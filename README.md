@@ -43,7 +43,7 @@ git clone https://github.com/sipico/bunny-api-proxy.git
 cd bunny-api-proxy
 
 # Build
-go build -o bunny-api-proxy ./cmd/bunny-proxy
+go build -o bunny-api-proxy ./cmd/bunny-api-proxy
 
 # Run (currently only serves health checks)
 ./bunny-api-proxy
@@ -75,7 +75,7 @@ golangci-lint run
 govulncheck ./...
 
 # Build binary
-go build -o bunny-api-proxy ./cmd/bunny-proxy
+go build -o bunny-api-proxy ./cmd/bunny-api-proxy
 
 # Build Docker image
 docker build -t bunny-api-proxy .

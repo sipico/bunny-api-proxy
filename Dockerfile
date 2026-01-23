@@ -16,7 +16,7 @@ RUN go mod download
 COPY . .
 
 # Build the binary
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags '-extldflags "-static"' -o bunny-api-proxy ./cmd/bunny-proxy
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags '-extldflags "-static"' -o bunny-api-proxy ./cmd/bunny-api-proxy
 
 # Final stage
 FROM alpine:latest
