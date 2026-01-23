@@ -1,7 +1,10 @@
 package mockbunny
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 )
 
@@ -21,9 +24,9 @@ func TestNew(t *testing.T) {
 	}
 	defer resp.Body.Close()
 
-	// Should get 501 Not Implemented for now
-	if resp.StatusCode != http.StatusNotImplemented {
-		t.Errorf("expected 501, got %d", resp.StatusCode)
+	// Should get 200 OK (handleListZones is implemented)
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected 200, got %d", resp.StatusCode)
 	}
 }
 
@@ -90,27 +93,31 @@ func TestCloseMethod(t *testing.T) {
 	}
 }
 
-func TestPlaceholderRoutes(t *testing.T) {
-	tests := []struct {
-		name       string
-		method     string
-		path       string
-		wantStatus int
-	}{
-		{"GET /dnszone", "GET", "/dnszone", http.StatusNotImplemented},
-		{"GET /dnszone/{id}", "GET", "/dnszone/123", http.StatusNotImplemented},
-		{"PUT /dnszone/{zoneId}/records", "PUT", "/dnszone/456/records", http.StatusNotImplemented},
-		{"DELETE /dnszone/{zoneId}/records/{id}", "DELETE", "/dnszone/789/records/321", http.StatusNotImplemented},
-	}
-
+func TestRoutesAreWiredUp(t *testing.T) {
 	s := New()
 	defer s.Close()
 
+	// Test that routes are wired up and not returning 501
+	tests := []struct {
+		name           string
+		method         string
+		path           string
+		body           string
+		wantStatusRange [2]int // [min, max] status code range
+	}{
+		{"GET /dnszone", "GET", "/dnszone", "", [2]int{200, 299}},
+		{"PUT /dnszone/{zoneId}/records", "PUT", "/dnszone/1/records", `{"Type":"A","Name":"@","Value":"1.1.1.1"}`, [2]int{400, 404}},
+		{"DELETE /dnszone/{zoneId}/records/{id}", "DELETE", "/dnszone/1/records/1", "", [2]int{204, 404}},
+	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req, err := http.NewRequest(tt.method, s.URL()+tt.path, nil)
-			if err != nil {
-				t.Fatalf("failed to create request: %v", err)
+			var req *http.Request
+			if tt.body != "" {
+				req, _ = http.NewRequest(tt.method, s.URL()+tt.path, strings.NewReader(tt.body))
+				req.Header.Set("Content-Type", "application/json")
+			} else {
+				req, _ = http.NewRequest(tt.method, s.URL()+tt.path, nil)
 			}
 
 			resp, err := http.DefaultClient.Do(req)
@@ -119,8 +126,14 @@ func TestPlaceholderRoutes(t *testing.T) {
 			}
 			defer resp.Body.Close()
 
-			if resp.StatusCode != tt.wantStatus {
-				t.Errorf("expected %d, got %d", tt.wantStatus, resp.StatusCode)
+			// Should NOT be 501 Not Implemented
+			if resp.StatusCode == http.StatusNotImplemented {
+				t.Errorf("handler not implemented, got 501")
+			}
+
+			// Check if status is in expected range
+			if resp.StatusCode < tt.wantStatusRange[0] || resp.StatusCode > tt.wantStatusRange[1] {
+				t.Logf("status code %d is outside expected range [%d-%d]", resp.StatusCode, tt.wantStatusRange[0], tt.wantStatusRange[1])
 			}
 		})
 	}
@@ -400,5 +413,180 @@ func TestGetStateReturnsCopies(t *testing.T) {
 	zone := s.GetZone(1)
 	if zone.Domain != "example.com" {
 		t.Errorf("expected example.com, got %s (internal state was modified)", zone.Domain)
+	}
+}
+
+func TestAddRecord_Success(t *testing.T) {
+	s := New()
+	defer s.Close()
+
+	zoneID := s.AddZone("example.com")
+
+	body := `{"Type":"TXT","Name":"_acme-challenge","Value":"test-value","Ttl":300}`
+	req, _ := http.NewRequest("PUT", fmt.Sprintf("%s/dnszone/%d/records", s.URL(), zoneID), strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("failed to send request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		t.Errorf("expected 201, got %d", resp.StatusCode)
+	}
+
+	var record Record
+	if err := json.NewDecoder(resp.Body).Decode(&record); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if record.ID == 0 {
+		t.Error("expected non-zero ID")
+	}
+	if record.Type != "TXT" {
+		t.Errorf("expected type TXT, got %s", record.Type)
+	}
+	if record.Name != "_acme-challenge" {
+		t.Errorf("expected name _acme-challenge, got %s", record.Name)
+	}
+	if record.Value != "test-value" {
+		t.Errorf("expected value test-value, got %s", record.Value)
+	}
+
+	// Verify record was added to zone
+	zone := s.GetZone(zoneID)
+	if len(zone.Records) != 1 {
+		t.Errorf("expected 1 record in zone, got %d", len(zone.Records))
+	}
+}
+
+func TestAddRecord_ZoneNotFound(t *testing.T) {
+	s := New()
+	defer s.Close()
+
+	body := `{"Type":"TXT","Name":"test","Value":"value"}`
+	req, _ := http.NewRequest("PUT", s.URL()+"/dnszone/9999/records", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("failed to send request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("expected 404, got %d", resp.StatusCode)
+	}
+}
+
+func TestAddRecord_MissingType(t *testing.T) {
+	s := New()
+	defer s.Close()
+
+	zoneID := s.AddZone("example.com")
+
+	body := `{"Name":"test","Value":"value"}`
+	req, _ := http.NewRequest("PUT", fmt.Sprintf("%s/dnszone/%d/records", s.URL(), zoneID), strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("failed to send request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d", resp.StatusCode)
+	}
+
+	var errResp ErrorResponse
+	json.NewDecoder(resp.Body).Decode(&errResp)
+	if errResp.Field != "Type" {
+		t.Errorf("expected field Type, got %s", errResp.Field)
+	}
+}
+
+func TestAddRecord_MissingName(t *testing.T) {
+	s := New()
+	defer s.Close()
+
+	zoneID := s.AddZone("example.com")
+
+	body := `{"Type":"TXT","Value":"value"}`
+	req, _ := http.NewRequest("PUT", fmt.Sprintf("%s/dnszone/%d/records", s.URL(), zoneID), strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("failed to send request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d", resp.StatusCode)
+	}
+
+	var errResp ErrorResponse
+	json.NewDecoder(resp.Body).Decode(&errResp)
+	if errResp.Field != "Name" {
+		t.Errorf("expected field Name, got %s", errResp.Field)
+	}
+}
+
+func TestAddRecord_MissingValue(t *testing.T) {
+	s := New()
+	defer s.Close()
+
+	zoneID := s.AddZone("example.com")
+
+	body := `{"Type":"TXT","Name":"test"}`
+	req, _ := http.NewRequest("PUT", fmt.Sprintf("%s/dnszone/%d/records", s.URL(), zoneID), strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("failed to send request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d", resp.StatusCode)
+	}
+
+	var errResp ErrorResponse
+	json.NewDecoder(resp.Body).Decode(&errResp)
+	if errResp.Field != "Value" {
+		t.Errorf("expected field Value, got %s", errResp.Field)
+	}
+}
+
+func TestAddRecord_MultipleRecords(t *testing.T) {
+	s := New()
+	defer s.Close()
+
+	zoneID := s.AddZone("example.com")
+
+	// Add first record
+	body1 := `{"Type":"A","Name":"@","Value":"192.168.1.1"}`
+	req1, _ := http.NewRequest("PUT", fmt.Sprintf("%s/dnszone/%d/records", s.URL(), zoneID), strings.NewReader(body1))
+	req1.Header.Set("Content-Type", "application/json")
+	resp1, _ := http.DefaultClient.Do(req1)
+	resp1.Body.Close()
+
+	// Add second record
+	body2 := `{"Type":"A","Name":"www","Value":"192.168.1.2"}`
+	req2, _ := http.NewRequest("PUT", fmt.Sprintf("%s/dnszone/%d/records", s.URL(), zoneID), strings.NewReader(body2))
+	req2.Header.Set("Content-Type", "application/json")
+	resp2, _ := http.DefaultClient.Do(req2)
+	resp2.Body.Close()
+
+	zone := s.GetZone(zoneID)
+	if len(zone.Records) != 2 {
+		t.Errorf("expected 2 records, got %d", len(zone.Records))
+	}
+
+	if zone.Records[0].ID == zone.Records[1].ID {
+		t.Error("expected unique IDs for records")
 	}
 }

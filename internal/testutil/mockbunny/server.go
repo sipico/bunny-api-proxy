@@ -1,7 +1,6 @@
 package mockbunny
 
 import (
-	"net/http"
 	"net/http/httptest"
 	"time"
 
@@ -24,27 +23,21 @@ func New() *Server {
 
 	r := chi.NewRouter()
 
-	// Placeholder routes (handlers added in subsequent tasks)
-	r.Get("/dnszone", func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, "not implemented", http.StatusNotImplemented)
-	})
-	r.Get("/dnszone/{id}", func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, "not implemented", http.StatusNotImplemented)
-	})
-	r.Put("/dnszone/{zoneId}/records", func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, "not implemented", http.StatusNotImplemented)
-	})
-	r.Delete("/dnszone/{zoneId}/records/{id}", func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, "not implemented", http.StatusNotImplemented)
-	})
-
 	ts := httptest.NewServer(r)
 
-	return &Server{
+	server := &Server{
 		Server: ts,
 		state:  state,
 		router: r,
 	}
+
+	// Wire up handlers
+	r.Get("/dnszone", server.handleListZones)
+	r.Get("/dnszone/{id}", server.handleGetZone)
+	r.Put("/dnszone/{zoneId}/records", server.handleAddRecord)
+	r.Delete("/dnszone/{zoneId}/records/{id}", server.handleDeleteRecord)
+
+	return server
 }
 
 // URL returns the base URL of the mock server.
