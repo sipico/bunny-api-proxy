@@ -42,7 +42,7 @@ An API proxy for bunny.net that allows creating scoped/limited API keys. Sits be
 ```
 bunny-api-proxy/
 ├── cmd/
-│   └── bunny-proxy/
+│   └── bunny-api-proxy/
 │       └── main.go              # Entry point
 ├── internal/
 │   ├── proxy/                   # Core proxy logic
@@ -164,7 +164,7 @@ docker run -d \
   -e ADMIN_PASSWORD=secretpassword \
   -e ENCRYPTION_KEY=32-character-random-string \
   -p 8080:8080 \
-  -v bunny-proxy-data:/data \
+  -v bunny-api-proxy-data:/data \
   bunny-api-proxy
 ```
 
@@ -238,13 +238,13 @@ Mirror bunny.net DNS API structure (MVP endpoints listed above).
 FROM golang:1.24-alpine AS builder
 WORKDIR /app
 COPY . .
-RUN go build -o bunny-proxy ./cmd/bunny-proxy
+RUN go build -o bunny-api-proxy ./cmd/bunny-api-proxy
 
 # Stage 2: Runtime
 FROM alpine:latest
-COPY --from=builder /app/bunny-proxy /usr/local/bin/
+COPY --from=builder /app/bunny-api-proxy /usr/local/bin/
 EXPOSE 8080
-CMD ["bunny-proxy"]
+CMD ["bunny-api-proxy"]
 ```
 
 ### TLS

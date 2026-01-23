@@ -24,7 +24,7 @@ coverage.txt
 coverage.html
 
 # Build artifacts
-bunny-proxy
+bunny-api-proxy
 *.exe
 
 # Environment
