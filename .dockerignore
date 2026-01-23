@@ -1,0 +1,37 @@
+# Git
+.git
+.gitignore
+
+# Documentation
+*.md
+!README.md
+ARCHITECTURE.md
+CLAUDE.md
+FUTURE_ENHANCEMENTS.md
+
+# CI/CD
+.github
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# Test files
+*_test.go
+coverage.txt
+coverage.html
+
+# Build artifacts
+bunny-proxy
+*.exe
+
+# Environment
+.env
+.env.local
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
