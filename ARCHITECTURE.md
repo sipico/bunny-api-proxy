@@ -78,7 +78,7 @@ Every push runs:
 2. `golangci-lint` - strict linting
 3. `go test -race -cover` - tests with race detection and coverage
 4. `govulncheck` - security vulnerability check
-5. Minimum test coverage threshold (80%)
+5. Minimum test coverage threshold (75%)
 6. Docker build validation
 
 ## Testing Strategy

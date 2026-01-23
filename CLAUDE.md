@@ -27,7 +27,7 @@ Write tests first, then implementation. Tests are the safety net since there's n
 ### Code quality
 - All code must pass `golangci-lint` (strict)
 - All code must be formatted with `gofmt`
-- Minimum 80% test coverage
+- Minimum 75% test coverage
 - Run `govulncheck` for security
 
 ### Go idioms

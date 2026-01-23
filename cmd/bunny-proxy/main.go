@@ -1,3 +1,4 @@
+// Package main provides the entry point for the Bunny API Proxy server.
 package main
 
 import (
@@ -15,13 +16,28 @@ import (
 const version = "0.1.0"
 
 func main() {
-	// Get configuration from environment variables per ARCHITECTURE.md
-	httpPort := os.Getenv("HTTP_PORT")
-	if httpPort == "" {
-		httpPort = "8080"
-	}
+	httpPort := getHTTPPort()
+	r := setupRouter()
+	addr := fmt.Sprintf(":%s", httpPort)
+	log.Printf("Bunny API Proxy v%s starting on %s", version, addr)
 
-	// Initialize Chi router
+	//nolint:gosec // G114: Using ListenAndServe during development; production will use proper server config
+	if err := http.ListenAndServe(addr, r); err != nil {
+		log.Fatalf("Server failed to start: %v", err)
+	}
+}
+
+// getHTTPPort returns the HTTP port from environment or default
+func getHTTPPort() string {
+	port := os.Getenv("HTTP_PORT")
+	if port == "" {
+		return "8080"
+	}
+	return port
+}
+
+// setupRouter configures and returns the HTTP router with all routes and middleware
+func setupRouter() chi.Router {
 	r := chi.NewRouter()
 
 	// Add Chi middleware
@@ -36,29 +52,24 @@ func main() {
 	// Root endpoint
 	r.Get("/", rootHandler)
 
-	addr := fmt.Sprintf(":%s", httpPort)
-	log.Printf("Bunny API Proxy v%s starting on %s", version, addr)
-
-	if err := http.ListenAndServe(addr, r); err != nil {
-		log.Fatalf("Server failed to start: %v", err)
-	}
+	return r
 }
 
 // healthHandler returns OK if the process is alive
-func healthHandler(w http.ResponseWriter, r *http.Request) {
+func healthHandler(w http.ResponseWriter, _ *http.Request) {
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprintf(w, `{"status":"ok"}`)
+	_, _ = fmt.Fprintf(w, `{"status":"ok"}`)
 }
 
 // readyHandler returns OK if the service is ready to serve requests (DB connected)
-func readyHandler(w http.ResponseWriter, r *http.Request) {
+func readyHandler(w http.ResponseWriter, _ *http.Request) {
 	// TODO: Check database connection when storage layer is implemented
 	// For now, always return OK since there's no DB yet
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprintf(w, `{"status":"ok"}`)
+	_, _ = fmt.Fprintf(w, `{"status":"ok"}`)
 }
 
-func rootHandler(w http.ResponseWriter, r *http.Request) {
+func rootHandler(w http.ResponseWriter, _ *http.Request) {
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprintf(w, `{"message":"Bunny API Proxy","version":"%s"}`, version)
+	_, _ = fmt.Fprintf(w, `{"message":"Bunny API Proxy","version":"%s"}`, version)
 }
