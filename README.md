@@ -5,9 +5,13 @@
 [![codecov](https://codecov.io/gh/sipico/bunny-api-proxy/branch/main/graph/badge.svg)](https://codecov.io/gh/sipico/bunny-api-proxy)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 
-An API proxy for bunny.net that enables scoped and limited API keys. This allows you to create restricted API keys for specific operations, perfect for ACME DNS-01 validation and other use cases where you want to limit access to specific DNS zones or operations.
+An API proxy for bunny.net that will enable scoped and limited API keys. The goal is to create restricted API keys for specific operations, perfect for ACME DNS-01 validation and other use cases where you want to limit access to specific DNS zones or operations.
 
-## Features
+**⚠️ Project Status: Early Development**
+
+This project is in active development. Currently only basic project scaffolding and CI/CD infrastructure are in place. The proxy functionality, API key management, and admin UI are not yet implemented.
+
+## Planned Features
 
 - **Scoped API Keys**: Create API keys with granular permissions
 - **DNS API Support**: Full support for bunny.net DNS operations (MVP scope)
@@ -18,21 +22,20 @@ An API proxy for bunny.net that enables scoped and limited API keys. This allows
 - **SQLite Storage**: Lightweight, embedded database
 - **Security First**: Built with security best practices and regular vulnerability scanning
 
-## Quick Start
+## Current Status
 
-### Using Docker
+The following components are implemented:
 
-```bash
-docker pull ghcr.io/sipico/bunny-api-proxy:latest
-docker run -d \
-  -p 8080:8080 \
-  -e ADMIN_PASSWORD=your_secure_password \
-  -e ENCRYPTION_KEY=your-32-character-random-key \
-  -v bunny-proxy-data:/data \
-  bunny-api-proxy
-```
+- ✅ Project structure and Go module setup
+- ✅ GitHub Actions CI/CD pipeline (test, lint, security scanning, Docker build)
+- ✅ Basic HTTP server with Chi router
+- ✅ Health check endpoints (`/health`, `/ready`)
+- ⏳ Core proxy functionality (not yet implemented)
+- ⏳ API key management (not yet implemented)
+- ⏳ Admin UI (not yet implemented)
+- ⏳ Database layer (not yet implemented)
 
-### Building from Source
+## Building from Source
 
 ```bash
 # Clone the repository
@@ -42,7 +45,7 @@ cd bunny-api-proxy
 # Build
 go build -o bunny-proxy ./cmd/bunny-proxy
 
-# Run
+# Run (currently only serves health checks)
 ./bunny-proxy
 ```
 
@@ -80,15 +83,11 @@ docker build -t bunny-api-proxy .
 
 ## Configuration
 
-Configuration is done via environment variables:
+Currently, the server supports the following environment variable:
 
 - `HTTP_PORT`: HTTP server port (default: 8080)
-- `ADMIN_PASSWORD`: Password for web UI login (required)
-- `ENCRYPTION_KEY`: 32-character key for encrypting stored API keys (required)
-- `LOG_LEVEL`: Logging verbosity - debug, info, warn, error (default: info)
-- `DATA_PATH`: Database location (default: /data/proxy.db)
 
-**Note**: The bunny.net master API key is configured via the Admin UI after deployment, not through environment variables.
+Additional configuration options (admin password, encryption keys, database path, etc.) will be implemented as features are developed.
 
 ## License
 
