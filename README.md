@@ -40,7 +40,7 @@ git clone https://github.com/sipico/bunny-api-proxy.git
 cd bunny-api-proxy
 
 # Build
-make build
+go build -o bunny-proxy ./cmd/bunny-proxy
 
 # Run
 ./bunny-proxy
@@ -60,22 +60,22 @@ See [CLAUDE.md](CLAUDE.md) for development conventions and [ARCHITECTURE.md](ARC
 
 ```bash
 # Format code
-make fmt
+gofmt -w .
 
-# Run tests
-make test
+# Run tests with coverage
+go test -race -cover ./...
 
 # Run linter
-make lint
+golangci-lint run
 
 # Security scan
-make security
+govulncheck ./...
 
 # Build binary
-make build
+go build -o bunny-proxy ./cmd/bunny-proxy
 
 # Build Docker image
-make docker-build
+docker build -t bunny-api-proxy .
 ```
 
 ## Configuration
