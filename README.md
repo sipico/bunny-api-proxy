@@ -3,7 +3,7 @@
 [![CI](https://github.com/sipico/bunny-api-proxy/actions/workflows/ci.yml/badge.svg)](https://github.com/sipico/bunny-api-proxy/actions/workflows/ci.yml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/sipico/bunny-api-proxy)](https://goreportcard.com/report/github.com/sipico/bunny-api-proxy)
 [![codecov](https://codecov.io/gh/sipico/bunny-api-proxy/branch/main/graph/badge.svg)](https://codecov.io/gh/sipico/bunny-api-proxy)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 
 An API proxy for bunny.net that enables scoped and limited API keys. This allows you to create restricted API keys for specific operations, perfect for ACME DNS-01 validation and other use cases where you want to limit access to specific DNS zones or operations.
 
@@ -92,8 +92,12 @@ Configuration is done via environment variables:
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) for details
+AGPL v3 - see [LICENSE](LICENSE) for details.
+
+Commercial licenses are available for organizations that want to use this software without the AGPL v3 copyleft requirements. For inquiries, please open an issue or contact the maintainer.
 
 ## Contributing
 
-Contributions are welcome! Please read [CLAUDE.md](CLAUDE.md) for development guidelines.
+This project is not accepting external code contributions (pull requests) at this time.
+
+Bug reports and feature requests are welcome as GitHub Issues. See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
