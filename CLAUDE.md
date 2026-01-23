@@ -42,6 +42,35 @@ Write tests first, then implementation. Tests are the safety net since there's n
 - Commit messages should be clear and descriptive
 - Never commit secrets or API keys
 
+### Checking GitHub Actions CI Status
+
+When validating CI runs, use WebFetch with timestamp parameters to bypass the 15-minute cache:
+
+```bash
+# Get current timestamp
+date +%s
+
+# Use timestamp in URL to bypass cache
+https://github.com/sipico/bunny-api-proxy/actions?t=<timestamp>
+https://github.com/sipico/bunny-api-proxy/actions/runs/<run_id>?t=<timestamp>
+```
+
+**What WebFetch provides:**
+- Run status (success/failure/in progress)
+- Individual job statuses and timing (Test, Lint, Security Scan, Build, Docker Build)
+- Error messages and failure reasons
+- Artifact information
+
+**What WebFetch cannot access:**
+- Detailed step-by-step logs (requires authentication)
+- Raw log output
+
+**Best practices:**
+- Use timestamp parameters for every CI check to ensure fresh data
+- Check CI status once or twice after pushing, don't sleep in loops
+- Report visible status/errors; accept that raw logs aren't accessible
+- For failed runs, WebFetch typically shows enough error detail to diagnose issues
+
 ## Build & Test Commands
 
 ```bash
@@ -58,7 +87,7 @@ go test -race -cover ./...
 govulncheck ./...
 
 # Build
-go build -o bunny-proxy ./cmd/bunny-proxy
+go build -o bunny-api-proxy ./cmd/bunny-api-proxy
 
 # Build Docker image
 docker build -t bunny-api-proxy .
@@ -67,7 +96,7 @@ docker build -t bunny-api-proxy .
 ## Project Structure
 
 ```
-cmd/bunny-proxy/     # Entry point
+cmd/bunny-api-proxy/ # Entry point
 internal/            # Private application code
   proxy/             # Core proxy logic
   auth/              # Key validation, permissions
@@ -83,7 +112,7 @@ migrations/          # Database migrations
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) - Technical decisions and rationale
 - [FUTURE_ENHANCEMENTS.md](FUTURE_ENHANCEMENTS.md) - Deferred features and ideas
-- `.github/workflows/` - CI/CD pipeline (to be created)
+- `.github/workflows/ci.yml` - CI/CD pipeline
 
 ## MVP Scope
 
