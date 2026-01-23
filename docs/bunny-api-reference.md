@@ -10,29 +10,27 @@ This document captures the bunny.net DNS API specifications relevant to the Bunn
 
 ### MVP Endpoints (Implemented)
 
-| Operation | Method | Path | Docs |
-|-----------|--------|------|------|
-| List DNS Zones | GET | `/dnszone` | [dnszonepublic_index](https://docs.bunny.net/reference/dnszonepublic_index) |
-| Get DNS Zone | GET | `/dnszone/{id}` | [dnszonepublic_index2](https://docs.bunny.net/reference/dnszonepublic_index2) |
-| Add DNS Record | PUT | `/dnszone/{zoneId}/records` | [dnszonepublic_addrecord](https://docs.bunny.net/reference/dnszonepublic_addrecord) |
-| Delete DNS Record | DELETE | `/dnszone/{zoneId}/records/{id}` | [dnszonepublic_deleterecord](https://docs.bunny.net/reference/dnszonepublic_deleterecord) |
+| Operation | Method | Path | Docs (markdown) |
+|-----------|--------|------|-----------------|
+| List DNS Zones | GET | `/dnszone` | [dnszonepublic_index.md](https://docs.bunny.net/reference/dnszonepublic_index.md) |
+| Get DNS Zone | GET | `/dnszone/{id}` | [dnszonepublic_index2.md](https://docs.bunny.net/reference/dnszonepublic_index2.md) |
+| Add DNS Record | PUT | `/dnszone/{zoneId}/records` | [dnszonepublic_addrecord.md](https://docs.bunny.net/reference/dnszonepublic_addrecord.md) |
+| Delete DNS Record | DELETE | `/dnszone/{zoneId}/records/{id}` | [dnszonepublic_deleterecord.md](https://docs.bunny.net/reference/dnszonepublic_deleterecord.md) |
 
 ### Other DNS Endpoints (Future)
 
-| Operation | Method | Path | Docs |
-|-----------|--------|------|------|
-| Add DNS Zone | POST | `/dnszone` | [dnszonepublic_add](https://docs.bunny.net/reference/dnszonepublic_add) |
-| Update DNS Zone | POST | `/dnszone/{id}` | [dnszonepublic_update](https://docs.bunny.net/reference/dnszonepublic_update) |
-| Delete DNS Zone | DELETE | `/dnszone/{id}` | [dnszonepublic_delete](https://docs.bunny.net/reference/dnszonepublic_delete) |
-| Update DNS Record | POST | `/dnszone/{zoneId}/records/{id}` | [dnszonepublic_updaterecord](https://docs.bunny.net/reference/dnszonepublic_updaterecord) |
-| Check Zone Availability | POST | `/dnszone/checkavailability` | [dnszonepublic_checkavailability](https://docs.bunny.net/reference/dnszonepublic_checkavailability) |
-| Get DNS Statistics | GET | `/dnszone/{id}/statistics` | [dnszonepublic_statistics](https://docs.bunny.net/reference/dnszonepublic_statistics) |
-| Export DNS Records | GET | `/dnszone/{id}/export` | [dnszonepublic_export](https://docs.bunny.net/reference/dnszonepublic_export) |
-| Import DNS Records | POST | `/dnszone/{id}/import` | [dnszonepublic_import](https://docs.bunny.net/reference/dnszonepublic_import) |
-| Enable DNSSEC | POST | `/dnszone/{id}/dnssec` | [managednszonednssecendpoint_enablednssecdnszone](https://docs.bunny.net/reference/managednszonednssecendpoint_enablednssecdnszone) |
-| Disable DNSSEC | DELETE | `/dnszone/{id}/dnssec` | [managednszonednssecendpoint_disablednssecdnszone](https://docs.bunny.net/reference/managednszonednssecendpoint_disablednssecdnszone) |
-
-**Tip:** Append `.md` to any docs URL for markdown version (e.g., `dnszonepublic_index.md`)
+| Operation | Method | Path | Docs (markdown) |
+|-----------|--------|------|-----------------|
+| Add DNS Zone | POST | `/dnszone` | [dnszonepublic_add.md](https://docs.bunny.net/reference/dnszonepublic_add.md) |
+| Update DNS Zone | POST | `/dnszone/{id}` | [dnszonepublic_update.md](https://docs.bunny.net/reference/dnszonepublic_update.md) |
+| Delete DNS Zone | DELETE | `/dnszone/{id}` | [dnszonepublic_delete.md](https://docs.bunny.net/reference/dnszonepublic_delete.md) |
+| Update DNS Record | POST | `/dnszone/{zoneId}/records/{id}` | [dnszonepublic_updaterecord.md](https://docs.bunny.net/reference/dnszonepublic_updaterecord.md) |
+| Check Zone Availability | POST | `/dnszone/checkavailability` | [dnszonepublic_checkavailability.md](https://docs.bunny.net/reference/dnszonepublic_checkavailability.md) |
+| Get DNS Statistics | GET | `/dnszone/{id}/statistics` | [dnszonepublic_statistics.md](https://docs.bunny.net/reference/dnszonepublic_statistics.md) |
+| Export DNS Records | GET | `/dnszone/{id}/export` | [dnszonepublic_export.md](https://docs.bunny.net/reference/dnszonepublic_export.md) |
+| Import DNS Records | POST | `/dnszone/{id}/import` | [dnszonepublic_import.md](https://docs.bunny.net/reference/dnszonepublic_import.md) |
+| Enable DNSSEC | POST | `/dnszone/{id}/dnssec` | [enablednssecdnszone.md](https://docs.bunny.net/reference/managednszonednssecendpoint_enablednssecdnszone.md) |
+| Disable DNSSEC | DELETE | `/dnszone/{id}/dnssec` | [disablednssecdnszone.md](https://docs.bunny.net/reference/managednszonednssecendpoint_disablednssecdnszone.md) |
 
 ---
 
