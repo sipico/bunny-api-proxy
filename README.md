@@ -24,7 +24,12 @@ An API proxy for bunny.net that enables scoped and limited API keys. This allows
 
 ```bash
 docker pull ghcr.io/sipico/bunny-api-proxy:latest
-docker run -p 8080:8080 -e BUNNY_API_KEY=your_master_key bunny-api-proxy
+docker run -d \
+  -p 8080:8080 \
+  -e ADMIN_PASSWORD=your_secure_password \
+  -e ENCRYPTION_KEY=your-32-character-random-key \
+  -v bunny-proxy-data:/data \
+  bunny-api-proxy
 ```
 
 ### Building from Source
@@ -77,10 +82,13 @@ make docker-build
 
 Configuration is done via environment variables:
 
-- `PORT`: HTTP server port (default: 8080)
-- `BUNNY_API_KEY`: Master bunny.net API key
-- `DATABASE_PATH`: Path to SQLite database (default: ./bunny-proxy.db)
-- `ADMIN_TOKEN`: Token for accessing admin UI
+- `HTTP_PORT`: HTTP server port (default: 8080)
+- `ADMIN_PASSWORD`: Password for web UI login (required)
+- `ENCRYPTION_KEY`: 32-character key for encrypting stored API keys (required)
+- `LOG_LEVEL`: Logging verbosity - debug, info, warn, error (default: info)
+- `DATA_PATH`: Database location (default: /data/proxy.db)
+
+**Note**: The bunny.net master API key is configured via the Admin UI after deployment, not through environment variables.
 
 ## License
 
