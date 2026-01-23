@@ -25,9 +25,6 @@ linters:
       check-type-assertions: true
       check-blank: true
 
-    govet:
-      check-shadowing: true
-
     revive:
       confidence: 0.8
       rules:
