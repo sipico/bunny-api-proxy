@@ -29,6 +29,8 @@ This document captures the bunny.net DNS API specifications relevant to the Bunn
 | Get DNS Statistics | GET | `/dnszone/{id}/statistics` | [dnszonepublic_statistics](https://docs.bunny.net/reference/dnszonepublic_statistics) |
 | Export DNS Records | GET | `/dnszone/{id}/export` | [dnszonepublic_export](https://docs.bunny.net/reference/dnszonepublic_export) |
 | Import DNS Records | POST | `/dnszone/{id}/import` | [dnszonepublic_import](https://docs.bunny.net/reference/dnszonepublic_import) |
+| Enable DNSSEC | POST | `/dnszone/{id}/dnssec` | [managednszonednssecendpoint_enablednssecdnszone](https://docs.bunny.net/reference/managednszonednssecendpoint_enablednssecdnszone) |
+| Disable DNSSEC | DELETE | `/dnszone/{id}/dnssec` | [managednszonednssecendpoint_disablednssecdnszone](https://docs.bunny.net/reference/managednszonednssecendpoint_disablednssecdnszone) |
 
 **Tip:** Append `.md` to any docs URL for markdown version (e.g., `dnszonepublic_index.md`)
 
