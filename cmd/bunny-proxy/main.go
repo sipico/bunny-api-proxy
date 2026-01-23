@@ -21,7 +21,6 @@ func main() {
 	addr := fmt.Sprintf(":%s", httpPort)
 	log.Printf("Bunny API Proxy v%s starting on %s", version, addr)
 
-	//nolint:gosec // G114: Using ListenAndServe during development; production will use proper server config
 	if err := http.ListenAndServe(addr, r); err != nil {
 		log.Fatalf("Server failed to start: %v", err)
 	}
@@ -58,7 +57,8 @@ func setupRouter() chi.Router {
 // healthHandler returns OK if the process is alive
 func healthHandler(w http.ResponseWriter, _ *http.Request) {
 	w.WriteHeader(http.StatusOK)
-	_, _ = fmt.Fprintf(w, `{"status":"ok"}`)
+	//nolint:errcheck // Response write errors are unrecoverable
+	fmt.Fprintf(w, `{"status":"ok"}`)
 }
 
 // readyHandler returns OK if the service is ready to serve requests (DB connected)
@@ -66,10 +66,12 @@ func readyHandler(w http.ResponseWriter, _ *http.Request) {
 	// TODO: Check database connection when storage layer is implemented
 	// For now, always return OK since there's no DB yet
 	w.WriteHeader(http.StatusOK)
-	_, _ = fmt.Fprintf(w, `{"status":"ok"}`)
+	//nolint:errcheck // Response write errors are unrecoverable
+	fmt.Fprintf(w, `{"status":"ok"}`)
 }
 
 func rootHandler(w http.ResponseWriter, _ *http.Request) {
 	w.WriteHeader(http.StatusOK)
-	_, _ = fmt.Fprintf(w, `{"message":"Bunny API Proxy","version":"%s"}`, version)
+	//nolint:errcheck // Response write errors are unrecoverable
+	fmt.Fprintf(w, `{"message":"Bunny API Proxy","version":"%s"}`, version)
 }
