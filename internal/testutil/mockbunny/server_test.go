@@ -99,10 +99,10 @@ func TestRoutesAreWiredUp(t *testing.T) {
 
 	// Test that routes are wired up and not returning 501
 	tests := []struct {
-		name           string
-		method         string
-		path           string
-		body           string
+		name            string
+		method          string
+		path            string
+		body            string
 		wantStatusRange [2]int // [min, max] status code range
 	}{
 		{"GET /dnszone", "GET", "/dnszone", "", [2]int{200, 299}},
