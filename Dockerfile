@@ -16,7 +16,7 @@ RUN go mod download
 COPY . .
 
 # Build the binary
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags '-extldflags "-static"' -o bunny-proxy ./cmd/bunny-proxy
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags '-extldflags "-static"' -o bunny-api-proxy ./cmd/bunny-proxy
 
 # Final stage
 FROM alpine:latest
@@ -27,7 +27,7 @@ RUN apk --no-cache add ca-certificates
 WORKDIR /app
 
 # Copy binary from builder
-COPY --from=builder /app/bunny-proxy .
+COPY --from=builder /app/bunny-api-proxy .
 
 # TODO: Copy web assets when Admin UI is implemented
 # COPY --from=builder /app/web ./web
@@ -47,4 +47,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
 
 # Run the binary
-CMD ["./bunny-proxy"]
+CMD ["./bunny-api-proxy"]
