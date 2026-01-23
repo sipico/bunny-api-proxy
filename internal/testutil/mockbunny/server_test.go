@@ -98,9 +98,9 @@ func TestPlaceholderRoutes(t *testing.T) {
 		wantStatus int
 	}{
 		{"GET /dnszone", "GET", "/dnszone", http.StatusNotImplemented},
-		{"GET /dnszone/{id}", "GET", "/dnszone/123", http.StatusNotImplemented},
+		{"GET /dnszone/{id}", "GET", "/dnszone/123", http.StatusNotFound},
 		{"PUT /dnszone/{zoneId}/records", "PUT", "/dnszone/456/records", http.StatusNotImplemented},
-		{"DELETE /dnszone/{zoneId}/records/{id}", "DELETE", "/dnszone/789/records/321", http.StatusNotImplemented},
+		{"DELETE /dnszone/{zoneId}/records/{id}", "DELETE", "/dnszone/789/records/321", http.StatusNotFound},
 	}
 
 	s := New()
