@@ -25,21 +25,11 @@ jobs:
       - name: Run tests with coverage
         run: go test -race -coverprofile=coverage.txt -covermode=atomic ./...
 
-      - name: Check test coverage
-        run: |
-          coverage=$(go tool cover -func=coverage.txt | grep total | awk '{print $3}' | sed 's/%//')
-          echo "Coverage: ${coverage}%"
-          if (( $(echo "$coverage < 75" | bc -l) )); then
-            echo "Error: Test coverage is below 75% (current: ${coverage}%)"
-            exit 1
-          fi
+      - name: Install go-test-coverage
+        run: go install github.com/vladopajic/go-test-coverage/v2@latest
 
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
-        with:
-          file: ./coverage.txt
-          flags: unittests
-          fail_ci_if_error: false
+      - name: Check test coverage
+        run: go-test-coverage --config .testcoverage.yml
 
   lint:
     name: Lint

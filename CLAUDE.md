@@ -83,6 +83,9 @@ golangci-lint run
 # Run tests with coverage
 go test -race -cover ./...
 
+# Check coverage (per-file, per-package, total >= 75%)
+make coverage
+
 # Security check
 govulncheck ./...
 

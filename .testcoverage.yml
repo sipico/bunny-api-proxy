@@ -1,0 +1,14 @@
+# go-test-coverage configuration
+# https://github.com/vladopajic/go-test-coverage
+
+profile: coverage.txt
+
+threshold:
+  file: 75
+  package: 75
+  total: 75
+
+# Exclude test utilities from coverage requirements
+exclude:
+  paths:
+    - internal/testutil/.*
