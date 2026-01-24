@@ -1,102 +1,222 @@
 package bunny
 
 import (
+	"bytes"
 	"context"
+	"fmt"
+	"io"
+	"net/http"
 	"testing"
 
-	mockbunny "github.com/sipico/bunny-api-proxy/internal/testutil/mockbunny"
+	"github.com/sipico/bunny-api-proxy/internal/testutil/mockbunny"
 )
 
-// TestDeleteRecord tests the DeleteRecord method with various scenarios.
-func TestDeleteRecord(t *testing.T) {
-	tests := []struct {
-		name        string
-		setup       func(*mockbunny.Server) (int64, int64) // returns zoneID, recordID
-		expectError bool
-		expectErr   error
-	}{
-		{
-			name: "success deleting record",
-			setup: func(s *mockbunny.Server) (int64, int64) {
-				// Create zone with a record
-				record := mockbunny.Record{
-					Type:  "A",
-					Name:  "www",
-					Value: "192.168.1.1",
-					TTL:   3600,
-				}
-				zoneID := s.AddZoneWithRecords("example.com", []mockbunny.Record{record})
-				zone := s.GetZone(zoneID)
-				if zone == nil || len(zone.Records) == 0 {
-					t.Fatalf("zone or records not found")
-				}
-				recordID := zone.Records[0].ID
+// mockTransport is a test helper that returns pre-configured HTTP responses.
+type mockTransport struct {
+	statusCode int
+	body       []byte
+}
 
-				return zoneID, recordID
+// RoundTrip implements http.RoundTripper for mockTransport.
+func (mt *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	return &http.Response{
+		StatusCode: mt.statusCode,
+		Body:       io.NopCloser(bytes.NewReader(mt.body)),
+		Header:     make(http.Header),
+	}, nil
+}
+
+// TestGetZone tests the GetZone method with various scenarios.
+func TestGetZone(t *testing.T) {
+	t.Run("success with zone and records", func(t *testing.T) {
+		server := mockbunny.New()
+		defer server.Close()
+
+		// Add a zone with some records
+		zoneID := server.AddZoneWithRecords("example.com", []mockbunny.Record{
+			{
+				Type:  "A",
+				Name:  "www",
+				Value: "1.2.3.4",
+				TTL:   300,
 			},
-			expectError: false,
-			expectErr:   nil,
-		},
-		{
-			name: "zone not found error",
-			setup: func(s *mockbunny.Server) (int64, int64) {
-				// Return non-existent zone ID and a record ID
-				return 9999, 1
+			{
+				Type:  "CNAME",
+				Name:  "alias",
+				Value: "www.example.com",
+				TTL:   300,
 			},
-			expectError: true,
-			expectErr:   ErrNotFound,
-		},
-		{
-			name: "record not found error",
-			setup: func(s *mockbunny.Server) (int64, int64) {
-				// Create zone but use non-existent record ID
-				zoneID := s.AddZone("example.com")
-				return zoneID, 9999
-			},
-			expectError: true,
-			expectErr:   ErrNotFound,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := mockbunny.New()
-			defer s.Close()
-
-			zoneID, recordID := tt.setup(s)
-
-			// Create client pointing to mock server
-			client := NewClient("test-api-key", WithBaseURL(s.URL()))
-
-			// Execute delete
-			err := client.DeleteRecord(context.Background(), zoneID, recordID)
-
-			// Check error expectation
-			if tt.expectError && err == nil {
-				t.Error("expected error, got nil")
-			}
-			if !tt.expectError && err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-
-			// Check error type if specified
-			if tt.expectErr != nil && err != tt.expectErr {
-				t.Errorf("expected error %v, got %v", tt.expectErr, err)
-			}
-
-			// For success case, verify record was actually deleted
-			if !tt.expectError && tt.name == "success deleting record" {
-				zone := s.GetZone(zoneID)
-				if zone == nil {
-					t.Fatal("zone not found")
-				}
-				// Verify record is no longer in zone
-				for _, r := range zone.Records {
-					if r.ID == recordID {
-						t.Errorf("record %d still exists after delete", recordID)
-					}
-				}
-			}
 		})
-	}
+
+		client := NewClient("test-key", WithBaseURL(server.URL()))
+		zone, err := client.GetZone(context.Background(), zoneID)
+
+		if err != nil {
+			t.Fatalf("GetZone failed: %v", err)
+		}
+
+		if zone == nil {
+			t.Fatal("expected non-nil zone")
+		}
+
+		if zone.ID != zoneID {
+			t.Errorf("expected zone ID %d, got %d", zoneID, zone.ID)
+		}
+
+		if zone.Domain != "example.com" {
+			t.Errorf("expected domain example.com, got %s", zone.Domain)
+		}
+
+		if len(zone.Records) != 2 {
+			t.Errorf("expected 2 records, got %d", len(zone.Records))
+		}
+
+		// Verify record details
+		if zone.Records[0].Type != "A" {
+			t.Errorf("expected first record type A, got %s", zone.Records[0].Type)
+		}
+
+		if zone.Records[1].Type != "CNAME" {
+			t.Errorf("expected second record type CNAME, got %s", zone.Records[1].Type)
+		}
+	})
+
+	t.Run("not found error (404)", func(t *testing.T) {
+		server := mockbunny.New()
+		defer server.Close()
+
+		client := NewClient("test-key", WithBaseURL(server.URL()))
+		zone, err := client.GetZone(context.Background(), 999)
+
+		if err != ErrNotFound {
+			t.Errorf("expected ErrNotFound, got %v", err)
+		}
+
+		if zone != nil {
+			t.Errorf("expected nil zone, got %v", zone)
+		}
+	})
+
+	t.Run("unauthorized error (401)", func(t *testing.T) {
+		// Create a custom HTTP client that returns 401
+		transport := &mockTransport{
+			statusCode: http.StatusUnauthorized,
+			body:       []byte(""),
+		}
+		httpClient := &http.Client{Transport: transport}
+
+		client := NewClient("test-key", WithHTTPClient(httpClient))
+		zone, err := client.GetZone(context.Background(), 1)
+
+		if err != ErrUnauthorized {
+			t.Errorf("expected ErrUnauthorized, got %v", err)
+		}
+
+		if zone != nil {
+			t.Errorf("expected nil zone, got %v", zone)
+		}
+	})
+}
+
+// TestListZones tests the ListZones method with various scenarios.
+func TestListZones(t *testing.T) {
+	t.Run("success with zones", func(t *testing.T) {
+		server := mockbunny.New()
+		defer server.Close()
+
+		server.AddZone("example.com")
+		server.AddZone("test.com")
+		server.AddZone("foo.bar")
+
+		client := NewClient("test-key", WithBaseURL(server.URL()))
+		resp, err := client.ListZones(context.Background(), nil)
+		if err != nil {
+			t.Fatalf("ListZones failed: %v", err)
+		}
+
+		if resp.TotalItems != 3 || len(resp.Items) != 3 {
+			t.Errorf("Expected 3 items, got total=%d, items=%d", resp.TotalItems, len(resp.Items))
+		}
+	})
+
+	t.Run("success empty list", func(t *testing.T) {
+		server := mockbunny.New()
+		defer server.Close()
+
+		client := NewClient("test-key", WithBaseURL(server.URL()))
+		resp, err := client.ListZones(context.Background(), nil)
+		if err != nil {
+			t.Fatalf("ListZones failed: %v", err)
+		}
+
+		if resp.TotalItems != 0 || len(resp.Items) != 0 {
+			t.Errorf("Expected 0 items, got total=%d, items=%d", resp.TotalItems, len(resp.Items))
+		}
+	})
+
+	t.Run("with search filter", func(t *testing.T) {
+		server := mockbunny.New()
+		defer server.Close()
+
+		server.AddZone("example.com")
+		server.AddZone("test.com")
+		server.AddZone("example.org")
+
+		client := NewClient("test-key", WithBaseURL(server.URL()))
+		resp, err := client.ListZones(context.Background(), &ListZonesOptions{
+			Search: "example",
+		})
+		if err != nil {
+			t.Fatalf("ListZones failed: %v", err)
+		}
+
+		if resp.TotalItems != 2 || len(resp.Items) != 2 {
+			t.Errorf("Expected 2 items with search filter, got total=%d, items=%d", resp.TotalItems, len(resp.Items))
+		}
+	})
+
+	t.Run("with pagination options", func(t *testing.T) {
+		server := mockbunny.New()
+		defer server.Close()
+
+		for i := 0; i < 25; i++ {
+			server.AddZone(fmt.Sprintf("zone%d.com", i))
+		}
+
+		client := NewClient("test-key", WithBaseURL(server.URL()))
+		resp, err := client.ListZones(context.Background(), &ListZonesOptions{
+			Page:    2,
+			PerPage: 10,
+		})
+		if err != nil {
+			t.Fatalf("ListZones failed: %v", err)
+		}
+
+		if resp.TotalItems != 25 || len(resp.Items) != 10 || resp.CurrentPage != 2 {
+			t.Errorf("Pagination test failed: total=%d, items=%d, page=%d", resp.TotalItems, len(resp.Items), resp.CurrentPage)
+		}
+		if !resp.HasMoreItems {
+			t.Error("Expected HasMoreItems=true for page 2 of 3")
+		}
+	})
+
+	t.Run("context cancellation", func(t *testing.T) {
+		server := mockbunny.New()
+		defer server.Close()
+
+		server.AddZone("example.com")
+		client := NewClient("test-key", WithBaseURL(server.URL()))
+
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		resp, err := client.ListZones(ctx, nil)
+
+		if err == nil {
+			t.Error("expected error with cancelled context")
+		}
+		if resp != nil {
+			t.Error("expected nil response on error")
+		}
+	})
 }

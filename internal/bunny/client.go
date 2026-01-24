@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"strconv"
 )
 
 const (
@@ -51,4 +53,139 @@ func NewClient(apiKey string, opts ...Option) *Client {
 	}
 
 	return c
+}
+
+// GetZone retrieves a single DNS zone by ID, including all its records.
+func (c *Client) GetZone(ctx context.Context, id int64) (*Zone, error) {
+	url := fmt.Sprintf("%s/dnszone/%d", c.baseURL, id)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("AccessKey", c.apiKey)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		//nolint:errcheck
+		resp.Body.Close()
+	}()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	// Handle specific status codes
+	if resp.StatusCode == http.StatusOK {
+		var zone Zone
+		if err := json.Unmarshal(body, &zone); err != nil {
+			return nil, fmt.Errorf("failed to decode zone: %w", err)
+		}
+		return &zone, nil
+	}
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, ErrNotFound
+	}
+
+	// Use generic error parser for all other cases (including 401)
+	return nil, parseError(resp.StatusCode, body)
+}
+
+// ListZones retrieves all DNS zones, optionally filtered.
+// Returns the full paginated response.
+func (c *Client) ListZones(ctx context.Context, opts *ListZonesOptions) (*ListZonesResponse, error) {
+	// Use defaults if opts is nil
+	if opts == nil {
+		opts = &ListZonesOptions{}
+	}
+
+	// Build URL with query parameters
+	query := url.Values{}
+
+	if opts.Page > 0 {
+		query.Set("page", strconv.Itoa(opts.Page))
+	}
+
+	if opts.PerPage > 0 {
+		query.Set("perPage", strconv.Itoa(opts.PerPage))
+	}
+
+	if opts.Search != "" {
+		query.Set("search", opts.Search)
+	}
+
+	endpoint := c.baseURL + "/dnszone"
+	if len(query) > 0 {
+		endpoint += "?" + query.Encode()
+	}
+
+	// Create request
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// Set authentication header
+	req.Header.Set("AccessKey", c.apiKey)
+
+	// Execute request
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		//nolint:errcheck
+		resp.Body.Close()
+	}()
+
+	// Read response body
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	// Handle error responses
+	if resp.StatusCode != http.StatusOK {
+		return nil, parseError(resp.StatusCode, body)
+	}
+
+	// Decode successful response
+	var result ListZonesResponse
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &result, nil
+}
+
+// parseError parses API error responses and returns an appropriate error.
+func parseError(statusCode int, body []byte) error {
+	switch statusCode {
+	case http.StatusUnauthorized:
+		return ErrUnauthorized
+	case http.StatusInternalServerError, http.StatusServiceUnavailable:
+		// Try to parse as structured error
+		var apiErr APIError
+		if err := json.Unmarshal(body, &apiErr); err == nil && apiErr.Message != "" {
+			apiErr.StatusCode = statusCode
+			return &apiErr
+		}
+		// Fall back to generic error
+		return fmt.Errorf("bunny: server error (status %d)", statusCode)
+	default:
+		// Try to parse as structured error
+		var apiErr APIError
+		if err := json.Unmarshal(body, &apiErr); err == nil && apiErr.Message != "" {
+			apiErr.StatusCode = statusCode
+			return &apiErr
+		}
+		// Fall back to generic error
+		return fmt.Errorf("bunny: request failed (status %d)", statusCode)
+	}
 }
