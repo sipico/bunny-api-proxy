@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/sipico/bunny-api-proxy/internal/storage"
 )
 
 // mockStorage implements minimal Storage interface for testing
@@ -17,6 +19,10 @@ type mockStorage struct {
 
 func (m *mockStorage) Close() error {
 	return m.closeErr
+}
+
+func (m *mockStorage) ValidateAdminToken(ctx context.Context, token string) (*storage.AdminToken, error) {
+	return nil, storage.ErrNotFound
 }
 
 func TestHandleHealth(t *testing.T) {

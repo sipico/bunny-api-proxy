@@ -16,12 +16,25 @@ func (h *Handler) NewRouter() chi.Router {
 	// Public endpoints (no auth)
 	r.Get("/health", h.HandleHealth)
 	r.Get("/ready", h.HandleReady)
-
 	// Routes added by later issues:
 	// - POST /login (Issue 2)
 	// - POST /logout (Issue 2)
-	// - /api/* (Issue 4, with token auth middleware)
-	// - /* (Issue 5+, with session auth middleware)
+
+	// Admin API (token auth, Issue 3)
+	r.Route("/api", func(r chi.Router) {
+		r.Use(h.TokenAuthMiddleware)
+		// Handlers added by Issue 4:
+		// r.Post("/loglevel", h.HandleSetLogLevel)
+		// r.Get("/tokens", h.HandleListTokens)
+		// r.Post("/tokens", h.HandleCreateToken)
+		// r.Delete("/tokens/{id}", h.HandleDeleteToken)
+	})
+
+	// Protected web UI (session auth, added by Issue 5+)
+	// r.Group(func(r chi.Router) {
+	//     r.Use(h.SessionMiddleware)
+	//     // Web UI routes here
+	// })
 
 	return r
 }

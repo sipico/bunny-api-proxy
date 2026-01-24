@@ -5,6 +5,8 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+
+	"github.com/sipico/bunny-api-proxy/internal/storage"
 )
 
 // Common errors
@@ -29,6 +31,9 @@ type Handler struct {
 type Storage interface {
 	// Health check
 	Close() error
+
+	// AdminToken operations (Issue 3)
+	ValidateAdminToken(ctx context.Context, token string) (*storage.AdminToken, error)
 }
 
 // NewHandler creates an admin handler
