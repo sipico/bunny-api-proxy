@@ -2,6 +2,7 @@
 package bunny
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -162,6 +163,107 @@ func (c *Client) ListZones(ctx context.Context, opts *ListZonesOptions) (*ListZo
 	}
 
 	return &result, nil
+}
+
+// AddRecordRequest represents the request body for creating a new DNS record.
+type AddRecordRequest struct {
+	Type     string `json:"Type"`
+	Name     string `json:"Name"`
+	Value    string `json:"Value"`
+	TTL      int32  `json:"Ttl"`
+	Priority int32  `json:"Priority"`
+	Weight   int32  `json:"Weight"`
+	Port     int32  `json:"Port"`
+	Flags    int    `json:"Flags"`
+	Tag      string `json:"Tag"`
+	Disabled bool   `json:"Disabled"`
+	Comment  string `json:"Comment"`
+}
+
+// AddRecord adds a new DNS record to a zone.
+func (c *Client) AddRecord(ctx context.Context, zoneID int64, req *AddRecordRequest) (*Record, error) {
+	url := fmt.Sprintf("%s/dnszone/%d/records", c.baseURL, zoneID)
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPut, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	httpReq.Header.Set("AccessKey", c.apiKey)
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		//nolint:errcheck
+		resp.Body.Close()
+	}()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	// Handle specific status codes
+	if resp.StatusCode == http.StatusCreated {
+		var record Record
+		if err := json.Unmarshal(respBody, &record); err != nil {
+			return nil, fmt.Errorf("failed to decode record: %w", err)
+		}
+		return &record, nil
+	}
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, ErrNotFound
+	}
+
+	// Use generic error parser for all other cases (including 401)
+	return nil, parseError(resp.StatusCode, respBody)
+}
+
+// DeleteRecord removes a DNS record from the specified zone.
+func (c *Client) DeleteRecord(ctx context.Context, zoneID, recordID int64) error {
+	url := fmt.Sprintf("%s/dnszone/%d/records/%d", c.baseURL, zoneID, recordID)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("AccessKey", c.apiKey)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		//nolint:errcheck
+		resp.Body.Close()
+	}()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+
+	// Handle specific status codes
+	if resp.StatusCode == http.StatusNoContent {
+		return nil
+	}
+
+	if resp.StatusCode == http.StatusNotFound {
+		return ErrNotFound
+	}
+
+	// Use generic error parser for all other cases (including 401)
+	return parseError(resp.StatusCode, body)
 }
 
 // parseError parses API error responses and returns an appropriate error.
