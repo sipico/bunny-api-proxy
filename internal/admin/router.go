@@ -22,11 +22,10 @@ func (h *Handler) NewRouter() chi.Router {
 	// Admin API (token auth)
 	r.Route("/api", func(r chi.Router) {
 		r.Use(h.TokenAuthMiddleware)
-		// Handlers added by Issue 4:
-		// r.Post("/loglevel", h.HandleSetLogLevel)
-		// r.Get("/tokens", h.HandleListTokens)
-		// r.Post("/tokens", h.HandleCreateToken)
-		// r.Delete("/tokens/{id}", h.HandleDeleteToken)
+		r.Post("/loglevel", h.HandleSetLogLevel)
+		r.Get("/tokens", h.HandleListTokens)
+		r.Post("/tokens", h.HandleCreateToken)
+		r.Delete("/tokens/{id}", h.HandleDeleteToken)
 	})
 
 	// Protected web UI (session auth)

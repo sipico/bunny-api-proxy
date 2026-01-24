@@ -33,9 +33,21 @@ func (m *mockStorage) ValidateAdminToken(ctx context.Context, token string) (*st
 	return nil, storage.ErrNotFound
 }
 
+func (m *mockStorage) CreateAdminToken(ctx context.Context, name, token string) (int64, error) {
+	return 0, nil
+}
+
+func (m *mockStorage) ListAdminTokens(ctx context.Context) ([]*storage.AdminToken, error) {
+	return make([]*storage.AdminToken, 0), nil
+}
+
+func (m *mockStorage) DeleteAdminToken(ctx context.Context, id int64) error {
+	return nil
+}
+
 func TestHandleHealth(t *testing.T) {
 	// Test case 1: Returns 200 OK with status
-	h := NewHandler(&mockStorage{}, NewSessionStore(0), slog.Default())
+	h := NewHandler(&mockStorage{}, NewSessionStore(0), new(slog.LevelVar), slog.Default())
 
 	req := httptest.NewRequest("GET", "/health", nil)
 	w := httptest.NewRecorder()
@@ -84,7 +96,7 @@ func TestHandleReady(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := NewHandler(tt.storage, NewSessionStore(0), slog.Default())
+			h := NewHandler(tt.storage, NewSessionStore(0), new(slog.LevelVar), slog.Default())
 
 			req := httptest.NewRequest("GET", "/ready", nil)
 			w := httptest.NewRecorder()
@@ -108,7 +120,7 @@ func TestHandleReady(t *testing.T) {
 }
 
 func TestNewRouter(t *testing.T) {
-	h := NewHandler(&mockStorage{}, NewSessionStore(0), slog.Default())
+	h := NewHandler(&mockStorage{}, NewSessionStore(0), new(slog.LevelVar), slog.Default())
 	router := h.NewRouter()
 
 	// Test that router is created and routes work
@@ -139,19 +151,26 @@ func TestNewRouter(t *testing.T) {
 
 func TestNewHandler(t *testing.T) {
 	// Test with nil logger (should use default)
-	h := NewHandler(&mockStorage{}, NewSessionStore(0), nil)
+	h := NewHandler(&mockStorage{}, NewSessionStore(0), nil, nil)
 	if h == nil {
 		t.Fatal("expected handler, got nil")
 	}
 	if h.logger == nil {
 		t.Error("expected logger to be set to default")
 	}
+	if h.logLevel == nil {
+		t.Error("expected logLevel to be initialized")
+	}
 
-	// Test with custom logger
+	// Test with custom logger and logLevel
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	h = NewHandler(&mockStorage{}, NewSessionStore(0), logger)
+	logLevel := new(slog.LevelVar)
+	h = NewHandler(&mockStorage{}, NewSessionStore(0), logLevel, logger)
 	if h.logger != logger {
 		t.Error("expected custom logger to be used")
+	}
+	if h.logLevel != logLevel {
+		t.Error("expected custom logLevel to be used")
 	}
 }
 

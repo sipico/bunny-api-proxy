@@ -87,6 +87,7 @@ func TestHandleDashboard(t *testing.T) {
 			handler: NewHandler(
 				&mockStorageForWeb{},
 				NewSessionStore(0),
+			nil,
 				slog.New(slog.NewTextHandler(io.Discard, nil)),
 			),
 			wantStatus: http.StatusOK,
@@ -158,6 +159,7 @@ func TestHandleMasterKeyForm(t *testing.T) {
 			h := NewHandler(
 				&mockStorageForWeb{masterKey: tt.masterKey},
 				NewSessionStore(0),
+			nil,
 				slog.New(slog.NewTextHandler(io.Discard, nil)),
 			)
 
@@ -220,6 +222,7 @@ func TestHandleSetMasterKey(t *testing.T) {
 			h := NewHandler(
 				&mockStorageForWeb{},
 				NewSessionStore(0),
+			nil,
 				slog.New(slog.NewTextHandler(io.Discard, nil)),
 			)
 
@@ -300,6 +303,7 @@ func TestMasterKeyMasking(t *testing.T) {
 			h := NewHandler(
 				&mockStorageForWeb{masterKey: tt.key},
 				NewSessionStore(0),
+			nil,
 				slog.New(slog.NewTextHandler(io.Discard, nil)),
 			)
 
@@ -327,6 +331,7 @@ func TestMasterKeyPersistence(t *testing.T) {
 	h := NewHandler(
 		mock,
 		NewSessionStore(0),
+			nil,
 		slog.New(slog.NewTextHandler(io.Discard, nil)),
 	)
 
@@ -359,6 +364,7 @@ func TestHandleSetMasterKeyStorageError(t *testing.T) {
 	h2 := NewHandler(
 		storageWithError,
 		NewSessionStore(0),
+			nil,
 		slog.New(slog.NewTextHandler(io.Discard, nil)),
 	)
 
@@ -378,6 +384,7 @@ func TestHandleSetMasterKeyParseFormError(t *testing.T) {
 	h := NewHandler(
 		&mockStorageForWeb{},
 		NewSessionStore(0),
+			nil,
 		slog.New(slog.NewTextHandler(io.Discard, nil)),
 	)
 
@@ -401,6 +408,7 @@ func TestHandleMasterKeyFormStorageError(t *testing.T) {
 	h := NewHandler(
 		storageWithError,
 		NewSessionStore(0),
+			nil,
 		slog.New(slog.NewTextHandler(io.Discard, nil)),
 	)
 
