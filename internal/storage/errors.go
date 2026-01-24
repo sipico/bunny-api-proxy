@@ -9,6 +9,9 @@ var (
 	// ErrDecryption is returned when decryption fails due to wrong key or corrupted data.
 	ErrDecryption = errors.New("decryption failed: wrong key or corrupted data")
 
-	// ErrNotFound is returned when a requested resource is not found.
-	ErrNotFound = errors.New("not found")
+	// ErrDuplicate is returned when attempting to create a resource that already exists.
+	ErrDuplicate = errors.New("resource already exists")
+
+	// ErrNotFound is returned when a resource is not found.
+	ErrNotFound = errors.New("resource not found")
 )

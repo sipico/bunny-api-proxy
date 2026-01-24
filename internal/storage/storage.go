@@ -1,7 +1,9 @@
 // Package storage provides types and interfaces for SQLite persistence operations.
 package storage
 
-import "context"
+import (
+	"context"
+)
 
 // Storage defines the interface for SQLite persistence operations.
 type Storage interface {
