@@ -7,7 +7,9 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strconv"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/sipico/bunny-api-proxy/internal/bunny"
 )
 
@@ -78,4 +80,176 @@ func handleBunnyError(w http.ResponseWriter, err error) {
 		// Generic errors (network, parsing, etc.)
 		writeError(w, http.StatusInternalServerError, "internal server error")
 	}
+}
+
+// HandleListZones lists all DNS zones with optional filtering.
+func (h *Handler) HandleListZones(w http.ResponseWriter, r *http.Request) {
+	opts := &bunny.ListZonesOptions{}
+
+	// Parse optional query parameters
+	if pageStr := r.URL.Query().Get("page"); pageStr != "" {
+		page, err := strconv.Atoi(pageStr)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "invalid page parameter")
+			return
+		}
+		opts.Page = page
+	}
+
+	if perPageStr := r.URL.Query().Get("perPage"); perPageStr != "" {
+		perPage, err := strconv.Atoi(perPageStr)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "invalid perPage parameter")
+			return
+		}
+		opts.PerPage = perPage
+	}
+
+	if search := r.URL.Query().Get("search"); search != "" {
+		opts.Search = search
+	}
+
+	// Call client to list zones
+	result, err := h.client.ListZones(r.Context(), opts)
+	if err != nil {
+		handleBunnyError(w, err)
+		return
+	}
+
+	// Log the request
+	h.logger.Info("list zones", "page", opts.Page, "perPage", opts.PerPage, "search", opts.Search)
+
+	// Return successful response
+	writeJSON(w, http.StatusOK, result)
+}
+
+// HandleGetZone retrieves a single DNS zone by ID.
+func (h *Handler) HandleGetZone(w http.ResponseWriter, r *http.Request) {
+	zoneIDStr := chi.URLParam(r, "zoneID")
+	if zoneIDStr == "" {
+		writeError(w, http.StatusBadRequest, "missing zone ID")
+		return
+	}
+
+	zoneID, err := strconv.ParseInt(zoneIDStr, 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid zone ID")
+		return
+	}
+
+	// Call client to get zone
+	zone, err := h.client.GetZone(r.Context(), zoneID)
+	if err != nil {
+		handleBunnyError(w, err)
+		return
+	}
+
+	// Log the request
+	h.logger.Info("get zone", "zone_id", zoneID)
+
+	// Return successful response
+	writeJSON(w, http.StatusOK, zone)
+}
+
+// HandleListRecords lists all DNS records for a zone.
+func (h *Handler) HandleListRecords(w http.ResponseWriter, r *http.Request) {
+	zoneIDStr := chi.URLParam(r, "zoneID")
+	if zoneIDStr == "" {
+		writeError(w, http.StatusBadRequest, "missing zone ID")
+		return
+	}
+
+	zoneID, err := strconv.ParseInt(zoneIDStr, 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid zone ID")
+		return
+	}
+
+	// Call client to get zone (which includes records)
+	zone, err := h.client.GetZone(r.Context(), zoneID)
+	if err != nil {
+		handleBunnyError(w, err)
+		return
+	}
+
+	// Log the request
+	h.logger.Info("list records", "zone_id", zoneID)
+
+	// Return only the records array
+	writeJSON(w, http.StatusOK, zone.Records)
+}
+
+// HandleAddRecord creates a new DNS record in the specified zone.
+func (h *Handler) HandleAddRecord(w http.ResponseWriter, r *http.Request) {
+	zoneIDStr := chi.URLParam(r, "zoneID")
+	if zoneIDStr == "" {
+		writeError(w, http.StatusBadRequest, "missing zone ID")
+		return
+	}
+
+	zoneID, err := strconv.ParseInt(zoneIDStr, 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid zone ID")
+		return
+	}
+
+	// Decode request body
+	var req bunny.AddRecordRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	// Call client to add record
+	record, err := h.client.AddRecord(r.Context(), zoneID, &req)
+	if err != nil {
+		handleBunnyError(w, err)
+		return
+	}
+
+	// Log the request
+	h.logger.Info("add record", "zone_id", zoneID, "type", req.Type, "name", req.Name)
+
+	// Return 201 Created with the record
+	writeJSON(w, http.StatusCreated, record)
+}
+
+// HandleDeleteRecord removes a DNS record from the specified zone.
+func (h *Handler) HandleDeleteRecord(w http.ResponseWriter, r *http.Request) {
+	zoneIDStr := chi.URLParam(r, "zoneID")
+	if zoneIDStr == "" {
+		writeError(w, http.StatusBadRequest, "missing zone ID")
+		return
+	}
+
+	zoneID, err := strconv.ParseInt(zoneIDStr, 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid zone ID")
+		return
+	}
+
+	recordIDStr := chi.URLParam(r, "recordID")
+	if recordIDStr == "" {
+		writeError(w, http.StatusBadRequest, "missing record ID")
+		return
+	}
+
+	recordID, err := strconv.ParseInt(recordIDStr, 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid record ID")
+		return
+	}
+
+	// Call client to delete record
+	err = h.client.DeleteRecord(r.Context(), zoneID, recordID)
+	if err != nil {
+		handleBunnyError(w, err)
+		return
+	}
+
+	// Log the request
+	h.logger.Info("delete record", "zone_id", zoneID, "record_id", recordID)
+
+	// Return 204 No Content
+	w.WriteHeader(http.StatusNoContent)
 }
