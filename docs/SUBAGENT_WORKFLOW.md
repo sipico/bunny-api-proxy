@@ -4,7 +4,7 @@ This document describes how to use Haiku sub-agents for cost-effective code impl
 
 ## Overview
 
-**Cost savings:** Using Haiku for implementation tasks saves ~83% compared to Opus.
+**Cost savings:** Using Haiku for implementation tasks saves **~99% compared to Opus** (measured: $17.84 vs $2,495.72 for 19 subagent tasks).
 
 **Division of labor:**
 - **Opus (coordinator):** Design, specs, issue creation, code review, merging
@@ -275,13 +275,17 @@ Sub-agents should report in this format:
 - Total: ~X,XXX tokens
 ```
 
-Typical task sizes:
-| Task Type | Typical Tokens |
-|-----------|---------------|
-| Types/structs only | 8,000 - 12,000 |
-| Single method + tests | 15,000 - 25,000 |
-| Bug fix with investigation | 20,000 - 40,000 |
-| Merge conflict resolution | 10,000 - 20,000 |
+**Real-world data from bunny-api-proxy implementation:**
+
+| Task Type | Output Tokens | Total Tokens | Haiku Cost |
+|-----------|---------------|--------------|------------|
+| Types/structs (#20) | 6,961 | 1.4M | $0.22 |
+| Client struct (#21) | 4,564 - 9,721 | 1.1M - 3.3M | $0.15 - $0.37 |
+| API method + tests (#22-25) | 21K - 58K | 10M - 33M | $1.03 - $3.23 |
+| Merge conflict resolution | 15K - 22K | 1.5M - 3.4M | $0.34 - $0.49 |
+| Coverage fix (#28) | 7,347 | 1.3M | $0.22 |
+
+**Note:** Total tokens are high due to cache reads (context), but cache reads are discounted 90%. Actual costs are very low.
 
 ## Checklist for Coordinator
 
@@ -326,3 +330,91 @@ WORKFLOW:
 4. Tokens: "Input: 18,500, Output: 4,200, Total: 22,700"
 
 **Coordinator:** Reviews PR, CI passes, merges.
+
+## Token Usage Extraction
+
+A script is available to extract token usage from session transcripts:
+
+```bash
+# Full report with all sessions
+./scripts/extract-tokens.py
+
+# Summary table only
+./scripts/extract-tokens.py --summary
+
+# Single transcript file
+./scripts/extract-tokens.py ~/.claude/projects/.../subagents/agent-XXXXX.jsonl
+```
+
+**Sample output:**
+```
+SUMMARY: SUBAGENT TOKEN USAGE
+==========================================================================================
+Issue    Agent      Output     Total        Haiku $    Opus $     Saved
+------------------------------------------------------------------------------------------
+#20      adff3d6    6,961      1,392,743    $0.22      $21.31     $21.09
+#21      a07629a    4,564      1,129,162    $0.15      $17.21     $17.06
+...
+------------------------------------------------------------------------------------------
+TOTAL                                       $17.84     $2495.72   $2477.87 (99%)
+```
+
+**Transcript locations:**
+- Main sessions: `~/.claude/projects/{project}/`
+- Subagents: `~/.claude/projects/{project}/{session-id}/subagents/`
+
+The script parses JSONL files and extracts:
+- `input_tokens` - direct input tokens
+- `output_tokens` - output tokens
+- `cache_creation_input_tokens` - tokens written to cache (25% premium)
+- `cache_read_input_tokens` - tokens read from cache (90% discount)
+
+**Cost calculation:**
+- Haiku: $0.80/1M input, $4.00/1M output, $0.08/1M cache read, $1.00/1M cache write
+- Opus: $15.00/1M input, $75.00/1M output, $1.50/1M cache read, $18.75/1M cache write
+
+## Coordinator Cost Optimization
+
+**Reality check:** In the bunny-api-proxy project, the coordinator (Opus) cost $2,473 while subagents (Haiku) cost only $18. The coordinator dominates total project cost.
+
+| Component | Cost | % of Total |
+|-----------|------|------------|
+| Coordinator (Opus) | $2,473 | 99.3% |
+| Subagents (Haiku) | $18 | 0.7% |
+| **Total** | **$2,491** | |
+
+### Why Coordinator Costs Dominate
+
+1. **Long-running sessions** - Coordinator stays active across multiple subagent tasks
+2. **Context accumulation** - Each turn adds to the conversation history
+3. **Opus pricing** - 19x more expensive than Haiku for input, 19x for output
+4. **Design overhead** - Specs, reviews, orchestration all happen in Opus
+
+### Optimization Strategies
+
+| Strategy | Potential Savings | Trade-off |
+|----------|------------------|-----------|
+| **Batch task creation** | High | Create all issues in one pass before spawning any subagents |
+| **Shorter sessions** | High | End session after setup, start new session for reviews |
+| **Delegate more to Haiku** | Medium | Use Haiku for exploration, research, initial design |
+| **Prescriptive specs** | Medium | Less back-and-forth during implementation |
+| **Parallel subagents** | Low | Reduces coordinator wait time, not token usage |
+
+### When to Use Each Model
+
+| Task Type | Recommended Model | Rationale |
+|-----------|------------------|-----------|
+| Architecture decisions | Opus | Needs deep reasoning |
+| Issue/spec creation | Opus | Quality specs save subagent costs |
+| Code exploration | Haiku | Cheaper for search/read tasks |
+| Implementation | Haiku | 99% savings on coding |
+| Code review | Opus | Catches subtle issues |
+| PR merge | Opus (minimal) | Simple commands, low cost |
+
+### Session Management Tips
+
+1. **Plan before starting** - Have a clear task list before engaging the coordinator
+2. **Batch similar work** - Create all related issues at once, spawn subagents together
+3. **Use concise prompts** - The coordinator already knows context; don't repeat
+4. **End sessions cleanly** - Don't leave sessions running idle
+5. **Consider session splits** - Design phase → end session → Implementation phase → end session → Review phase

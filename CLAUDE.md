@@ -120,7 +120,7 @@ migrations/          # Database migrations
 
 ## Sub-Agent Workflow
 
-For implementation tasks, use Haiku sub-agents to save ~83% on costs:
+For implementation tasks, use Haiku sub-agents to save ~99% on costs:
 
 1. **Opus (coordinator):** Creates detailed GitHub issues with specs
 2. **Haiku (sub-agent):** Implements code, tests, runs validation
