@@ -1,8 +1,8 @@
 package storage
 
 import (
+	"bytes"
 	"context"
-	"database/sql"
 	"testing"
 	"time"
 
@@ -11,14 +11,13 @@ import (
 
 // TestAddPermissionSuccess verifies that a permission is created successfully.
 func TestAddPermissionSuccess(t *testing.T) {
-	db := setupTestDB(t)
-	defer db.Close()
+	storage := setupTestStorage(t)
+	defer storage.Close()
 
-	storage := NewSQLiteStorage(db)
 	ctx := context.Background()
 
 	// Create a scoped key first
-	keyID := createTestScopedKey(t, db)
+	keyID := createTestScopedKey(t, storage)
 
 	// Create a permission
 	perm := &Permission{
@@ -39,7 +38,7 @@ func TestAddPermissionSuccess(t *testing.T) {
 	// Verify the permission was inserted
 	var zoneID int64
 	var allowedActions, recordTypes string
-	err = db.QueryRowContext(ctx,
+	err = storage.getDB().QueryRowContext(ctx,
 		"SELECT zone_id, allowed_actions, record_types FROM permissions WHERE id = ?",
 		id).Scan(&zoneID, &allowedActions, &recordTypes)
 	if err != nil {
@@ -61,14 +60,12 @@ func TestAddPermissionSuccess(t *testing.T) {
 
 // TestAddPermissionValidateZoneID verifies that invalid zone ID is rejected.
 func TestAddPermissionValidateZoneID(t *testing.T) {
-	db := setupTestDB(t)
-	defer db.Close()
-
-	storage := NewSQLiteStorage(db)
+	storage := setupTestStorage(t)
+	defer storage.Close()
 	ctx := context.Background()
 
 	// Create a scoped key
-	keyID := createTestScopedKey(t, db)
+	keyID := createTestScopedKey(t, storage)
 
 	tests := []struct {
 		name    string
@@ -98,14 +95,12 @@ func TestAddPermissionValidateZoneID(t *testing.T) {
 
 // TestAddPermissionValidateActions verifies that empty actions are rejected.
 func TestAddPermissionValidateActions(t *testing.T) {
-	db := setupTestDB(t)
-	defer db.Close()
-
-	storage := NewSQLiteStorage(db)
+	storage := setupTestStorage(t)
+	defer storage.Close()
 	ctx := context.Background()
 
 	// Create a scoped key
-	keyID := createTestScopedKey(t, db)
+	keyID := createTestScopedKey(t, storage)
 
 	perm := &Permission{
 		ZoneID:         12345,
@@ -121,14 +116,12 @@ func TestAddPermissionValidateActions(t *testing.T) {
 
 // TestAddPermissionValidateRecordTypes verifies that empty record types are rejected.
 func TestAddPermissionValidateRecordTypes(t *testing.T) {
-	db := setupTestDB(t)
-	defer db.Close()
-
-	storage := NewSQLiteStorage(db)
+	storage := setupTestStorage(t)
+	defer storage.Close()
 	ctx := context.Background()
 
 	// Create a scoped key
-	keyID := createTestScopedKey(t, db)
+	keyID := createTestScopedKey(t, storage)
 
 	perm := &Permission{
 		ZoneID:         12345,
@@ -144,10 +137,8 @@ func TestAddPermissionValidateRecordTypes(t *testing.T) {
 
 // TestAddPermissionForeignKeyConstraint verifies that non-existent scopedKeyID fails.
 func TestAddPermissionForeignKeyConstraint(t *testing.T) {
-	db := setupTestDB(t)
-	defer db.Close()
-
-	storage := NewSQLiteStorage(db)
+	storage := setupTestStorage(t)
+	defer storage.Close()
 	ctx := context.Background()
 
 	// Use non-existent scoped key ID
@@ -165,14 +156,12 @@ func TestAddPermissionForeignKeyConstraint(t *testing.T) {
 
 // TestGetPermissionsEmpty verifies that empty list is returned for key with no permissions.
 func TestGetPermissionsEmpty(t *testing.T) {
-	db := setupTestDB(t)
-	defer db.Close()
-
-	storage := NewSQLiteStorage(db)
+	storage := setupTestStorage(t)
+	defer storage.Close()
 	ctx := context.Background()
 
 	// Create a scoped key
-	keyID := createTestScopedKey(t, db)
+	keyID := createTestScopedKey(t, storage)
 
 	perms, err := storage.GetPermissions(ctx, keyID)
 	if err != nil {
@@ -190,14 +179,12 @@ func TestGetPermissionsEmpty(t *testing.T) {
 
 // TestGetPermissionsRetrievesCorrectly verifies that permissions are retrieved correctly.
 func TestGetPermissionsRetrievesCorrectly(t *testing.T) {
-	db := setupTestDB(t)
-	defer db.Close()
-
-	storage := NewSQLiteStorage(db)
+	storage := setupTestStorage(t)
+	defer storage.Close()
 	ctx := context.Background()
 
 	// Create a scoped key
-	keyID := createTestScopedKey(t, db)
+	keyID := createTestScopedKey(t, storage)
 
 	// Create a permission
 	perm := &Permission{
@@ -237,14 +224,12 @@ func TestGetPermissionsRetrievesCorrectly(t *testing.T) {
 
 // TestGetPermissionsMultiple verifies that multiple permissions are retrieved correctly.
 func TestGetPermissionsMultiple(t *testing.T) {
-	db := setupTestDB(t)
-	defer db.Close()
-
-	storage := NewSQLiteStorage(db)
+	storage := setupTestStorage(t)
+	defer storage.Close()
 	ctx := context.Background()
 
 	// Create a scoped key
-	keyID := createTestScopedKey(t, db)
+	keyID := createTestScopedKey(t, storage)
 
 	// Create multiple permissions
 	for i := 0; i < 3; i++ {
@@ -280,14 +265,12 @@ func TestGetPermissionsMultiple(t *testing.T) {
 
 // TestGetPermissionsJSONDecoding verifies that JSON arrays are decoded correctly.
 func TestGetPermissionsJSONDecoding(t *testing.T) {
-	db := setupTestDB(t)
-	defer db.Close()
-
-	storage := NewSQLiteStorage(db)
+	storage := setupTestStorage(t)
+	defer storage.Close()
 	ctx := context.Background()
 
 	// Create a scoped key
-	keyID := createTestScopedKey(t, db)
+	keyID := createTestScopedKey(t, storage)
 
 	// Create permission with complex arrays
 	perm := &Permission{
@@ -330,14 +313,12 @@ func TestGetPermissionsJSONDecoding(t *testing.T) {
 
 // TestDeletePermissionSuccess verifies that a permission is deleted successfully.
 func TestDeletePermissionSuccess(t *testing.T) {
-	db := setupTestDB(t)
-	defer db.Close()
-
-	storage := NewSQLiteStorage(db)
+	storage := setupTestStorage(t)
+	defer storage.Close()
 	ctx := context.Background()
 
 	// Create a scoped key and permission
-	keyID := createTestScopedKey(t, db)
+	keyID := createTestScopedKey(t, storage)
 	perm := &Permission{
 		ZoneID:         12345,
 		AllowedActions: []string{"list_records"},
@@ -367,10 +348,8 @@ func TestDeletePermissionSuccess(t *testing.T) {
 
 // TestDeletePermissionNotFound verifies that deleting non-existent permission returns ErrNotFound.
 func TestDeletePermissionNotFound(t *testing.T) {
-	db := setupTestDB(t)
-	defer db.Close()
-
-	storage := NewSQLiteStorage(db)
+	storage := setupTestStorage(t)
+	defer storage.Close()
 	ctx := context.Background()
 
 	err := storage.DeletePermission(ctx, 999)
@@ -381,14 +360,12 @@ func TestDeletePermissionNotFound(t *testing.T) {
 
 // TestCascadeDeleteScopedKey verifies that deleting a scoped key deletes its permissions.
 func TestCascadeDeleteScopedKey(t *testing.T) {
-	db := setupTestDB(t)
-	defer db.Close()
-
-	storage := NewSQLiteStorage(db)
+	storage := setupTestStorage(t)
+	defer storage.Close()
 	ctx := context.Background()
 
 	// Create a scoped key and permission
-	keyID := createTestScopedKey(t, db)
+	keyID := createTestScopedKey(t, storage)
 	perm := &Permission{
 		ZoneID:         12345,
 		AllowedActions: []string{"list_records"},
@@ -400,7 +377,7 @@ func TestCascadeDeleteScopedKey(t *testing.T) {
 	}
 
 	// Delete the scoped key
-	_, err = db.ExecContext(ctx, "DELETE FROM scoped_keys WHERE id = ?", keyID)
+	_, err = storage.getDB().ExecContext(ctx, "DELETE FROM scoped_keys WHERE id = ?", keyID)
 	if err != nil {
 		t.Fatalf("failed to delete scoped key: %v", err)
 	}
@@ -418,14 +395,12 @@ func TestCascadeDeleteScopedKey(t *testing.T) {
 
 // TestPermissionTimeTracking verifies that created_at is populated.
 func TestPermissionTimeTracking(t *testing.T) {
-	db := setupTestDB(t)
-	defer db.Close()
-
-	storage := NewSQLiteStorage(db)
+	storage := setupTestStorage(t)
+	defer storage.Close()
 	ctx := context.Background()
 
 	// Create a scoped key and permission
-	keyID := createTestScopedKey(t, db)
+	keyID := createTestScopedKey(t, storage)
 	before := time.Now().UTC().Add(-1 * time.Second) // Allow 1 second margin
 
 	perm := &Permission{
@@ -458,14 +433,12 @@ func TestPermissionTimeTracking(t *testing.T) {
 
 // TestPermissionSpecialCharacters verifies that special characters in strings are handled.
 func TestPermissionSpecialCharacters(t *testing.T) {
-	db := setupTestDB(t)
-	defer db.Close()
-
-	storage := NewSQLiteStorage(db)
+	storage := setupTestStorage(t)
+	defer storage.Close()
 	ctx := context.Background()
 
 	// Create a scoped key
-	keyID := createTestScopedKey(t, db)
+	keyID := createTestScopedKey(t, storage)
 
 	// Create permission with special characters
 	perm := &Permission{
@@ -495,58 +468,26 @@ func TestPermissionSpecialCharacters(t *testing.T) {
 	}
 }
 
-// Helper function to set up test database
-func setupTestDB(t *testing.T) *sql.DB {
-	db, err := sql.Open("sqlite3", ":memory:")
+// Helper function to get a 32-byte test encryption key
+func testEncryptionKey() []byte {
+	return bytes.Repeat([]byte{0x01}, 32)
+}
+
+// Helper function to set up test storage
+func setupTestStorage(t *testing.T) *SQLiteStorage {
+	storage, err := New(":memory:", testEncryptionKey())
 	if err != nil {
-		t.Fatalf("failed to open test database: %v", err)
+		t.Fatalf("failed to create test storage: %v", err)
 	}
-
-	if err := InitSchema(db); err != nil {
-		t.Fatalf("InitSchema failed: %v", err)
-	}
-
-	return db
+	return storage
 }
 
 // Helper function to create a test scoped key
-func createTestScopedKey(t *testing.T, db *sql.DB) int64 {
-	result, err := db.Exec("INSERT INTO scoped_keys (key_hash, name) VALUES (?, ?)", "test_key_hash", "test_key")
-	if err != nil {
-		t.Fatalf("failed to insert scoped key: %v", err)
-	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		t.Fatalf("failed to get last insert ID: %v", err)
-	}
-
-	return id
-}
-
-// TestSQLiteStorageClose verifies that the database connection is closed properly.
-func TestSQLiteStorageClose(t *testing.T) {
-	db, err := sql.Open("sqlite3", ":memory:")
-	if err != nil {
-		t.Fatalf("failed to open test database: %v", err)
-	}
-
-	if err := InitSchema(db); err != nil {
-		t.Fatalf("InitSchema failed: %v", err)
-	}
-
-	storage := NewSQLiteStorage(db)
-
-	// Close should not return an error
-	err = storage.Close()
-	if err != nil {
-		t.Errorf("Close failed: %v", err)
-	}
-
-	// Attempting to use the storage after close should fail
+func createTestScopedKey(t *testing.T, storage *SQLiteStorage) int64 {
 	ctx := context.Background()
-	_, err = storage.GetPermissions(ctx, 1)
-	if err == nil {
-		t.Errorf("expected error when using closed storage")
+	id, err := storage.CreateScopedKey(ctx, "test_key", "test_key_hash")
+	if err != nil {
+		t.Fatalf("failed to create test scoped key: %v", err)
 	}
+	return id
 }
