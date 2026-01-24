@@ -11,6 +11,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/sipico/bunny-api-proxy/internal/storage"
 )
 
 // mockStorageForSession implements Storage interface
@@ -20,6 +22,10 @@ type mockStorageForSession struct {
 
 func (m *mockStorageForSession) Close() error {
 	return m.closeErr
+}
+
+func (m *mockStorageForSession) ValidateAdminToken(ctx context.Context, token string) (*storage.AdminToken, error) {
+	return nil, storage.ErrNotFound
 }
 
 // TestSessionStoreCreateSession tests session creation
