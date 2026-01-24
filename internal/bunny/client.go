@@ -56,48 +56,6 @@ func NewClient(apiKey string, opts ...Option) *Client {
 	return c
 }
 
-// GetZone retrieves a single DNS zone by ID, including all its records.
-func (c *Client) GetZone(ctx context.Context, id int64) (*Zone, error) {
-	url := fmt.Sprintf("%s/dnszone/%d", c.baseURL, id)
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("AccessKey", c.apiKey)
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		//nolint:errcheck
-		resp.Body.Close()
-	}()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	// Handle specific status codes
-	if resp.StatusCode == http.StatusOK {
-		var zone Zone
-		if err := json.Unmarshal(body, &zone); err != nil {
-			return nil, fmt.Errorf("failed to decode zone: %w", err)
-		}
-		return &zone, nil
-	}
-
-	if resp.StatusCode == http.StatusNotFound {
-		return nil, ErrNotFound
-	}
-
-	// Use generic error parser for all other cases (including 401)
-	return nil, parseError(resp.StatusCode, body)
-}
-
 // ListZones retrieves all DNS zones, optionally filtered.
 // Returns the full paginated response.
 func (c *Client) ListZones(ctx context.Context, opts *ListZonesOptions) (*ListZonesResponse, error) {
@@ -163,6 +121,48 @@ func (c *Client) ListZones(ctx context.Context, opts *ListZonesOptions) (*ListZo
 	}
 
 	return &result, nil
+}
+
+// GetZone retrieves a single DNS zone by ID, including all its records.
+func (c *Client) GetZone(ctx context.Context, id int64) (*Zone, error) {
+	url := fmt.Sprintf("%s/dnszone/%d", c.baseURL, id)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("AccessKey", c.apiKey)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		//nolint:errcheck
+		resp.Body.Close()
+	}()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	// Handle specific status codes
+	if resp.StatusCode == http.StatusOK {
+		var zone Zone
+		if err := json.Unmarshal(body, &zone); err != nil {
+			return nil, fmt.Errorf("failed to decode zone: %w", err)
+		}
+		return &zone, nil
+	}
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, ErrNotFound
+	}
+
+	// Use generic error parser for all other cases (including 401)
+	return nil, parseError(resp.StatusCode, body)
 }
 
 // AddRecordRequest represents the request body for creating a new DNS record.
