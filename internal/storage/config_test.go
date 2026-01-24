@@ -12,9 +12,9 @@ import (
 // TestNewValidatesEncryptionKey tests that New() rejects invalid encryption keys.
 func TestNewValidatesEncryptionKey(t *testing.T) {
 	tests := []struct {
-		name         string
-		keyLength    int
-		expectError  bool
+		name        string
+		keyLength   int
+		expectError bool
 	}{
 		{"valid 32-byte key", 32, false},
 		{"invalid 16-byte key", 16, true},
