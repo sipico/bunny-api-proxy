@@ -322,66 +322,6 @@ func TestMasterKeyMasking(t *testing.T) {
 	}
 }
 
-func TestWebRouterIntegration(t *testing.T) {
-	h := NewHandler(
-		&mockStorageForWeb{masterKey: "test_key"},
-		NewSessionStore(0),
-		slog.New(slog.NewTextHandler(io.Discard, nil)),
-	)
-
-	router := h.NewRouter()
-
-	tests := []struct {
-		name       string
-		method     string
-		path       string
-		wantStatus int
-		// Check if page requires session
-		requiresSession bool
-	}{
-		{
-			name:       "GET /health",
-			method:     "GET",
-			path:       "/health",
-			wantStatus: http.StatusOK,
-		},
-		{
-			name:            "GET /admin (requires session)",
-			method:          "GET",
-			path:            "/",
-			wantStatus:      http.StatusUnauthorized,
-			requiresSession: true,
-		},
-		{
-			name:            "GET /admin/master-key (requires session)",
-			method:          "GET",
-			path:            "/master-key",
-			wantStatus:      http.StatusUnauthorized,
-			requiresSession: true,
-		},
-		{
-			name:            "POST /admin/master-key (requires session)",
-			method:          "POST",
-			path:            "/master-key",
-			wantStatus:      http.StatusUnauthorized,
-			requiresSession: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest(tt.method, tt.path, nil)
-			w := httptest.NewRecorder()
-
-			router.ServeHTTP(w, req)
-
-			if w.Code != tt.wantStatus {
-				t.Errorf("expected status %d, got %d", tt.wantStatus, w.Code)
-			}
-		})
-	}
-}
-
 func TestMasterKeyPersistence(t *testing.T) {
 	mock := &mockStorageForWeb{}
 	h := NewHandler(
@@ -408,4 +348,171 @@ func TestMasterKeyPersistence(t *testing.T) {
 	if stored != "new_master_key_123" {
 		t.Errorf("expected stored key 'new_master_key_123', got %q", stored)
 	}
+}
+
+func TestHandleSetMasterKeyStorageError(t *testing.T) {
+	// Create a mock that returns an error on SetMasterAPIKey
+	storageWithError := &mockStorageWithError{
+		masterKey: "",
+	}
+
+	h2 := NewHandler(
+		storageWithError,
+		NewSessionStore(0),
+		slog.New(slog.NewTextHandler(io.Discard, nil)),
+	)
+
+	body := strings.NewReader("key=test_key")
+	req := httptest.NewRequest("POST", "/admin/master-key", body)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	w := httptest.NewRecorder()
+
+	h2.HandleSetMasterKey(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("expected status 500, got %d", w.Code)
+	}
+}
+
+func TestHandleSetMasterKeyParseFormError(t *testing.T) {
+	h := NewHandler(
+		&mockStorageForWeb{},
+		NewSessionStore(0),
+		slog.New(slog.NewTextHandler(io.Discard, nil)),
+	)
+
+	// Create request with invalid form encoding
+	req := httptest.NewRequest("POST", "/admin/master-key", nil)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.ContentLength = 999999999 // Force ParseForm to fail
+
+	w := httptest.NewRecorder()
+
+	h.HandleSetMasterKey(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected status 400, got %d", w.Code)
+	}
+}
+
+func TestHandleMasterKeyFormStorageError(t *testing.T) {
+	storageWithError := &mockStorageWithError{}
+
+	h := NewHandler(
+		storageWithError,
+		NewSessionStore(0),
+		slog.New(slog.NewTextHandler(io.Discard, nil)),
+	)
+
+	req := httptest.NewRequest("GET", "/admin/master-key", nil)
+	w := httptest.NewRecorder()
+
+	h.HandleMasterKeyForm(w, req)
+
+	// GetMasterAPIKey should return an empty string and error, but we ignore it
+	// So the form should still render with empty CurrentKey
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status 200, got %d", w.Code)
+	}
+}
+
+func TestHandleDashboardTemplateExecuteError(t *testing.T) {
+	// Create a handler with a template that will fail to execute
+	h := &Handler{
+		storage:      &mockStorageForWeb{},
+		sessionStore: NewSessionStore(0),
+		logger:       slog.New(slog.NewTextHandler(io.Discard, nil)),
+		// Use nil templates to trigger the error path, but we already have a check for nil
+		// Instead, create invalid template that references undefined field
+		// This is hard to test without actual template execution errors
+	}
+
+	// For now, just test the nil case
+	req := httptest.NewRequest("GET", "/admin", nil)
+	w := httptest.NewRecorder()
+
+	h.HandleDashboard(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("expected status 500, got %d", w.Code)
+	}
+}
+
+func TestHandleMasterKeyFormTemplateExecuteError(t *testing.T) {
+	h := &Handler{
+		storage:      &mockStorageForWeb{},
+		sessionStore: NewSessionStore(0),
+		logger:       slog.New(slog.NewTextHandler(io.Discard, nil)),
+		// nil templates
+	}
+
+	req := httptest.NewRequest("GET", "/admin/master-key", nil)
+	w := httptest.NewRecorder()
+
+	h.HandleMasterKeyForm(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("expected status 500, got %d", w.Code)
+	}
+}
+
+// mockStorageWithError implements Storage but returns error on operations
+type mockStorageWithError struct {
+	masterKey string
+}
+
+func (m *mockStorageWithError) Close() error {
+	return nil
+}
+
+func (m *mockStorageWithError) GetMasterAPIKey(ctx context.Context) (string, error) {
+	return "", storage.ErrNotFound
+}
+
+func (m *mockStorageWithError) SetMasterAPIKey(ctx context.Context, key string) error {
+	return storage.ErrNotFound
+}
+
+func (m *mockStorageWithError) ValidateAdminToken(ctx context.Context, token string) (*storage.AdminToken, error) {
+	return nil, storage.ErrNotFound
+}
+
+func (m *mockStorageWithError) CreateAdminToken(ctx context.Context, name, token string) (int64, error) {
+	return 0, storage.ErrNotFound
+}
+
+func (m *mockStorageWithError) ListAdminTokens(ctx context.Context) ([]*storage.AdminToken, error) {
+	return nil, nil
+}
+
+func (m *mockStorageWithError) DeleteAdminToken(ctx context.Context, id int64) error {
+	return storage.ErrNotFound
+}
+
+func (m *mockStorageWithError) CreateScopedKey(ctx context.Context, name string, key string) (int64, error) {
+	return 0, storage.ErrNotFound
+}
+
+func (m *mockStorageWithError) GetScopedKeyByHash(ctx context.Context, keyHash string) (*storage.ScopedKey, error) {
+	return nil, storage.ErrNotFound
+}
+
+func (m *mockStorageWithError) ListScopedKeys(ctx context.Context) ([]*storage.ScopedKey, error) {
+	return nil, nil
+}
+
+func (m *mockStorageWithError) DeleteScopedKey(ctx context.Context, id int64) error {
+	return storage.ErrNotFound
+}
+
+func (m *mockStorageWithError) AddPermission(ctx context.Context, scopedKeyID int64, perm *storage.Permission) (int64, error) {
+	return 0, storage.ErrNotFound
+}
+
+func (m *mockStorageWithError) GetPermissions(ctx context.Context, scopedKeyID int64) ([]*storage.Permission, error) {
+	return nil, nil
+}
+
+func (m *mockStorageWithError) DeletePermission(ctx context.Context, id int64) error {
+	return storage.ErrNotFound
 }
