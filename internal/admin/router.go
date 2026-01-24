@@ -16,11 +16,10 @@ func (h *Handler) NewRouter() chi.Router {
 	// Public endpoints (no auth)
 	r.Get("/health", h.HandleHealth)
 	r.Get("/ready", h.HandleReady)
-	// Routes added by later issues:
-	// - POST /login (Issue 2)
-	// - POST /logout (Issue 2)
+	r.Post("/login", h.HandleLogin)
+	r.Post("/logout", h.HandleLogout)
 
-	// Admin API (token auth, Issue 3)
+	// Admin API (token auth)
 	r.Route("/api", func(r chi.Router) {
 		r.Use(h.TokenAuthMiddleware)
 		// Handlers added by Issue 4:

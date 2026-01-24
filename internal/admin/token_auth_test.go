@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/sipico/bunny-api-proxy/internal/storage"
 )
@@ -85,7 +86,7 @@ func TestTokenAuthMiddleware(t *testing.T) {
 				},
 			}
 
-			h := NewHandler(mock, slog.Default())
+			h := NewHandler(mock, NewSessionStore(24*time.Hour), slog.Default())
 
 			// Create test handler that checks context
 			var contextHadToken bool
