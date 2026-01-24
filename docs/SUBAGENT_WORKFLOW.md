@@ -371,4 +371,50 @@ The script parses JSONL files and extracts:
 
 **Cost calculation:**
 - Haiku: $0.80/1M input, $4.00/1M output, $0.08/1M cache read, $1.00/1M cache write
-- Opus: $15.00/1M input, $75.00/1M output
+- Opus: $15.00/1M input, $75.00/1M output, $1.50/1M cache read, $18.75/1M cache write
+
+## Coordinator Cost Optimization
+
+**Reality check:** In the bunny-api-proxy project, the coordinator (Opus) cost $2,473 while subagents (Haiku) cost only $18. The coordinator dominates total project cost.
+
+| Component | Cost | % of Total |
+|-----------|------|------------|
+| Coordinator (Opus) | $2,473 | 99.3% |
+| Subagents (Haiku) | $18 | 0.7% |
+| **Total** | **$2,491** | |
+
+### Why Coordinator Costs Dominate
+
+1. **Long-running sessions** - Coordinator stays active across multiple subagent tasks
+2. **Context accumulation** - Each turn adds to the conversation history
+3. **Opus pricing** - 19x more expensive than Haiku for input, 19x for output
+4. **Design overhead** - Specs, reviews, orchestration all happen in Opus
+
+### Optimization Strategies
+
+| Strategy | Potential Savings | Trade-off |
+|----------|------------------|-----------|
+| **Batch task creation** | High | Create all issues in one pass before spawning any subagents |
+| **Shorter sessions** | High | End session after setup, start new session for reviews |
+| **Delegate more to Haiku** | Medium | Use Haiku for exploration, research, initial design |
+| **Prescriptive specs** | Medium | Less back-and-forth during implementation |
+| **Parallel subagents** | Low | Reduces coordinator wait time, not token usage |
+
+### When to Use Each Model
+
+| Task Type | Recommended Model | Rationale |
+|-----------|------------------|-----------|
+| Architecture decisions | Opus | Needs deep reasoning |
+| Issue/spec creation | Opus | Quality specs save subagent costs |
+| Code exploration | Haiku | Cheaper for search/read tasks |
+| Implementation | Haiku | 99% savings on coding |
+| Code review | Opus | Catches subtle issues |
+| PR merge | Opus (minimal) | Simple commands, low cost |
+
+### Session Management Tips
+
+1. **Plan before starting** - Have a clear task list before engaging the coordinator
+2. **Batch similar work** - Create all related issues at once, spawn subagents together
+3. **Use concise prompts** - The coordinator already knows context; don't repeat
+4. **End sessions cleanly** - Don't leave sessions running idle
+5. **Consider session splits** - Design phase → end session → Implementation phase → end session → Review phase
