@@ -8,4 +8,7 @@ var (
 
 	// ErrDecryption is returned when decryption fails due to wrong key or corrupted data.
 	ErrDecryption = errors.New("decryption failed: wrong key or corrupted data")
+
+	// ErrNotFound is returned when a requested resource is not found.
+	ErrNotFound = errors.New("not found")
 )
