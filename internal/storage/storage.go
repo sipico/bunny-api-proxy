@@ -22,6 +22,12 @@ type Storage interface {
 	GetPermissions(ctx context.Context, scopedKeyID int64) ([]*Permission, error)
 	DeletePermission(ctx context.Context, id int64) error
 
+	// AdminToken operations
+	CreateAdminToken(ctx context.Context, name, token string) (int64, error)
+	ValidateAdminToken(ctx context.Context, token string) (*AdminToken, error)
+	ListAdminTokens(ctx context.Context) ([]*AdminToken, error)
+	DeleteAdminToken(ctx context.Context, id int64) error
+
 	// Lifecycle
 	Close() error
 }
