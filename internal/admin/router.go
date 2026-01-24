@@ -28,11 +28,13 @@ func (h *Handler) NewRouter() chi.Router {
 		r.Delete("/tokens/{id}", h.HandleDeleteToken)
 	})
 
-	// Protected web UI (session auth, added by Issue 5+)
-	// r.Group(func(r chi.Router) {
-	//     r.Use(h.SessionMiddleware)
-	//     // Web UI routes here
-	// })
+	// Protected web UI (session auth)
+	r.Group(func(r chi.Router) {
+		r.Use(h.SessionMiddleware)
+		r.Get("/", h.HandleDashboard)
+		r.Get("/master-key", h.HandleMasterKeyForm)
+		r.Post("/master-key", h.HandleSetMasterKey)
+	})
 
 	return r
 }

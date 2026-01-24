@@ -24,6 +24,14 @@ func (m *mockStorageForSession) Close() error {
 	return m.closeErr
 }
 
+func (m *mockStorageForSession) GetMasterAPIKey(ctx context.Context) (string, error) {
+	return "", nil
+}
+
+func (m *mockStorageForSession) SetMasterAPIKey(ctx context.Context, key string) error {
+	return nil
+}
+
 func (m *mockStorageForSession) ValidateAdminToken(ctx context.Context, token string) (*storage.AdminToken, error) {
 	return nil, storage.ErrNotFound
 }
