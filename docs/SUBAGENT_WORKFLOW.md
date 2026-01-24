@@ -101,15 +101,18 @@ WORKFLOW:
 6. Create branch, commit, push
 7. Create PR to main
 8. Wait for CI to pass (check with: gh pr checks XX --repo [owner/repo])
-9. Post comment: completion summary
-10. Post comment: token usage (Input: X, Output: Y, Total: Z)
+9. Verify PR shows all checks passing (wait for "All checks have passed")
+10. Post comment: completion summary
+11. Post comment: token usage (Input: X, Output: Y, Total: Z)
 
 If CI fails, fix the issue and push again before declaring complete.
+If PR checks are still pending, wait for them to complete before declaring success.
 ```
 
 **Critical elements:**
 - Explicit branch name (never use `<your-session-id>`)
 - Require CI validation
+- **Require PR check verification** - don't declare success until PR shows green
 - Standardized token reporting format
 
 ### Phase 4: Execution Patterns
@@ -144,6 +147,148 @@ Run: git fetch origin main && git merge origin/main
 Keep ALL code from both branches.
 Validate and push."
 ```
+
+### Phase 4a: Git Worktree Isolation for Parallel Execution
+
+**Problem:** When running multiple sub-agents in parallel, they all share the same working directory (`/home/user/project`). This causes:
+- Agents see each other's uncommitted changes
+- File interference and scope violations
+- Race conditions on go.mod/go.sum
+- Confused git state
+
+**Solution:** Use git worktree to give each agent its own isolated directory.
+
+#### How Git Worktree Works
+
+Git worktree creates separate working directories that share the same `.git` database:
+
+```
+/home/user/bunny-api-proxy/          # Main checkout (main branch)
+/home/user/bunny-api-proxy-wt-48/    # Worktree for issue #48
+/home/user/bunny-api-proxy-wt-49/    # Worktree for issue #49
+/home/user/bunny-api-proxy-wt-50/    # Worktree for issue #50
+```
+
+Each worktree:
+- Has its own files (complete isolation)
+- Can be on a different branch
+- Shares git objects (efficient, no duplication)
+- Can run builds/tests independently
+
+#### Issue Template with Worktree Setup
+
+Add this section to issues when parallel execution is planned:
+
+```markdown
+## ⚠️ CRITICAL: Git Worktree Workflow
+
+**You MUST use git worktree to avoid interfering with other parallel sub-agents.**
+
+### Setup Workflow
+
+```bash
+# 1. Create isolated worktree for this issue
+ISSUE_NUM=<this-issue-number>
+BRANCH_NAME="claude/issue-${ISSUE_NUM}-[SESSION_ID]"
+WORKTREE_DIR="/home/user/[project]-wt-${ISSUE_NUM}"
+
+cd /home/user/[project]
+git worktree add "${WORKTREE_DIR}" -b "${BRANCH_NAME}" main
+
+# 2. Work in the worktree (ALL commands must run here)
+cd "${WORKTREE_DIR}"
+
+# 3. Do all your work (read files, write code, test, commit)
+# ... implementation ...
+
+# 4. Push and verify CI BEFORE creating PR
+git push -u origin "${BRANCH_NAME}"
+
+# Wait for CI to complete
+sleep 30
+
+# 5. Check CI status - MUST BE PASSING before PR creation
+gh run list --repo [owner/repo] --branch "${BRANCH_NAME}" --limit 1
+# If CI fails, fix issues, commit, push, and check again
+
+# 6. Create PR ONLY after CI passes
+gh pr create --repo [owner/repo] --base main --head "${BRANCH_NAME}" --title "..." --body "..."
+
+# 7. Verify PR checks pass before declaring success
+gh pr checks [PR#] --repo [owner/repo] --watch
+# Wait until all checks show "pass" before reporting completion
+
+# 8. Cleanup when done (AFTER PR is fully green)
+cd /home/user/[project]
+git worktree remove "${WORKTREE_DIR}"
+```
+
+### Why This Matters
+
+- **Worktree isolation**: Prevents interference between parallel sub-agents
+- **CI verification**: Ensures quality before creating PR
+- **PR check verification**: Ensures PR is ready to merge before reporting success
+- **Clean history**: No fixup commits after PR creation
+```
+
+#### Worktree Management Commands
+
+**List all worktrees:**
+```bash
+git worktree list
+```
+
+**Remove a worktree:**
+```bash
+git worktree remove /path/to/worktree
+# Or force remove if there are uncommitted changes:
+git worktree remove --force /path/to/worktree
+```
+
+**Cleanup orphaned worktrees:**
+```bash
+git worktree prune
+```
+
+#### When to Use Worktrees
+
+| Scenario | Use Worktree? | Reason |
+|----------|---------------|---------|
+| Single sequential task | No | Unnecessary overhead |
+| 2+ parallel tasks | **Yes** | Prevents interference |
+| Tasks on different packages | Yes | Even if unlikely to conflict |
+| Tasks with go.mod changes | **Yes (critical)** | Avoids race conditions |
+| Quick fix on existing branch | No | Just switch branches |
+
+#### Go Module Conflicts with Worktrees
+
+When parallel tasks both add dependencies, they'll conflict on `go.mod` and `go.sum` during merge.
+
+**Resolution strategy:**
+
+```bash
+# After first PR merges, rebase remaining PRs:
+cd /path/to/worktree
+git fetch origin main
+git rebase origin/main
+
+# Conflict on go.mod/go.sum?
+git checkout --theirs go.mod go.sum
+go mod tidy
+git add go.mod go.sum
+git rebase --continue
+
+# Verify builds
+go build ./...
+go test ./...
+
+# Push update
+git push -f origin [branch-name]
+
+# Wait for CI, then merge PR
+```
+
+**Key insight:** Let `go mod tidy` regenerate the files rather than manually merging. Go's tooling knows the correct dependency graph.
 
 ### Phase 5: Review and Merge (Opus)
 
@@ -264,6 +409,57 @@ func (c *Client) GetZone(ctx context.Context, id int64) (*Zone, error)
 | Tasks modify different files in same package | Usually safe |
 | Tasks add methods to same file | Sequential or expect conflicts |
 | Tasks modify same function | Must be sequential |
+
+### Critical Lesson: Worktree Isolation Required for Parallel Execution
+
+**Discovered:** January 2026, storage layer implementation
+
+**Problem with shared checkout:**
+- Sub-agents working in `/home/user/project` could see each other's uncommitted files
+- Led to scope violations (agent #39 created files meant for agent #40)
+- 10+ CI fix commits across PRs
+- Required manual cleanup
+
+**Solution with worktrees:**
+- Each agent in `/home/user/project-wt-{issue}/`
+- Complete file isolation
+- Zero interference
+- 100% CI pass rate on PR creation
+
+**Results comparison:**
+
+| Metric | Shared Checkout | Git Worktree |
+|--------|----------------|--------------|
+| Scope adherence | ❌ Failed | ✅ Perfect |
+| CI on first push | 0/3 PRs | 3/3 PRs |
+| Fix commits needed | 10+ | 0 |
+| File interference | Yes | None |
+
+**Recommendation:** **Always use worktrees for parallel sub-agents.** The setup overhead (~5 lines in issue) prevents hours of debugging.
+
+### PR Check Verification
+
+**Critical addition:** Sub-agents must verify PR checks pass before declaring success.
+
+**Before:**
+```bash
+7. Create PR to main
+8. Wait for CI to pass
+9. Post completion summary
+```
+
+**After:**
+```bash
+7. Create PR to main
+8. Wait for CI to pass
+9. Verify PR shows all checks passing: gh pr checks [PR#] --watch
+10. Post completion summary (only after PR is fully green)
+```
+
+**Why this matters:**
+- CI can pass on push but PR checks may still be pending
+- Coordinator needs confirmation that PR is ready to merge
+- Prevents premature "success" reports
 
 ## Token Usage Tracking
 
