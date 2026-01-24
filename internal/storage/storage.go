@@ -3,7 +3,6 @@ package storage
 
 import (
 	"context"
-	"database/sql"
 )
 
 // Storage defines the interface for SQLite persistence operations.

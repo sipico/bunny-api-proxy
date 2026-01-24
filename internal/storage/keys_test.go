@@ -2,7 +2,7 @@ package storage
 
 import (
 	"context"
-	"database/sql"
+	"crypto/rand"
 	"testing"
 	"time"
 
@@ -11,17 +11,14 @@ import (
 
 // TestCreateScopedKey verifies that CreateScopedKey creates a key successfully.
 func TestCreateScopedKey(t *testing.T) {
-	db, err := sql.Open("sqlite3", ":memory:")
+	encryptionKey := make([]byte, 32)
+	_, _ = rand.Read(encryptionKey)
+
+	s, err := New(":memory:", encryptionKey)
 	if err != nil {
-		t.Fatalf("failed to open database: %v", err)
+		t.Fatalf("failed to create storage: %v", err)
 	}
-	defer db.Close()
-
-	if err := InitSchema(db); err != nil {
-		t.Fatalf("InitSchema failed: %v", err)
-	}
-
-	s := NewSQLiteStorage(db)
+	defer func() { _ = s.Close() }()
 	ctx := context.Background()
 
 	// Test 1: Create key successfully
@@ -49,17 +46,14 @@ func TestCreateScopedKey(t *testing.T) {
 // Note: Normal CreateScopedKey calls cannot produce duplicate hashes due to bcrypt's random salts.
 // This test verifies the constraint by manually inserting a duplicate hash.
 func TestCreateScopedKeyDuplicate(t *testing.T) {
-	db, err := sql.Open("sqlite3", ":memory:")
+	encryptionKey := make([]byte, 32)
+	_, _ = rand.Read(encryptionKey)
+
+	s, err := New(":memory:", encryptionKey)
 	if err != nil {
-		t.Fatalf("failed to open database: %v", err)
+		t.Fatalf("failed to create storage: %v", err)
 	}
-	defer db.Close()
-
-	if err := InitSchema(db); err != nil {
-		t.Fatalf("InitSchema failed: %v", err)
-	}
-
-	s := NewSQLiteStorage(db)
+	defer func() { _ = s.Close() }()
 	ctx := context.Background()
 
 	// Create first key normally
@@ -80,7 +74,7 @@ func TestCreateScopedKeyDuplicate(t *testing.T) {
 	storedHash := keys[0].KeyHash
 
 	// Try to manually insert another key with the same hash (simulates duplicate constraint violation)
-	_, err = db.ExecContext(ctx,
+	_, err = s.db.ExecContext(ctx,
 		"INSERT INTO scoped_keys (key_hash, name) VALUES (?, ?)",
 		storedHash, "key-2")
 
@@ -100,17 +94,14 @@ func TestCreateScopedKeyDuplicate(t *testing.T) {
 
 // TestCreateScopedKeyContextCancellation verifies context cancellation works.
 func TestCreateScopedKeyContextCancellation(t *testing.T) {
-	db, err := sql.Open("sqlite3", ":memory:")
+	encryptionKey := make([]byte, 32)
+	_, _ = rand.Read(encryptionKey)
+
+	s, err := New(":memory:", encryptionKey)
 	if err != nil {
-		t.Fatalf("failed to open database: %v", err)
+		t.Fatalf("failed to create storage: %v", err)
 	}
-	defer db.Close()
-
-	if err := InitSchema(db); err != nil {
-		t.Fatalf("InitSchema failed: %v", err)
-	}
-
-	s := NewSQLiteStorage(db)
+	defer func() { _ = s.Close() }()
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel immediately
 
@@ -122,17 +113,14 @@ func TestCreateScopedKeyContextCancellation(t *testing.T) {
 
 // TestGetScopedKeyByHash verifies that GetScopedKeyByHash retrieves created keys.
 func TestGetScopedKeyByHash(t *testing.T) {
-	db, err := sql.Open("sqlite3", ":memory:")
+	encryptionKey := make([]byte, 32)
+	_, _ = rand.Read(encryptionKey)
+
+	s, err := New(":memory:", encryptionKey)
 	if err != nil {
-		t.Fatalf("failed to open database: %v", err)
+		t.Fatalf("failed to create storage: %v", err)
 	}
-	defer db.Close()
-
-	if err := InitSchema(db); err != nil {
-		t.Fatalf("InitSchema failed: %v", err)
-	}
-
-	s := NewSQLiteStorage(db)
+	defer func() { _ = s.Close() }()
 	ctx := context.Background()
 
 	// Create a key
@@ -178,17 +166,14 @@ func TestGetScopedKeyByHash(t *testing.T) {
 
 // TestGetScopedKeyByHashNotFound verifies ErrNotFound for non-existent hash.
 func TestGetScopedKeyByHashNotFound(t *testing.T) {
-	db, err := sql.Open("sqlite3", ":memory:")
+	encryptionKey := make([]byte, 32)
+	_, _ = rand.Read(encryptionKey)
+
+	s, err := New(":memory:", encryptionKey)
 	if err != nil {
-		t.Fatalf("failed to open database: %v", err)
+		t.Fatalf("failed to create storage: %v", err)
 	}
-	defer db.Close()
-
-	if err := InitSchema(db); err != nil {
-		t.Fatalf("InitSchema failed: %v", err)
-	}
-
-	s := NewSQLiteStorage(db)
+	defer func() { _ = s.Close() }()
 	ctx := context.Background()
 
 	// Try to get non-existent key
@@ -200,17 +185,14 @@ func TestGetScopedKeyByHashNotFound(t *testing.T) {
 
 // TestListScopedKeys verifies listing of scoped keys.
 func TestListScopedKeys(t *testing.T) {
-	db, err := sql.Open("sqlite3", ":memory:")
+	encryptionKey := make([]byte, 32)
+	_, _ = rand.Read(encryptionKey)
+
+	s, err := New(":memory:", encryptionKey)
 	if err != nil {
-		t.Fatalf("failed to open database: %v", err)
+		t.Fatalf("failed to create storage: %v", err)
 	}
-	defer db.Close()
-
-	if err := InitSchema(db); err != nil {
-		t.Fatalf("InitSchema failed: %v", err)
-	}
-
-	s := NewSQLiteStorage(db)
+	defer func() { _ = s.Close() }()
 	ctx := context.Background()
 
 	// Test 1: Empty list initially
@@ -272,17 +254,14 @@ func TestListScopedKeys(t *testing.T) {
 
 // TestDeleteScopedKey verifies deletion of scoped keys.
 func TestDeleteScopedKey(t *testing.T) {
-	db, err := sql.Open("sqlite3", ":memory:")
+	encryptionKey := make([]byte, 32)
+	_, _ = rand.Read(encryptionKey)
+
+	s, err := New(":memory:", encryptionKey)
 	if err != nil {
-		t.Fatalf("failed to open database: %v", err)
+		t.Fatalf("failed to create storage: %v", err)
 	}
-	defer db.Close()
-
-	if err := InitSchema(db); err != nil {
-		t.Fatalf("InitSchema failed: %v", err)
-	}
-
-	s := NewSQLiteStorage(db)
+	defer func() { _ = s.Close() }()
 	ctx := context.Background()
 
 	// Create a key
@@ -320,17 +299,14 @@ func TestDeleteScopedKey(t *testing.T) {
 
 // TestDeleteScopedKeyNotFound verifies ErrNotFound for deleting non-existent key.
 func TestDeleteScopedKeyNotFound(t *testing.T) {
-	db, err := sql.Open("sqlite3", ":memory:")
+	encryptionKey := make([]byte, 32)
+	_, _ = rand.Read(encryptionKey)
+
+	s, err := New(":memory:", encryptionKey)
 	if err != nil {
-		t.Fatalf("failed to open database: %v", err)
+		t.Fatalf("failed to create storage: %v", err)
 	}
-	defer db.Close()
-
-	if err := InitSchema(db); err != nil {
-		t.Fatalf("InitSchema failed: %v", err)
-	}
-
-	s := NewSQLiteStorage(db)
+	defer func() { _ = s.Close() }()
 	ctx := context.Background()
 
 	// Try to delete non-existent key
@@ -342,17 +318,14 @@ func TestDeleteScopedKeyNotFound(t *testing.T) {
 
 // TestScopedKeyWorkflow tests a complete workflow.
 func TestScopedKeyWorkflow(t *testing.T) {
-	db, err := sql.Open("sqlite3", ":memory:")
+	encryptionKey := make([]byte, 32)
+	_, _ = rand.Read(encryptionKey)
+
+	s, err := New(":memory:", encryptionKey)
 	if err != nil {
-		t.Fatalf("failed to open database: %v", err)
+		t.Fatalf("failed to create storage: %v", err)
 	}
-	defer db.Close()
-
-	if err := InitSchema(db); err != nil {
-		t.Fatalf("InitSchema failed: %v", err)
-	}
-
-	s := NewSQLiteStorage(db)
+	defer func() { _ = s.Close() }()
 	ctx := context.Background()
 
 	// 1. Create multiple keys
@@ -412,16 +385,13 @@ func TestScopedKeyWorkflow(t *testing.T) {
 
 // TestSQLiteStorageClose verifies that Close() properly closes the database.
 func TestSQLiteStorageClose(t *testing.T) {
-	db, err := sql.Open("sqlite3", ":memory:")
+	encryptionKey := make([]byte, 32)
+	_, _ = rand.Read(encryptionKey)
+
+	storage, err := New(":memory:", encryptionKey)
 	if err != nil {
-		t.Fatalf("failed to open test database: %v", err)
+		t.Fatalf("failed to create storage: %v", err)
 	}
-
-	if err := InitSchema(db); err != nil {
-		t.Fatalf("InitSchema failed: %v", err)
-	}
-
-	storage := NewSQLiteStorage(db)
 
 	// Close should succeed
 	if err := storage.Close(); err != nil {
