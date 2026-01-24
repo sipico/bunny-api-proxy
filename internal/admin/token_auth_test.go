@@ -25,6 +25,18 @@ func (m *mockStorageWithToken) ValidateAdminToken(ctx context.Context, token str
 	return nil, storage.ErrNotFound
 }
 
+func (m *mockStorageWithToken) CreateAdminToken(ctx context.Context, name, token string) (int64, error) {
+	return 0, nil
+}
+
+func (m *mockStorageWithToken) ListAdminTokens(ctx context.Context) ([]*storage.AdminToken, error) {
+	return make([]*storage.AdminToken, 0), nil
+}
+
+func (m *mockStorageWithToken) DeleteAdminToken(ctx context.Context, id int64) error {
+	return nil
+}
+
 func TestTokenAuthMiddleware(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -86,7 +98,7 @@ func TestTokenAuthMiddleware(t *testing.T) {
 				},
 			}
 
-			h := NewHandler(mock, NewSessionStore(24*time.Hour), slog.Default())
+			h := NewHandler(mock, NewSessionStore(24*time.Hour), new(slog.LevelVar), slog.Default())
 
 			// Create test handler that checks context
 			var contextHadToken bool

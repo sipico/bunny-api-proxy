@@ -22,8 +22,7 @@ type Handler struct {
 	storage      Storage
 	sessionStore *SessionStore
 	logger       *slog.Logger
-	// Additional fields added by later issues:
-	// - logLevel (Issue 4)
+	logLevel     *slog.LevelVar
 }
 
 // Storage interface for admin operations
@@ -34,16 +33,25 @@ type Storage interface {
 
 	// AdminToken operations (Issue 3)
 	ValidateAdminToken(ctx context.Context, token string) (*storage.AdminToken, error)
+
+	// AdminToken CRUD (Issue 4)
+	CreateAdminToken(ctx context.Context, name, token string) (int64, error)
+	ListAdminTokens(ctx context.Context) ([]*storage.AdminToken, error)
+	DeleteAdminToken(ctx context.Context, id int64) error
 }
 
 // NewHandler creates an admin handler
-func NewHandler(storage Storage, sessionStore *SessionStore, logger *slog.Logger) *Handler {
+func NewHandler(storage Storage, sessionStore *SessionStore, logLevel *slog.LevelVar, logger *slog.Logger) *Handler {
 	if logger == nil {
 		logger = slog.Default()
+	}
+	if logLevel == nil {
+		logLevel = new(slog.LevelVar)
 	}
 	return &Handler{
 		storage:      storage,
 		sessionStore: sessionStore,
+		logLevel:     logLevel,
 		logger:       logger,
 	}
 }
