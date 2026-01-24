@@ -26,98 +26,6 @@ func (mt *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	}, nil
 }
 
-// TestGetZone tests the GetZone method with various scenarios.
-func TestGetZone(t *testing.T) {
-	t.Run("success with zone and records", func(t *testing.T) {
-		server := mockbunny.New()
-		defer server.Close()
-
-		// Add a zone with some records
-		zoneID := server.AddZoneWithRecords("example.com", []mockbunny.Record{
-			{
-				Type:  "A",
-				Name:  "www",
-				Value: "1.2.3.4",
-				TTL:   300,
-			},
-			{
-				Type:  "CNAME",
-				Name:  "alias",
-				Value: "www.example.com",
-				TTL:   300,
-			},
-		})
-
-		client := NewClient("test-key", WithBaseURL(server.URL()))
-		zone, err := client.GetZone(context.Background(), zoneID)
-
-		if err != nil {
-			t.Fatalf("GetZone failed: %v", err)
-		}
-
-		if zone == nil {
-			t.Fatal("expected non-nil zone")
-		}
-
-		if zone.ID != zoneID {
-			t.Errorf("expected zone ID %d, got %d", zoneID, zone.ID)
-		}
-
-		if zone.Domain != "example.com" {
-			t.Errorf("expected domain example.com, got %s", zone.Domain)
-		}
-
-		if len(zone.Records) != 2 {
-			t.Errorf("expected 2 records, got %d", len(zone.Records))
-		}
-
-		// Verify record details
-		if zone.Records[0].Type != "A" {
-			t.Errorf("expected first record type A, got %s", zone.Records[0].Type)
-		}
-
-		if zone.Records[1].Type != "CNAME" {
-			t.Errorf("expected second record type CNAME, got %s", zone.Records[1].Type)
-		}
-	})
-
-	t.Run("not found error (404)", func(t *testing.T) {
-		server := mockbunny.New()
-		defer server.Close()
-
-		client := NewClient("test-key", WithBaseURL(server.URL()))
-		zone, err := client.GetZone(context.Background(), 999)
-
-		if err != ErrNotFound {
-			t.Errorf("expected ErrNotFound, got %v", err)
-		}
-
-		if zone != nil {
-			t.Errorf("expected nil zone, got %v", zone)
-		}
-	})
-
-	t.Run("unauthorized error (401)", func(t *testing.T) {
-		// Create a custom HTTP client that returns 401
-		transport := &mockTransport{
-			statusCode: http.StatusUnauthorized,
-			body:       []byte(""),
-		}
-		httpClient := &http.Client{Transport: transport}
-
-		client := NewClient("test-key", WithHTTPClient(httpClient))
-		zone, err := client.GetZone(context.Background(), 1)
-
-		if err != ErrUnauthorized {
-			t.Errorf("expected ErrUnauthorized, got %v", err)
-		}
-
-		if zone != nil {
-			t.Errorf("expected nil zone, got %v", zone)
-		}
-	})
-}
-
 // TestListZones tests the ListZones method with various scenarios.
 func TestListZones(t *testing.T) {
 	t.Run("success with zones", func(t *testing.T) {
@@ -221,13 +129,13 @@ func TestListZones(t *testing.T) {
 	})
 }
 
-// TestDeleteRecord tests the DeleteRecord method with various scenarios.
-func TestDeleteRecord(t *testing.T) {
-	t.Run("success deleting record", func(t *testing.T) {
+// TestGetZone tests the GetZone method with various scenarios.
+func TestGetZone(t *testing.T) {
+	t.Run("success with zone and records", func(t *testing.T) {
 		server := mockbunny.New()
 		defer server.Close()
 
-		// Add a zone with a record
+		// Add a zone with some records
 		zoneID := server.AddZoneWithRecords("example.com", []mockbunny.Record{
 			{
 				Type:  "A",
@@ -235,54 +143,60 @@ func TestDeleteRecord(t *testing.T) {
 				Value: "1.2.3.4",
 				TTL:   300,
 			},
+			{
+				Type:  "CNAME",
+				Name:  "alias",
+				Value: "www.example.com",
+				TTL:   300,
+			},
 		})
 
-		// Get the record ID from the zone
-		zone := server.GetZone(zoneID)
-		if zone == nil || len(zone.Records) == 0 {
-			t.Fatalf("expected zone with record")
-		}
-		recordID := zone.Records[0].ID
-
-		// Delete the record
 		client := NewClient("test-key", WithBaseURL(server.URL()))
-		err := client.DeleteRecord(context.Background(), zoneID, recordID)
+		zone, err := client.GetZone(context.Background(), zoneID)
 
 		if err != nil {
-			t.Fatalf("DeleteRecord failed: %v", err)
+			t.Fatalf("GetZone failed: %v", err)
 		}
 
-		// Verify record is deleted
-		updatedZone := server.GetZone(zoneID)
-		if len(updatedZone.Records) != 0 {
-			t.Errorf("expected 0 records after deletion, got %d", len(updatedZone.Records))
+		if zone == nil {
+			t.Fatal("expected non-nil zone")
+		}
+
+		if zone.ID != zoneID {
+			t.Errorf("expected zone ID %d, got %d", zoneID, zone.ID)
+		}
+
+		if zone.Domain != "example.com" {
+			t.Errorf("expected domain example.com, got %s", zone.Domain)
+		}
+
+		if len(zone.Records) != 2 {
+			t.Errorf("expected 2 records, got %d", len(zone.Records))
+		}
+
+		// Verify record details
+		if zone.Records[0].Type != "A" {
+			t.Errorf("expected first record type A, got %s", zone.Records[0].Type)
+		}
+
+		if zone.Records[1].Type != "CNAME" {
+			t.Errorf("expected second record type CNAME, got %s", zone.Records[1].Type)
 		}
 	})
 
-	t.Run("zone not found error (404)", func(t *testing.T) {
+	t.Run("not found error (404)", func(t *testing.T) {
 		server := mockbunny.New()
 		defer server.Close()
 
 		client := NewClient("test-key", WithBaseURL(server.URL()))
-		err := client.DeleteRecord(context.Background(), 999, 1)
+		zone, err := client.GetZone(context.Background(), 999)
 
 		if err != ErrNotFound {
 			t.Errorf("expected ErrNotFound, got %v", err)
 		}
-	})
 
-	t.Run("record not found error (404)", func(t *testing.T) {
-		server := mockbunny.New()
-		defer server.Close()
-
-		// Add a zone without records
-		zoneID := server.AddZone("example.com")
-
-		client := NewClient("test-key", WithBaseURL(server.URL()))
-		err := client.DeleteRecord(context.Background(), zoneID, 999)
-
-		if err != ErrNotFound {
-			t.Errorf("expected ErrNotFound, got %v", err)
+		if zone != nil {
+			t.Errorf("expected nil zone, got %v", zone)
 		}
 	})
 
@@ -295,10 +209,14 @@ func TestDeleteRecord(t *testing.T) {
 		httpClient := &http.Client{Transport: transport}
 
 		client := NewClient("test-key", WithHTTPClient(httpClient))
-		err := client.DeleteRecord(context.Background(), 1, 1)
+		zone, err := client.GetZone(context.Background(), 1)
 
 		if err != ErrUnauthorized {
 			t.Errorf("expected ErrUnauthorized, got %v", err)
+		}
+
+		if zone != nil {
+			t.Errorf("expected nil zone, got %v", zone)
 		}
 	})
 }
@@ -473,6 +391,88 @@ func TestAddRecord(t *testing.T) {
 
 		if record != nil {
 			t.Errorf("expected nil record, got %v", record)
+		}
+	})
+}
+
+// TestDeleteRecord tests the DeleteRecord method with various scenarios.
+func TestDeleteRecord(t *testing.T) {
+	t.Run("success deleting record", func(t *testing.T) {
+		server := mockbunny.New()
+		defer server.Close()
+
+		// Add a zone with a record
+		zoneID := server.AddZoneWithRecords("example.com", []mockbunny.Record{
+			{
+				Type:  "A",
+				Name:  "www",
+				Value: "1.2.3.4",
+				TTL:   300,
+			},
+		})
+
+		// Get the record ID from the zone
+		zone := server.GetZone(zoneID)
+		if zone == nil || len(zone.Records) == 0 {
+			t.Fatalf("expected zone with record")
+		}
+		recordID := zone.Records[0].ID
+
+		// Delete the record
+		client := NewClient("test-key", WithBaseURL(server.URL()))
+		err := client.DeleteRecord(context.Background(), zoneID, recordID)
+
+		if err != nil {
+			t.Fatalf("DeleteRecord failed: %v", err)
+		}
+
+		// Verify record is deleted
+		updatedZone := server.GetZone(zoneID)
+		if len(updatedZone.Records) != 0 {
+			t.Errorf("expected 0 records after deletion, got %d", len(updatedZone.Records))
+		}
+	})
+
+	t.Run("zone not found error (404)", func(t *testing.T) {
+		server := mockbunny.New()
+		defer server.Close()
+
+		client := NewClient("test-key", WithBaseURL(server.URL()))
+		err := client.DeleteRecord(context.Background(), 999, 1)
+
+		if err != ErrNotFound {
+			t.Errorf("expected ErrNotFound, got %v", err)
+		}
+	})
+
+	t.Run("record not found error (404)", func(t *testing.T) {
+		server := mockbunny.New()
+		defer server.Close()
+
+		// Add a zone without records
+		zoneID := server.AddZone("example.com")
+
+		client := NewClient("test-key", WithBaseURL(server.URL()))
+		err := client.DeleteRecord(context.Background(), zoneID, 999)
+
+		if err != ErrNotFound {
+			t.Errorf("expected ErrNotFound, got %v", err)
+		}
+	})
+
+	t.Run("unauthorized error (401)", func(t *testing.T) {
+		// Create a custom HTTP client that returns 401
+		transport := &mockTransport{
+			statusCode: http.StatusUnauthorized,
+			body:       []byte(""),
+		}
+		httpClient := &http.Client{Transport: transport}
+
+		client := NewClient("test-key", WithHTTPClient(httpClient))
+		err := client.DeleteRecord(context.Background(), 1, 1)
+
+		if err != ErrUnauthorized {
+			t.Errorf("expected ErrUnauthorized, got %v", err)
 		}
 	})
 }
