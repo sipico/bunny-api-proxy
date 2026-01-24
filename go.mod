@@ -7,3 +7,8 @@ require (
 	golang.org/x/crypto v0.47.0
 	modernc.org/sqlite v1.28.0
 )
+
+require (
+	golang.org/x/sys v0.20.0 // indirect
+	modernc.org/libc v1.41.0 // indirect
+)
