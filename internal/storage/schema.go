@@ -106,4 +106,3 @@ func InitSchema(db *sql.DB) error {
 func MigrateSchema(db *sql.DB) error {
 	return InitSchema(db)
 }
-// CI trigger
