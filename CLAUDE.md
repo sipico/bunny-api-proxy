@@ -115,7 +115,25 @@ migrations/          # Database migrations
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) - Technical decisions and rationale
 - [FUTURE_ENHANCEMENTS.md](FUTURE_ENHANCEMENTS.md) - Deferred features and ideas
+- [docs/SUBAGENT_WORKFLOW.md](docs/SUBAGENT_WORKFLOW.md) - Cost-effective sub-agent patterns
 - `.github/workflows/ci.yml` - CI/CD pipeline
+
+## Sub-Agent Workflow
+
+For implementation tasks, use Haiku sub-agents to save ~83% on costs:
+
+1. **Opus (coordinator):** Creates detailed GitHub issues with specs
+2. **Haiku (sub-agent):** Implements code, tests, runs validation
+3. **Opus (coordinator):** Reviews and merges PRs
+
+See [docs/SUBAGENT_WORKFLOW.md](docs/SUBAGENT_WORKFLOW.md) for detailed patterns.
+
+**Quick reference:**
+- Issue = source of truth (full spec)
+- Prompt = minimal (just workflow steps)
+- Always use explicit branch names (never `<your-session-id>`)
+- Sub-agent must verify CI passes before declaring complete
+- Token usage reported as: `Input: X, Output: Y, Total: Z`
 
 ## MVP Scope
 
