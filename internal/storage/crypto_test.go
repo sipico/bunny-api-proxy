@@ -8,8 +8,8 @@ import (
 )
 
 func TestEncryptDecryptAPIKey(t *testing.T) {
-	// Create a valid 32-byte encryption key
-	encryptionKey := []byte("this-is-a-32-byte-key-for-aes!")
+	// Create a valid 32-byte encryption key (must be exactly 32 bytes)
+	encryptionKey := []byte("12345678901234567890123456789012") // exactly 32 bytes
 
 	tests := []struct {
 		name      string
@@ -88,7 +88,7 @@ func TestEncryptDecryptAPIKey(t *testing.T) {
 
 func TestEncryptRandomNonce(t *testing.T) {
 	// Ensure different plaintexts produce different ciphertexts due to random nonces
-	encryptionKey := []byte("this-is-a-32-byte-key-for-aes!")
+	encryptionKey := []byte("12345678901234567890123456789012") // exactly 32 bytes
 	apiKey := "test-api-key"
 
 	encrypted1, err := EncryptAPIKey(apiKey, encryptionKey)
@@ -116,8 +116,8 @@ func TestEncryptRandomNonce(t *testing.T) {
 
 func TestDecryptWithWrongKey(t *testing.T) {
 	// Encrypt with one key, try to decrypt with another
-	encryptionKey1 := []byte("this-is-a-32-byte-key-for-aes!")
-	encryptionKey2 := []byte("different-key-that-is-32-bytes!")
+	encryptionKey1 := []byte("12345678901234567890123456789012") // exactly 32 bytes
+	encryptionKey2 := []byte("abcdefghijklmnopqrstuvwxyz012345") // different 32 bytes
 	apiKey := "test-api-key"
 
 	encrypted, err := EncryptAPIKey(apiKey, encryptionKey1)
@@ -132,7 +132,7 @@ func TestDecryptWithWrongKey(t *testing.T) {
 }
 
 func TestDecryptCorruptedData(t *testing.T) {
-	encryptionKey := []byte("this-is-a-32-byte-key-for-aes!")
+	encryptionKey := []byte("12345678901234567890123456789012") // exactly 32 bytes
 
 	tests := []struct {
 		name      string
@@ -148,7 +148,7 @@ func TestDecryptCorruptedData(t *testing.T) {
 		},
 		{
 			name:      "corrupted ciphertext",
-			encrypted: []byte("this-is-a-32-byte-key-for-aes!" + "corrupted"),
+			encrypted: []byte("123456789012345678901234567890123corrupted"),
 		},
 	}
 
@@ -203,12 +203,12 @@ func TestHashVerifyKeySuccess(t *testing.T) {
 			key:  "",
 		},
 		{
-			name: "very long key",
-			key:  string(make([]byte, 10000)) + "test",
-		},
-		{
 			name: "special characters",
 			key:  "key!@#$%^&*(){}[]|:;<>?,./~`",
+		},
+		{
+			name: "medium length key",
+			key:  "this-is-a-medium-length-key-for-testing-bcrypt",
 		},
 	}
 
@@ -275,7 +275,7 @@ func TestDifferentInputsDifferentHashes(t *testing.T) {
 }
 
 func TestEncryptEdgeCases(t *testing.T) {
-	encryptionKey := []byte("this-is-a-32-byte-key-for-aes!")
+	encryptionKey := []byte("12345678901234567890123456789012") // exactly 32 bytes
 
 	tests := []struct {
 		name   string
@@ -319,5 +319,16 @@ func TestEncryptEdgeCases(t *testing.T) {
 				t.Fatalf("round-trip encryption/decryption failed: got %q, want %q", decrypted, tt.apiKey)
 			}
 		})
+	}
+}
+
+func TestHashKeyBcryptLimit(t *testing.T) {
+	// bcrypt has a 72-byte limit on password length
+	// Keys longer than 72 bytes should fail
+	longKey := string(make([]byte, 73)) + "a"
+
+	_, err := HashKey(longKey)
+	if err == nil {
+		t.Fatal("HashKey() should fail for keys longer than 72 bytes")
 	}
 }
