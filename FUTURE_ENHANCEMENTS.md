@@ -23,6 +23,15 @@ This document tracks features and improvements deferred from MVP to keep scope m
 
 ## Permission Model
 
+### Response Filtering (Data Privacy)
+
+- [ ] **Filter ListZones response** - Return only zones the scoped key has permission for
+  - Currently: Key for Zone A can see Zones B, C in ListZones response
+  - Desired: ListZones returns only zones with matching permissions
+  - Implementation: Add `FilterResponse()` function in proxy handlers
+  - Empty result = empty array (valid response, not error)
+  - Note: Request validation prevents privilege escalation; this adds data privacy
+
 ### Pattern Matching
 
 - [ ] **Zone name patterns** - e.g., "all .nl domains", "zones containing 'prod'"
