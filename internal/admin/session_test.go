@@ -28,6 +28,18 @@ func (m *mockStorageForSession) ValidateAdminToken(ctx context.Context, token st
 	return nil, storage.ErrNotFound
 }
 
+func (m *mockStorageForSession) CreateAdminToken(ctx context.Context, name, token string) (int64, error) {
+	return 0, nil
+}
+
+func (m *mockStorageForSession) ListAdminTokens(ctx context.Context) ([]*storage.AdminToken, error) {
+	return make([]*storage.AdminToken, 0), nil
+}
+
+func (m *mockStorageForSession) DeleteAdminToken(ctx context.Context, id int64) error {
+	return nil
+}
+
 // TestSessionStoreCreateSession tests session creation
 func TestSessionStoreCreateSession(t *testing.T) {
 	t.Run("generates unique session IDs", func(t *testing.T) {
