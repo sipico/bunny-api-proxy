@@ -23,7 +23,7 @@ func EncryptAPIKey(apiKey string, encryptionKey []byte) ([]byte, error) {
 
 	// Create cipher (safe because key size is already validated)
 	block, _ := aes.NewCipher(encryptionKey) //nolint:errcheck
-	gcm, _ := cipher.NewGCM(block)            //nolint:errcheck
+	gcm, _ := cipher.NewGCM(block)           //nolint:errcheck
 
 	// Generate random nonce
 	nonce := make([]byte, gcm.NonceSize())
@@ -57,7 +57,7 @@ func DecryptAPIKey(encrypted []byte, encryptionKey []byte) (string, error) {
 
 	// Create cipher (safe because key size is already validated)
 	block, _ := aes.NewCipher(encryptionKey) //nolint:errcheck
-	gcm, _ := cipher.NewGCM(block)            //nolint:errcheck
+	gcm, _ := cipher.NewGCM(block)           //nolint:errcheck
 
 	// Extract nonce and ciphertext
 	nonceSize := gcm.NonceSize()
