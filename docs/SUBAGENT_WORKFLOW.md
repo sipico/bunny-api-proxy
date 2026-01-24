@@ -152,6 +152,88 @@ Validate and push."
 3. **Merge:** `gh pr merge XX --repo [owner/repo] --merge`
 4. **Update main:** `git checkout main && git pull`
 
+## Spec Detail Levels
+
+Based on experience from two sub-agent sessions (mockbunny and bunny client), there are two approaches to spec detail:
+
+### Prescriptive Specs (More Detail)
+
+Used in mockbunny session. Issue includes near-complete code:
+
+```markdown
+## Implementation
+
+```go
+func (s *Server) handleListZones(w http.ResponseWriter, r *http.Request) {
+    // Parse query parameters
+    page := 1
+    perPage := 1000
+    // ... full implementation provided
+}
+```
+
+## Test Cases
+
+```go
+func TestListZones_Empty(t *testing.T) {
+    // ... full test code provided
+}
+```
+```
+
+**Pros:**
+- Highly predictable output
+- Less agent interpretation
+- Faster implementation (copy-paste-adjust)
+
+**Cons:**
+- More coordinator effort upfront
+- Less agent learning/adaptation
+- May miss better solutions
+
+**Best for:** Standard patterns, boilerplate, well-understood problems
+
+### Abstract Specs (Less Detail)
+
+Used in bunny client session. Issue includes signatures and behavior:
+
+```markdown
+## Specification
+
+```go
+// GetZone retrieves a single DNS zone by ID, including all its records.
+func (c *Client) GetZone(ctx context.Context, id int64) (*Zone, error)
+```
+
+### Behavior
+- Returns ErrNotFound for 404
+- Returns ErrUnauthorized for 401
+- Includes all records in zone
+```
+
+**Pros:**
+- Less coordinator effort
+- Agent can find optimal implementation
+- Better for complex logic
+
+**Cons:**
+- Less predictable output
+- Needs more guardrails ("do NOT" lists)
+- May need revision cycles
+
+**Best for:** Complex logic, unique problems, when optimal solution unclear
+
+### Choosing the Right Level
+
+| Situation | Recommended Level |
+|-----------|------------------|
+| Standard CRUD handlers | Prescriptive |
+| Boilerplate/scaffolding | Prescriptive |
+| Complex business logic | Abstract |
+| Performance-critical code | Abstract (let agent optimize) |
+| Test utilities | Prescriptive |
+| API clients | Abstract with examples |
+
 ## Lessons Learned
 
 ### What Works Well
