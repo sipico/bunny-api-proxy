@@ -12,6 +12,6 @@ var (
 	// ErrDuplicate is returned when attempting to create a resource that already exists.
 	ErrDuplicate = errors.New("resource already exists")
 
-	// ErrNotFound is returned when a resource is not found.
+	// ErrNotFound is returned when a requested resource does not exist.
 	ErrNotFound = errors.New("resource not found")
 )
