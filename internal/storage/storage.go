@@ -1,7 +1,10 @@
 // Package storage provides types and interfaces for SQLite persistence operations.
 package storage
 
-import "context"
+import (
+	"context"
+	"database/sql"
+)
 
 // Storage defines the interface for SQLite persistence operations.
 type Storage interface {
@@ -22,4 +25,19 @@ type Storage interface {
 
 	// Lifecycle
 	Close() error
+}
+
+// SQLiteStorage implements Storage interface with SQLite backend.
+type SQLiteStorage struct {
+	db *sql.DB
+}
+
+// NewSQLiteStorage creates a new SQLiteStorage instance.
+func NewSQLiteStorage(db *sql.DB) *SQLiteStorage {
+	return &SQLiteStorage{db: db}
+}
+
+// Close closes the database connection.
+func (s *SQLiteStorage) Close() error {
+	return s.db.Close()
 }
