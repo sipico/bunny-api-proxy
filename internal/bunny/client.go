@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"strconv"
 )
 
 const (
@@ -54,30 +56,42 @@ func NewClient(apiKey string, opts ...Option) *Client {
 	return c
 }
 
-// AddRecord creates a new DNS record in the specified zone.
-// Returns the created record with its assigned ID.
-// Returns ErrNotFound if the zone does not exist.
-// Returns ErrUnauthorized if the API key is invalid.
-// Returns APIError for validation errors (400 status).
-func (c *Client) AddRecord(ctx context.Context, zoneID int64, record Record) (*Record, error) {
-	// Build URL with zone ID in path
-	endpoint := fmt.Sprintf("%s/dnszone/%d/records", c.baseURL, zoneID)
+// ListZones retrieves all DNS zones, optionally filtered.
+// Returns the full paginated response.
+func (c *Client) ListZones(ctx context.Context, opts *ListZonesOptions) (*ListZonesResponse, error) {
+	// Use defaults if opts is nil
+	if opts == nil {
+		opts = &ListZonesOptions{}
+	}
 
-	// Marshal record to JSON for request body
-	body, err := json.Marshal(record)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal record: %w", err)
+	// Build URL with query parameters
+	query := url.Values{}
+
+	if opts.Page > 0 {
+		query.Set("page", strconv.Itoa(opts.Page))
+	}
+
+	if opts.PerPage > 0 {
+		query.Set("perPage", strconv.Itoa(opts.PerPage))
+	}
+
+	if opts.Search != "" {
+		query.Set("search", opts.Search)
+	}
+
+	endpoint := c.baseURL + "/dnszone"
+	if len(query) > 0 {
+		endpoint += "?" + query.Encode()
 	}
 
 	// Create request
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut, endpoint, io.NopCloser(bytes.NewReader(body)))
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	// Set headers
+	// Set authentication header
 	req.Header.Set("AccessKey", c.apiKey)
-	req.Header.Set("Content-Type", "application/json")
 
 	// Execute request
 	resp, err := c.httpClient.Do(req)
@@ -90,49 +104,141 @@ func (c *Client) AddRecord(ctx context.Context, zoneID int64, record Record) (*R
 	}()
 
 	// Read response body
-	respBody, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
 
 	// Handle error responses
-	switch resp.StatusCode {
-	case http.StatusCreated:
-		// Success: 201 Created, decode response
-		var result Record
-		if err := json.Unmarshal(respBody, &result); err != nil {
-			return nil, fmt.Errorf("failed to decode record response: %w", err)
-		}
-		return &result, nil
-	case http.StatusNotFound:
-		return nil, ErrNotFound
-	case http.StatusUnauthorized:
-		return nil, ErrUnauthorized
-	case http.StatusBadRequest:
-		// Return APIError for validation errors
-		return nil, c.parseError(resp.StatusCode, respBody)
-	default:
-		return nil, c.parseError(resp.StatusCode, respBody)
+	if resp.StatusCode != http.StatusOK {
+		return nil, parseError(resp.StatusCode, body)
 	}
+
+	// Decode successful response
+	var result ListZonesResponse
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &result, nil
+}
+
+// GetZone retrieves a single DNS zone by ID, including all its records.
+func (c *Client) GetZone(ctx context.Context, id int64) (*Zone, error) {
+	url := fmt.Sprintf("%s/dnszone/%d", c.baseURL, id)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("AccessKey", c.apiKey)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		//nolint:errcheck
+		resp.Body.Close()
+	}()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	// Handle specific status codes
+	if resp.StatusCode == http.StatusOK {
+		var zone Zone
+		if err := json.Unmarshal(body, &zone); err != nil {
+			return nil, fmt.Errorf("failed to decode zone: %w", err)
+		}
+		return &zone, nil
+	}
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, ErrNotFound
+	}
+
+	// Use generic error parser for all other cases (including 401)
+	return nil, parseError(resp.StatusCode, body)
+}
+
+// AddRecordRequest represents the request body for creating a new DNS record.
+type AddRecordRequest struct {
+	Type     string `json:"Type"`
+	Name     string `json:"Name"`
+	Value    string `json:"Value"`
+	TTL      int32  `json:"Ttl"`
+	Priority int32  `json:"Priority"`
+	Weight   int32  `json:"Weight"`
+	Port     int32  `json:"Port"`
+	Flags    int    `json:"Flags"`
+	Tag      string `json:"Tag"`
+	Disabled bool   `json:"Disabled"`
+	Comment  string `json:"Comment"`
+}
+
+// AddRecord adds a new DNS record to a zone.
+func (c *Client) AddRecord(ctx context.Context, zoneID int64, req *AddRecordRequest) (*Record, error) {
+	url := fmt.Sprintf("%s/dnszone/%d/records", c.baseURL, zoneID)
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPut, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	httpReq.Header.Set("AccessKey", c.apiKey)
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		//nolint:errcheck
+		resp.Body.Close()
+	}()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	// Handle specific status codes
+	if resp.StatusCode == http.StatusCreated {
+		var record Record
+		if err := json.Unmarshal(respBody, &record); err != nil {
+			return nil, fmt.Errorf("failed to decode record: %w", err)
+		}
+		return &record, nil
+	}
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, ErrNotFound
+	}
+
+	// Use generic error parser for all other cases (including 401)
+	return nil, parseError(resp.StatusCode, respBody)
 }
 
 // DeleteRecord removes a DNS record from the specified zone.
-// Returns ErrNotFound if the zone or record does not exist.
-// Returns ErrUnauthorized if the API key is invalid.
 func (c *Client) DeleteRecord(ctx context.Context, zoneID, recordID int64) error {
-	// Build URL with zone ID and record ID in path
-	endpoint := fmt.Sprintf("%s/dnszone/%d/records/%d", c.baseURL, zoneID, recordID)
+	url := fmt.Sprintf("%s/dnszone/%d/records/%d", c.baseURL, zoneID, recordID)
 
-	// Create request
-	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, endpoint, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
 	if err != nil {
 		return err
 	}
 
-	// Set authentication header
 	req.Header.Set("AccessKey", c.apiKey)
 
-	// Execute request
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return err
@@ -142,28 +248,26 @@ func (c *Client) DeleteRecord(ctx context.Context, zoneID, recordID int64) error
 		resp.Body.Close()
 	}()
 
-	// Read response body for error handling
-	respBody, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return err
 	}
 
-	// Handle error responses
-	switch resp.StatusCode {
-	case http.StatusNoContent:
-		// Success: 204 No Content
+	// Handle specific status codes
+	if resp.StatusCode == http.StatusNoContent {
 		return nil
-	case http.StatusNotFound:
-		return ErrNotFound
-	case http.StatusUnauthorized:
-		return ErrUnauthorized
-	default:
-		return c.parseError(resp.StatusCode, respBody)
 	}
+
+	if resp.StatusCode == http.StatusNotFound {
+		return ErrNotFound
+	}
+
+	// Use generic error parser for all other cases (including 401)
+	return parseError(resp.StatusCode, body)
 }
 
 // parseError parses API error responses and returns an appropriate error.
-func (c *Client) parseError(statusCode int, body []byte) error {
+func parseError(statusCode int, body []byte) error {
 	switch statusCode {
 	case http.StatusUnauthorized:
 		return ErrUnauthorized

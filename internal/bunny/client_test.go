@@ -1,339 +1,634 @@
 package bunny
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"testing"
 
-	mockbunny "github.com/sipico/bunny-api-proxy/internal/testutil/mockbunny"
+	"github.com/sipico/bunny-api-proxy/internal/testutil/mockbunny"
 )
 
-// TestAddRecord_SuccessTXT tests successful creation of a TXT record.
-func TestAddRecord_SuccessTXT(t *testing.T) {
-	s := mockbunny.New()
-	defer s.Close()
-
-	// Set up a zone
-	zoneID := s.AddZone("example.com")
-
-	// Create client pointing to mock server
-	client := NewClient("test-api-key", WithBaseURL(s.URL()))
-
-	// Create a TXT record
-	record := Record{
-		Type:  "TXT",
-		Name:  "_acme-challenge",
-		Value: "validation-token-123",
-		TTL:   300,
-	}
-
-	result, err := client.AddRecord(context.Background(), zoneID, record)
-	if err != nil {
-		t.Fatalf("AddRecord failed: %v", err)
-	}
-
-	// Verify result has assigned ID
-	if result.ID == 0 {
-		t.Error("expected non-zero record ID")
-	}
-
-	// Verify record fields are preserved
-	if result.Type != "TXT" {
-		t.Errorf("expected type TXT, got %s", result.Type)
-	}
-	if result.Name != "_acme-challenge" {
-		t.Errorf("expected name _acme-challenge, got %s", result.Name)
-	}
-	if result.Value != "validation-token-123" {
-		t.Errorf("expected value validation-token-123, got %s", result.Value)
-	}
-	if result.TTL != 300 {
-		t.Errorf("expected TTL 300, got %d", result.TTL)
-	}
-
-	// Verify record was actually added to zone
-	zone := s.GetZone(zoneID)
-	if zone == nil {
-		t.Fatal("zone not found")
-	}
-	if len(zone.Records) != 1 {
-		t.Errorf("expected 1 record in zone, got %d", len(zone.Records))
-	}
+// mockTransport is a test helper that returns pre-configured HTTP responses.
+type mockTransport struct {
+	statusCode int
+	body       []byte
 }
 
-// TestAddRecord_SuccessA tests successful creation of an A record.
-func TestAddRecord_SuccessA(t *testing.T) {
-	s := mockbunny.New()
-	defer s.Close()
-
-	zoneID := s.AddZone("example.com")
-	client := NewClient("test-api-key", WithBaseURL(s.URL()))
-
-	// Create an A record
-	record := Record{
-		Type:  "A",
-		Name:  "www",
-		Value: "192.168.1.1",
-		TTL:   3600,
-	}
-
-	result, err := client.AddRecord(context.Background(), zoneID, record)
-	if err != nil {
-		t.Fatalf("AddRecord failed: %v", err)
-	}
-
-	// Verify result
-	if result.ID == 0 {
-		t.Error("expected non-zero record ID")
-	}
-	if result.Type != "A" {
-		t.Errorf("expected type A, got %s", result.Type)
-	}
-	if result.Value != "192.168.1.1" {
-		t.Errorf("expected value 192.168.1.1, got %s", result.Value)
-	}
+// RoundTrip implements http.RoundTripper for mockTransport.
+func (mt *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	return &http.Response{
+		StatusCode: mt.statusCode,
+		Body:       io.NopCloser(bytes.NewReader(mt.body)),
+		Header:     make(http.Header),
+	}, nil
 }
 
-// TestAddRecord_ZoneNotFound tests 404 error when zone doesn't exist.
-func TestAddRecord_ZoneNotFound(t *testing.T) {
-	s := mockbunny.New()
-	defer s.Close()
+// TestGetZone tests the GetZone method with various scenarios.
+func TestGetZone(t *testing.T) {
+	t.Run("success with zone and records", func(t *testing.T) {
+		server := mockbunny.New()
+		defer server.Close()
 
-	client := NewClient("test-api-key", WithBaseURL(s.URL()))
-
-	record := Record{
-		Type:  "A",
-		Name:  "www",
-		Value: "192.168.1.1",
-	}
-
-	_, err := client.AddRecord(context.Background(), 9999, record)
-	if err == nil {
-		t.Fatal("expected error for non-existent zone")
-	}
-	if err != ErrNotFound {
-		t.Errorf("expected ErrNotFound, got %v", err)
-	}
-}
-
-// TestAddRecord_ValidationError tests 400 error for invalid record type.
-func TestAddRecord_ValidationError(t *testing.T) {
-	s := mockbunny.New()
-	defer s.Close()
-
-	zoneID := s.AddZone("example.com")
-	client := NewClient("test-api-key", WithBaseURL(s.URL()))
-
-	// Create record with missing required Type field
-	record := Record{
-		Type:  "", // Invalid: empty type
-		Name:  "www",
-		Value: "192.168.1.1",
-	}
-
-	_, err := client.AddRecord(context.Background(), zoneID, record)
-	if err == nil {
-		t.Fatal("expected validation error")
-	}
-
-	// Should be an APIError with 400 status
-	apiErr, ok := err.(*APIError)
-	if !ok {
-		t.Fatalf("expected APIError, got %T: %v", err, err)
-	}
-	if apiErr.StatusCode != http.StatusBadRequest {
-		t.Errorf("expected status %d, got %d", http.StatusBadRequest, apiErr.StatusCode)
-	}
-}
-
-// TestAddRecord_Unauthorized tests 401 error handling.
-func TestAddRecord_Unauthorized(t *testing.T) {
-	s := mockbunny.New()
-	defer s.Close()
-
-	_ = s.AddZone("example.com")
-
-	// Create client with invalid API key
-	client := NewClient("invalid-key", WithBaseURL(s.URL()))
-
-	record := Record{
-		Type:  "A",
-		Name:  "www",
-		Value: "192.168.1.1",
-	}
-
-	// Note: The mock server doesn't validate API keys,
-	// so this test verifies the client implementation would correctly handle 401.
-	_, err := client.AddRecord(context.Background(), 1, record)
-
-	// Mock doesn't validate keys, so no error expected in this test environment
-	if err == nil {
-		// This is expected with the current mock server
-		t.Skip("mock server does not validate API keys, 401 handling verified in implementation")
-	}
-}
-
-// TestAddRecord_PreservesDefaultFields tests that the response includes default fields.
-func TestAddRecord_PreservesDefaultFields(t *testing.T) {
-	s := mockbunny.New()
-	defer s.Close()
-
-	zoneID := s.AddZone("example.com")
-	client := NewClient("test-api-key", WithBaseURL(s.URL()))
-
-	record := Record{
-		Type:  "TXT",
-		Name:  "test",
-		Value: "test-value",
-	}
-
-	result, err := client.AddRecord(context.Background(), zoneID, record)
-	if err != nil {
-		t.Fatalf("AddRecord failed: %v", err)
-	}
-
-	// Verify default fields are set by server
-	if result.MonitorStatus != "Unknown" {
-		t.Errorf("expected MonitorStatus Unknown, got %s", result.MonitorStatus)
-	}
-	if result.MonitorType != "None" {
-		t.Errorf("expected MonitorType None, got %s", result.MonitorType)
-	}
-	if result.SmartRoutingType != "None" {
-		t.Errorf("expected SmartRoutingType None, got %s", result.SmartRoutingType)
-	}
-}
-
-// TestAddRecord_MultipleTTLValues tests creating records with different TTL values.
-func TestAddRecord_MultipleTTLValues(t *testing.T) {
-	s := mockbunny.New()
-	defer s.Close()
-
-	zoneID := s.AddZone("example.com")
-	client := NewClient("test-api-key", WithBaseURL(s.URL()))
-
-	tests := []struct {
-		name string
-		ttl  int32
-	}{
-		{"zero TTL", 0},
-		{"300 seconds", 300},
-		{"3600 seconds", 3600},
-		{"86400 seconds", 86400},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			record := Record{
+		// Add a zone with some records
+		zoneID := server.AddZoneWithRecords("example.com", []mockbunny.Record{
+			{
 				Type:  "A",
-				Name:  fmt.Sprintf("test-%d", tt.ttl),
-				Value: "192.168.1.1",
-				TTL:   tt.ttl,
-			}
-
-			result, err := client.AddRecord(context.Background(), zoneID, record)
-			if err != nil {
-				t.Fatalf("AddRecord failed: %v", err)
-			}
-
-			if result.TTL != tt.ttl {
-				t.Errorf("expected TTL %d, got %d", tt.ttl, result.TTL)
-			}
+				Name:  "www",
+				Value: "1.2.3.4",
+				TTL:   300,
+			},
+			{
+				Type:  "CNAME",
+				Name:  "alias",
+				Value: "www.example.com",
+				TTL:   300,
+			},
 		})
-	}
+
+		client := NewClient("test-key", WithBaseURL(server.URL()))
+		zone, err := client.GetZone(context.Background(), zoneID)
+
+		if err != nil {
+			t.Fatalf("GetZone failed: %v", err)
+		}
+
+		if zone == nil {
+			t.Fatal("expected non-nil zone")
+		}
+
+		if zone.ID != zoneID {
+			t.Errorf("expected zone ID %d, got %d", zoneID, zone.ID)
+		}
+
+		if zone.Domain != "example.com" {
+			t.Errorf("expected domain example.com, got %s", zone.Domain)
+		}
+
+		if len(zone.Records) != 2 {
+			t.Errorf("expected 2 records, got %d", len(zone.Records))
+		}
+
+		// Verify record details
+		if zone.Records[0].Type != "A" {
+			t.Errorf("expected first record type A, got %s", zone.Records[0].Type)
+		}
+
+		if zone.Records[1].Type != "CNAME" {
+			t.Errorf("expected second record type CNAME, got %s", zone.Records[1].Type)
+		}
+	})
+
+	t.Run("not found error (404)", func(t *testing.T) {
+		server := mockbunny.New()
+		defer server.Close()
+
+		client := NewClient("test-key", WithBaseURL(server.URL()))
+		zone, err := client.GetZone(context.Background(), 999)
+
+		if err != ErrNotFound {
+			t.Errorf("expected ErrNotFound, got %v", err)
+		}
+
+		if zone != nil {
+			t.Errorf("expected nil zone, got %v", zone)
+		}
+	})
+
+	t.Run("unauthorized error (401)", func(t *testing.T) {
+		// Create a custom HTTP client that returns 401
+		transport := &mockTransport{
+			statusCode: http.StatusUnauthorized,
+			body:       []byte(""),
+		}
+		httpClient := &http.Client{Transport: transport}
+
+		client := NewClient("test-key", WithHTTPClient(httpClient))
+		zone, err := client.GetZone(context.Background(), 1)
+
+		if err != ErrUnauthorized {
+			t.Errorf("expected ErrUnauthorized, got %v", err)
+		}
+
+		if zone != nil {
+			t.Errorf("expected nil zone, got %v", zone)
+		}
+	})
+}
+
+// TestListZones tests the ListZones method with various scenarios.
+func TestListZones(t *testing.T) {
+	t.Run("success with zones", func(t *testing.T) {
+		server := mockbunny.New()
+		defer server.Close()
+
+		server.AddZone("example.com")
+		server.AddZone("test.com")
+		server.AddZone("foo.bar")
+
+		client := NewClient("test-key", WithBaseURL(server.URL()))
+		resp, err := client.ListZones(context.Background(), nil)
+		if err != nil {
+			t.Fatalf("ListZones failed: %v", err)
+		}
+
+		if resp.TotalItems != 3 || len(resp.Items) != 3 {
+			t.Errorf("Expected 3 items, got total=%d, items=%d", resp.TotalItems, len(resp.Items))
+		}
+	})
+
+	t.Run("success empty list", func(t *testing.T) {
+		server := mockbunny.New()
+		defer server.Close()
+
+		client := NewClient("test-key", WithBaseURL(server.URL()))
+		resp, err := client.ListZones(context.Background(), nil)
+		if err != nil {
+			t.Fatalf("ListZones failed: %v", err)
+		}
+
+		if resp.TotalItems != 0 || len(resp.Items) != 0 {
+			t.Errorf("Expected 0 items, got total=%d, items=%d", resp.TotalItems, len(resp.Items))
+		}
+	})
+
+	t.Run("with search filter", func(t *testing.T) {
+		server := mockbunny.New()
+		defer server.Close()
+
+		server.AddZone("example.com")
+		server.AddZone("test.com")
+		server.AddZone("example.org")
+
+		client := NewClient("test-key", WithBaseURL(server.URL()))
+		resp, err := client.ListZones(context.Background(), &ListZonesOptions{
+			Search: "example",
+		})
+		if err != nil {
+			t.Fatalf("ListZones failed: %v", err)
+		}
+
+		if resp.TotalItems != 2 || len(resp.Items) != 2 {
+			t.Errorf("Expected 2 items with search filter, got total=%d, items=%d", resp.TotalItems, len(resp.Items))
+		}
+	})
+
+	t.Run("with pagination options", func(t *testing.T) {
+		server := mockbunny.New()
+		defer server.Close()
+
+		for i := 0; i < 25; i++ {
+			server.AddZone(fmt.Sprintf("zone%d.com", i))
+		}
+
+		client := NewClient("test-key", WithBaseURL(server.URL()))
+		resp, err := client.ListZones(context.Background(), &ListZonesOptions{
+			Page:    2,
+			PerPage: 10,
+		})
+		if err != nil {
+			t.Fatalf("ListZones failed: %v", err)
+		}
+
+		if resp.TotalItems != 25 || len(resp.Items) != 10 || resp.CurrentPage != 2 {
+			t.Errorf("Pagination test failed: total=%d, items=%d, page=%d", resp.TotalItems, len(resp.Items), resp.CurrentPage)
+		}
+		if !resp.HasMoreItems {
+			t.Error("Expected HasMoreItems=true for page 2 of 3")
+		}
+	})
+
+	t.Run("context cancellation", func(t *testing.T) {
+		server := mockbunny.New()
+		defer server.Close()
+
+		server.AddZone("example.com")
+		client := NewClient("test-key", WithBaseURL(server.URL()))
+
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		resp, err := client.ListZones(ctx, nil)
+
+		if err == nil {
+			t.Error("expected error with cancelled context")
+		}
+		if resp != nil {
+			t.Error("expected nil response on error")
+		}
+	})
 }
 
 // TestDeleteRecord tests the DeleteRecord method with various scenarios.
 func TestDeleteRecord(t *testing.T) {
-	tests := []struct {
-		name        string
-		setup       func(*mockbunny.Server) (int64, int64) // returns zoneID, recordID
-		expectError bool
-		expectErr   error
-	}{
-		{
-			name: "success deleting record",
-			setup: func(s *mockbunny.Server) (int64, int64) {
-				// Create zone with a record
-				record := mockbunny.Record{
-					Type:  "A",
-					Name:  "www",
-					Value: "192.168.1.1",
-					TTL:   3600,
-				}
-				zoneID := s.AddZoneWithRecords("example.com", []mockbunny.Record{record})
-				zone := s.GetZone(zoneID)
-				if zone == nil || len(zone.Records) == 0 {
-					t.Fatalf("zone or records not found")
-				}
-				recordID := zone.Records[0].ID
+	t.Run("success deleting record", func(t *testing.T) {
+		server := mockbunny.New()
+		defer server.Close()
 
-				return zoneID, recordID
+		// Add a zone with a record
+		zoneID := server.AddZoneWithRecords("example.com", []mockbunny.Record{
+			{
+				Type:  "A",
+				Name:  "www",
+				Value: "1.2.3.4",
+				TTL:   300,
 			},
-			expectError: false,
-			expectErr:   nil,
-		},
-		{
-			name: "zone not found error",
-			setup: func(s *mockbunny.Server) (int64, int64) {
-				// Return non-existent zone ID and a record ID
-				return 9999, 1
-			},
-			expectError: true,
-			expectErr:   ErrNotFound,
-		},
-		{
-			name: "record not found error",
-			setup: func(s *mockbunny.Server) (int64, int64) {
-				// Create zone but use non-existent record ID
-				zoneID := s.AddZone("example.com")
-				return zoneID, 9999
-			},
-			expectError: true,
-			expectErr:   ErrNotFound,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := mockbunny.New()
-			defer s.Close()
-
-			zoneID, recordID := tt.setup(s)
-
-			// Create client pointing to mock server
-			client := NewClient("test-api-key", WithBaseURL(s.URL()))
-
-			// Execute delete
-			err := client.DeleteRecord(context.Background(), zoneID, recordID)
-
-			// Check error expectation
-			if tt.expectError && err == nil {
-				t.Error("expected error, got nil")
-			}
-			if !tt.expectError && err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-
-			// Check error type if specified
-			if tt.expectErr != nil && err != tt.expectErr {
-				t.Errorf("expected error %v, got %v", tt.expectErr, err)
-			}
-
-			// For success case, verify record was actually deleted
-			if !tt.expectError && tt.name == "success deleting record" {
-				zone := s.GetZone(zoneID)
-				if zone == nil {
-					t.Fatal("zone not found")
-				}
-				// Verify record is no longer in zone
-				for _, r := range zone.Records {
-					if r.ID == recordID {
-						t.Errorf("record %d still exists after delete", recordID)
-					}
-				}
-			}
 		})
-	}
+
+		// Get the record ID from the zone
+		zone := server.GetZone(zoneID)
+		if zone == nil || len(zone.Records) == 0 {
+			t.Fatalf("expected zone with record")
+		}
+		recordID := zone.Records[0].ID
+
+		// Delete the record
+		client := NewClient("test-key", WithBaseURL(server.URL()))
+		err := client.DeleteRecord(context.Background(), zoneID, recordID)
+
+		if err != nil {
+			t.Fatalf("DeleteRecord failed: %v", err)
+		}
+
+		// Verify record is deleted
+		updatedZone := server.GetZone(zoneID)
+		if len(updatedZone.Records) != 0 {
+			t.Errorf("expected 0 records after deletion, got %d", len(updatedZone.Records))
+		}
+	})
+
+	t.Run("zone not found error (404)", func(t *testing.T) {
+		server := mockbunny.New()
+		defer server.Close()
+
+		client := NewClient("test-key", WithBaseURL(server.URL()))
+		err := client.DeleteRecord(context.Background(), 999, 1)
+
+		if err != ErrNotFound {
+			t.Errorf("expected ErrNotFound, got %v", err)
+		}
+	})
+
+	t.Run("record not found error (404)", func(t *testing.T) {
+		server := mockbunny.New()
+		defer server.Close()
+
+		// Add a zone without records
+		zoneID := server.AddZone("example.com")
+
+		client := NewClient("test-key", WithBaseURL(server.URL()))
+		err := client.DeleteRecord(context.Background(), zoneID, 999)
+
+		if err != ErrNotFound {
+			t.Errorf("expected ErrNotFound, got %v", err)
+		}
+	})
+
+	t.Run("unauthorized error (401)", func(t *testing.T) {
+		// Create a custom HTTP client that returns 401
+		transport := &mockTransport{
+			statusCode: http.StatusUnauthorized,
+			body:       []byte(""),
+		}
+		httpClient := &http.Client{Transport: transport}
+
+		client := NewClient("test-key", WithHTTPClient(httpClient))
+		err := client.DeleteRecord(context.Background(), 1, 1)
+
+		if err != ErrUnauthorized {
+			t.Errorf("expected ErrUnauthorized, got %v", err)
+		}
+	})
+}
+
+// TestAddRecord tests the AddRecord method with various scenarios.
+func TestAddRecord(t *testing.T) {
+	t.Run("success creating record", func(t *testing.T) {
+		server := mockbunny.New()
+		defer server.Close()
+
+		// Add a zone
+		zoneID := server.AddZone("example.com")
+
+		client := NewClient("test-key", WithBaseURL(server.URL()))
+		req := &AddRecordRequest{
+			Type:  "A",
+			Name:  "www",
+			Value: "1.2.3.4",
+			TTL:   300,
+		}
+
+		record, err := client.AddRecord(context.Background(), zoneID, req)
+
+		if err != nil {
+			t.Fatalf("AddRecord failed: %v", err)
+		}
+
+		if record == nil {
+			t.Fatal("expected non-nil record")
+		}
+
+		if record.Type != "A" {
+			t.Errorf("expected record type A, got %s", record.Type)
+		}
+
+		if record.Name != "www" {
+			t.Errorf("expected record name www, got %s", record.Name)
+		}
+
+		if record.Value != "1.2.3.4" {
+			t.Errorf("expected record value 1.2.3.4, got %s", record.Value)
+		}
+	})
+
+	t.Run("zone not found error (404)", func(t *testing.T) {
+		server := mockbunny.New()
+		defer server.Close()
+
+		client := NewClient("test-key", WithBaseURL(server.URL()))
+		req := &AddRecordRequest{
+			Type:  "A",
+			Name:  "www",
+			Value: "1.2.3.4",
+			TTL:   300,
+		}
+
+		record, err := client.AddRecord(context.Background(), 999, req)
+
+		if err != ErrNotFound {
+			t.Errorf("expected ErrNotFound, got %v", err)
+		}
+
+		if record != nil {
+			t.Errorf("expected nil record, got %v", record)
+		}
+	})
+
+	t.Run("unauthorized error (401)", func(t *testing.T) {
+		// Create a custom HTTP client that returns 401
+		transport := &mockTransport{
+			statusCode: http.StatusUnauthorized,
+			body:       []byte(""),
+		}
+		httpClient := &http.Client{Transport: transport}
+
+		client := NewClient("test-key", WithHTTPClient(httpClient))
+		req := &AddRecordRequest{
+			Type:  "A",
+			Name:  "www",
+			Value: "1.2.3.4",
+			TTL:   300,
+		}
+
+		record, err := client.AddRecord(context.Background(), 1, req)
+
+		if err != ErrUnauthorized {
+			t.Errorf("expected ErrUnauthorized, got %v", err)
+		}
+
+		if record != nil {
+			t.Errorf("expected nil record, got %v", record)
+		}
+	})
+
+	t.Run("server error with structured error", func(t *testing.T) {
+		transport := &mockTransport{
+			statusCode: http.StatusInternalServerError,
+			body:       []byte(`{"ErrorKey":"InvalidInput","Field":"Type","Message":"Invalid record type"}`),
+		}
+		httpClient := &http.Client{Transport: transport}
+
+		client := NewClient("test-key", WithHTTPClient(httpClient))
+		req := &AddRecordRequest{
+			Type:  "INVALID",
+			Name:  "www",
+			Value: "1.2.3.4",
+			TTL:   300,
+		}
+
+		record, err := client.AddRecord(context.Background(), 1, req)
+
+		if err == nil {
+			t.Fatal("expected error")
+		}
+
+		if record != nil {
+			t.Errorf("expected nil record, got %v", record)
+		}
+
+		// Check error message contains field information
+		if err.Error() != "bunny: InvalidInput (field: Type): Invalid record type" {
+			t.Errorf("unexpected error message: %v", err)
+		}
+	})
+
+	t.Run("service unavailable error", func(t *testing.T) {
+		transport := &mockTransport{
+			statusCode: http.StatusServiceUnavailable,
+			body:       []byte(`{"ErrorKey":"ServiceUnavailable","Message":"API is temporarily unavailable"}`),
+		}
+		httpClient := &http.Client{Transport: transport}
+
+		client := NewClient("test-key", WithHTTPClient(httpClient))
+		req := &AddRecordRequest{
+			Type:  "A",
+			Name:  "www",
+			Value: "1.2.3.4",
+			TTL:   300,
+		}
+
+		record, err := client.AddRecord(context.Background(), 1, req)
+
+		if err == nil {
+			t.Fatal("expected error")
+		}
+
+		if record != nil {
+			t.Errorf("expected nil record, got %v", record)
+		}
+	})
+
+	t.Run("server error with invalid JSON", func(t *testing.T) {
+		transport := &mockTransport{
+			statusCode: http.StatusInternalServerError,
+			body:       []byte(`{invalid json}`),
+		}
+		httpClient := &http.Client{Transport: transport}
+
+		client := NewClient("test-key", WithHTTPClient(httpClient))
+		req := &AddRecordRequest{
+			Type:  "A",
+			Name:  "www",
+			Value: "1.2.3.4",
+			TTL:   300,
+		}
+
+		record, err := client.AddRecord(context.Background(), 1, req)
+
+		if err == nil {
+			t.Fatal("expected error")
+		}
+
+		if record != nil {
+			t.Errorf("expected nil record, got %v", record)
+		}
+	})
+}
+
+// TestParseError tests the parseError function with various scenarios.
+func TestParseError(t *testing.T) {
+	t.Run("unauthorized (401)", func(t *testing.T) {
+		err := parseError(http.StatusUnauthorized, []byte(""))
+		if err != ErrUnauthorized {
+			t.Errorf("expected ErrUnauthorized, got %v", err)
+		}
+	})
+
+	t.Run("500 with structured error", func(t *testing.T) {
+		body := []byte(`{"ErrorKey":"ServerError","Message":"Internal error"}`)
+		err := parseError(http.StatusInternalServerError, body)
+
+		if err == nil {
+			t.Fatal("expected error")
+		}
+
+		apiErr, ok := err.(*APIError)
+		if !ok {
+			t.Fatalf("expected *APIError, got %T", err)
+		}
+
+		if apiErr.Message != "Internal error" {
+			t.Errorf("expected message 'Internal error', got %s", apiErr.Message)
+		}
+
+		if apiErr.StatusCode != http.StatusInternalServerError {
+			t.Errorf("expected status 500, got %d", apiErr.StatusCode)
+		}
+	})
+
+	t.Run("500 with invalid JSON", func(t *testing.T) {
+		body := []byte(`{invalid json}`)
+		err := parseError(http.StatusInternalServerError, body)
+
+		if err == nil {
+			t.Fatal("expected error")
+		}
+
+		// Should return generic error message
+		if err.Error() != "bunny: server error (status 500)" {
+			t.Errorf("unexpected error message: %v", err)
+		}
+	})
+
+	t.Run("503 with structured error", func(t *testing.T) {
+		body := []byte(`{"ErrorKey":"ServiceUnavailable","Message":"Service is down"}`)
+		err := parseError(http.StatusServiceUnavailable, body)
+
+		if err == nil {
+			t.Fatal("expected error")
+		}
+
+		apiErr, ok := err.(*APIError)
+		if !ok {
+			t.Fatalf("expected *APIError, got %T", err)
+		}
+
+		if apiErr.Message != "Service is down" {
+			t.Errorf("expected message 'Service is down', got %s", apiErr.Message)
+		}
+
+		if apiErr.StatusCode != http.StatusServiceUnavailable {
+			t.Errorf("expected status 503, got %d", apiErr.StatusCode)
+		}
+	})
+
+	t.Run("503 with invalid JSON", func(t *testing.T) {
+		body := []byte(`{invalid json}`)
+		err := parseError(http.StatusServiceUnavailable, body)
+
+		if err == nil {
+			t.Fatal("expected error")
+		}
+
+		if err.Error() != "bunny: server error (status 503)" {
+			t.Errorf("unexpected error message: %v", err)
+		}
+	})
+
+	t.Run("400 with structured error", func(t *testing.T) {
+		body := []byte(`{"ErrorKey":"BadRequest","Message":"Invalid input"}`)
+		err := parseError(http.StatusBadRequest, body)
+
+		if err == nil {
+			t.Fatal("expected error")
+		}
+
+		apiErr, ok := err.(*APIError)
+		if !ok {
+			t.Fatalf("expected *APIError, got %T", err)
+		}
+
+		if apiErr.Message != "Invalid input" {
+			t.Errorf("expected message 'Invalid input', got %s", apiErr.Message)
+		}
+	})
+
+	t.Run("400 with invalid JSON", func(t *testing.T) {
+		body := []byte(`{invalid json}`)
+		err := parseError(http.StatusBadRequest, body)
+
+		if err == nil {
+			t.Fatal("expected error")
+		}
+
+		if err.Error() != "bunny: request failed (status 400)" {
+			t.Errorf("unexpected error message: %v", err)
+		}
+	})
+
+	t.Run("422 with empty message", func(t *testing.T) {
+		body := []byte(`{"ErrorKey":"Unprocessable","Message":""}`)
+		err := parseError(http.StatusUnprocessableEntity, body)
+
+		if err == nil {
+			t.Fatal("expected error")
+		}
+
+		// Should fall back to generic error since Message is empty
+		if err.Error() != "bunny: request failed (status 422)" {
+			t.Errorf("unexpected error message: %v", err)
+		}
+	})
+}
+
+// TestAPIError tests the APIError.Error method.
+func TestAPIError(t *testing.T) {
+	t.Run("with field", func(t *testing.T) {
+		apiErr := &APIError{
+			StatusCode: http.StatusBadRequest,
+			ErrorKey:   "ValidationError",
+			Field:      "email",
+			Message:    "Invalid email address",
+		}
+
+		expected := "bunny: ValidationError (field: email): Invalid email address"
+		if apiErr.Error() != expected {
+			t.Errorf("expected %q, got %q", expected, apiErr.Error())
+		}
+	})
+
+	t.Run("without field", func(t *testing.T) {
+		apiErr := &APIError{
+			StatusCode: http.StatusInternalServerError,
+			ErrorKey:   "ServerError",
+			Message:    "Internal server error occurred",
+		}
+
+		expected := "bunny: ServerError: Internal server error occurred"
+		if apiErr.Error() != expected {
+			t.Errorf("expected %q, got %q", expected, apiErr.Error())
+		}
+	})
 }
