@@ -409,3 +409,29 @@ func TestScopedKeyWorkflow(t *testing.T) {
 		t.Errorf("expected remaining key to be id %d, got %d", id2, keys[0].ID)
 	}
 }
+
+// TestSQLiteStorageClose verifies that Close() properly closes the database.
+func TestSQLiteStorageClose(t *testing.T) {
+	db, err := sql.Open("sqlite3", ":memory:")
+	if err != nil {
+		t.Fatalf("failed to open test database: %v", err)
+	}
+
+	if err := InitSchema(db); err != nil {
+		t.Fatalf("InitSchema failed: %v", err)
+	}
+
+	storage := NewSQLiteStorage(db)
+
+	// Close should succeed
+	if err := storage.Close(); err != nil {
+		t.Errorf("Close() failed: %v", err)
+	}
+
+	// Verify database is closed by attempting an operation
+	ctx := context.Background()
+	_, err = storage.ListScopedKeys(ctx)
+	if err == nil {
+		t.Error("expected error when using closed storage, got nil")
+	}
+}
