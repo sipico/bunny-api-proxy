@@ -34,6 +34,10 @@ func (h *Handler) NewRouter() chi.Router {
 		r.Get("/", h.HandleDashboard)
 		r.Get("/master-key", h.HandleMasterKeyForm)
 		r.Post("/master-key", h.HandleSetMasterKey)
+		r.Get("/tokens", h.HandleListAdminTokensPage)
+		r.Get("/tokens/new", h.HandleNewTokenForm)
+		r.Post("/tokens", h.HandleCreateAdminToken)
+		r.Post("/tokens/{id}/delete", h.HandleDeleteAdminToken)
 	})
 
 	return r
