@@ -84,36 +84,129 @@ Post comments on this issue for:
 
 The prompt should be **minimal** - the issue is the source of truth.
 
+**CRITICAL: Coordinator must provide explicit values, not placeholders.**
+
 **Template:**
 ```
-Implement GitHub issue #XX for [repo].
+Implement GitHub issue #XX for sipico/bunny-api-proxy.
 
-Read the issue: gh issue view XX --repo [owner/repo]
+Read the issue: gh issue view XX --repo sipico/bunny-api-proxy
 
-BRANCH: `claude/issue-XX-[SESSION_ID]` (use this exact name)
+## Git Configuration (use EXACTLY these values)
 
-WORKFLOW:
-1. Post comment: implementation plan
-2. Read reference files from issue
+Worktree: /home/user/bunny-api-proxy-wt-XX
+Branch: claude/issue-XX-YYYYY
+Session ID: YYYYY
+
+## Setup Commands (copy-paste exactly)
+
+```bash
+cd /home/user/bunny-api-proxy
+git fetch origin main
+git worktree add /home/user/bunny-api-proxy-wt-XX -b claude/issue-XX-YYYYY origin/main
+cd /home/user/bunny-api-proxy-wt-XX
+```
+
+## Workflow
+
+1. Post comment on issue: implementation plan
+2. Read reference files listed in issue
 3. Implement ONLY what the issue specifies
 4. Post comment: design decisions (if any)
-5. Validate locally: make coverage && golangci-lint run
-6. Create branch, commit, push
-7. Create PR to main
-8. Wait for CI to pass (check with: gh pr checks XX --repo [owner/repo])
-9. Verify PR shows all checks passing (wait for "All checks have passed")
+5. Validate: go test -race -cover ./... && gofmt -w . && golangci-lint run
+6. Commit and push:
+   git add -A
+   git commit -m "Description of changes"
+   git push -u origin claude/issue-XX-YYYYY
+7. Wait for CI to pass (sleep 60, then check)
+8. Create PR ONLY after CI passes
+9. Verify PR checks pass: gh pr checks [PR#] --repo sipico/bunny-api-proxy --watch
 10. Post comment: completion summary
 11. Post comment: token usage (Input: X, Output: Y, Total: Z)
+12. Cleanup: cd /home/user/bunny-api-proxy && git worktree remove /home/user/bunny-api-proxy-wt-XX
 
-If CI fails, fix the issue and push again before declaring complete.
-If PR checks are still pending, wait for them to complete before declaring success.
+If CI fails, fix and push again. Do NOT create PR until CI passes.
+If PR checks are pending, wait. Do NOT declare success until PR is green.
 ```
 
 **Critical elements:**
-- Explicit branch name (never use `<your-session-id>`)
-- Require CI validation
+- **Explicit worktree path** (never use `${ISSUE_NUM}` - use actual number)
+- **Explicit branch name** (never use `[SESSION_ID]` - use actual ID)
+- **Explicit session ID** (coordinator provides this)
+- Require CI validation before PR creation
 - **Require PR check verification** - don't declare success until PR shows green
 - Standardized token reporting format
+
+### Phase 3a: Coordinator Session Management
+
+**The coordinator MUST track and distribute their session ID.**
+
+When starting coordination for a parent issue, establish:
+
+```markdown
+## Coordination Session
+
+**Coordinator Session ID:** `NBGre`
+
+All sub-issues will use this session ID in branch names.
+
+| Issue | Title | Branch Name | Worktree Path |
+|-------|-------|-------------|---------------|
+| #72 | Proxy core types | `claude/issue-72-NBGre` | `/home/user/bunny-api-proxy-wt-72` |
+| #73 | HTTP handlers | `claude/issue-73-NBGre` | `/home/user/bunny-api-proxy-wt-73` |
+| #74 | Integration | `claude/issue-74-NBGre` | `/home/user/bunny-api-proxy-wt-74` |
+```
+
+**Why this matters:**
+- Git push authorization requires branch names ending with coordinator's session ID
+- Agents cannot determine the session ID themselves
+- Explicit values prevent 403 errors and branch recreation
+
+### Phase 3b: Handling Dependencies Between Issues
+
+**For issues that depend on other issues being merged first:**
+
+Add this section to dependent issues:
+
+```markdown
+## ⚠️ DEPENDENCIES - Pre-Flight Check Required
+
+**This issue depends on:** #72, #73
+
+### Before Starting (REQUIRED)
+
+```bash
+cd /home/user/bunny-api-proxy
+git fetch origin main
+git log --oneline origin/main | head -10
+```
+
+**Verify these commits exist on main:**
+- [ ] "Proxy: Implement core types" (from #72)
+- [ ] "Proxy: Implement HTTP handlers" (from #73)
+
+### If Dependencies NOT Merged
+
+**DO NOT:**
+- ❌ Create stub implementations
+- ❌ Proceed with implementation
+- ❌ Create worktree
+
+**DO:**
+- ✅ Comment on this issue: "Blocked: waiting for #72, #73 to merge"
+- ✅ Wait for coordinator to confirm merges
+- ✅ Re-run pre-flight check after notification
+
+### Why This Matters
+
+Creating stub implementations will:
+- Fail coverage thresholds (stubs = ~15% coverage)
+- Create duplicate type definitions
+- Require manual conflict resolution
+- Waste CI runs
+```
+
+**Coordinator responsibility:** Do not spawn agents for dependent issues until dependencies are merged.
 
 ### Phase 4: Execution Patterns
 
@@ -177,58 +270,85 @@ Each worktree:
 
 #### Issue Template with Worktree Setup
 
-Add this section to issues when parallel execution is planned:
+Add this section to issues when parallel execution is planned.
+
+**CRITICAL: Use explicit values, not placeholders. The coordinator fills in actual numbers.**
 
 ```markdown
 ## ⚠️ CRITICAL: Git Worktree Workflow
 
 **You MUST use git worktree to avoid interfering with other parallel sub-agents.**
 
-### Setup Workflow
+### Git Configuration (use EXACTLY these values)
+
+| Setting | Value |
+|---------|-------|
+| Issue Number | 72 |
+| Session ID | NBGre |
+| Worktree Path | `/home/user/bunny-api-proxy-wt-72` |
+| Branch Name | `claude/issue-72-NBGre` |
+
+### Setup Commands (copy-paste exactly)
 
 ```bash
-# 1. Create isolated worktree for this issue
-ISSUE_NUM=<this-issue-number>
-BRANCH_NAME="claude/issue-${ISSUE_NUM}-[SESSION_ID]"
-WORKTREE_DIR="/home/user/[project]-wt-${ISSUE_NUM}"
+cd /home/user/bunny-api-proxy
+git fetch origin main
+git worktree add /home/user/bunny-api-proxy-wt-72 -b claude/issue-72-NBGre origin/main
+cd /home/user/bunny-api-proxy-wt-72
+```
 
-cd /home/user/[project]
-git worktree add "${WORKTREE_DIR}" -b "${BRANCH_NAME}" main
+### Implementation
 
-# 2. Work in the worktree (ALL commands must run here)
-cd "${WORKTREE_DIR}"
+Work ONLY in the worktree directory. All commands run here.
 
-# 3. Do all your work (read files, write code, test, commit)
-# ... implementation ...
+### Push and Verify CI (BEFORE creating PR)
 
-# 4. Push and verify CI BEFORE creating PR
-git push -u origin "${BRANCH_NAME}"
+```bash
+git add -A
+git commit -m "Proxy: Implement core types and structs"
+git push -u origin claude/issue-72-NBGre
 
-# Wait for CI to complete
-sleep 30
+# Wait for CI
+sleep 60
 
-# 5. Check CI status - MUST BE PASSING before PR creation
-gh run list --repo [owner/repo] --branch "${BRANCH_NAME}" --limit 1
-# If CI fails, fix issues, commit, push, and check again
+# Check CI status
+gh run list --repo sipico/bunny-api-proxy --branch claude/issue-72-NBGre --limit 1
 
-# 6. Create PR ONLY after CI passes
-gh pr create --repo [owner/repo] --base main --head "${BRANCH_NAME}" --title "..." --body "..."
+# If CI fails: fix, commit, push, check again
+# Do NOT create PR until CI passes
+```
 
-# 7. Verify PR checks pass before declaring success
-gh pr checks [PR#] --repo [owner/repo] --watch
-# Wait until all checks show "pass" before reporting completion
+### Create PR (ONLY after CI passes)
 
-# 8. Cleanup when done (AFTER PR is fully green)
-cd /home/user/[project]
-git worktree remove "${WORKTREE_DIR}"
+```bash
+gh pr create --repo sipico/bunny-api-proxy \
+  --base main \
+  --head claude/issue-72-NBGre \
+  --title "Proxy: Implement core types and structs" \
+  --body "Closes #72"
+```
+
+### Verify PR Checks (BEFORE declaring success)
+
+```bash
+gh pr checks <PR_NUMBER> --repo sipico/bunny-api-proxy --watch
+# Wait until ALL checks show "pass"
+# Do NOT report completion until PR is green
+```
+
+### Cleanup (AFTER PR is green)
+
+```bash
+cd /home/user/bunny-api-proxy
+git worktree remove /home/user/bunny-api-proxy-wt-72
 ```
 
 ### Why This Matters
 
 - **Worktree isolation**: Prevents interference between parallel sub-agents
-- **CI verification**: Ensures quality before creating PR
-- **PR check verification**: Ensures PR is ready to merge before reporting success
-- **Clean history**: No fixup commits after PR creation
+- **Explicit values**: Prevents session ID errors and 403 push failures
+- **CI before PR**: Ensures quality, avoids fixup commits
+- **PR verification**: Confirms PR is mergeable before reporting success
 ```
 
 #### Worktree Management Commands
@@ -380,6 +500,31 @@ func (c *Client) GetZone(ctx context.Context, id int64) (*Zone, error)
 | API clients | Abstract with examples |
 
 ## Lessons Learned
+
+### Auth Package Coordination Retrospective (January 2026)
+
+See: `docs/retrospectives/auth-package-coordination-20260124.md`
+
+**Key findings from coordinating 3 parallel Haiku agents:**
+
+| Issue | Root Cause | Fix |
+|-------|------------|-----|
+| Agents created stubs | Ignored dependency declarations | Enforce sequential execution for dependent issues |
+| Duplicate `mockStorage` | Same package, parallel branches | Use shared test utilities or sequential merges |
+| Branch push 403 errors | Wrong session ID in branch name | Coordinator passes explicit branch names |
+| 3 wasted CI runs | Reactive conflict resolution | Proactive dependency analysis before spawning |
+
+**Recommended approach: Hybrid execution**
+```
+Independent issues (no deps, no file conflicts) → Parallel
+Dependent issues → Sequential (after deps merge)
+```
+
+**Anti-patterns to avoid:**
+1. ❌ Spawning all agents in parallel when dependencies exist
+2. ❌ Using placeholders like `[SESSION_ID]` instead of explicit values
+3. ❌ Allowing agents to create stub implementations
+4. ❌ Creating PR before CI passes
 
 ### What Works Well
 
