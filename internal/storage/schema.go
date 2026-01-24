@@ -18,7 +18,9 @@ func InitSchema(db *sql.DB) error {
 	if err != nil {
 		return fmt.Errorf("failed to start transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() {
+		_ = tx.Rollback() // Ignore rollback error if commit succeeds
+	}()
 
 	// Create config table
 	if _, err := tx.Exec(`
