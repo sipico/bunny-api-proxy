@@ -4,7 +4,11 @@ package admin
 import (
 	"context"
 	"errors"
+	"fmt"
+	"html/template"
 	"log/slog"
+	"os"
+	"path/filepath"
 
 	"github.com/sipico/bunny-api-proxy/internal/storage"
 )
@@ -22,6 +26,7 @@ type Handler struct {
 	storage      Storage
 	sessionStore *SessionStore
 	logger       *slog.Logger
+	templates    *template.Template
 	// Additional fields added by later issues:
 	// - logLevel (Issue 4)
 }
@@ -29,6 +34,10 @@ type Handler struct {
 // Storage interface for admin operations
 // Extended by later issues with additional methods
 type Storage interface {
+	// Config operations (Issue 5)
+	GetMasterAPIKey(ctx context.Context) (string, error)
+	SetMasterAPIKey(ctx context.Context, key string) error
+
 	// Health check
 	Close() error
 
@@ -41,10 +50,36 @@ func NewHandler(storage Storage, sessionStore *SessionStore, logger *slog.Logger
 	if logger == nil {
 		logger = slog.Default()
 	}
+
+	// Load templates from filesystem
+	// Try multiple locations to support both binary and test execution
+	var tmpl *template.Template
+	var err error
+
+	// Try relative to current directory first (binary execution)
+	tmpl, err = template.ParseGlob("web/templates/*.html")
+	if err != nil {
+		// Try relative to project root (when running from within project)
+		tmpl, err = template.ParseGlob("../../web/templates/*.html")
+		if err != nil {
+			// Try absolute path based on common deployment
+			homeDir, err2 := os.UserHomeDir()
+			if err2 == nil && homeDir != "" {
+				absPath := filepath.Join(homeDir, "bunny-api-proxy", "web", "templates", "*.html")
+				tmpl, err = template.ParseGlob(absPath)
+			}
+		}
+	}
+
+	if err != nil {
+		logger.Warn("failed to load templates", "error", fmt.Sprintf("%v (tried relative and absolute paths)", err))
+	}
+
 	return &Handler{
 		storage:      storage,
 		sessionStore: sessionStore,
 		logger:       logger,
+		templates:    tmpl,
 	}
 }
 
