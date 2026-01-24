@@ -17,10 +17,10 @@ var (
 
 // Handler provides admin endpoints
 type Handler struct {
-	storage Storage
-	logger  *slog.Logger
+	storage      Storage
+	sessionStore *SessionStore
+	logger       *slog.Logger
 	// Additional fields added by later issues:
-	// - sessionStore (Issue 2)
 	// - logLevel (Issue 4)
 }
 
@@ -32,13 +32,14 @@ type Storage interface {
 }
 
 // NewHandler creates an admin handler
-func NewHandler(storage Storage, logger *slog.Logger) *Handler {
+func NewHandler(storage Storage, sessionStore *SessionStore, logger *slog.Logger) *Handler {
 	if logger == nil {
 		logger = slog.Default()
 	}
 	return &Handler{
-		storage: storage,
-		logger:  logger,
+		storage:      storage,
+		sessionStore: sessionStore,
+		logger:       logger,
 	}
 }
 
