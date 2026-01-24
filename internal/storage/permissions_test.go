@@ -523,3 +523,30 @@ func createTestScopedKey(t *testing.T, db *sql.DB) int64 {
 
 	return id
 }
+
+// TestSQLiteStorageClose verifies that the database connection is closed properly.
+func TestSQLiteStorageClose(t *testing.T) {
+	db, err := sql.Open("sqlite3", ":memory:")
+	if err != nil {
+		t.Fatalf("failed to open test database: %v", err)
+	}
+
+	if err := InitSchema(db); err != nil {
+		t.Fatalf("InitSchema failed: %v", err)
+	}
+
+	storage := NewSQLiteStorage(db)
+
+	// Close should not return an error
+	err = storage.Close()
+	if err != nil {
+		t.Errorf("Close failed: %v", err)
+	}
+
+	// Attempting to use the storage after close should fail
+	ctx := context.Background()
+	_, err = storage.GetPermissions(ctx, 1)
+	if err == nil {
+		t.Errorf("expected error when using closed storage")
+	}
+}
