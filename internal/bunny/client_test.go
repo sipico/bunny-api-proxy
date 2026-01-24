@@ -302,3 +302,333 @@ func TestDeleteRecord(t *testing.T) {
 		}
 	})
 }
+
+// TestAddRecord tests the AddRecord method with various scenarios.
+func TestAddRecord(t *testing.T) {
+	t.Run("success creating record", func(t *testing.T) {
+		server := mockbunny.New()
+		defer server.Close()
+
+		// Add a zone
+		zoneID := server.AddZone("example.com")
+
+		client := NewClient("test-key", WithBaseURL(server.URL()))
+		req := &AddRecordRequest{
+			Type:  "A",
+			Name:  "www",
+			Value: "1.2.3.4",
+			TTL:   300,
+		}
+
+		record, err := client.AddRecord(context.Background(), zoneID, req)
+
+		if err != nil {
+			t.Fatalf("AddRecord failed: %v", err)
+		}
+
+		if record == nil {
+			t.Fatal("expected non-nil record")
+		}
+
+		if record.Type != "A" {
+			t.Errorf("expected record type A, got %s", record.Type)
+		}
+
+		if record.Name != "www" {
+			t.Errorf("expected record name www, got %s", record.Name)
+		}
+
+		if record.Value != "1.2.3.4" {
+			t.Errorf("expected record value 1.2.3.4, got %s", record.Value)
+		}
+	})
+
+	t.Run("zone not found error (404)", func(t *testing.T) {
+		server := mockbunny.New()
+		defer server.Close()
+
+		client := NewClient("test-key", WithBaseURL(server.URL()))
+		req := &AddRecordRequest{
+			Type:  "A",
+			Name:  "www",
+			Value: "1.2.3.4",
+			TTL:   300,
+		}
+
+		record, err := client.AddRecord(context.Background(), 999, req)
+
+		if err != ErrNotFound {
+			t.Errorf("expected ErrNotFound, got %v", err)
+		}
+
+		if record != nil {
+			t.Errorf("expected nil record, got %v", record)
+		}
+	})
+
+	t.Run("unauthorized error (401)", func(t *testing.T) {
+		// Create a custom HTTP client that returns 401
+		transport := &mockTransport{
+			statusCode: http.StatusUnauthorized,
+			body:       []byte(""),
+		}
+		httpClient := &http.Client{Transport: transport}
+
+		client := NewClient("test-key", WithHTTPClient(httpClient))
+		req := &AddRecordRequest{
+			Type:  "A",
+			Name:  "www",
+			Value: "1.2.3.4",
+			TTL:   300,
+		}
+
+		record, err := client.AddRecord(context.Background(), 1, req)
+
+		if err != ErrUnauthorized {
+			t.Errorf("expected ErrUnauthorized, got %v", err)
+		}
+
+		if record != nil {
+			t.Errorf("expected nil record, got %v", record)
+		}
+	})
+
+	t.Run("server error with structured error", func(t *testing.T) {
+		transport := &mockTransport{
+			statusCode: http.StatusInternalServerError,
+			body:       []byte(`{"ErrorKey":"InvalidInput","Field":"Type","Message":"Invalid record type"}`),
+		}
+		httpClient := &http.Client{Transport: transport}
+
+		client := NewClient("test-key", WithHTTPClient(httpClient))
+		req := &AddRecordRequest{
+			Type:  "INVALID",
+			Name:  "www",
+			Value: "1.2.3.4",
+			TTL:   300,
+		}
+
+		record, err := client.AddRecord(context.Background(), 1, req)
+
+		if err == nil {
+			t.Fatal("expected error")
+		}
+
+		if record != nil {
+			t.Errorf("expected nil record, got %v", record)
+		}
+
+		// Check error message contains field information
+		if err.Error() != "bunny: InvalidInput (field: Type): Invalid record type" {
+			t.Errorf("unexpected error message: %v", err)
+		}
+	})
+
+	t.Run("service unavailable error", func(t *testing.T) {
+		transport := &mockTransport{
+			statusCode: http.StatusServiceUnavailable,
+			body:       []byte(`{"ErrorKey":"ServiceUnavailable","Message":"API is temporarily unavailable"}`),
+		}
+		httpClient := &http.Client{Transport: transport}
+
+		client := NewClient("test-key", WithHTTPClient(httpClient))
+		req := &AddRecordRequest{
+			Type:  "A",
+			Name:  "www",
+			Value: "1.2.3.4",
+			TTL:   300,
+		}
+
+		record, err := client.AddRecord(context.Background(), 1, req)
+
+		if err == nil {
+			t.Fatal("expected error")
+		}
+
+		if record != nil {
+			t.Errorf("expected nil record, got %v", record)
+		}
+	})
+
+	t.Run("server error with invalid JSON", func(t *testing.T) {
+		transport := &mockTransport{
+			statusCode: http.StatusInternalServerError,
+			body:       []byte(`{invalid json}`),
+		}
+		httpClient := &http.Client{Transport: transport}
+
+		client := NewClient("test-key", WithHTTPClient(httpClient))
+		req := &AddRecordRequest{
+			Type:  "A",
+			Name:  "www",
+			Value: "1.2.3.4",
+			TTL:   300,
+		}
+
+		record, err := client.AddRecord(context.Background(), 1, req)
+
+		if err == nil {
+			t.Fatal("expected error")
+		}
+
+		if record != nil {
+			t.Errorf("expected nil record, got %v", record)
+		}
+	})
+}
+
+// TestParseError tests the parseError function with various scenarios.
+func TestParseError(t *testing.T) {
+	t.Run("unauthorized (401)", func(t *testing.T) {
+		err := parseError(http.StatusUnauthorized, []byte(""))
+		if err != ErrUnauthorized {
+			t.Errorf("expected ErrUnauthorized, got %v", err)
+		}
+	})
+
+	t.Run("500 with structured error", func(t *testing.T) {
+		body := []byte(`{"ErrorKey":"ServerError","Message":"Internal error"}`)
+		err := parseError(http.StatusInternalServerError, body)
+
+		if err == nil {
+			t.Fatal("expected error")
+		}
+
+		apiErr, ok := err.(*APIError)
+		if !ok {
+			t.Fatalf("expected *APIError, got %T", err)
+		}
+
+		if apiErr.Message != "Internal error" {
+			t.Errorf("expected message 'Internal error', got %s", apiErr.Message)
+		}
+
+		if apiErr.StatusCode != http.StatusInternalServerError {
+			t.Errorf("expected status 500, got %d", apiErr.StatusCode)
+		}
+	})
+
+	t.Run("500 with invalid JSON", func(t *testing.T) {
+		body := []byte(`{invalid json}`)
+		err := parseError(http.StatusInternalServerError, body)
+
+		if err == nil {
+			t.Fatal("expected error")
+		}
+
+		// Should return generic error message
+		if err.Error() != "bunny: server error (status 500)" {
+			t.Errorf("unexpected error message: %v", err)
+		}
+	})
+
+	t.Run("503 with structured error", func(t *testing.T) {
+		body := []byte(`{"ErrorKey":"ServiceUnavailable","Message":"Service is down"}`)
+		err := parseError(http.StatusServiceUnavailable, body)
+
+		if err == nil {
+			t.Fatal("expected error")
+		}
+
+		apiErr, ok := err.(*APIError)
+		if !ok {
+			t.Fatalf("expected *APIError, got %T", err)
+		}
+
+		if apiErr.Message != "Service is down" {
+			t.Errorf("expected message 'Service is down', got %s", apiErr.Message)
+		}
+
+		if apiErr.StatusCode != http.StatusServiceUnavailable {
+			t.Errorf("expected status 503, got %d", apiErr.StatusCode)
+		}
+	})
+
+	t.Run("503 with invalid JSON", func(t *testing.T) {
+		body := []byte(`{invalid json}`)
+		err := parseError(http.StatusServiceUnavailable, body)
+
+		if err == nil {
+			t.Fatal("expected error")
+		}
+
+		if err.Error() != "bunny: server error (status 503)" {
+			t.Errorf("unexpected error message: %v", err)
+		}
+	})
+
+	t.Run("400 with structured error", func(t *testing.T) {
+		body := []byte(`{"ErrorKey":"BadRequest","Message":"Invalid input"}`)
+		err := parseError(http.StatusBadRequest, body)
+
+		if err == nil {
+			t.Fatal("expected error")
+		}
+
+		apiErr, ok := err.(*APIError)
+		if !ok {
+			t.Fatalf("expected *APIError, got %T", err)
+		}
+
+		if apiErr.Message != "Invalid input" {
+			t.Errorf("expected message 'Invalid input', got %s", apiErr.Message)
+		}
+	})
+
+	t.Run("400 with invalid JSON", func(t *testing.T) {
+		body := []byte(`{invalid json}`)
+		err := parseError(http.StatusBadRequest, body)
+
+		if err == nil {
+			t.Fatal("expected error")
+		}
+
+		if err.Error() != "bunny: request failed (status 400)" {
+			t.Errorf("unexpected error message: %v", err)
+		}
+	})
+
+	t.Run("422 with empty message", func(t *testing.T) {
+		body := []byte(`{"ErrorKey":"Unprocessable","Message":""}`)
+		err := parseError(http.StatusUnprocessableEntity, body)
+
+		if err == nil {
+			t.Fatal("expected error")
+		}
+
+		// Should fall back to generic error since Message is empty
+		if err.Error() != "bunny: request failed (status 422)" {
+			t.Errorf("unexpected error message: %v", err)
+		}
+	})
+}
+
+// TestAPIError tests the APIError.Error method.
+func TestAPIError(t *testing.T) {
+	t.Run("with field", func(t *testing.T) {
+		apiErr := &APIError{
+			StatusCode: http.StatusBadRequest,
+			ErrorKey:   "ValidationError",
+			Field:      "email",
+			Message:    "Invalid email address",
+		}
+
+		expected := "bunny: ValidationError (field: email): Invalid email address"
+		if apiErr.Error() != expected {
+			t.Errorf("expected %q, got %q", expected, apiErr.Error())
+		}
+	})
+
+	t.Run("without field", func(t *testing.T) {
+		apiErr := &APIError{
+			StatusCode: http.StatusInternalServerError,
+			ErrorKey:   "ServerError",
+			Message:    "Internal server error occurred",
+		}
+
+		expected := "bunny: ServerError: Internal server error occurred"
+		if apiErr.Error() != expected {
+			t.Errorf("expected %q, got %q", expected, apiErr.Error())
+		}
+	})
+}
