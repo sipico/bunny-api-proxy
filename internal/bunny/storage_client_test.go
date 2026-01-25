@@ -404,3 +404,106 @@ func (c *countingKeyStore) GetMasterAPIKey(ctx context.Context) (string, error) 
 	*c.callCount++
 	return c.underlying.GetMasterAPIKey(ctx)
 }
+
+func TestNewStorageClient_WithClientOption(t *testing.T) {
+	mockKS := &MockKeyStore{
+		apiKey: "test-key",
+	}
+
+	customBaseURL := "https://custom.example.com"
+
+	// Create StorageClient with Client option (backward compatibility)
+	client := NewStorageClient(mockKS, WithBaseURL(customBaseURL))
+
+	// Verify the client was created
+	if client == nil {
+		t.Fatalf("expected client, got nil")
+	}
+
+	// Verify baseURL is set correctly
+	if client.baseURL != customBaseURL {
+		t.Fatalf("expected baseURL %s, got %s", customBaseURL, client.baseURL)
+	}
+}
+
+func TestStorageClient_GetZone_StorageError(t *testing.T) {
+	// Setup mock KeyStore that returns a different error
+	mockKS := &MockKeyStore{
+		err: errors.New("database connection failed"),
+	}
+
+	client := NewStorageClient(mockKS)
+
+	// Call GetZone
+	ctx := context.Background()
+	result, err := client.GetZone(ctx, 1)
+
+	// Assert error handling
+	if err == nil {
+		t.Fatalf("expected error, got nil")
+	}
+
+	if errors.Is(err, ErrNotConfigured) {
+		t.Fatalf("expected storage error, got ErrNotConfigured")
+	}
+
+	if result != nil {
+		t.Fatalf("expected nil result, got: %v", result)
+	}
+}
+
+func TestStorageClient_AddRecord_StorageError(t *testing.T) {
+	// Setup mock KeyStore that returns a different error
+	mockKS := &MockKeyStore{
+		err: errors.New("database connection failed"),
+	}
+
+	client := NewStorageClient(mockKS)
+
+	// Create a test record request
+	req := &AddRecordRequest{
+		Type:  "A",
+		Name:  "test",
+		Value: "192.0.2.1",
+		TTL:   3600,
+	}
+
+	// Call AddRecord
+	ctx := context.Background()
+	result, err := client.AddRecord(ctx, 1, req)
+
+	// Assert error handling
+	if err == nil {
+		t.Fatalf("expected error, got nil")
+	}
+
+	if errors.Is(err, ErrNotConfigured) {
+		t.Fatalf("expected storage error, got ErrNotConfigured")
+	}
+
+	if result != nil {
+		t.Fatalf("expected nil result, got: %v", result)
+	}
+}
+
+func TestStorageClient_DeleteRecord_StorageError(t *testing.T) {
+	// Setup mock KeyStore that returns a different error
+	mockKS := &MockKeyStore{
+		err: errors.New("database connection failed"),
+	}
+
+	client := NewStorageClient(mockKS)
+
+	// Call DeleteRecord
+	ctx := context.Background()
+	err := client.DeleteRecord(ctx, 1, 1)
+
+	// Assert error handling
+	if err == nil {
+		t.Fatalf("expected error, got nil")
+	}
+
+	if errors.Is(err, ErrNotConfigured) {
+		t.Fatalf("expected storage error, got ErrNotConfigured")
+	}
+}
