@@ -133,6 +133,14 @@ This document tracks features and improvements deferred from MVP to keep scope m
 
 ## Admin UI
 
+### Static Web Assets
+
+- [ ] **Implement web/static/ directory** - CSS, JavaScript, and HTMX assets
+  - Design session needed for look and feel
+  - Layout and UI/UX decisions
+  - Currently templates use inline styles
+  - Move to proper static asset pipeline
+
 ### Enhanced Features
 
 - [ ] **Dark mode** - Because why not
@@ -150,9 +158,18 @@ This document tracks features and improvements deferred from MVP to keep scope m
 
 ## Deployment & Operations
 
+### SQLite Driver
+
+- [ ] **Switch to modernc.org/sqlite** - Pure Go SQLite driver (no CGO)
+  - Would enable simpler builds and easier cross-compilation
+  - Would allow scratch/distroless base images
+  - Currently using `mattn/go-sqlite3` which requires CGO
+  - Evaluate performance implications before switching
+  - Note: modernc.org/sqlite is less battle-tested but actively maintained
+
 ### Docker
 
-- [ ] **Distroless/scratch base image** - Minimal attack surface
+- [ ] **Distroless/scratch base image** - Minimal attack surface (requires CGO-free SQLite driver first)
 - [ ] **Multi-arch builds** - ARM64 support (Raspberry Pi, M1 Mac)
 - [ ] **Docker Compose example** - With Traefik/nginx TLS termination
 - [ ] **Kubernetes Helm chart** - Easy K8s deployment
@@ -168,6 +185,14 @@ This document tracks features and improvements deferred from MVP to keep scope m
 - [ ] **Automated backups** - Scheduled SQLite backup
 - [ ] **Backup to S3/bunny Storage** - Off-site backup
 - [ ] **Point-in-time recovery** - Restore to specific moment
+
+### Database Schema Management
+
+- [ ] **Versioned migrations** - Implement migrations/ directory for schema changes
+  - Currently using `CREATE TABLE IF NOT EXISTS` in schema.go
+  - Need versioned migrations when schema evolves (adding columns, etc.)
+  - Consider tools like golang-migrate or custom solution
+  - Track schema version in database
 
 ---
 
@@ -197,6 +222,11 @@ This document tracks features and improvements deferred from MVP to keep scope m
 
 ### Documentation
 
+- [ ] **CHANGELOG.md maintenance** - Version history and breaking changes
+  - Decide on format (Keep a Changelog, Conventional Changelog, etc.)
+  - Determine update process (manual, automated from commits, CI integration)
+  - Define what constitutes a changelog entry
+  - Link from API.md and README.md once established
 - [ ] **User guide** - How to deploy and configure
 - [ ] **API reference** - All endpoints documented
 - [ ] **Contributing guide** - How to contribute to the project

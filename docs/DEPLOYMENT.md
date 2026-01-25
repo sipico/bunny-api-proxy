@@ -824,7 +824,7 @@ gzip -c /var/lib/bunny-api-proxy/proxy.db > /backups/proxy-$(date +%Y%m%d-%H%M%S
 
 ## Upgrading
 
-Upgrades are safe and straightforward due to automatic database migrations.
+Upgrades are safe and straightforward. The database schema is auto-initialized on startup.
 
 ### Docker Upgrade
 

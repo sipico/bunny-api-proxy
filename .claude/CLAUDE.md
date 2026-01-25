@@ -108,7 +108,6 @@ internal/            # Private application code
   bunny/             # bunny.net API client
   testutil/mockbunny/ # Mock server for testing
 web/                 # Templates and static files
-migrations/          # Database migrations
 ```
 
 ## Key Files
