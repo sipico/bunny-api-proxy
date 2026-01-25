@@ -148,13 +148,21 @@ jobs:
         run: |
           docker compose -f docker-compose.test.yml run --rm test-runner
 
-      - name: Show logs on failure
-        if: failure()
+      - name: Collect logs
+        if: always()
         run: |
-          echo "=== Proxy logs ==="
-          docker compose -f docker-compose.test.yml logs proxy
-          echo "=== Mockbunny logs ==="
-          docker compose -f docker-compose.test.yml logs mockbunny
+          mkdir -p e2e-logs
+          docker compose -f docker-compose.test.yml logs proxy > e2e-logs/proxy.log 2>&1 || true
+          docker compose -f docker-compose.test.yml logs mockbunny > e2e-logs/mockbunny.log 2>&1 || true
+          docker compose -f docker-compose.test.yml ps > e2e-logs/services.log 2>&1 || true
+
+      - name: Upload E2E logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-logs
+          path: e2e-logs/
+          retention-days: 7
 
       - name: Cleanup
         if: always()
