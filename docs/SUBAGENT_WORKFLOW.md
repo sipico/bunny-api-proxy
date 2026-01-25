@@ -233,6 +233,30 @@ Creating stub implementations will:
 
 **Coordinator responsibility:** Do not spawn agents for dependent issues until dependencies are merged.
 
+### Phase 3c: Coordination Issue Structure
+
+Parent coordination issues (that spawn multiple sub-issues) should include these sections:
+
+| Section | Purpose |
+|---------|---------|
+| **Session ID Block** | Coordinator's session ID, branch naming table with explicit values |
+| **Dependency Graph** | Which sub-issues depend on others (blocks/blocked-by) |
+| **Execution Strategy** | Parallel vs sequential, with rationale |
+| **Expected Merge Conflicts** | Files likely to conflict (e.g., router.go), resolution strategy |
+| **Shared Test Infrastructure** | Mock strategy (first issue creates, others import) |
+| **Progress Tracking** | Checklist of sub-issues with status |
+| **Quality Gates** | Coverage target (80% aim, 75% minimum), error path testing |
+
+**Why this matters:**
+- Proactive conflict identification saves CI runs
+- Shared mock strategy prevents interface drift
+- Explicit dependencies prevent stub implementations
+- Progress tracking enables coordinator intervention
+
+**Examples:** See retrospectives for detailed coordination examples:
+- `docs/retrospectives/proxy-package-coordination-20260125.md`
+- `docs/retrospectives/admin-package-coordination-20260125.md`
+
 ### Phase 4: Execution Patterns
 
 #### Sequential Execution (when tasks modify same files)
