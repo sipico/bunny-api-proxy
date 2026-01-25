@@ -193,7 +193,7 @@ docker run -d \
 | Access Type | Auth Method | Purpose |
 |-------------|-------------|---------|
 | Web UI | Password → session cookie | Human admin interaction |
-| Admin API | Bearer token | Scripts, automation |
+| Admin API | AccessKey token | Scripts, automation |
 
 - Admin password: Only entered in web login form
 - Admin API token: Generated via Web UI, stored hashed in DB

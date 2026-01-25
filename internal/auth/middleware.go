@@ -16,8 +16,8 @@ const keyInfoContextKey contextKey = "keyInfo"
 func Middleware(v *Validator) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Extract API key from Authorization header
-			apiKey := extractBearerToken(r)
+			// Extract API key from AccessKey header
+			apiKey := extractAccessKey(r)
 			if apiKey == "" {
 				writeJSONError(w, http.StatusUnauthorized, "missing API key")
 				return
@@ -64,17 +64,9 @@ func GetKeyInfo(ctx context.Context) *KeyInfo {
 	return nil
 }
 
-// extractBearerToken gets token from "Authorization: Bearer <token>" header
-func extractBearerToken(r *http.Request) string {
-	auth := r.Header.Get("Authorization")
-	if auth == "" {
-		return ""
-	}
-	parts := strings.SplitN(auth, " ", 2)
-	if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
-		return ""
-	}
-	return parts[1]
+// extractAccessKey gets API key from "AccessKey" header
+func extractAccessKey(r *http.Request) string {
+	return strings.TrimSpace(r.Header.Get("AccessKey"))
 }
 
 // writeJSONError writes a JSON error response

@@ -453,10 +453,10 @@ Admin endpoints for managing the proxy itself (master API key, scoped keys, admi
 
 Admin API endpoints support two authentication methods:
 
-#### 1. Bearer Token (Recommended)
-Use a Bearer token created via the admin UI or API:
+#### 1. AccessKey Token (Recommended)
+Use an AccessKey token created via the admin UI or API:
 ```
-Authorization: Bearer <admin-token>
+AccessKey: <admin-token>
 ```
 
 #### 2. Basic Auth (Bootstrap Only)
@@ -576,7 +576,7 @@ Change the runtime log level.
 **Example Request:**
 ```bash
 curl -X POST http://localhost:8080/admin/api/loglevel \
-  -H "Authorization: Bearer <admin-token>" \
+  -H "AccessKey: <admin-token>" \
   -H "Content-Type: application/json" \
   -d '{"level": "debug"}'
 ```
@@ -602,7 +602,7 @@ List all admin tokens (names and IDs only - tokens are never returned after crea
 **Example Request:**
 ```bash
 curl -X GET http://localhost:8080/admin/api/tokens \
-  -H "Authorization: Bearer <admin-token>"
+  -H "AccessKey: <admin-token>"
 ```
 
 **Example Response:**
@@ -643,7 +643,7 @@ Create a new admin token.
 **Example Request:**
 ```bash
 curl -X POST http://localhost:8080/admin/api/tokens \
-  -H "Authorization: Bearer <admin-token>" \
+  -H "AccessKey: <admin-token>" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "my-new-token",
@@ -675,7 +675,7 @@ Delete an admin token by ID.
 **Example Request:**
 ```bash
 curl -X DELETE http://localhost:8080/admin/api/tokens/1 \
-  -H "Authorization: Bearer <admin-token>"
+  -H "AccessKey: <admin-token>"
 ```
 
 **Error Responses:**
@@ -700,7 +700,7 @@ Set the master bunny.net API key (can only be set once).
 **Example Request:**
 ```bash
 curl -X PUT http://localhost:8080/admin/api/master-key \
-  -H "Authorization: Bearer <admin-token>" \
+  -H "AccessKey: <admin-token>" \
   -H "Content-Type: application/json" \
   -d '{"api_key": "12345abcde-bunny-api-key"}'
 ```
@@ -747,7 +747,7 @@ Create a new scoped API key with permissions in one operation.
 **Example Request:**
 ```bash
 curl -X POST http://localhost:8080/admin/api/keys \
-  -H "Authorization: Bearer <admin-token>" \
+  -H "AccessKey: <admin-token>" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "acme-client",
