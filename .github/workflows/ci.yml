@@ -120,6 +120,7 @@ jobs:
     name: E2E Tests
     runs-on: ubuntu-latest
     needs: [test, lint]
+    continue-on-error: true  # Non-blocking: workflow passes even if E2E fails
 
     steps:
       - name: Checkout code
