@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -2802,5 +2804,62 @@ func TestStartServerAndWaitForShutdownServerStartupError(t *testing.T) {
 	// Verify error message contains "server error"
 	if !strings.Contains(err.Error(), "server error") {
 		t.Errorf("error message should contain 'server error', got: %s", err.Error())
+	}
+}
+
+// TestStartServerAndWaitForShutdownGracefulSignalShutdown tests graceful shutdown when receiving SIGTERM signal
+func TestStartServerAndWaitForShutdownGracefulSignalShutdown(t *testing.T) {
+	// Create a test logger with a buffer to capture logs
+	var logBuffer bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&logBuffer, &slog.HandlerOptions{Level: slog.LevelInfo}))
+
+	// Create an http.Server with a handler and random port
+	server := &http.Server{
+		Addr: ":0", // Use random available port
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("OK"))
+		}),
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+
+	// Start server in a goroutine and capture result
+	done := make(chan error, 1)
+	go func() {
+		done <- startServerAndWaitForShutdown(logger, server)
+	}()
+
+	// Wait briefly for server to start and listen
+	time.Sleep(100 * time.Millisecond)
+
+	// Send SIGTERM signal to the current process
+	err := syscall.Kill(syscall.Getpid(), syscall.SIGTERM)
+	if err != nil {
+		t.Fatalf("failed to send SIGTERM signal: %v", err)
+	}
+
+	// Wait for server to gracefully shutdown (with timeout)
+	shutdownDone := make(chan error, 1)
+	go func() {
+		shutdownDone <- <-done
+	}()
+
+	select {
+	case err := <-shutdownDone:
+		// Verify graceful shutdown returned nil
+		if err != nil {
+			t.Fatalf("expected graceful shutdown to return nil, got error: %v", err)
+		}
+
+		// Verify log contains expected messages
+		logOutput := logBuffer.String()
+		if !strings.Contains(logOutput, "Received signal, shutting down") {
+			t.Errorf("expected log to contain 'Received signal, shutting down', got: %s", logOutput)
+		}
+		if !strings.Contains(logOutput, "Server shut down gracefully") {
+			t.Errorf("expected log to contain 'Server shut down gracefully', got: %s", logOutput)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("timeout waiting for graceful shutdown")
 	}
 }
