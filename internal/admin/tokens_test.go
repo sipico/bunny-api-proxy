@@ -81,6 +81,10 @@ func (m *mockStorageForTokens) GetScopedKeyByHash(ctx context.Context, keyHash s
 	return nil, storage.ErrNotFound
 }
 
+func (m *mockStorageForTokens) GetScopedKey(ctx context.Context, id int64) (*storage.ScopedKey, error) {
+	return nil, storage.ErrNotFound
+}
+
 func (m *mockStorageForTokens) ListScopedKeys(ctx context.Context) ([]*storage.ScopedKey, error) {
 	return nil, nil
 }
