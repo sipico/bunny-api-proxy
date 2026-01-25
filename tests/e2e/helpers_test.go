@@ -229,7 +229,7 @@ func proxyRequest(t *testing.T, method, path, apiKey string, body []byte) *http.
 	}
 
 	req, _ := http.NewRequest(method, proxyURL+path, bodyReader)
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", apiKey))
+	req.Header.Set("AccessKey", apiKey)
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}

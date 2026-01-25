@@ -15,15 +15,16 @@ type TokenInfo struct {
 	Name string
 }
 
-// TokenAuthMiddleware validates Bearer tokens or Basic Auth for admin API
+// TokenAuthMiddleware validates AccessKey tokens or Basic Auth for admin API
 // It accepts either:
-// - Bearer token: validated against stored admin tokens
+// - AccessKey token: validated against stored admin tokens
 // - Basic auth: username "admin" with the admin password (for bootstrapping)
 func (h *Handler) TokenAuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		authHeader := r.Header.Get("Authorization")
-		if authHeader == "" {
-			http.Error(w, "Missing Authorization header", http.StatusUnauthorized)
+		accessKey := r.Header.Get("AccessKey")
+		if authHeader == "" && accessKey == "" {
+			http.Error(w, "missing API key", http.StatusUnauthorized)
 			return
 		}
 
@@ -54,16 +55,10 @@ func (h *Handler) TokenAuthMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		// Check "Bearer " prefix
-		const bearerPrefix = "Bearer "
-		if !strings.HasPrefix(authHeader, bearerPrefix) {
-			http.Error(w, "Invalid Authorization header format", http.StatusUnauthorized)
-			return
-		}
-
-		token := strings.TrimPrefix(authHeader, bearerPrefix)
+		// Check AccessKey header
+		token := strings.TrimSpace(accessKey)
 		if token == "" {
-			http.Error(w, "Missing token", http.StatusUnauthorized)
+			http.Error(w, "missing API key", http.StatusUnauthorized)
 			return
 		}
 

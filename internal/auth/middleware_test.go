@@ -36,7 +36,7 @@ func TestMiddleware_MissingAuth(t *testing.T) {
 	}
 }
 
-func TestMiddleware_InvalidBearerFormat(t *testing.T) {
+func TestMiddleware_MissingAccessKey(t *testing.T) {
 	mockStorage := &mockStorage{}
 	validator := &Validator{storage: mockStorage}
 	handler := Middleware(validator)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -44,7 +44,7 @@ func TestMiddleware_InvalidBearerFormat(t *testing.T) {
 	}))
 
 	req := httptest.NewRequest("GET", "/dnszone", nil)
-	req.Header.Set("Authorization", "InvalidFormat")
+	req.Header.Set("AccessKey", "")
 	rec := httptest.NewRecorder()
 
 	handler.ServeHTTP(rec, req)
@@ -62,7 +62,7 @@ func TestMiddleware_InvalidAPIKey(t *testing.T) {
 	}))
 
 	req := httptest.NewRequest("GET", "/dnszone", nil)
-	req.Header.Set("Authorization", "Bearer invalid-key")
+	req.Header.Set("AccessKey", "invalid-key")
 	rec := httptest.NewRecorder()
 
 	handler.ServeHTTP(rec, req)
@@ -105,7 +105,7 @@ func TestMiddleware_ValidatorInternalError(t *testing.T) {
 	}))
 
 	req := httptest.NewRequest("GET", "/dnszone", nil)
-	req.Header.Set("Authorization", "Bearer test-key")
+	req.Header.Set("AccessKey", "test-key")
 	rec := httptest.NewRecorder()
 
 	handler.ServeHTTP(rec, req)
@@ -161,90 +161,73 @@ func TestGetKeyInfo_MultipleContextValues(t *testing.T) {
 	}
 }
 
-func TestExtractBearerToken_ValidToken(t *testing.T) {
+func TestExtractAccessKey_ValidKey(t *testing.T) {
 	req := httptest.NewRequest("GET", "/dnszone", nil)
-	req.Header.Set("Authorization", "Bearer mytoken123")
+	req.Header.Set("AccessKey", "mytoken123")
 
-	token := extractBearerToken(req)
+	token := extractAccessKey(req)
 
 	if token != "mytoken123" {
 		t.Errorf("token = %q, want 'mytoken123'", token)
 	}
 }
 
-func TestExtractBearerToken_CaseInsensitive(t *testing.T) {
+func TestExtractAccessKey_WithWhitespace(t *testing.T) {
 	req := httptest.NewRequest("GET", "/dnszone", nil)
-	req.Header.Set("Authorization", "bearer mytoken123")
+	req.Header.Set("AccessKey", "  mytoken123  ")
 
-	token := extractBearerToken(req)
+	token := extractAccessKey(req)
 
 	if token != "mytoken123" {
 		t.Errorf("token = %q, want 'mytoken123'", token)
 	}
 }
 
-func TestExtractBearerToken_MixedCase(t *testing.T) {
-	req := httptest.NewRequest("GET", "/dnszone", nil)
-	req.Header.Set("Authorization", "BeArEr mytoken123")
-
-	token := extractBearerToken(req)
-
-	if token != "mytoken123" {
-		t.Errorf("token = %q, want 'mytoken123'", token)
-	}
-}
-
-func TestExtractBearerToken_NoHeader(t *testing.T) {
+func TestExtractAccessKey_NoHeader(t *testing.T) {
 	req := httptest.NewRequest("GET", "/dnszone", nil)
 
-	token := extractBearerToken(req)
+	token := extractAccessKey(req)
 
 	if token != "" {
 		t.Errorf("token = %q, want ''", token)
 	}
 }
 
-func TestExtractBearerToken_InvalidFormat(t *testing.T) {
+func TestExtractAccessKey_EmptyHeader(t *testing.T) {
 	req := httptest.NewRequest("GET", "/dnszone", nil)
-	req.Header.Set("Authorization", "InvalidFormat")
+	req.Header.Set("AccessKey", "")
 
-	token := extractBearerToken(req)
+	token := extractAccessKey(req)
 
 	if token != "" {
 		t.Errorf("token = %q, want ''", token)
 	}
 }
 
-func TestExtractBearerToken_OnlyBearer(t *testing.T) {
+func TestExtractAccessKey_SpecialChars(t *testing.T) {
 	req := httptest.NewRequest("GET", "/dnszone", nil)
-	req.Header.Set("Authorization", "Bearer")
+	req.Header.Set("AccessKey", "token-with-special!@#$%")
 
-	token := extractBearerToken(req)
+	token := extractAccessKey(req)
 
-	if token != "" {
-		t.Errorf("token = %q, want ''", token)
+	expectedToken := "token-with-special!@#$%"
+	if token != expectedToken {
+		t.Errorf("token = %q, want %q", token, expectedToken)
 	}
 }
 
-func TestExtractBearerToken_BearerWithSpaces(t *testing.T) {
-	req := httptest.NewRequest("GET", "/dnszone", nil)
-	req.Header.Set("Authorization", "Bearer token-with-spaces ")
-
-	token := extractBearerToken(req)
-
-	if token != "token-with-spaces " {
-		t.Errorf("token = %q, want 'token-with-spaces '", token)
+func TestExtractAccessKey_LongKey(t *testing.T) {
+	longKey := ""
+	for i := 0; i < 50; i++ {
+		longKey += "abcdefghij"
 	}
-}
-
-func TestExtractBearerToken_EmptyToken(t *testing.T) {
 	req := httptest.NewRequest("GET", "/dnszone", nil)
-	req.Header.Set("Authorization", "Bearer ")
+	req.Header.Set("AccessKey", longKey)
 
-	token := extractBearerToken(req)
+	token := extractAccessKey(req)
 
-	if token != "" {
-		t.Errorf("token = %q, want ''", token)
+	if token != longKey {
+		t.Errorf("token length = %d, want %d", len(token), len(longKey))
 	}
 }
 
@@ -483,7 +466,7 @@ func TestMiddleware_ParseRequestErrorPath(t *testing.T) {
 	// Create a wrapper that simulates middleware with valid key
 	// but invalid request endpoint
 	middlewareHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		apiKey := extractBearerToken(r)
+		apiKey := extractAccessKey(r)
 		if apiKey == "" {
 			writeJSONError(w, http.StatusUnauthorized, "missing API key")
 			return
@@ -511,7 +494,7 @@ func TestMiddleware_ParseRequestErrorPath(t *testing.T) {
 	})
 
 	req := httptest.NewRequest("GET", "/invalid/path", nil)
-	req.Header.Set("Authorization", "Bearer test-key")
+	req.Header.Set("AccessKey", "test-key")
 	rec := httptest.NewRecorder()
 
 	middlewareHandler.ServeHTTP(rec, req)
@@ -527,7 +510,7 @@ func TestMiddleware_PermissionDeniedPath(t *testing.T) {
 
 	// Simulate middleware flow with permission denied
 	middlewareHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		apiKey := extractBearerToken(r)
+		apiKey := extractAccessKey(r)
 		if apiKey == "" {
 			writeJSONError(w, http.StatusUnauthorized, "missing API key")
 			return
@@ -563,7 +546,7 @@ func TestMiddleware_PermissionDeniedPath(t *testing.T) {
 	// Request with valid structure but will fail permission check
 	// (no matching zones in permissions)
 	req := httptest.NewRequest("GET", "/dnszone/999/records", nil)
-	req.Header.Set("Authorization", "Bearer test-key")
+	req.Header.Set("AccessKey", "test-key")
 	rec := httptest.NewRecorder()
 
 	middlewareHandler.ServeHTTP(rec, req)
@@ -590,11 +573,11 @@ func TestMiddleware_SuccessfulFlow(t *testing.T) {
 	}))
 
 	// Even though we have no valid key, the flow should be:
-	// 1. Extract bearer token - succeeds
+	// 1. Extract access key - succeeds
 	// 2. ValidateKey - fails with invalid key
 	// So handler never gets called
 	req := httptest.NewRequest("GET", "/dnszone", nil)
-	req.Header.Set("Authorization", "Bearer test-key")
+	req.Header.Set("AccessKey", "test-key")
 	rec := httptest.NewRecorder()
 
 	handler.ServeHTTP(rec, req)
@@ -614,9 +597,9 @@ func TestMiddleware_BearerTokenWithSpecialChars(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	// Bearer token with special characters (common in real API keys)
+	// API key with special characters (common in real API keys)
 	req := httptest.NewRequest("GET", "/dnszone", nil)
-	req.Header.Set("Authorization", "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test")
+	req.Header.Set("AccessKey", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test")
 	rec := httptest.NewRecorder()
 
 	handler.ServeHTTP(rec, req)
@@ -641,10 +624,10 @@ func TestMiddleware_MultipleAuthorizationHeaders(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	// Only the first Authorization header should be used
+	// Only the first AccessKey header should be used
 	req := httptest.NewRequest("GET", "/dnszone", nil)
-	req.Header.Add("Authorization", "Bearer key1")
-	req.Header.Add("Authorization", "Bearer key2")
+	req.Header.Add("AccessKey", "key1")
+	req.Header.Add("AccessKey", "key2")
 	rec := httptest.NewRecorder()
 
 	handler.ServeHTTP(rec, req)
@@ -668,7 +651,7 @@ func TestMiddleware_LargeAuthorizationHeader(t *testing.T) {
 	}
 
 	req := httptest.NewRequest("GET", "/dnszone", nil)
-	req.Header.Set("Authorization", "Bearer "+largeKey)
+	req.Header.Set("AccessKey", largeKey)
 	rec := httptest.NewRecorder()
 
 	handler.ServeHTTP(rec, req)
@@ -704,7 +687,7 @@ func TestMiddleware_InvalidPath(t *testing.T) {
 	}))
 
 	req := httptest.NewRequest("GET", "/invalid/path", nil)
-	req.Header.Set("Authorization", "Bearer test-key")
+	req.Header.Set("AccessKey", "test-key")
 	rec := httptest.NewRecorder()
 
 	handler.ServeHTTP(rec, req)
@@ -734,7 +717,7 @@ func TestMiddleware_ForbiddenAccess(t *testing.T) {
 	}))
 
 	req := httptest.NewRequest("GET", "/dnszone/999", nil)
-	req.Header.Set("Authorization", "Bearer test-key")
+	req.Header.Set("AccessKey", "test-key")
 	rec := httptest.NewRecorder()
 
 	handler.ServeHTTP(rec, req)
@@ -768,7 +751,7 @@ func TestMiddleware_SuccessfulRequest(t *testing.T) {
 	}))
 
 	req := httptest.NewRequest("GET", "/dnszone", nil)
-	req.Header.Set("Authorization", "Bearer test-key")
+	req.Header.Set("AccessKey", "test-key")
 	rec := httptest.NewRecorder()
 
 	handler.ServeHTTP(rec, req)

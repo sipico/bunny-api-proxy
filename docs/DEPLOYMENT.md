@@ -331,7 +331,7 @@ For automated key management via scripts:
 4. Use for automated administration:
 
 ```bash
-curl -H "Authorization: Bearer admin-token-here" \
+curl -H "AccessKey: admin-token-here" \
   http://localhost:8080/admin/api/keys
 ```
 
@@ -1004,7 +1004,7 @@ groups:
 
 ```bash
 curl -X POST http://localhost:8080/admin/api/loglevel \
-  -H "Authorization: Bearer admin-token" \
+  -H "AccessKey: admin-token" \
   -H "Content-Type: application/json" \
   -d '{"level":"debug"}'
 ```

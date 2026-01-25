@@ -141,7 +141,7 @@ func TestIntegration_ListZones(t *testing.T) {
 
 	// Make test request
 	req := httptest.NewRequest("GET", "/dnszone", nil)
-	req.Header.Set("Authorization", "Bearer test-key-123")
+	req.Header.Set("AccessKey", "test-key-123")
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
@@ -190,7 +190,7 @@ func TestIntegration_GetZone(t *testing.T) {
 
 	// Request specific zone
 	req := httptest.NewRequest("GET", fmt.Sprintf("/dnszone/%d", zoneID), nil)
-	req.Header.Set("Authorization", "Bearer test-key-123")
+	req.Header.Set("AccessKey", "test-key-123")
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
@@ -239,7 +239,7 @@ func TestIntegration_ListRecords(t *testing.T) {
 
 	// Request records
 	req := httptest.NewRequest("GET", fmt.Sprintf("/dnszone/%d/records", zoneID), nil)
-	req.Header.Set("Authorization", "Bearer test-key-123")
+	req.Header.Set("AccessKey", "test-key-123")
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
@@ -289,7 +289,7 @@ func TestIntegration_AddRecord(t *testing.T) {
 	}
 
 	req := httptest.NewRequest("POST", fmt.Sprintf("/dnszone/%d/records", zoneID), bytes.NewReader(body))
-	req.Header.Set("Authorization", "Bearer test-key-123")
+	req.Header.Set("AccessKey", "test-key-123")
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
@@ -344,7 +344,7 @@ func TestIntegration_DeleteRecord(t *testing.T) {
 
 	// Delete the record
 	req := httptest.NewRequest("DELETE", fmt.Sprintf("/dnszone/%d/records/%d", zoneID, recordID), nil)
-	req.Header.Set("Authorization", "Bearer test-key-123")
+	req.Header.Set("AccessKey", "test-key-123")
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
@@ -411,7 +411,7 @@ func TestIntegration_Unauthorized_InvalidKey(t *testing.T) {
 
 	// Request with invalid key
 	req := httptest.NewRequest("GET", "/dnszone", nil)
-	req.Header.Set("Authorization", "Bearer invalid-key-xyz")
+	req.Header.Set("AccessKey", "invalid-key-xyz")
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
@@ -451,7 +451,7 @@ func TestIntegration_Forbidden_WrongZone(t *testing.T) {
 
 	// Try to access zone with permission
 	req := httptest.NewRequest("GET", fmt.Sprintf("/dnszone/%d/records", zoneID1), nil)
-	req.Header.Set("Authorization", "Bearer valid-key")
+	req.Header.Set("AccessKey", "valid-key")
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
@@ -462,7 +462,7 @@ func TestIntegration_Forbidden_WrongZone(t *testing.T) {
 
 	// Try to access zone without permission (not in storage permissions)
 	req2 := httptest.NewRequest("GET", fmt.Sprintf("/dnszone/%d/records", zoneID2), nil)
-	req2.Header.Set("Authorization", "Bearer valid-key")
+	req2.Header.Set("AccessKey", "valid-key")
 	w2 := httptest.NewRecorder()
 
 	router.ServeHTTP(w2, req2)
@@ -504,7 +504,7 @@ func TestIntegration_Forbidden_WrongRecordType(t *testing.T) {
 	}
 
 	req := httptest.NewRequest("POST", fmt.Sprintf("/dnszone/%d/records", zoneID), bytes.NewReader(body))
-	req.Header.Set("Authorization", "Bearer restricted-key")
+	req.Header.Set("AccessKey", "restricted-key")
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 

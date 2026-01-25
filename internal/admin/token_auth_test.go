@@ -68,7 +68,7 @@ func (m *mockStorageWithToken) DeletePermission(ctx context.Context, id int64) e
 func TestTokenAuthMiddleware(t *testing.T) {
 	tests := []struct {
 		name           string
-		authHeader     string
+		accessKey      string
 		validateResult *storage.AdminToken
 		validateError  error
 		adminPassword  string // Set ADMIN_PASSWORD env for basic auth tests
@@ -76,8 +76,8 @@ func TestTokenAuthMiddleware(t *testing.T) {
 		wantContext    bool // Should token info be in context?
 	}{
 		{
-			name:       "valid token",
-			authHeader: "Bearer valid-token-123",
+			name:      "valid token",
+			accessKey: "valid-token-123",
 			validateResult: &storage.AdminToken{
 				ID:   1,
 				Name: "test-token",
@@ -87,28 +87,23 @@ func TestTokenAuthMiddleware(t *testing.T) {
 		},
 		{
 			name:       "missing header",
-			authHeader: "",
-			wantStatus: http.StatusUnauthorized,
-		},
-		{
-			name:       "invalid format - unknown prefix",
-			authHeader: "Digest abc123",
+			accessKey:  "",
 			wantStatus: http.StatusUnauthorized,
 		},
 		{
 			name:       "empty token",
-			authHeader: "Bearer ",
+			accessKey:  "",
 			wantStatus: http.StatusUnauthorized,
 		},
 		{
 			name:          "invalid token - not in database",
-			authHeader:    "Bearer invalid-token",
+			accessKey:     "invalid-token",
 			validateError: storage.ErrNotFound,
 			wantStatus:    http.StatusUnauthorized,
 		},
 		{
 			name:          "database error",
-			authHeader:    "Bearer valid-token",
+			accessKey:     "valid-token",
 			validateError: errors.New("database error"),
 			wantStatus:    http.StatusInternalServerError,
 		},
@@ -157,8 +152,8 @@ func TestTokenAuthMiddleware(t *testing.T) {
 
 			// Create request
 			req := httptest.NewRequest("GET", "/api/test", nil)
-			if tt.authHeader != "" {
-				req.Header.Set("Authorization", tt.authHeader)
+			if tt.accessKey != "" {
+				req.Header.Set("AccessKey", tt.accessKey)
 			}
 			w := httptest.NewRecorder()
 

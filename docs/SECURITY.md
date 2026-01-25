@@ -11,7 +11,7 @@ The Bunny API Proxy implements a **two-tier authentication architecture** design
 | Tier | Users | Purpose | Auth Method |
 |------|-------|---------|-------------|
 | **Admin** | Humans, automation | Manage proxy configuration | Password + session cookies or bearer tokens |
-| **Scoped Proxy Keys** | API clients (ACME, etc.) | Limited access to bunny.net API | Bearer tokens with explicit permissions |
+| **Scoped Proxy Keys** | API clients (ACME, etc.) | Limited access to bunny.net API | AccessKey tokens with explicit permissions |
 
 ### Principle of Least Privilege
 
@@ -74,11 +74,11 @@ Example permission model:
 
 ### 2.2 Admin API Authentication
 
-**Flow**: Bearer Token or Basic Auth → Validated → Request Processing
+**Flow**: AccessKey Token or Basic Auth → Validated → Request Processing
 
-#### Bearer Token Authentication
+#### AccessKey Token Authentication
 - **Endpoint**: Any `POST /admin/api/*` endpoint
-- **Header format**: `Authorization: Bearer <token>`
+- **Header format**: `AccessKey: <token>`
 - **Token validation**:
   1. Token is hashed with SHA-256
   2. Hash is compared against stored admin token hashes in database
@@ -105,12 +105,12 @@ Example permission model:
 
 ### 2.3 Proxy API (Scoped Keys)
 
-**Flow**: Bearer Token → Key Validation → Permission Check → Proxying
+**Flow**: AccessKey Token → Key Validation → Permission Check → Proxying
 
 #### Key Validation
-- **Header format**: `Authorization: Bearer <scoped-key>`
+- **Header format**: `AccessKey: <scoped-key>`
 - **Validation process**:
-  1. Extract key from `Authorization` header
+  1. Extract key from `AccessKey` header
   2. Load all scoped keys from database
   3. Compare provided key against each bcrypt hash
   4. Return KeyInfo (ID, name, permissions) if match found
@@ -563,7 +563,7 @@ The admin password is **never stored** in the database or files:
 **Threat**: API client makes request without API key or with invalid key
 
 **Mitigation**:
-- Middleware enforces Bearer token requirement
+- Middleware enforces AccessKey requirement
 - All requests validated before reaching handlers
 - Invalid keys logged with remote IP for detection
 
