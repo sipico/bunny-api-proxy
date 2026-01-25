@@ -35,6 +35,12 @@ func (h *Handler) NewRouter() chi.Router {
 		r.Get("/master-key", h.HandleMasterKeyForm)
 		r.Post("/master-key", h.HandleSetMasterKey)
 
+		// Admin token management (Issue 92)
+		r.Get("/tokens", h.HandleListAdminTokensPage)
+		r.Get("/tokens/new", h.HandleNewTokenForm)
+		r.Post("/tokens", h.HandleCreateAdminToken)
+		r.Post("/tokens/{id}/delete", h.HandleDeleteAdminToken)
+
 		// Key and permission management (Issue 91)
 		r.Get("/keys", h.HandleListKeys)
 		r.Get("/keys/new", h.HandleNewKeyForm)
