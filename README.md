@@ -34,7 +34,7 @@ docker run -it \
   -e ADMIN_PASSWORD=change-me-in-production \
   -e ENCRYPTION_KEY=32-character-key-for-aes-256enc \
   -v bunny-proxy-data:/data \
-  sipico/bunny-api-proxy:latest
+  ghcr.io/sipico/bunny-api-proxy:latest
 ```
 
 Then access the admin UI at `http://localhost:8080` with username `admin` and your chosen password.
@@ -45,7 +45,7 @@ Then access the admin UI at `http://localhost:8080` with username `admin` and yo
 version: '3.8'
 services:
   bunny-proxy:
-    image: sipico/bunny-api-proxy:latest
+    image: ghcr.io/sipico/bunny-api-proxy:latest
     ports:
       - "8080:8080"
     environment:
