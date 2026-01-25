@@ -150,9 +150,18 @@ This document tracks features and improvements deferred from MVP to keep scope m
 
 ## Deployment & Operations
 
+### SQLite Driver
+
+- [ ] **Switch to modernc.org/sqlite** - Pure Go SQLite driver (no CGO)
+  - Would enable simpler builds and easier cross-compilation
+  - Would allow scratch/distroless base images
+  - Currently using `mattn/go-sqlite3` which requires CGO
+  - Evaluate performance implications before switching
+  - Note: modernc.org/sqlite is less battle-tested but actively maintained
+
 ### Docker
 
-- [ ] **Distroless/scratch base image** - Minimal attack surface
+- [ ] **Distroless/scratch base image** - Minimal attack surface (requires CGO-free SQLite driver first)
 - [ ] **Multi-arch builds** - ARM64 support (Raspberry Pi, M1 Mac)
 - [ ] **Docker Compose example** - With Traefik/nginx TLS termination
 - [ ] **Kubernetes Helm chart** - Easy K8s deployment

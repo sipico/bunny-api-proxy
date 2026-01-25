@@ -26,7 +26,7 @@ An API proxy for bunny.net that allows creating scoped/limited API keys. Sits be
 | Language | Go 1.24 | Aligns with bunny.net's Terraform provider, single binary, excellent for proxies |
 | Web Framework | Chi | Lightweight, idiomatic Go, 100% net/http compatible |
 | Database | SQLite | Zero config, single file, perfect for single-container deployment |
-| SQLite Driver | modernc.org/sqlite | Pure Go (no CGO), simpler builds, easier cross-compilation |
+| SQLite Driver | github.com/mattn/go-sqlite3 | Mature, battle-tested, excellent performance (requires CGO) |
 | Admin UI | Go templates + HTMX | Single binary, interactive without full SPA complexity |
 | Container Base | Alpine | Small (~5 MB), has shell for debugging, includes CA certs |
 
