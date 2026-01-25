@@ -24,6 +24,7 @@ import (
 )
 
 const version = "0.1.0"
+const serverShutdownTimeout = 30 * time.Second
 
 func main() {
 	if err := run(); err != nil {
@@ -31,18 +32,24 @@ func main() {
 	}
 }
 
-// run initializes all components and starts the server with graceful shutdown.
-func run() error {
-	// 1. Load and validate configuration
-	cfg, err := config.Load()
-	if err != nil {
-		return fmt.Errorf("config load failed: %w", err)
-	}
+// serverComponents holds all initialized server components for testing
+type serverComponents struct {
+	logger      *slog.Logger
+	logLevel    *slog.LevelVar
+	store       storage.Storage
+	validator   *auth.Validator
+	bunnyClient *bunny.StorageClient
+	proxyRouter http.Handler
+	adminRouter http.Handler
+	mainRouter  *chi.Mux
+}
 
+// initializeComponents sets up all server components with proper error handling
+func initializeComponents(cfg *config.Config) (*serverComponents, error) {
 	// 2. Configure structured logging with dynamic level
 	logLevel := new(slog.LevelVar)
 	if err := logLevel.UnmarshalText([]byte(cfg.LogLevel)); err != nil {
-		return fmt.Errorf("invalid log level %q: %w", cfg.LogLevel, err)
+		return nil, fmt.Errorf("invalid log level %q: %w", cfg.LogLevel, err)
 	}
 
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel}))
@@ -57,13 +64,8 @@ func run() error {
 	// 3. Initialize storage
 	store, err := storage.New(cfg.DataPath, cfg.EncryptionKey)
 	if err != nil {
-		return fmt.Errorf("storage initialization failed: %w", err)
+		return nil, fmt.Errorf("storage initialization failed: %w", err)
 	}
-	defer func() {
-		if closeErr := store.Close(); closeErr != nil {
-			logger.Error("storage close failed", "error", closeErr)
-		}
-	}()
 
 	// 4. Create auth validator
 	validator := auth.NewValidator(store)
@@ -90,17 +92,33 @@ func run() error {
 	r.Mount("/api", proxyRouter)
 	r.Mount("/admin", adminRouter)
 
-	// 9. Start server with graceful shutdown
+	return &serverComponents{
+		logger:      logger,
+		logLevel:    logLevel,
+		store:       store,
+		validator:   validator,
+		bunnyClient: bunnyClient,
+		proxyRouter: proxyRouter,
+		adminRouter: adminRouter,
+		mainRouter:  r,
+	}, nil
+}
+
+// createServer creates and returns an HTTP server with the given configuration
+func createServer(cfg *config.Config, handler http.Handler) *http.Server {
 	addr := fmt.Sprintf(":%s", cfg.HTTPPort)
-	server := &http.Server{
+	return &http.Server{
 		Addr:         addr,
-		Handler:      r,
+		Handler:      handler,
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
 		IdleTimeout:  60 * time.Second,
 	}
+}
 
-	logger.Info("Server listening", "address", addr)
+// startServerAndWaitForShutdown starts the server and waits for shutdown signal or error
+func startServerAndWaitForShutdown(logger *slog.Logger, server *http.Server) error {
+	logger.Info("Server listening", "address", server.Addr)
 
 	// Channel to signal server shutdown
 	serverErrors := make(chan error, 1)
@@ -122,8 +140,8 @@ func run() error {
 	case sig := <-sigChan:
 		logger.Info("Received signal, shutting down", "signal", sig.String())
 
-		// Graceful shutdown with 30 second timeout
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		// Graceful shutdown with timeout
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), serverShutdownTimeout)
 		defer cancel()
 
 		if err := server.Shutdown(shutdownCtx); err != nil {
@@ -134,6 +152,32 @@ func run() error {
 	}
 
 	return nil
+}
+
+// run initializes all components and starts the server with graceful shutdown.
+func run() error {
+	// 1. Load and validate configuration
+	cfg, err := config.Load()
+	if err != nil {
+		return fmt.Errorf("config load failed: %w", err)
+	}
+
+	// Initialize all components
+	components, err := initializeComponents(cfg)
+	if err != nil {
+		return err
+	}
+
+	// Ensure storage is closed when we exit
+	defer func() {
+		if closeErr := components.store.Close(); closeErr != nil {
+			components.logger.Error("storage close failed", "error", closeErr)
+		}
+	}()
+
+	// Create and start server with graceful shutdown
+	server := createServer(cfg, components.mainRouter)
+	return startServerAndWaitForShutdown(components.logger, server)
 }
 
 // healthHandler returns OK if the process is alive
