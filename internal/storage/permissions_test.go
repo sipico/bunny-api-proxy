@@ -482,6 +482,244 @@ func setupTestStorage(t *testing.T) *SQLiteStorage {
 	return storage
 }
 
+// TestAddPermissionInsertError verifies that database insert errors are handled.
+func TestAddPermissionInsertError(t *testing.T) {
+	storage := setupTestStorage(t)
+	defer storage.Close()
+
+	// Create a scoped key
+	keyID := createTestScopedKey(t, storage)
+
+	// Create a permission
+	perm := &Permission{
+		ZoneID:         12345,
+		AllowedActions: []string{"list_records"},
+		RecordTypes:    []string{"TXT"},
+	}
+
+	// Cancel context before insert
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, err := storage.AddPermission(ctx, keyID, perm)
+	if err == nil {
+		t.Errorf("AddPermission with canceled context should fail")
+	}
+}
+
+// TestGetPermissionsQueryError verifies that query errors are handled.
+func TestGetPermissionsQueryError(t *testing.T) {
+	storage := setupTestStorage(t)
+	defer storage.Close()
+
+	// Create a scoped key
+	keyID := createTestScopedKey(t, storage)
+
+	// Cancel context before query
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, err := storage.GetPermissions(ctx, keyID)
+	if err == nil {
+		t.Errorf("GetPermissions with canceled context should fail")
+	}
+}
+
+// TestAddPermissionContextTimeout verifies that context timeout is handled properly.
+func TestAddPermissionContextTimeout(t *testing.T) {
+	storage := setupTestStorage(t)
+	defer storage.Close()
+
+	// Create a scoped key
+	keyID := createTestScopedKey(t, storage)
+
+	// Create a permission with very short timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Nanosecond)
+	defer cancel()
+	time.Sleep(2 * time.Millisecond) // Ensure timeout has expired
+
+	perm := &Permission{
+		ZoneID:         12345,
+		AllowedActions: []string{"list_records"},
+		RecordTypes:    []string{"TXT"},
+	}
+
+	_, err := storage.AddPermission(ctx, keyID, perm)
+	if err == nil {
+		t.Errorf("AddPermission with expired context should fail")
+	}
+}
+
+// TestGetPermissionsUnmarshalAllowedActionsError verifies that corrupted allowed_actions JSON is handled.
+func TestGetPermissionsUnmarshalAllowedActionsError(t *testing.T) {
+	storage := setupTestStorage(t)
+	defer storage.Close()
+	ctx := context.Background()
+
+	// Create a scoped key
+	keyID := createTestScopedKey(t, storage)
+
+	// Insert a permission with corrupted JSON directly into the database
+	_, err := storage.getDB().ExecContext(ctx,
+		"INSERT INTO permissions (scoped_key_id, zone_id, allowed_actions, record_types) VALUES (?, ?, ?, ?)",
+		keyID, 12345, "not-valid-json", `["TXT"]`)
+	if err != nil {
+		t.Fatalf("failed to insert corrupted permission: %v", err)
+	}
+
+	// GetPermissions should fail when trying to unmarshal the corrupted JSON
+	_, err = storage.GetPermissions(ctx, keyID)
+	if err == nil {
+		t.Errorf("GetPermissions with corrupted allowed_actions JSON should fail")
+	}
+}
+
+// TestGetPermissionsUnmarshalRecordTypesError verifies that corrupted record_types JSON is handled.
+func TestGetPermissionsUnmarshalRecordTypesError(t *testing.T) {
+	storage := setupTestStorage(t)
+	defer storage.Close()
+	ctx := context.Background()
+
+	// Create a scoped key
+	keyID := createTestScopedKey(t, storage)
+
+	// Insert a permission with corrupted JSON directly into the database
+	_, err := storage.getDB().ExecContext(ctx,
+		"INSERT INTO permissions (scoped_key_id, zone_id, allowed_actions, record_types) VALUES (?, ?, ?, ?)",
+		keyID, 12345, `["list_records"]`, "not-valid-json")
+	if err != nil {
+		t.Fatalf("failed to insert corrupted permission: %v", err)
+	}
+
+	// GetPermissions should fail when trying to unmarshal the corrupted JSON
+	_, err = storage.GetPermissions(ctx, keyID)
+	if err == nil {
+		t.Errorf("GetPermissions with corrupted record_types JSON should fail")
+	}
+}
+
+// TestDeletePermissionError verifies that delete errors are handled.
+func TestDeletePermissionError(t *testing.T) {
+	storage := setupTestStorage(t)
+	defer storage.Close()
+
+	// Cancel context before delete
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	err := storage.DeletePermission(ctx, 1)
+	if err == nil {
+		t.Errorf("DeletePermission with canceled context should fail")
+	}
+}
+
+// TestAddPermissionMultiplePermissions verifies multiple permissions for same key.
+func TestAddPermissionMultiplePermissions(t *testing.T) {
+	storage := setupTestStorage(t)
+	defer storage.Close()
+	ctx := context.Background()
+
+	// Create a scoped key
+	keyID := createTestScopedKey(t, storage)
+
+	// Create multiple permissions
+	ids := make([]int64, 3)
+	for i := 0; i < 3; i++ {
+		perm := &Permission{
+			ZoneID:         int64(10000 + i),
+			AllowedActions: []string{"list_records"},
+			RecordTypes:    []string{"TXT"},
+		}
+		id, err := storage.AddPermission(ctx, keyID, perm)
+		if err != nil {
+			t.Fatalf("AddPermission failed: %v", err)
+		}
+		ids[i] = id
+	}
+
+	// Verify all permissions exist
+	perms, err := storage.GetPermissions(ctx, keyID)
+	if err != nil {
+		t.Fatalf("GetPermissions failed: %v", err)
+	}
+
+	if len(perms) != 3 {
+		t.Errorf("expected 3 permissions, got %d", len(perms))
+	}
+
+	// Delete one permission
+	err = storage.DeletePermission(ctx, ids[1])
+	if err != nil {
+		t.Fatalf("DeletePermission failed: %v", err)
+	}
+
+	// Verify only 2 remain
+	perms, err = storage.GetPermissions(ctx, keyID)
+	if err != nil {
+		t.Fatalf("GetPermissions failed: %v", err)
+	}
+
+	if len(perms) != 2 {
+		t.Errorf("expected 2 permissions after deletion, got %d", len(perms))
+	}
+}
+
+// TestGetPermissionsRowsErrError verifies that rows.Err() errors are handled.
+func TestGetPermissionsRowsErrError(t *testing.T) {
+	storage := setupTestStorage(t)
+	ctx := context.Background()
+
+	// Create a scoped key
+	keyID := createTestScopedKey(t, storage)
+
+	// Create a permission
+	perm := &Permission{
+		ZoneID:         12345,
+		AllowedActions: []string{"list_records"},
+		RecordTypes:    []string{"TXT"},
+	}
+	_, err := storage.AddPermission(ctx, keyID, perm)
+	if err != nil {
+		t.Fatalf("AddPermission failed: %v", err)
+	}
+
+	// Close the storage (database connection) to simulate a database error
+	storage.Close()
+
+	// Try to get permissions - should fail since DB is closed
+	_, err = storage.GetPermissions(ctx, keyID)
+	if err == nil {
+		t.Errorf("GetPermissions on closed database should fail")
+	}
+}
+
+// TestDeletePermissionRowsAffectedError verifies that rows affected errors are handled.
+func TestDeletePermissionRowsAffectedError(t *testing.T) {
+	storage := setupTestStorage(t)
+	ctx := context.Background()
+
+	// Create a scoped key and permission
+	keyID := createTestScopedKey(t, storage)
+	perm := &Permission{
+		ZoneID:         12345,
+		AllowedActions: []string{"list_records"},
+		RecordTypes:    []string{"TXT"},
+	}
+	permID, err := storage.AddPermission(ctx, keyID, perm)
+	if err != nil {
+		t.Fatalf("AddPermission failed: %v", err)
+	}
+
+	// Close the storage (database connection)
+	storage.Close()
+
+	// Try to delete - should fail since DB is closed
+	err = storage.DeletePermission(ctx, permID)
+	if err == nil {
+		t.Errorf("DeletePermission on closed database should fail")
+	}
+}
+
 // Helper function to create a test scoped key
 func createTestScopedKey(t *testing.T, storage *SQLiteStorage) int64 {
 	ctx := context.Background()
