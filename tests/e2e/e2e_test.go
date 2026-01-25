@@ -62,7 +62,7 @@ func TestE2E_ProxyToMockbunny(t *testing.T) {
 	apiKey := createScopedKey(t, zoneID)
 
 	// 4. Use the scoped key to list zones via proxy
-	resp := proxyRequest(t, "GET", "/dnszone", apiKey, nil)
+	resp := proxyRequest(t, "GET", "/api/dnszone", apiKey, nil)
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
@@ -99,7 +99,7 @@ func TestE2E_GetZone(t *testing.T) {
 	zoneID := seedZone(t, "getzone-test.com")
 	apiKey := createScopedKey(t, zoneID)
 
-	resp := proxyRequest(t, "GET", fmt.Sprintf("/dnszone/%d", zoneID), apiKey, nil)
+	resp := proxyRequest(t, "GET", fmt.Sprintf("/api/dnszone/%d", zoneID), apiKey, nil)
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
@@ -138,7 +138,7 @@ func TestE2E_AddAndDeleteRecord(t *testing.T) {
 	}
 	body, _ := json.Marshal(addRecordBody)
 
-	resp := proxyRequest(t, "POST", fmt.Sprintf("/dnszone/%d/records", zoneID), apiKey, body)
+	resp := proxyRequest(t, "POST", fmt.Sprintf("/api/dnszone/%d/records", zoneID), apiKey, body)
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusCreated {
@@ -158,7 +158,7 @@ func TestE2E_AddAndDeleteRecord(t *testing.T) {
 	}
 
 	// 3. Delete the record
-	resp2 := proxyRequest(t, "DELETE", fmt.Sprintf("/dnszone/%d/records/%d", zoneID, record.ID), apiKey, nil)
+	resp2 := proxyRequest(t, "DELETE", fmt.Sprintf("/api/dnszone/%d/records/%d", zoneID, record.ID), apiKey, nil)
 	defer resp2.Body.Close()
 
 	if resp2.StatusCode != http.StatusNoContent {
@@ -177,7 +177,7 @@ func TestE2E_ListRecords(t *testing.T) {
 
 	apiKey := createScopedKey(t, zoneID)
 
-	resp := proxyRequest(t, "GET", fmt.Sprintf("/dnszone/%d/records", zoneID), apiKey, nil)
+	resp := proxyRequest(t, "GET", fmt.Sprintf("/api/dnszone/%d/records", zoneID), apiKey, nil)
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
@@ -202,7 +202,7 @@ func TestE2E_ListRecords(t *testing.T) {
 
 // TestE2E_UnauthorizedWithoutKey verifies that requests without an API key are rejected.
 func TestE2E_UnauthorizedWithoutKey(t *testing.T) {
-	resp, err := http.Get(proxyURL + "/dnszone")
+	resp, err := http.Get(proxyURL + "/api/dnszone")
 	if err != nil {
 		t.Fatalf("Request failed: %v", err)
 	}
@@ -223,7 +223,7 @@ func TestE2E_UnauthorizedWithoutKey(t *testing.T) {
 
 // TestE2E_UnauthorizedWithInvalidKey verifies that invalid API keys are rejected.
 func TestE2E_UnauthorizedWithInvalidKey(t *testing.T) {
-	resp, err := http.Get(proxyURL + "/dnszone")
+	resp, err := http.Get(proxyURL + "/api/dnszone")
 	if err != nil {
 		t.Fatalf("Request failed: %v", err)
 	}
@@ -252,7 +252,7 @@ func TestE2E_ForbiddenWrongZone(t *testing.T) {
 	apiKey := createScopedKey(t, zone1ID)
 
 	// Try to access zone2 with zone1's key
-	resp := proxyRequest(t, "GET", fmt.Sprintf("/dnszone/%d", zone2ID), apiKey, nil)
+	resp := proxyRequest(t, "GET", fmt.Sprintf("/api/dnszone/%d", zone2ID), apiKey, nil)
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusForbidden {
@@ -284,7 +284,7 @@ func TestE2E_ForbiddenWrongRecordType(t *testing.T) {
 	}
 	body, _ := json.Marshal(addRecordBody)
 
-	resp := proxyRequest(t, "POST", fmt.Sprintf("/dnszone/%d/records", zoneID), apiKey, body)
+	resp := proxyRequest(t, "POST", fmt.Sprintf("/api/dnszone/%d/records", zoneID), apiKey, body)
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusForbidden {
