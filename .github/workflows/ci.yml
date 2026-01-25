@@ -130,27 +130,27 @@ jobs:
 
       - name: Build and start services
         run: |
-          docker-compose -f docker-compose.test.yml up -d --build proxy mockbunny
+          docker compose -f docker-compose.test.yml up -d --build proxy mockbunny
 
       - name: Wait for services to be healthy
         run: |
           echo "Waiting for services..."
-          timeout 60 bash -c 'until docker-compose -f docker-compose.test.yml ps | grep -q "healthy"; do sleep 2; done'
-          docker-compose -f docker-compose.test.yml ps
+          timeout 60 bash -c 'until docker compose -f docker-compose.test.yml ps | grep -q "healthy"; do sleep 2; done'
+          docker compose -f docker-compose.test.yml ps
 
       - name: Run E2E tests
         run: |
-          docker-compose -f docker-compose.test.yml run --rm test-runner
+          docker compose -f docker-compose.test.yml run --rm test-runner
 
       - name: Show logs on failure
         if: failure()
         run: |
           echo "=== Proxy logs ==="
-          docker-compose -f docker-compose.test.yml logs proxy
+          docker compose -f docker-compose.test.yml logs proxy
           echo "=== Mockbunny logs ==="
-          docker-compose -f docker-compose.test.yml logs mockbunny
+          docker compose -f docker-compose.test.yml logs mockbunny
 
       - name: Cleanup
         if: always()
         run: |
-          docker-compose -f docker-compose.test.yml down -v
+          docker compose -f docker-compose.test.yml down -v
