@@ -2774,3 +2774,33 @@ func TestRunInitializeComponentsInvalidLogLevel(t *testing.T) {
 		t.Errorf("expected error containing 'invalid log level', got: %v", err)
 	}
 }
+
+// TestStartServerAndWaitForShutdownServerStartupError tests server startup error handling
+func TestStartServerAndWaitForShutdownServerStartupError(t *testing.T) {
+	// Create a test logger
+	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
+
+	// Create an http.Server with invalid address that will fail on ListenAndServe
+	server := &http.Server{
+		Addr:    "invalid:address:99999",
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}),
+	}
+
+	// Call startServerAndWaitForShutdown - it should return an error
+	err := startServerAndWaitForShutdown(logger, server)
+
+	// Verify error is returned
+	if err == nil {
+		t.Fatal("expected error from startServerAndWaitForShutdown, got nil")
+	}
+
+	// Verify error is not http.ErrServerClosed
+	if errors.Is(err, http.ErrServerClosed) {
+		t.Errorf("error should not be http.ErrServerClosed, got %v", err)
+	}
+
+	// Verify error message contains "server error"
+	if !strings.Contains(err.Error(), "server error") {
+		t.Errorf("error message should contain 'server error', got: %s", err.Error())
+	}
+}
