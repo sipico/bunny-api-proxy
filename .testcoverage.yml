@@ -7,3 +7,9 @@ threshold:
   file: 85
   package: 85
   total: 85
+
+# Exclude test utilities from coverage requirements
+# These are helper binaries for E2E testing, not production code
+exclude:
+  paths:
+    - cmd/mockbunny/.*
