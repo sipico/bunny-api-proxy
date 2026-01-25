@@ -15,12 +15,18 @@ import (
 
 const version = "0.1.0"
 
-func main() {
+// run initializes and returns the server configuration
+// This is separated from main() to enable testing
+func run() (string, chi.Router) {
 	httpPort := getHTTPPort()
 	r := setupRouter()
 	addr := fmt.Sprintf(":%s", httpPort)
 	log.Printf("Bunny API Proxy v%s starting on %s", version, addr)
+	return addr, r
+}
 
+func main() {
+	addr, r := run()
 	if err := http.ListenAndServe(addr, r); err != nil {
 		log.Fatalf("Server failed to start: %v", err)
 	}

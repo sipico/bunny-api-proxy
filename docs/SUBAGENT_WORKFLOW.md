@@ -245,17 +245,13 @@ Parent coordination issues (that spawn multiple sub-issues) should include these
 | **Expected Merge Conflicts** | Files likely to conflict (e.g., router.go), resolution strategy |
 | **Shared Test Infrastructure** | Mock strategy (first issue creates, others import) |
 | **Progress Tracking** | Checklist of sub-issues with status |
-| **Quality Gates** | Coverage target (80% aim, 75% minimum), error path testing |
+| **Quality Gates** | Coverage target (95% aim, 85% minimum), error path testing |
 
 **Why this matters:**
 - Proactive conflict identification saves CI runs
 - Shared mock strategy prevents interface drift
 - Explicit dependencies prevent stub implementations
 - Progress tracking enables coordinator intervention
-
-**Examples:** See retrospectives for detailed coordination examples:
-- `docs/retrospectives/proxy-package-coordination-20260125.md`
-- `docs/retrospectives/admin-package-coordination-20260125.md`
 
 ### Phase 4: Execution Patterns
 
@@ -550,11 +546,9 @@ func (c *Client) GetZone(ctx context.Context, id int64) (*Zone, error)
 
 ## Lessons Learned
 
-### Auth Package Coordination Retrospective (January 2026)
+### Key Findings from Multi-Agent Coordination
 
-See: `docs/retrospectives/auth-package-coordination-20260124.md`
-
-**Key findings from coordinating 3 parallel Haiku agents:**
+**Key findings from coordinating parallel Haiku agents:**
 
 | Issue | Root Cause | Fix |
 |-------|------------|-----|
@@ -585,6 +579,8 @@ Dependent issues → Sequential (after deps merge)
 | `make coverage` locally | Catches CI failures early |
 | Small focused tasks | Easier to review, less conflict |
 
+**Coverage targets:** Aim for 95% to ensure the 85% minimum is met. Small changes can cause fluctuations.
+
 ### What to Avoid
 
 | Anti-Pattern | Problem | Solution |
@@ -594,6 +590,26 @@ Dependent issues → Sequential (after deps merge)
 | Large multi-file tasks | Merge conflicts, hard to review | Break into smaller tasks |
 | Vague scope | Sub-agent adds unrequested features | Explicit "do NOT" list |
 | No token reporting | Can't track costs | Standardized format required |
+
+### Shared Test Infrastructure
+
+When coordinating multiple issues in the same package, avoid duplicate mock implementations:
+
+1. **First issue creates shared mocks** - Create test utilities (mocks, helpers) in a dedicated file
+2. **Merge first issue before spawning dependent issues** - Ensures shared infrastructure is available
+3. **Subsequent issues import shared mocks** - Don't create package-local duplicates
+
+**Example pattern:**
+```
+Issue #72: Create storage mock (testutil/mock_storage.go) → merge first
+Issue #73: Implement handlers (imports testutil.MockStorage) → parallel with #74
+Issue #74: Implement auth (imports testutil.MockStorage) → parallel with #73
+```
+
+**Why this matters:**
+- Prevents interface drift between mocks
+- Avoids merge conflicts on duplicate definitions
+- Single source of truth for test infrastructure
 
 ### Parallel Execution Guidelines
 

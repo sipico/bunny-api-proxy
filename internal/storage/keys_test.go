@@ -461,3 +461,173 @@ func TestSQLiteStorageClose(t *testing.T) {
 		t.Error("expected error when using closed storage, got nil")
 	}
 }
+
+// TestCreateScopedKeyClosedDB verifies error handling when database is closed.
+func TestCreateScopedKeyClosedDB(t *testing.T) {
+	encryptionKey := make([]byte, 32)
+	_, _ = rand.Read(encryptionKey)
+
+	s, err := New(":memory:", encryptionKey)
+	if err != nil {
+		t.Fatalf("failed to create storage: %v", err)
+	}
+	s.Close()
+
+	ctx := context.Background()
+	_, err = s.CreateScopedKey(ctx, "test", "key")
+	if err == nil {
+		t.Errorf("expected error with closed database, got nil")
+	}
+}
+
+// TestGetScopedKeyByHashClosedDB verifies error handling when database is closed.
+func TestGetScopedKeyByHashClosedDB(t *testing.T) {
+	encryptionKey := make([]byte, 32)
+	_, _ = rand.Read(encryptionKey)
+
+	s, err := New(":memory:", encryptionKey)
+	if err != nil {
+		t.Fatalf("failed to create storage: %v", err)
+	}
+	s.Close()
+
+	ctx := context.Background()
+	_, err = s.GetScopedKeyByHash(ctx, "some-hash")
+	if err == nil {
+		t.Errorf("expected error with closed database, got nil")
+	}
+}
+
+// TestGetScopedKeyClosedDB verifies error handling when database is closed.
+func TestGetScopedKeyClosedDB(t *testing.T) {
+	encryptionKey := make([]byte, 32)
+	_, _ = rand.Read(encryptionKey)
+
+	s, err := New(":memory:", encryptionKey)
+	if err != nil {
+		t.Fatalf("failed to create storage: %v", err)
+	}
+	s.Close()
+
+	ctx := context.Background()
+	_, err = s.GetScopedKey(ctx, 123)
+	if err == nil {
+		t.Errorf("expected error with closed database, got nil")
+	}
+}
+
+// TestListScopedKeysClosedDB verifies error handling when database is closed.
+func TestListScopedKeysClosedDB(t *testing.T) {
+	encryptionKey := make([]byte, 32)
+	_, _ = rand.Read(encryptionKey)
+
+	s, err := New(":memory:", encryptionKey)
+	if err != nil {
+		t.Fatalf("failed to create storage: %v", err)
+	}
+	s.Close()
+
+	ctx := context.Background()
+	_, err = s.ListScopedKeys(ctx)
+	if err == nil {
+		t.Errorf("expected error with closed database, got nil")
+	}
+}
+
+// TestDeleteScopedKeyClosedDB verifies error handling when database is closed.
+func TestDeleteScopedKeyClosedDB(t *testing.T) {
+	encryptionKey := make([]byte, 32)
+	_, _ = rand.Read(encryptionKey)
+
+	s, err := New(":memory:", encryptionKey)
+	if err != nil {
+		t.Fatalf("failed to create storage: %v", err)
+	}
+	s.Close()
+
+	ctx := context.Background()
+	err = s.DeleteScopedKey(ctx, 123)
+	if err == nil {
+		t.Errorf("expected error with closed database, got nil")
+	}
+}
+
+// TestGetScopedKeyByHashContextCancellation verifies context cancellation handling.
+func TestGetScopedKeyByHashContextCancellation(t *testing.T) {
+	encryptionKey := make([]byte, 32)
+	_, _ = rand.Read(encryptionKey)
+
+	s, err := New(":memory:", encryptionKey)
+	if err != nil {
+		t.Fatalf("failed to create storage: %v", err)
+	}
+	defer func() { _ = s.Close() }()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel immediately
+
+	_, err = s.GetScopedKeyByHash(ctx, "hash")
+	if err == nil {
+		t.Errorf("expected error with canceled context, got nil")
+	}
+}
+
+// TestGetScopedKeyContextCancellation verifies context cancellation handling.
+func TestGetScopedKeyContextCancellation(t *testing.T) {
+	encryptionKey := make([]byte, 32)
+	_, _ = rand.Read(encryptionKey)
+
+	s, err := New(":memory:", encryptionKey)
+	if err != nil {
+		t.Fatalf("failed to create storage: %v", err)
+	}
+	defer func() { _ = s.Close() }()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel immediately
+
+	_, err = s.GetScopedKey(ctx, 123)
+	if err == nil {
+		t.Errorf("expected error with canceled context, got nil")
+	}
+}
+
+// TestListScopedKeysContextCancellation verifies context cancellation handling.
+func TestListScopedKeysContextCancellation(t *testing.T) {
+	encryptionKey := make([]byte, 32)
+	_, _ = rand.Read(encryptionKey)
+
+	s, err := New(":memory:", encryptionKey)
+	if err != nil {
+		t.Fatalf("failed to create storage: %v", err)
+	}
+	defer func() { _ = s.Close() }()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel immediately
+
+	_, err = s.ListScopedKeys(ctx)
+	if err == nil {
+		t.Errorf("expected error with canceled context, got nil")
+	}
+}
+
+// TestDeleteScopedKeyContextCancellation verifies context cancellation handling.
+func TestDeleteScopedKeyContextCancellation(t *testing.T) {
+	encryptionKey := make([]byte, 32)
+	_, _ = rand.Read(encryptionKey)
+
+	s, err := New(":memory:", encryptionKey)
+	if err != nil {
+		t.Fatalf("failed to create storage: %v", err)
+	}
+	defer func() { _ = s.Close() }()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel immediately
+
+	err = s.DeleteScopedKey(ctx, 123)
+	if err == nil {
+		t.Errorf("expected error with canceled context, got nil")
+	}
+}

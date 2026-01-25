@@ -3,6 +3,7 @@ package admin
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -72,6 +73,24 @@ func (m *mockStorage) AddPermission(ctx context.Context, scopedKeyID int64, perm
 func (m *mockStorage) DeletePermission(ctx context.Context, id int64) error {
 	return nil
 }
+
+// failingWriter is a ResponseWriter that fails on Write to test error handling
+type failingWriter struct {
+	header http.Header
+}
+
+func (f *failingWriter) Header() http.Header {
+	if f.header == nil {
+		f.header = make(http.Header)
+	}
+	return f.header
+}
+
+func (f *failingWriter) Write([]byte) (int, error) {
+	return 0, fmt.Errorf("write failed")
+}
+
+func (f *failingWriter) WriteHeader(int) {}
 
 func TestHandleHealth(t *testing.T) {
 	// Test case 1: Returns 200 OK with status
@@ -243,4 +262,34 @@ func TestContextHelpers(t *testing.T) {
 			t.Errorf("expected token info map, got %v", info)
 		}
 	})
+}
+
+func TestHandleHealthEncodingError(t *testing.T) {
+	h := NewHandler(&mockStorage{}, NewSessionStore(0), new(slog.LevelVar), slog.Default())
+
+	req := httptest.NewRequest("GET", "/health", nil)
+	w := &failingWriter{}
+
+	// This should not panic even when Write fails
+	h.HandleHealth(w, req)
+}
+
+func TestHandleReadyStorageNilEncodingError(t *testing.T) {
+	h := NewHandler(nil, NewSessionStore(0), new(slog.LevelVar), slog.Default())
+
+	req := httptest.NewRequest("GET", "/ready", nil)
+	w := &failingWriter{}
+
+	// This should not panic even when Write fails
+	h.HandleReady(w, req)
+}
+
+func TestHandleReadyStorageConnectedEncodingError(t *testing.T) {
+	h := NewHandler(&mockStorage{}, NewSessionStore(0), new(slog.LevelVar), slog.Default())
+
+	req := httptest.NewRequest("GET", "/ready", nil)
+	w := &failingWriter{}
+
+	// This should not panic even when Write fails
+	h.HandleReady(w, req)
 }
