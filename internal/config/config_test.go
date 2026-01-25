@@ -262,3 +262,35 @@ func TestLoad_DataPathValidation(t *testing.T) {
 		}
 	})
 }
+
+func TestLoad_BunnyAPIURL_Set(t *testing.T) {
+	t.Run("when BUNNY_API_URL is set", func(t *testing.T) {
+		t.Setenv("ADMIN_PASSWORD", "test-password")
+		t.Setenv("ENCRYPTION_KEY", "12345678901234567890123456789012")
+		t.Setenv("BUNNY_API_URL", "http://mockbunny:8081")
+
+		cfg, err := Load()
+		if err != nil {
+			t.Fatalf("Load() error = %v", err)
+		}
+		if cfg.BunnyAPIURL != "http://mockbunny:8081" {
+			t.Errorf("BunnyAPIURL = %q, want %q", cfg.BunnyAPIURL, "http://mockbunny:8081")
+		}
+	})
+}
+
+func TestLoad_BunnyAPIURL_NotSet(t *testing.T) {
+	t.Run("when BUNNY_API_URL is not set", func(t *testing.T) {
+		t.Setenv("ADMIN_PASSWORD", "test-password")
+		t.Setenv("ENCRYPTION_KEY", "12345678901234567890123456789012")
+		os.Unsetenv("BUNNY_API_URL")
+
+		cfg, err := Load()
+		if err != nil {
+			t.Fatalf("Load() error = %v", err)
+		}
+		if cfg.BunnyAPIURL != "" {
+			t.Errorf("BunnyAPIURL = %q, want empty string", cfg.BunnyAPIURL)
+		}
+	})
+}

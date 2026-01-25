@@ -71,7 +71,11 @@ func initializeComponents(cfg *config.Config) (*serverComponents, error) {
 	validator := auth.NewValidator(store)
 
 	// 5. Create bunny client (storage-backed)
-	bunnyClient := bunny.NewStorageClient(store)
+	var bunnyOpts []interface{}
+	if cfg.BunnyAPIURL != "" {
+		bunnyOpts = append(bunnyOpts, bunny.WithStorageClientBaseURL(cfg.BunnyAPIURL))
+	}
+	bunnyClient := bunny.NewStorageClient(store, bunnyOpts...)
 
 	// 6. Create proxy handler and router
 	proxyHandler := proxy.NewHandler(bunnyClient, logger)

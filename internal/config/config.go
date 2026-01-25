@@ -13,6 +13,7 @@ type Config struct {
 	LogLevel      string // debug, info, warn, error
 	HTTPPort      string
 	DataPath      string
+	BunnyAPIURL   string // Optional: Base URL for bunny.net API (empty = use default)
 }
 
 // ErrMissingAdminPassword indicates the ADMIN_PASSWORD environment variable is required.
@@ -32,6 +33,7 @@ func Load() (*Config, error) {
 	logLevel := os.Getenv("LOG_LEVEL")
 	httpPort := os.Getenv("HTTP_PORT")
 	dataPath := os.Getenv("DATA_PATH")
+	bunnyAPIURL := os.Getenv("BUNNY_API_URL")
 
 	// Validate required fields
 	if adminPassword == "" {
@@ -61,6 +63,7 @@ func Load() (*Config, error) {
 		LogLevel:      logLevel,
 		HTTPPort:      httpPort,
 		DataPath:      dataPath,
+		BunnyAPIURL:   bunnyAPIURL,
 	}
 
 	if err := cfg.Validate(); err != nil {
