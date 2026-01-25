@@ -8,11 +8,11 @@ import (
 
 // Config holds all application configuration
 type Config struct {
-	AdminPassword  string
-	EncryptionKey  []byte // Must be 32 bytes
-	LogLevel       string // debug, info, warn, error
-	HTTPPort       string
-	DataPath       string
+	AdminPassword string
+	EncryptionKey []byte // Must be 32 bytes
+	LogLevel      string // debug, info, warn, error
+	HTTPPort      string
+	DataPath      string
 }
 
 // ErrMissingAdminPassword indicates the ADMIN_PASSWORD environment variable is required.
@@ -56,11 +56,11 @@ func Load() (*Config, error) {
 	}
 
 	cfg := &Config{
-		AdminPassword:  adminPassword,
-		EncryptionKey:  []byte(encryptionKeyStr),
-		LogLevel:       logLevel,
-		HTTPPort:       httpPort,
-		DataPath:       dataPath,
+		AdminPassword: adminPassword,
+		EncryptionKey: []byte(encryptionKeyStr),
+		LogLevel:      logLevel,
+		HTTPPort:      httpPort,
+		DataPath:      dataPath,
 	}
 
 	if err := cfg.Validate(); err != nil {

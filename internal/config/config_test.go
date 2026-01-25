@@ -150,8 +150,8 @@ func TestLoad_InvalidEncryptionKeyLength(t *testing.T) {
 func TestValidate(t *testing.T) {
 	t.Run("valid encryption key length", func(t *testing.T) {
 		cfg := &Config{
-			AdminPassword:  "test-password",
-			EncryptionKey:  []byte("12345678901234567890123456789012"),
+			AdminPassword: "test-password",
+			EncryptionKey: []byte("12345678901234567890123456789012"),
 		}
 
 		err := cfg.Validate()
@@ -162,8 +162,8 @@ func TestValidate(t *testing.T) {
 
 	t.Run("invalid encryption key length", func(t *testing.T) {
 		cfg := &Config{
-			AdminPassword:  "test-password",
-			EncryptionKey:  []byte("short"),
+			AdminPassword: "test-password",
+			EncryptionKey: []byte("short"),
 		}
 
 		err := cfg.Validate()
