@@ -35,7 +35,7 @@ services:
       retries: 3
       start_period: 10s
     volumes:
-      - proxy-data:/data
+      - /tmp/proxy-data:/data
 
   test-runner:
     build:
@@ -55,6 +55,3 @@ networks:
   test-network:
     driver: bridge
     internal: true
-
-volumes:
-  proxy-data:
