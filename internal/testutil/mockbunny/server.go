@@ -37,6 +37,14 @@ func New() *Server {
 	r.Put("/dnszone/{zoneId}/records", server.handleAddRecord)
 	r.Delete("/dnszone/{zoneId}/records/{id}", server.handleDeleteRecord)
 
+	// Admin endpoints for test seeding
+	r.Route("/admin", func(r chi.Router) {
+		r.Post("/zones", server.handleAdminCreateZone)
+		r.Post("/zones/{zoneId}/records", server.handleAdminCreateRecord)
+		r.Delete("/reset", server.handleAdminReset)
+		r.Get("/state", server.handleAdminState)
+	})
+
 	return server
 }
 
