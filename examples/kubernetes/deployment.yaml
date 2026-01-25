@@ -1,0 +1,213 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bunny-api-proxy
+  namespace: default  # Change to your namespace
+  labels:
+    app: bunny-api-proxy
+    version: "2026.01.1"
+spec:
+  # Number of replicas
+  # SQLite: Keep at 1 (single writer limitation)
+  # For high availability: use PostgreSQL and increase replicas
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: bunny-api-proxy
+
+  # Deployment strategy
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0  # Maintain availability during updates
+
+  template:
+    metadata:
+      labels:
+        app: bunny-api-proxy
+        version: "2026.01.1"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+
+    spec:
+      # Security context (pod-level)
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+
+      # Service account (use default or create custom with minimal RBAC)
+      serviceAccountName: default
+
+      # Restart policy
+      restartPolicy: Always
+
+      # DNS policy
+      dnsPolicy: ClusterFirst
+
+      # Image pull policy
+      imagePullPolicy: IfNotPresent
+
+      containers:
+      - name: bunny-api-proxy
+        image: sipico/bunny-api-proxy:latest
+        imagePullPolicy: IfNotPresent
+
+        # Security context (container-level)
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+            add:
+              - NET_BIND_SERVICE  # Only if needed for port < 1024
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 1000
+
+        # Ports
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+
+        # Environment variables from Secret
+        # See: secret.yaml.example for Secret definition
+        env:
+        - name: ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: bunny-api-proxy-secret
+              key: admin-password
+        - name: ENCRYPTION_KEY
+          valueFrom:
+            secretKeyRef:
+              name: bunny-api-proxy-secret
+              key: encryption-key
+
+        # Other environment variables
+        - name: LOG_LEVEL
+          value: "info"  # Change to 'debug' for troubleshooting
+        - name: HTTP_PORT
+          value: "8080"
+        - name: DATA_PATH
+          value: "/data/proxy.db"
+        - name: DATABASE_AUTO_INIT
+          value: "true"
+
+        # Resource requests and limits
+        # Requests: guaranteed resources (pod scheduling)
+        # Limits: maximum resources (pod evicted/killed if exceeded)
+        resources:
+          requests:
+            cpu: 100m        # 0.1 CPU cores
+            memory: 128Mi    # 128 megabytes
+          limits:
+            cpu: 500m        # 0.5 CPU cores
+            memory: 256Mi    # 256 megabytes
+
+        # Liveness probe: is the container alive?
+        # Restarts container if probe fails
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+          successThreshold: 1
+
+        # Readiness probe: is the container ready for traffic?
+        # Removes pod from service if probe fails (but doesn't restart)
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: http
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 2
+          successThreshold: 1
+
+        # Startup probe: for slow-starting containers
+        # Waits for startup before checking liveness/readiness
+        startupProbe:
+          httpGet:
+            path: /health
+            port: http
+            scheme: HTTP
+          initialDelaySeconds: 0
+          periodSeconds: 5
+          timeoutSeconds: 10
+          failureThreshold: 30  # 30 * 5 = 150 seconds maximum startup time
+
+        # Volume mounts
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        - name: tmp
+          mountPath: /tmp
+        - name: run
+          mountPath: /run
+
+        # Lifecycle hooks (optional)
+        lifecycle:
+          preStop:
+            exec:
+              # Give proxy time to drain connections
+              command: ["/bin/sh", "-c", "sleep 15"]
+
+      # Volumes
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: bunny-api-proxy-pvc
+      - name: tmp
+        emptyDir:
+          sizeLimit: 1Gi
+      - name: run
+        emptyDir:
+          sizeLimit: 1Gi
+
+      # Pod scheduling preferences
+      affinity:
+        # Pod anti-affinity: run on different nodes if possible
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - bunny-api-proxy
+              topologyKey: kubernetes.io/hostname
+
+      # Tolerations (if using taints on nodes)
+      tolerations: []
+
+      # Node selector (if using labeled nodes)
+      nodeSelector: {}
+        # Example: disktype: ssd
+
+---
+# Note: This is a Deployment with replicas: 1
+# SQLite is not suitable for multiple replicas (single writer limitation)
+#
+# For high availability:
+# 1. Switch to PostgreSQL (see FUTURE_ENHANCEMENTS.md)
+# 2. Increase replicas: 2 or 3
+# 3. Consider StatefulSet instead of Deployment
+# 4. Use pod affinity rules to spread across nodes/zones
+#
+# For now, this single-replica Deployment is appropriate for the MVP

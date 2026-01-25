@@ -2,12 +2,13 @@
 .git
 .gitignore
 
+# Development files
+.claude
+
 # Documentation
 *.md
 !README.md
 ARCHITECTURE.md
-CLAUDE.md
-FUTURE_ENHANCEMENTS.md
 
 # CI/CD
 .github

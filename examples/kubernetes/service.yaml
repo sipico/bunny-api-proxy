@@ -1,0 +1,90 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: bunny-api-proxy
+  namespace: default  # Change to your namespace
+  labels:
+    app: bunny-api-proxy
+  annotations:
+    # Service documentation
+    description: "Service for Bunny API Proxy"
+
+spec:
+  type: ClusterIP
+
+  # Session affinity: route requests from same client to same pod
+  # Useful for stateful applications, set to None for stateless
+  sessionAffinity: None
+
+  # Selector: route traffic to pods with this label
+  selector:
+    app: bunny-api-proxy
+
+  # Port definitions
+  ports:
+  - name: http
+    protocol: TCP
+    port: 8080          # Service port (accessible from pods via 8080)
+    targetPort: http    # Container port (defined in deployment)
+    # For Kubernetes 1.20+: nodePort not used with ClusterIP
+
+---
+# Alternative: NodePort Service (for external access without Ingress)
+# Uncomment below and comment out the ClusterIP service above if needed
+#
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   name: bunny-api-proxy-nodeport
+#   namespace: default
+#   labels:
+#     app: bunny-api-proxy
+# spec:
+#   type: NodePort
+#   selector:
+#     app: bunny-api-proxy
+#   ports:
+#   - name: http
+#     protocol: TCP
+#     port: 8080
+#     targetPort: http
+#     nodePort: 30080      # Exposed on every node on port 30080
+#
+# Access via: http://node-ip:30080
+
+---
+# Alternative: LoadBalancer Service (for cloud providers with LB support)
+# Uncomment below if your cluster has LoadBalancer support (AWS, GCP, Azure)
+#
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   name: bunny-api-proxy-lb
+#   namespace: default
+#   labels:
+#     app: bunny-api-proxy
+# spec:
+#   type: LoadBalancer
+#   selector:
+#     app: bunny-api-proxy
+#   ports:
+#   - name: http
+#     protocol: TCP
+#     port: 80
+#     targetPort: http
+#
+# Cloud provider will assign an external IP/hostname
+# This exposes the service to the internet (use with Ingress+TLS instead)
+
+---
+# RECOMMENDED SETUP:
+# 1. Use ClusterIP service (above) - internal only
+# 2. Use Ingress + cert-manager for external access with TLS
+#    (See ingress.yaml.example)
+# 3. Or use NodePort if Ingress is not available
+#
+# Ingress advantages:
+# - Single entry point for multiple services
+# - TLS termination (via cert-manager and Let's Encrypt)
+# - Virtual host routing
+# - URL path routing

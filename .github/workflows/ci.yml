@@ -135,26 +135,26 @@ jobs:
 
       - name: Build and start services
         run: |
-          docker compose -f docker-compose.test.yml up -d --build proxy mockbunny
+          docker compose -f .claude/docker/docker-compose.test.yml up -d --build proxy mockbunny
 
       - name: Wait for services to be healthy
         run: |
           echo "Waiting for services..."
-          timeout 60 bash -c 'until docker compose -f docker-compose.test.yml ps | grep -q "healthy"; do sleep 2; done'
-          docker compose -f docker-compose.test.yml ps
+          timeout 60 bash -c 'until docker compose -f .claude/docker/docker-compose.test.yml ps | grep -q "healthy"; do sleep 2; done'
+          docker compose -f .claude/docker/docker-compose.test.yml ps
 
       - name: Run E2E tests
         run: |
           mkdir -p e2e-logs
-          docker compose -f docker-compose.test.yml run --rm test-runner 2>&1 | tee e2e-logs/test-runner.log
+          docker compose -f .claude/docker/docker-compose.test.yml run --rm test-runner 2>&1 | tee e2e-logs/test-runner.log
 
       - name: Collect logs
         if: always()
         run: |
           mkdir -p e2e-logs
-          docker compose -f docker-compose.test.yml logs proxy > e2e-logs/proxy.log 2>&1 || true
-          docker compose -f docker-compose.test.yml logs mockbunny > e2e-logs/mockbunny.log 2>&1 || true
-          docker compose -f docker-compose.test.yml ps > e2e-logs/services.log 2>&1 || true
+          docker compose -f .claude/docker/docker-compose.test.yml logs proxy > e2e-logs/proxy.log 2>&1 || true
+          docker compose -f .claude/docker/docker-compose.test.yml logs mockbunny > e2e-logs/mockbunny.log 2>&1 || true
+          docker compose -f .claude/docker/docker-compose.test.yml ps > e2e-logs/services.log 2>&1 || true
 
       - name: Upload E2E logs
         if: always()
@@ -167,4 +167,4 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          docker compose -f docker-compose.test.yml down -v
+          docker compose -f .claude/docker/docker-compose.test.yml down -v

@@ -1,0 +1,229 @@
+# Kubernetes Ingress for Bunny API Proxy
+# Provides external HTTPS access with automatic TLS certificates
+#
+# Prerequisites:
+# 1. Kubernetes cluster with Ingress controller (nginx, Traefik, etc.)
+# 2. cert-manager installed for automatic certificate management
+#
+# Installation steps:
+#
+# 1. Install cert-manager (if not already installed):
+#    helm repo add jetstack https://charts.jetstack.io
+#    helm repo update
+#    helm install cert-manager jetstack/cert-manager --namespace cert-manager --create-namespace --set installCRDs=true
+#
+# 2. Create ClusterIssuer for Let's Encrypt:
+#    kubectl apply -f - <<EOF
+#    apiVersion: cert-manager.io/v1
+#    kind: ClusterIssuer
+#    metadata:
+#      name: letsencrypt-prod
+#    spec:
+#      acme:
+#        server: https://acme-v02.api.letsencrypt.org/directory
+#        email: admin@example.com  # CHANGE THIS
+#        privateKeySecretRef:
+#          name: letsencrypt-prod-key
+#        solvers:
+#        - http01:
+#            ingress:
+#              class: nginx  # or traefik, depending on ingress controller
+#    EOF
+#
+# 3. Create Ingress (replace api.example.com with your domain):
+#    kubectl apply -f examples/kubernetes/ingress.yaml
+#
+# 4. Verify Ingress created:
+#    kubectl get ingress
+#    kubectl describe ingress bunny-api-proxy-ingress
+#
+# 5. Check certificate creation:
+#    kubectl get certificate
+#    kubectl describe certificate bunny-api-proxy-cert
+#
+# 6. Wait for TLS to be ready (may take a few minutes):
+#    kubectl get certificate bunny-api-proxy-cert -w
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: bunny-api-proxy-ingress
+  namespace: default  # Change to your namespace
+  annotations:
+    # Ingress class (depends on your controller)
+    # kubernetes.io/ingress.class: nginx
+    # or for Traefik:
+    # kubernetes.io/ingress.class: traefik
+
+    # cert-manager annotations
+    # Tells cert-manager to create a certificate for this Ingress
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    # Alternative: use a namespace-scoped issuer
+    # cert-manager.io/issuer: "letsencrypt-prod"
+
+    # NGINX-specific annotations (adjust for your controller)
+    # nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    # nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+
+    # Security headers (NGINX)
+    # nginx.ingress.kubernetes.io/configuration-snippet: |
+    #   more_set_headers "X-Frame-Options: DENY";
+    #   more_set_headers "X-Content-Type-Options: nosniff";
+    #   more_set_headers "X-XSS-Protection: 1; mode=block";
+    #   more_set_headers "Referrer-Policy: strict-origin-when-cross-origin";
+
+    # Rate limiting (NGINX)
+    # nginx.ingress.kubernetes.io/limit-rps: "100"
+    # nginx.ingress.kubernetes.io/limit-connections: "10"
+
+spec:
+  # Ingress class (Kubernetes 1.18+)
+  ingressClassName: nginx  # Change to: traefik, istio, etc.
+
+  # TLS configuration
+  tls:
+  - hosts:
+    - api.example.com          # CHANGE THIS to your domain
+    - "*.api.example.com"      # Optional: wildcard subdomain (remove if not needed)
+    secretName: bunny-api-proxy-cert
+    # cert-manager will create this certificate automatically
+
+  # Rules for routing
+  rules:
+  - host: api.example.com      # CHANGE THIS to your domain
+    http:
+      paths:
+      - path: /
+        pathType: Prefix  # Match all paths starting with /
+        backend:
+          service:
+            name: bunny-api-proxy
+            port:
+              number: 8080
+
+---
+# Alternative: Using a namespace-scoped issuer instead of ClusterIssuer
+#
+# apiVersion: cert-manager.io/v1
+# kind: Issuer
+# metadata:
+#   name: letsencrypt-prod
+#   namespace: default
+# spec:
+#   acme:
+#     server: https://acme-v02.api.letsencrypt.org/directory
+#     email: admin@example.com
+#     privateKeySecretRef:
+#       name: letsencrypt-prod-key
+#     solvers:
+#     - http01:
+#         ingress:
+#           class: nginx
+
+---
+# Example: Alternative Ingress with DNS-01 challenge (for wildcards)
+# Allows issuing wildcard certificates (*.api.example.com)
+#
+# apiVersion: cert-manager.io/v1
+# kind: ClusterIssuer
+# metadata:
+#   name: letsencrypt-prod-dns
+# spec:
+#   acme:
+#     server: https://acme-v02.api.letsencrypt.org/directory
+#     email: admin@example.com
+#     privateKeySecretRef:
+#       name: letsencrypt-prod-dns-key
+#     solvers:
+#     - dns01:
+#         route53:
+#           region: us-east-1
+#           hostedZoneID: Z1234567890ABC  # Your Route53 zone ID
+#           accessKeyID: AKIA...
+#           secretAccessKey: <AWS secret>
+#
+# Then use in Ingress:
+#   cert-manager.io/cluster-issuer: "letsencrypt-prod-dns"
+#   cert-manager.io/acme-challenge-type: "dns01"
+
+---
+# Example: Traefik IngressRoute (instead of standard Ingress)
+# Traefik uses custom resources for advanced features
+#
+# apiVersion: traefik.io/v1alpha1
+# kind: IngressRoute
+# metadata:
+#   name: bunny-api-proxy-route
+#   namespace: default
+# spec:
+#   entryPoints:
+#     - websecure
+#   routes:
+#     - match: "Host(`api.example.com`)"
+#       kind: Rule
+#       services:
+#         - name: bunny-api-proxy
+#           port: 8080
+#   tls:
+#     certResolver: letsencrypt
+
+---
+# Example: Using basic authentication (HTTP Basic Auth)
+# Protects the API with username/password
+#
+# 1. Create secret with username:password
+#    echo -n "admin:$(openssl passwd -apr1 password)" | base64
+#
+# 2. Create basic auth secret:
+#    kubectl create secret generic bunny-api-proxy-auth \
+#      --from-literal=auth=$(echo -n 'admin:password' | base64)
+#
+# 3. Use in Ingress annotations:
+#    nginx.ingress.kubernetes.io/auth-type: basic
+#    nginx.ingress.kubernetes.io/auth-secret: bunny-api-proxy-auth
+#    nginx.ingress.kubernetes.io/auth-realm: 'Bunny API Proxy'
+
+---
+# Example: CORS headers (NGINX)
+# Allow cross-origin requests from specific origins
+#
+# nginx.ingress.kubernetes.io/enable-cors: "true"
+# nginx.ingress.kubernetes.io/cors-allow-origin: "https://app.example.com"
+# nginx.ingress.kubernetes.io/cors-allow-credentials: "true"
+# nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, OPTIONS"
+# nginx.ingress.kubernetes.io/cors-expose-headers: "Authorization"
+
+---
+# Troubleshooting:
+#
+# 1. Check Ingress status:
+#    kubectl get ingress bunny-api-proxy-ingress
+#    kubectl describe ingress bunny-api-proxy-ingress
+#
+# 2. Check certificate:
+#    kubectl get certificate bunny-api-proxy-cert
+#    kubectl describe certificate bunny-api-proxy-cert
+#    kubectl get secret bunny-api-proxy-cert  # TLS cert secret
+#
+# 3. Check Ingress controller logs:
+#    kubectl logs -n ingress-nginx deployment/ingress-nginx-controller
+#    # or for Traefik:
+#    kubectl logs -n traefik deployment/traefik
+#
+# 4. Check cert-manager logs:
+#    kubectl logs -n cert-manager deployment/cert-manager
+#    kubectl logs -n cert-manager deployment/cert-manager-webhook
+#
+# 5. Test DNS resolution:
+#    nslookup api.example.com
+#    # Should resolve to your Ingress controller's IP
+#
+# 6. Test HTTPS:
+#    curl -v https://api.example.com/health
+#    # Should show valid certificate
+#
+# 7. Common issues:
+#    - DNS not configured: certificate won't issue
+#    - Firewall blocking ports 80/443: challenges will fail
+#    - Ingress controller not installed: no entry point
+#    - cert-manager not installed: no certificate generation

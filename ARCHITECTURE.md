@@ -37,6 +37,25 @@ An API proxy for bunny.net that allows creating scoped/limited API keys. Sits be
 - **TDD approach** - tests first, then implementation
 - **No local development** - all building/testing via GitHub Actions
 
+## Versioning
+
+This project uses **Calendar Versioning (CalVer)** with the format `YYYY.0M.MICRO`:
+
+- `YYYY` - Four-digit year (e.g., 2026)
+- `0M` - Zero-padded month (01-12)
+- `MICRO` - Incremental release number within the month (1, 2, 3, ...)
+
+**Examples:**
+- `2026.01.1` - First release in January 2026
+- `2026.01.2` - Second release in January 2026
+- `2026.02.1` - First release in February 2026
+
+**Rationale:**
+- Higher version number always means newer release
+- Month granularity appropriate for deployment tracking
+- No semantic compatibility promises (breaking changes can happen anytime)
+- Simple, intuitive, and human-readable
+
 ## Project Structure
 
 ```

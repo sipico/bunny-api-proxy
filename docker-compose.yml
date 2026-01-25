@@ -1,0 +1,112 @@
+version: '3.9'
+
+# Bunny API Proxy - Production Docker Compose Configuration
+# Usage: cp .env.example .env && edit .env && docker-compose up -d
+# This configuration provides:
+# - Persistent volume for SQLite database (data survives container restarts)
+# - Health checks for monitoring and orchestration
+# - Restart policy for production reliability
+# - Security hardening (drop capabilities, read-only where possible)
+# - Resource limits to prevent runaway containers
+
+services:
+  bunny-api-proxy:
+    # Use official image from registry (version pinned for reproducibility)
+    image: sipico/bunny-api-proxy:latest
+
+    # Container name for easy reference
+    container_name: bunny-api-proxy
+
+    # Load environment variables from .env file
+    # Variables defined here: ADMIN_PASSWORD, ENCRYPTION_KEY, LOG_LEVEL, HTTP_PORT, DATA_PATH
+    env_file: .env
+
+    # Port mapping: HOST:CONTAINER
+    # Expose 8080 from container to host on 8080
+    # For production behind reverse proxy, consider only exposing to localhost
+    ports:
+      - "127.0.0.1:8080:8080"  # Localhost only (recommended with reverse proxy)
+      # OR for direct exposure:
+      # - "8080:8080"
+
+    # Named volume for persistent data
+    # SQLite database is stored here and survives container restarts
+    volumes:
+      - bunny_data:/data
+
+    # Health check ensures container is responding
+    # Runs every 30 seconds, considers unhealthy after 3 failures (90 seconds)
+    # Used by orchestration tools (Swarm, Kubernetes) for automated recovery
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+    # Restart policy for production reliability
+    # 'unless-stopped': automatically restart unless explicitly stopped
+    # Ensures proxy stays running after server reboots or unexpected crashes
+    restart: unless-stopped
+
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    # Security: Drop unnecessary Linux capabilities
+    # CAP_NET_RAW: prevents raw socket access
+    # CAP_NET_ADMIN: prevents network administration
+    # CAP_SYS_ADMIN: prevents system-level operations
+    cap_drop:
+      - CAP_NET_RAW
+      - CAP_NET_ADMIN
+      - CAP_SYS_ADMIN
+
+    # Security: Read-only root filesystem
+    # Prevents accidental or malicious modification of the image
+    # Logs and temp files use mounted volumes
+    read_only: true
+
+    # Temporary mount for runtime state (needed by Go apps)
+    tmpfs:
+      - /tmp
+      - /run
+
+    # Resource limits prevent container from consuming all host resources
+    # Requests: guaranteed resources
+    # Limits: maximum resources (container killed if exceeded)
+    deploy:
+      resources:
+        requests:
+          cpus: '0.1'        # Request 100m CPU
+          memory: 128M       # Request 128MB RAM
+        limits:
+          cpus: '0.5'        # Max 500m CPU
+          memory: 256M       # Max 256MB RAM
+
+    # Labels for documentation and tooling
+    labels:
+      com.example.project: "bunny-api-proxy"
+      com.example.environment: "production"
+      com.example.description: "API proxy for bunny.net with scoped API keys"
+
+# Named volume for persistent data storage
+volumes:
+  bunny_data:
+    # Use local driver (data on host machine)
+    driver: local
+    # For advanced setups, consider:
+    # - NFS mount for distributed deployments
+    # - Block storage services (EBS, GCE Persistent Disks)
+    # - Managed storage (Docker Enterprise, cloud providers)
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data
+
+networks:
+  default:
+    driver: bridge

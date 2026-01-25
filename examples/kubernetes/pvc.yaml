@@ -1,0 +1,172 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: bunny-api-proxy-pvc
+  namespace: default  # Change to your namespace
+  labels:
+    app: bunny-api-proxy
+
+spec:
+  # Access mode: ReadWriteOnce means the volume can be mounted by only one node
+  # with read-write access. This is required for SQLite (single writer).
+  #
+  # Other modes:
+  # - ReadOnlyMany: many nodes can mount for reading
+  # - ReadWriteMany: many nodes can mount for reading and writing
+  #   (not suitable for SQLite, but needed for shared storage)
+  accessModes:
+    - ReadWriteOnce
+
+  # Storage class determines what type of storage is used
+  # Leave empty to use default storage class
+  # Examples: fast-ssd, standard, aws-ebs, gcp-pd, azure-managed-disk
+  #
+  # storageClassName: fast-ssd
+  storageClassName: ""  # Use default storage class
+
+  resources:
+    requests:
+      # 1Gi is usually sufficient for SQLite database
+      # Adjust based on expected API key volume:
+      # - Typical key: ~100 bytes
+      # - 1 million keys: ~100MB
+      # - Add overhead for logs, indexes, schema: 2-5x
+      # - Recommendation: 1Gi minimum, 10Gi comfortable
+      storage: 1Gi
+
+---
+# Optional: PersistentVolume for local storage
+# Use this if you want to explicitly provision storage on a specific node
+#
+# apiVersion: v1
+# kind: PersistentVolume
+# metadata:
+#   name: bunny-api-proxy-pv
+# spec:
+#   capacity:
+#     storage: 10Gi
+#   accessModes:
+#     - ReadWriteOnce
+#   persistentVolumeReclaimPolicy: Retain  # Don't auto-delete
+#   storageClassName: local-storage
+#   local:
+#     path: /mnt/data/bunny-api-proxy  # Local path on node
+#   nodeAffinity:
+#     required:
+#       nodeSelectorTerms:
+#       - matchExpressions:
+#         - key: kubernetes.io/hostname
+#           operator: In
+#           values:
+#           - worker-node-1  # Specify node name
+#
+# ---
+# apiVersion: storage.k8s.io/v1
+# kind: StorageClass
+# metadata:
+#   name: local-storage
+# provisioner: kubernetes.io/no-provisioner
+# volumeBindingMode: WaitForFirstConsumer
+
+---
+# Storage class recommendations:
+#
+# Cloud Providers:
+# - AWS EKS: "gp2" (gp3 for newer clusters)
+# - Google GKE: "standard" or "premium-rwo"
+# - Azure AKS: "default" or "managed-premium"
+#
+# On-premises:
+# - NFS: Install NFS provisioner, use "nfs-storage" class
+# - Local SSD: Use "local-storage" class (see example above)
+# - Ceph: Use "ceph-rbd" class
+#
+# For high-availability with PostgreSQL (future):
+# - Use storage with high IOPS
+# - Enable automatic snapshots/backups
+# - Configure WAL archiving
+# - Use separate volumes for WAL and data
+
+---
+# Backup and restore procedures:
+#
+# Backup (snapshot the PVC):
+# 1. Create a VolumeSnapshot (requires VolumeSnapshotClass)
+#    kubectl apply -f - <<EOF
+#    apiVersion: snapshot.storage.k8s.io/v1
+#    kind: VolumeSnapshot
+#    metadata:
+#      name: bunny-api-proxy-snapshot
+#    spec:
+#      source:
+#        persistentVolumeClaimName: bunny-api-proxy-pvc
+#    EOF
+#
+# 2. Verify snapshot created:
+#    kubectl get volumesnapshot
+#    kubectl describe volumesnapshot bunny-api-proxy-snapshot
+#
+# Restore from snapshot:
+# 1. Create new PVC from snapshot:
+#    kubectl apply -f - <<EOF
+#    apiVersion: v1
+#    kind: PersistentVolumeClaim
+#    metadata:
+#      name: bunny-api-proxy-pvc-restored
+#    spec:
+#      dataSource:
+#        name: bunny-api-proxy-snapshot
+#        kind: VolumeSnapshot
+#        apiGroup: snapshot.storage.k8s.io
+#      accessModes:
+#        - ReadWriteOnce
+#      resources:
+#        requests:
+#          storage: 1Gi
+#    EOF
+#
+# 2. Use restored PVC in pod (update deployment)
+# 3. Verify data integrity
+
+---
+# Manual backup (using pod):
+#
+# 1. Create backup pod:
+#    kubectl run backup-pod \
+#      --image=busybox \
+#      --overrides='{"spec":{"volumes":[{"name":"data","persistentVolumeClaim":{"claimName":"bunny-api-proxy-pvc"}}],"containers":[{"name":"backup-pod","volumeMounts":[{"name":"data","mountPath":"/data"}]}]}}' \
+#      -it \
+#      -- /bin/sh
+#
+# 2. Inside pod:
+#    tar czf /data/backup.tar.gz /data/proxy.db
+#    # Copy to external storage, S3, etc.
+#
+# 3. Exit pod and delete:
+#    kubectl delete pod backup-pod
+
+---
+# Alternative: Host path storage (for single-node testing)
+# NOT recommended for production
+#
+# apiVersion: v1
+# kind: PersistentVolume
+# metadata:
+#   name: bunny-api-proxy-hostpath-pv
+# spec:
+#   capacity:
+#     storage: 10Gi
+#   accessModes:
+#     - ReadWriteOnce
+#   persistentVolumeReclaimPolicy: Retain
+#   hostPath:
+#     path: /mnt/data/bunny-api-proxy
+#     type: DirectoryOrCreate
+#   nodeAffinity:
+#     required:
+#       nodeSelectorTerms:
+#       - matchExpressions:
+#         - key: kubernetes.io/hostname
+#           operator: In
+#           values:
+#           - localhost

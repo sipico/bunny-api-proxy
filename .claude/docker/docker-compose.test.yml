@@ -1,8 +1,8 @@
 services:
   mockbunny:
     build:
-      context: .
-      dockerfile: Dockerfile.mockbunny
+      context: ../..
+      dockerfile: .claude/docker/Dockerfile.mockbunny
     networks:
       - test-network
     healthcheck:
@@ -14,7 +14,7 @@ services:
 
   proxy:
     build:
-      context: .
+      context: ../..
       dockerfile: Dockerfile
     environment:
       - ADMIN_PASSWORD=testpassword123
@@ -39,8 +39,8 @@ services:
 
   test-runner:
     build:
-      context: .
-      dockerfile: Dockerfile.testrunner
+      context: ../..
+      dockerfile: .claude/docker/Dockerfile.testrunner
     environment:
       - PROXY_URL=http://proxy:8080
       - MOCKBUNNY_URL=http://mockbunny:8081
