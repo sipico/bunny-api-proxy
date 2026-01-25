@@ -18,9 +18,14 @@ import (
 // mockStorageWithTokenCRUD extends mockStorage with CRUD operations
 type mockStorageWithTokenCRUD struct {
 	*mockStorage
-	listTokens  func(ctx context.Context) ([]*storage.AdminToken, error)
-	createToken func(ctx context.Context, name, token string) (int64, error)
-	deleteToken func(ctx context.Context, id int64) error
+	listTokens      func(ctx context.Context) ([]*storage.AdminToken, error)
+	createToken     func(ctx context.Context, name, token string) (int64, error)
+	deleteToken     func(ctx context.Context, id int64) error
+	getMasterKey    func(ctx context.Context) (string, error)
+	setMasterKey    func(ctx context.Context, key string) error
+	createScopedKey func(ctx context.Context, name, apiKey string) (int64, error)
+	deleteScopedKey func(ctx context.Context, id int64) error
+	addPermission   func(ctx context.Context, scopedKeyID int64, perm *storage.Permission) (int64, error)
 }
 
 func (m *mockStorageWithTokenCRUD) ListAdminTokens(ctx context.Context) ([]*storage.AdminToken, error) {
@@ -44,6 +49,20 @@ func (m *mockStorageWithTokenCRUD) DeleteAdminToken(ctx context.Context, id int6
 	return nil
 }
 
+func (m *mockStorageWithTokenCRUD) GetMasterAPIKey(ctx context.Context) (string, error) {
+	if m.getMasterKey != nil {
+		return m.getMasterKey(ctx)
+	}
+	return "", nil
+}
+
+func (m *mockStorageWithTokenCRUD) SetMasterAPIKey(ctx context.Context, key string) error {
+	if m.setMasterKey != nil {
+		return m.setMasterKey(ctx, key)
+	}
+	return nil
+}
+
 func (m *mockStorageWithTokenCRUD) ListScopedKeys(ctx context.Context) ([]*storage.ScopedKey, error) {
 	return make([]*storage.ScopedKey, 0), nil
 }
@@ -53,10 +72,16 @@ func (m *mockStorageWithTokenCRUD) GetScopedKey(ctx context.Context, id int64) (
 }
 
 func (m *mockStorageWithTokenCRUD) CreateScopedKey(ctx context.Context, name, apiKey string) (int64, error) {
+	if m.createScopedKey != nil {
+		return m.createScopedKey(ctx, name, apiKey)
+	}
 	return 0, nil
 }
 
 func (m *mockStorageWithTokenCRUD) DeleteScopedKey(ctx context.Context, id int64) error {
+	if m.deleteScopedKey != nil {
+		return m.deleteScopedKey(ctx, id)
+	}
 	return nil
 }
 
@@ -65,6 +90,9 @@ func (m *mockStorageWithTokenCRUD) GetPermissions(ctx context.Context, keyID int
 }
 
 func (m *mockStorageWithTokenCRUD) AddPermission(ctx context.Context, scopedKeyID int64, perm *storage.Permission) (int64, error) {
+	if m.addPermission != nil {
+		return m.addPermission(ctx, scopedKeyID, perm)
+	}
 	return 0, nil
 }
 
@@ -414,5 +442,272 @@ func TestHandleDeleteToken(t *testing.T) {
 				t.Errorf("expected status %d, got %d", tt.wantStatus, w.Code)
 			}
 		})
+	}
+}
+
+func TestHandleSetMasterKeyAPI(t *testing.T) {
+	tests := []struct {
+		name        string
+		body        interface{}
+		existingKey string
+		mockSetErr  error
+		wantStatus  int
+		wantBody    string
+	}{
+		{
+			name:       "set master key successfully",
+			body:       SetMasterKeyRequest{APIKey: "new-master-key"},
+			wantStatus: http.StatusCreated,
+			wantBody:   `"status":"ok"`,
+		},
+		{
+			name:        "master key already set",
+			body:        SetMasterKeyRequest{APIKey: "new-master-key"},
+			existingKey: "existing-key",
+			wantStatus:  http.StatusConflict,
+			wantBody:    "master key already set",
+		},
+		{
+			name:       "missing api_key",
+			body:       SetMasterKeyRequest{APIKey: ""},
+			wantStatus: http.StatusBadRequest,
+			wantBody:   "API key required",
+		},
+		{
+			name:       "invalid JSON",
+			body:       "not-json",
+			wantStatus: http.StatusBadRequest,
+			wantBody:   "Invalid JSON",
+		},
+		{
+			name:       "storage error",
+			body:       SetMasterKeyRequest{APIKey: "new-key"},
+			mockSetErr: storage.ErrDecryption,
+			wantStatus: http.StatusInternalServerError,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mock := &mockStorageWithTokenCRUD{
+				mockStorage: &mockStorage{},
+				getMasterKey: func(ctx context.Context) (string, error) {
+					return tt.existingKey, nil
+				},
+				setMasterKey: func(ctx context.Context, key string) error {
+					return tt.mockSetErr
+				},
+			}
+			h := NewHandler(mock, NewSessionStore(24*time.Hour), new(slog.LevelVar), slog.Default())
+
+			var body io.Reader
+			if str, ok := tt.body.(string); ok {
+				body = bytes.NewBufferString(str)
+			} else {
+				bodyBytes, _ := json.Marshal(tt.body)
+				body = bytes.NewBuffer(bodyBytes)
+			}
+
+			req := httptest.NewRequest("PUT", "/api/master-key", body)
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+
+			h.HandleSetMasterKeyAPI(w, req)
+
+			if w.Code != tt.wantStatus {
+				t.Errorf("expected status %d, got %d", tt.wantStatus, w.Code)
+			}
+
+			if tt.wantBody != "" && !bytes.Contains(w.Body.Bytes(), []byte(tt.wantBody)) {
+				t.Errorf("expected body to contain %q, got %q", tt.wantBody, w.Body.String())
+			}
+		})
+	}
+}
+
+func TestHandleCreateKeyAPI(t *testing.T) {
+	tests := []struct {
+		name          string
+		body          interface{}
+		mockKeyID     int64
+		mockCreateErr error
+		mockPermID    int64
+		mockPermErr   error
+		wantStatus    int
+		wantBody      string
+	}{
+		{
+			name: "create key successfully",
+			body: CreateKeyRequest{
+				Name:        "test-key",
+				Zones:       []int64{123},
+				Actions:     []string{"list_zones"},
+				RecordTypes: []string{"TXT"},
+			},
+			mockKeyID:  42,
+			mockPermID: 1,
+			wantStatus: http.StatusCreated,
+			wantBody:   `"id":42`,
+		},
+		{
+			name: "create key with multiple zones",
+			body: CreateKeyRequest{
+				Name:        "multi-zone-key",
+				Zones:       []int64{123, 456},
+				Actions:     []string{"list_zones", "get_zone"},
+				RecordTypes: []string{"TXT", "A"},
+			},
+			mockKeyID:  43,
+			mockPermID: 2,
+			wantStatus: http.StatusCreated,
+			wantBody:   `"id":43`,
+		},
+		{
+			name: "missing name",
+			body: CreateKeyRequest{
+				Zones:       []int64{123},
+				Actions:     []string{"list_zones"},
+				RecordTypes: []string{"TXT"},
+			},
+			wantStatus: http.StatusBadRequest,
+			wantBody:   "Name required",
+		},
+		{
+			name: "missing zones",
+			body: CreateKeyRequest{
+				Name:        "test-key",
+				Zones:       []int64{},
+				Actions:     []string{"list_zones"},
+				RecordTypes: []string{"TXT"},
+			},
+			wantStatus: http.StatusBadRequest,
+			wantBody:   "At least one zone required",
+		},
+		{
+			name: "missing actions",
+			body: CreateKeyRequest{
+				Name:        "test-key",
+				Zones:       []int64{123},
+				Actions:     []string{},
+				RecordTypes: []string{"TXT"},
+			},
+			wantStatus: http.StatusBadRequest,
+			wantBody:   "At least one action required",
+		},
+		{
+			name: "missing record types",
+			body: CreateKeyRequest{
+				Name:        "test-key",
+				Zones:       []int64{123},
+				Actions:     []string{"list_zones"},
+				RecordTypes: []string{},
+			},
+			wantStatus: http.StatusBadRequest,
+			wantBody:   "At least one record type required",
+		},
+		{
+			name:       "invalid JSON",
+			body:       "not-json",
+			wantStatus: http.StatusBadRequest,
+			wantBody:   "Invalid JSON",
+		},
+		{
+			name: "storage error on create key",
+			body: CreateKeyRequest{
+				Name:        "test-key",
+				Zones:       []int64{123},
+				Actions:     []string{"list_zones"},
+				RecordTypes: []string{"TXT"},
+			},
+			mockCreateErr: storage.ErrDecryption,
+			wantStatus:    http.StatusInternalServerError,
+		},
+		{
+			name: "storage error on add permission",
+			body: CreateKeyRequest{
+				Name:        "test-key",
+				Zones:       []int64{123},
+				Actions:     []string{"list_zones"},
+				RecordTypes: []string{"TXT"},
+			},
+			mockKeyID:   42,
+			mockPermErr: storage.ErrDecryption,
+			wantStatus:  http.StatusInternalServerError,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mock := &mockStorageWithTokenCRUD{
+				mockStorage: &mockStorage{},
+				createScopedKey: func(ctx context.Context, name, apiKey string) (int64, error) {
+					if tt.mockCreateErr != nil {
+						return 0, tt.mockCreateErr
+					}
+					return tt.mockKeyID, nil
+				},
+				addPermission: func(ctx context.Context, scopedKeyID int64, perm *storage.Permission) (int64, error) {
+					if tt.mockPermErr != nil {
+						return 0, tt.mockPermErr
+					}
+					return tt.mockPermID, nil
+				},
+				deleteScopedKey: func(ctx context.Context, id int64) error {
+					return nil // Cleanup always succeeds in tests
+				},
+			}
+			h := NewHandler(mock, NewSessionStore(24*time.Hour), new(slog.LevelVar), slog.Default())
+
+			var body io.Reader
+			if str, ok := tt.body.(string); ok {
+				body = bytes.NewBufferString(str)
+			} else {
+				bodyBytes, _ := json.Marshal(tt.body)
+				body = bytes.NewBuffer(bodyBytes)
+			}
+
+			req := httptest.NewRequest("POST", "/api/keys", body)
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+
+			h.HandleCreateKeyAPI(w, req)
+
+			if w.Code != tt.wantStatus {
+				t.Errorf("expected status %d, got %d", tt.wantStatus, w.Code)
+			}
+
+			if tt.wantBody != "" && !bytes.Contains(w.Body.Bytes(), []byte(tt.wantBody)) {
+				t.Errorf("expected body to contain %q, got %q", tt.wantBody, w.Body.String())
+			}
+
+			// Verify response contains key for successful creation
+			if tt.wantStatus == http.StatusCreated {
+				var resp CreateKeyResponse
+				if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+					t.Fatalf("failed to decode response: %v", err)
+				}
+				if resp.Key == "" {
+					t.Error("expected key to be set in response")
+				}
+			}
+		})
+	}
+}
+
+func TestGenerateRandomKey(t *testing.T) {
+	// Test that generateRandomKey produces keys of correct length
+	key1 := generateRandomKey(32)
+	if len(key1) != 32 {
+		t.Errorf("expected key length 32, got %d", len(key1))
+	}
+
+	key2 := generateRandomKey(32)
+	if len(key2) != 32 {
+		t.Errorf("expected key length 32, got %d", len(key2))
+	}
+
+	// Keys should be different (random)
+	if key1 == key2 {
+		t.Error("expected different keys, got identical")
 	}
 }
