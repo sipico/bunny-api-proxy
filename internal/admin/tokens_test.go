@@ -2,6 +2,7 @@ package admin
 
 import (
 	"context"
+	"html/template"
 	"io"
 	"log/slog"
 	"net/http"
@@ -654,5 +655,70 @@ func TestHandleDeleteAdminTokenRedirectsToTokensList(t *testing.T) {
 	location := w.Header().Get("Location")
 	if location != "/admin/tokens" {
 		t.Errorf("expected redirect to /admin/tokens, got %q", location)
+	}
+}
+
+func TestHandleListAdminTokensPageTemplateExecuteError(t *testing.T) {
+	// Create a template that will fail on execution (empty template without required template)
+	badTmpl := template.New("bad")
+
+	h := &Handler{
+		storage:      &mockStorageForTokens{},
+		sessionStore: NewSessionStore(0),
+		logger:       slog.New(slog.NewTextHandler(io.Discard, nil)),
+		templates:    badTmpl,
+	}
+
+	req := httptest.NewRequest("GET", "/admin/tokens", nil)
+	w := httptest.NewRecorder()
+
+	h.HandleListAdminTokensPage(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("expected status 500, got %d", w.Code)
+	}
+}
+
+func TestHandleNewTokenFormTemplateExecuteError(t *testing.T) {
+	// Create a template that will fail on execution (empty template without required template)
+	badTmpl := template.New("bad")
+
+	h := &Handler{
+		storage:      &mockStorageForTokens{},
+		sessionStore: NewSessionStore(0),
+		logger:       slog.New(slog.NewTextHandler(io.Discard, nil)),
+		templates:    badTmpl,
+	}
+
+	req := httptest.NewRequest("GET", "/admin/tokens/new", nil)
+	w := httptest.NewRecorder()
+
+	h.HandleNewTokenForm(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("expected status 500, got %d", w.Code)
+	}
+}
+
+func TestHandleCreateAdminTokenTemplateExecuteError(t *testing.T) {
+	// Create a template that will fail on execution (empty template without required template)
+	badTmpl := template.New("bad")
+
+	h := &Handler{
+		storage:      &mockStorageForTokens{},
+		sessionStore: NewSessionStore(0),
+		logger:       slog.New(slog.NewTextHandler(io.Discard, nil)),
+		templates:    badTmpl,
+	}
+
+	body := strings.NewReader("name=test-token")
+	req := httptest.NewRequest("POST", "/admin/tokens", body)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	w := httptest.NewRecorder()
+
+	h.HandleCreateAdminToken(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("expected status 500, got %d", w.Code)
 	}
 }
