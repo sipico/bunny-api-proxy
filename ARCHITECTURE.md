@@ -74,7 +74,6 @@ bunny-api-proxy/
 ├── web/
 │   ├── templates/               # HTML templates
 │   └── static/                  # CSS, JS (HTMX)
-├── migrations/                  # Database migrations
 ├── .github/
 │   └── workflows/               # CI/CD
 ├── go.mod
