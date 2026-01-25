@@ -29,8 +29,8 @@ WORKDIR /app
 # Copy binary from builder
 COPY --from=builder /app/bunny-api-proxy .
 
-# TODO: Copy web assets when Admin UI is implemented
-# COPY --from=builder /app/web ./web
+# Copy web assets (templates, static files)
+COPY --from=builder /app/web ./web
 
 # Create non-root user
 RUN addgroup -g 1000 bunny && \
