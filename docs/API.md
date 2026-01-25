@@ -328,7 +328,7 @@ curl -X GET http://localhost:8080/dnszone/123456/records \
 Create a new DNS record in the specified zone.
 
 **Authentication:** Required (AccessKey header)
-**Permissions Required:** `add_records` action
+**Permissions Required:** `add_record` action
 **Path Parameters:**
 
 | Parameter | Type | Description |
@@ -417,7 +417,7 @@ curl -X POST http://localhost:8080/dnszone/123456/records \
 Delete a DNS record from the specified zone.
 
 **Authentication:** Required (AccessKey header)
-**Permissions Required:** `delete_records` action
+**Permissions Required:** `delete_record` action
 **Path Parameters:**
 
 | Parameter | Type | Description |
@@ -733,7 +733,7 @@ Create a new scoped API key with permissions in one operation.
 {
   "name": "key-name",
   "zones": [123456, 789012],
-  "actions": ["list_zones", "add_records", "delete_records"],
+  "actions": ["list_zones", "add_record", "delete_record"],
   "record_types": ["A", "CNAME", "TXT", "MX"]
 }
 ```
@@ -741,7 +741,7 @@ Create a new scoped API key with permissions in one operation.
 **Parameters:**
 - `name` (string, required) - Descriptive name for the key
 - `zones` (array of integers, required) - Zone IDs this key can access
-- `actions` (array of strings, required) - Allowed actions: `list_zones`, `add_records`, `delete_records`, `list_records`
+- `actions` (array of strings, required) - Allowed actions: `list_zones`, `get_zone`, `list_records`, `add_record`, `delete_record`
 - `record_types` (array of strings, required) - DNS record types the key can modify
 
 **Example Request:**
@@ -752,7 +752,7 @@ curl -X POST http://localhost:8080/admin/api/keys \
   -d '{
     "name": "acme-client",
     "zones": [123456],
-    "actions": ["list_zones", "add_records", "delete_records", "list_records"],
+    "actions": ["list_zones", "add_record", "delete_record", "list_records"],
     "record_types": ["TXT"]
   }'
 ```
@@ -940,7 +940,7 @@ Add a permission to a scoped key.
 
 **Form Parameters:**
 - `zone_id` - The zone ID
-- `allowed_actions` - Comma-separated list of actions (list_zones, add_records, delete_records, list_records)
+- `allowed_actions` - Comma-separated list of actions (list_zones, get_zone, list_records, add_record, delete_record)
 - `record_types` - Comma-separated list of DNS record types (A, AAAA, CNAME, TXT, MX, NS, SRV, CAA, etc.)
 
 **Response:** 302 Found - Redirects to `/admin/keys/{id}`
@@ -1008,7 +1008,7 @@ When the proxy receives an error from the bunny.net API:
 1. **Never expose API keys** - Store keys securely, never commit to version control
 2. **Use scoped keys** - Create keys with minimal required permissions
 3. **Limit zones** - Restrict keys to only the zones that need access
-4. **Limit actions** - Use only required actions (e.g., just `add_records` and `delete_records` for ACME)
+4. **Limit actions** - Use only required actions (e.g., just `add_record` and `delete_record` for ACME)
 5. **Limit record types** - Restrict to needed types (e.g., just `TXT` for ACME DNS-01)
 6. **Rotate regularly** - Delete and recreate keys periodically
 7. **Monitor usage** - Log all key usage through the proxy logs
@@ -1027,7 +1027,7 @@ curl -X POST http://localhost:8080/admin/api/keys \
   -d '{
     "name": "acme-dns-client",
     "zones": [123456],
-    "actions": ["list_zones", "list_records", "add_records", "delete_records"],
+    "actions": ["list_zones", "list_records", "add_record", "delete_record"],
     "record_types": ["TXT"]
   }'
 
