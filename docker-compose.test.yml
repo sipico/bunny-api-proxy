@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  mockbunny:
+    build:
+      context: .
+      dockerfile: Dockerfile.mockbunny
+    networks:
+      - test-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8081/admin/state"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+  proxy:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - ADMIN_PASSWORD=testpassword123
+      - ENCRYPTION_KEY=12345678901234567890123456789012
+      - LOG_LEVEL=debug
+      - HTTP_PORT=8080
+      - DATA_PATH=/data/proxy.db
+      - BUNNY_API_URL=http://mockbunny:8081
+    depends_on:
+      mockbunny:
+        condition: service_healthy
+    networks:
+      - test-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    volumes:
+      - proxy-data:/data
+
+networks:
+  test-network:
+    driver: bridge
+    internal: true
+
+volumes:
+  proxy-data:
