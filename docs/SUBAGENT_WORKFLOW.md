@@ -133,9 +133,34 @@ If PR checks are pending, wait. Do NOT declare success until PR is green.
 - **Explicit worktree path** (never use `${ISSUE_NUM}` - use actual number)
 - **Explicit branch name** (never use `[SESSION_ID]` - use actual ID)
 - **Explicit session ID** (coordinator provides this)
+- **Always use `--repo sipico/bunny-api-proxy`** with ALL gh commands (git remote is proxied, gh cannot auto-detect)
 - Require CI validation before PR creation
 - **Require PR check verification** - don't declare success until PR shows green
 - Standardized token reporting format
+
+### Common gh CLI Commands (always include --repo)
+
+```bash
+# View issue
+gh issue view 72 --repo sipico/bunny-api-proxy
+
+# Create PR
+gh pr create --repo sipico/bunny-api-proxy --base main --head claude/issue-72-XXXXX --title "..." --body "..."
+
+# Check PR status
+gh pr checks 123 --repo sipico/bunny-api-proxy --watch
+
+# Merge PR
+gh pr merge 123 --repo sipico/bunny-api-proxy --merge
+
+# List CI runs
+gh run list --repo sipico/bunny-api-proxy --branch claude/issue-72-XXXXX --limit 1
+
+# Comment on issue
+gh issue comment 72 --repo sipico/bunny-api-proxy --body "..."
+```
+
+**Why `--repo` is required:** The git remote uses a local proxy (`http://127.0.0.1:XXXXX/git/...`), so `gh` cannot auto-detect the GitHub repository. Without `--repo`, commands will fail.
 
 ### Phase 3a: Coordinator Session Management
 
