@@ -1203,3 +1203,13 @@ If migrating from a different DNS provider:
 ---
 
 *This documentation was compiled from official bunny.net API markdown documentation to provide a comprehensive reference for DNS Zone API integration.*
+
+---
+
+## Official Documentation Files
+
+All official bunny.net API documentation has been archived in the `/docs/bunny-api-official-docs/` directory:
+
+- **[bunny-api-official-docs/README.md](bunny-api-official-docs/README.md)** - Index of all official documentation files
+
+This ensures we have the complete, authoritative source for every endpoint specification, parameter, and response structure directly from bunny.net.
