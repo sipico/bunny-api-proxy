@@ -16,12 +16,19 @@ import (
 
 // mockStorageForKeys extends mockStorage with key and permission methods
 type mockStorageForKeys struct {
-	keys        map[int64]*storage.ScopedKey
-	permissions map[int64][]*storage.Permission
-	nextKeyID   int64
-	nextPermID  int64
-	masterKey   string
-	closeErr    error
+	keys               map[int64]*storage.ScopedKey
+	permissions        map[int64][]*storage.Permission
+	nextKeyID          int64
+	nextPermID         int64
+	masterKey          string
+	closeErr           error
+	listKeysErr        error
+	getKeyErr          error
+	createKeyErr       error
+	deleteKeyErr       error
+	getPermissionsErr  error
+	addPermissionErr   error
+	deletePermissionErr error
 }
 
 func (m *mockStorageForKeys) Close() error {
@@ -54,6 +61,9 @@ func (m *mockStorageForKeys) DeleteAdminToken(ctx context.Context, id int64) err
 }
 
 func (m *mockStorageForKeys) CreateScopedKey(ctx context.Context, name, apiKey string) (int64, error) {
+	if m.createKeyErr != nil {
+		return 0, m.createKeyErr
+	}
 	m.nextKeyID++
 	id := m.nextKeyID
 	if m.keys == nil {
@@ -74,6 +84,9 @@ func (m *mockStorageForKeys) GetScopedKeyByHash(ctx context.Context, keyHash str
 }
 
 func (m *mockStorageForKeys) GetScopedKey(ctx context.Context, id int64) (*storage.ScopedKey, error) {
+	if m.getKeyErr != nil {
+		return nil, m.getKeyErr
+	}
 	if m.keys == nil {
 		return nil, storage.ErrNotFound
 	}
@@ -85,6 +98,9 @@ func (m *mockStorageForKeys) GetScopedKey(ctx context.Context, id int64) (*stora
 }
 
 func (m *mockStorageForKeys) ListScopedKeys(ctx context.Context) ([]*storage.ScopedKey, error) {
+	if m.listKeysErr != nil {
+		return nil, m.listKeysErr
+	}
 	if m.keys == nil {
 		return []*storage.ScopedKey{}, nil
 	}
@@ -96,6 +112,9 @@ func (m *mockStorageForKeys) ListScopedKeys(ctx context.Context) ([]*storage.Sco
 }
 
 func (m *mockStorageForKeys) DeleteScopedKey(ctx context.Context, id int64) error {
+	if m.deleteKeyErr != nil {
+		return m.deleteKeyErr
+	}
 	if m.keys == nil {
 		return storage.ErrNotFound
 	}
@@ -108,6 +127,9 @@ func (m *mockStorageForKeys) DeleteScopedKey(ctx context.Context, id int64) erro
 }
 
 func (m *mockStorageForKeys) AddPermission(ctx context.Context, scopedKeyID int64, perm *storage.Permission) (int64, error) {
+	if m.addPermissionErr != nil {
+		return 0, m.addPermissionErr
+	}
 	m.nextPermID++
 	id := m.nextPermID
 	perm.ID = id
@@ -121,6 +143,9 @@ func (m *mockStorageForKeys) AddPermission(ctx context.Context, scopedKeyID int6
 }
 
 func (m *mockStorageForKeys) GetPermissions(ctx context.Context, scopedKeyID int64) ([]*storage.Permission, error) {
+	if m.getPermissionsErr != nil {
+		return nil, m.getPermissionsErr
+	}
 	if m.permissions == nil {
 		return []*storage.Permission{}, nil
 	}
@@ -132,6 +157,9 @@ func (m *mockStorageForKeys) GetPermissions(ctx context.Context, scopedKeyID int
 }
 
 func (m *mockStorageForKeys) DeletePermission(ctx context.Context, id int64) error {
+	if m.deletePermissionErr != nil {
+		return m.deletePermissionErr
+	}
 	if m.permissions == nil {
 		return storage.ErrNotFound
 	}
@@ -660,5 +688,254 @@ func TestParseCSV(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// Error path tests
+
+func TestHandleListKeysStorageError(t *testing.T) {
+	mockStore := &mockStorageForKeys{
+		listKeysErr: context.DeadlineExceeded,
+	}
+	h := NewHandler(mockStore, NewSessionStore(0), nil, slog.New(slog.NewTextHandler(io.Discard, nil)))
+
+	req := httptest.NewRequest("GET", "/admin/keys", nil)
+	w := httptest.NewRecorder()
+
+	h.HandleListKeys(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("expected status 500, got %d", w.Code)
+	}
+}
+
+func TestHandleKeyDetailStorageError(t *testing.T) {
+	mockStore := &mockStorageForKeys{
+		getKeyErr: context.DeadlineExceeded,
+	}
+	h := NewHandler(mockStore, NewSessionStore(0), nil, slog.New(slog.NewTextHandler(io.Discard, nil)))
+
+	req := httptest.NewRequest("GET", "/admin/keys/1", nil)
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("id", "1")
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	w := httptest.NewRecorder()
+
+	h.HandleKeyDetail(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("expected status 500, got %d", w.Code)
+	}
+}
+
+func TestHandleKeyDetailGetPermissionsError(t *testing.T) {
+	mockStore := &mockStorageForKeys{
+		keys: map[int64]*storage.ScopedKey{
+			1: {ID: 1, Name: "test", CreatedAt: time.Now()},
+		},
+		getPermissionsErr: context.DeadlineExceeded,
+	}
+	h := NewHandler(mockStore, NewSessionStore(0), nil, slog.New(slog.NewTextHandler(io.Discard, nil)))
+
+	req := httptest.NewRequest("GET", "/admin/keys/1", nil)
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("id", "1")
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	w := httptest.NewRecorder()
+
+	h.HandleKeyDetail(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("expected status 500, got %d", w.Code)
+	}
+}
+
+func TestHandleCreateKeyStorageError(t *testing.T) {
+	mockStore := &mockStorageForKeys{
+		createKeyErr: context.DeadlineExceeded,
+	}
+	h := NewHandler(mockStore, NewSessionStore(0), nil, slog.New(slog.NewTextHandler(io.Discard, nil)))
+
+	body := strings.NewReader("name=test&api_key=abc123")
+	req := httptest.NewRequest("POST", "/admin/keys", body)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	w := httptest.NewRecorder()
+
+	h.HandleCreateKey(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("expected status 500, got %d", w.Code)
+	}
+}
+
+func TestHandleDeleteKeyStorageError(t *testing.T) {
+	mockStore := &mockStorageForKeys{
+		deleteKeyErr: context.DeadlineExceeded,
+	}
+	h := NewHandler(mockStore, NewSessionStore(0), nil, slog.New(slog.NewTextHandler(io.Discard, nil)))
+
+	req := httptest.NewRequest("POST", "/admin/keys/1/delete", nil)
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("id", "1")
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	w := httptest.NewRecorder()
+
+	h.HandleDeleteKey(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("expected status 500, got %d", w.Code)
+	}
+}
+
+func TestHandleAddPermissionFormInvalidKeyID(t *testing.T) {
+	mockStore := &mockStorageForKeys{}
+	h := NewHandler(mockStore, NewSessionStore(0), nil, slog.New(slog.NewTextHandler(io.Discard, nil)))
+
+	req := httptest.NewRequest("GET", "/admin/keys/invalid/permissions/new", nil)
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("id", "invalid")
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	w := httptest.NewRecorder()
+
+	h.HandleAddPermissionForm(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected status 400, got %d", w.Code)
+	}
+}
+
+func TestHandleAddPermissionFormKeyNotFound(t *testing.T) {
+	mockStore := &mockStorageForKeys{
+		keys: map[int64]*storage.ScopedKey{},
+	}
+	h := NewHandler(mockStore, NewSessionStore(0), nil, slog.New(slog.NewTextHandler(io.Discard, nil)))
+
+	req := httptest.NewRequest("GET", "/admin/keys/999/permissions/new", nil)
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("id", "999")
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	w := httptest.NewRecorder()
+
+	h.HandleAddPermissionForm(w, req)
+
+	if w.Code != http.StatusNotFound {
+		t.Errorf("expected status 404, got %d", w.Code)
+	}
+}
+
+func TestHandleAddPermissionFormStorageError(t *testing.T) {
+	mockStore := &mockStorageForKeys{
+		getKeyErr: context.DeadlineExceeded,
+	}
+	h := NewHandler(mockStore, NewSessionStore(0), nil, slog.New(slog.NewTextHandler(io.Discard, nil)))
+
+	req := httptest.NewRequest("GET", "/admin/keys/1/permissions/new", nil)
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("id", "1")
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	w := httptest.NewRecorder()
+
+	h.HandleAddPermissionForm(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("expected status 500, got %d", w.Code)
+	}
+}
+
+func TestHandleAddPermissionInvalidKeyID(t *testing.T) {
+	mockStore := &mockStorageForKeys{}
+	h := NewHandler(mockStore, NewSessionStore(0), nil, slog.New(slog.NewTextHandler(io.Discard, nil)))
+
+	body := strings.NewReader("zone_id=1&allowed_actions=list&record_types=TXT")
+	req := httptest.NewRequest("POST", "/admin/keys/invalid/permissions", body)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("id", "invalid")
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	w := httptest.NewRecorder()
+
+	h.HandleAddPermission(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected status 400, got %d", w.Code)
+	}
+}
+
+func TestHandleAddPermissionEmptyActions(t *testing.T) {
+	mockStore := &mockStorageForKeys{}
+	h := NewHandler(mockStore, NewSessionStore(0), nil, slog.New(slog.NewTextHandler(io.Discard, nil)))
+
+	body := strings.NewReader("zone_id=1&allowed_actions=&record_types=TXT")
+	req := httptest.NewRequest("POST", "/admin/keys/1/permissions", body)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("id", "1")
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	w := httptest.NewRecorder()
+
+	h.HandleAddPermission(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected status 400, got %d", w.Code)
+	}
+}
+
+func TestHandleAddPermissionEmptyRecordTypes(t *testing.T) {
+	mockStore := &mockStorageForKeys{}
+	h := NewHandler(mockStore, NewSessionStore(0), nil, slog.New(slog.NewTextHandler(io.Discard, nil)))
+
+	body := strings.NewReader("zone_id=1&allowed_actions=list&record_types=")
+	req := httptest.NewRequest("POST", "/admin/keys/1/permissions", body)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("id", "1")
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	w := httptest.NewRecorder()
+
+	h.HandleAddPermission(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected status 400, got %d", w.Code)
+	}
+}
+
+func TestHandleAddPermissionStorageError(t *testing.T) {
+	mockStore := &mockStorageForKeys{
+		addPermissionErr: context.DeadlineExceeded,
+	}
+	h := NewHandler(mockStore, NewSessionStore(0), nil, slog.New(slog.NewTextHandler(io.Discard, nil)))
+
+	body := strings.NewReader("zone_id=1&allowed_actions=list&record_types=TXT")
+	req := httptest.NewRequest("POST", "/admin/keys/1/permissions", body)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("id", "1")
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	w := httptest.NewRecorder()
+
+	h.HandleAddPermission(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("expected status 500, got %d", w.Code)
+	}
+}
+
+func TestHandleDeletePermissionStorageError(t *testing.T) {
+	mockStore := &mockStorageForKeys{
+		deletePermissionErr: context.DeadlineExceeded,
+	}
+	h := NewHandler(mockStore, NewSessionStore(0), nil, slog.New(slog.NewTextHandler(io.Discard, nil)))
+
+	req := httptest.NewRequest("POST", "/admin/keys/1/permissions/1/delete", nil)
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("id", "1")
+	rctx.URLParams.Add("pid", "1")
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	w := httptest.NewRecorder()
+
+	h.HandleDeletePermission(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("expected status 500, got %d", w.Code)
 	}
 }
