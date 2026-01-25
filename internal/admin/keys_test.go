@@ -16,18 +16,18 @@ import (
 
 // mockStorageForKeys extends mockStorage with key and permission methods
 type mockStorageForKeys struct {
-	keys               map[int64]*storage.ScopedKey
-	permissions        map[int64][]*storage.Permission
-	nextKeyID          int64
-	nextPermID         int64
-	masterKey          string
-	closeErr           error
-	listKeysErr        error
-	getKeyErr          error
-	createKeyErr       error
-	deleteKeyErr       error
-	getPermissionsErr  error
-	addPermissionErr   error
+	keys                map[int64]*storage.ScopedKey
+	permissions         map[int64][]*storage.Permission
+	nextKeyID           int64
+	nextPermID          int64
+	masterKey           string
+	closeErr            error
+	listKeysErr         error
+	getKeyErr           error
+	createKeyErr        error
+	deleteKeyErr        error
+	getPermissionsErr   error
+	addPermissionErr    error
 	deletePermissionErr error
 }
 
