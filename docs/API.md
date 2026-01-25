@@ -1068,7 +1068,7 @@ fi
 |---|---|---|
 | `HTTP_PORT` | Port to listen on | 8080 |
 | `ADMIN_PASSWORD` | Password for admin access | (required) |
-| `DATA_PATH` | SQLite database file path | ./data.db |
+| `DATA_PATH` | SQLite database file path | /data/proxy.db |
 | `ENCRYPTION_KEY` | Encryption key for sensitive data | (auto-generated if not set) |
 | `LOG_LEVEL` | Default log level | info |
 | `BUNNY_API_URL` | bunny.net API URL (for testing/mocking) | https://api.bunny.net |
