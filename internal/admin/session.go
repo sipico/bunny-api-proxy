@@ -98,6 +98,15 @@ func (s *SessionStore) Cleanup(ctx context.Context) {
 	}
 }
 
+// ValidatePassword checks if the provided password matches the admin password
+func (s *SessionStore) ValidatePassword(password string) bool {
+	expectedPassword := os.Getenv("ADMIN_PASSWORD")
+	if expectedPassword == "" {
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(password), []byte(expectedPassword)) == 1
+}
+
 // HandleLogin processes admin login
 // POST /admin/login
 // Form data: password=<value>

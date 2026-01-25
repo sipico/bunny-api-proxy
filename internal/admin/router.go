@@ -26,6 +26,8 @@ func (h *Handler) NewRouter() chi.Router {
 		r.Get("/tokens", h.HandleListTokens)
 		r.Post("/tokens", h.HandleCreateToken)
 		r.Delete("/tokens/{id}", h.HandleDeleteToken)
+		r.Put("/master-key", h.HandleSetMasterKeyAPI)
+		r.Post("/keys", h.HandleCreateKeyAPI)
 	})
 
 	// Protected web UI (session auth)

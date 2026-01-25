@@ -11,7 +11,7 @@ import (
 	"strconv"
 )
 
-// URL patterns for DNS API endpoints
+// URL patterns for DNS API endpoints (matching bunny.net API paths)
 var (
 	listZonesPattern    = regexp.MustCompile(`^/dnszone/?$`)
 	getZonePattern      = regexp.MustCompile(`^/dnszone/(\d+)/?$`)
