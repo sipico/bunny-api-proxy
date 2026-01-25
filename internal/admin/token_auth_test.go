@@ -71,6 +71,7 @@ func TestTokenAuthMiddleware(t *testing.T) {
 		authHeader     string
 		validateResult *storage.AdminToken
 		validateError  error
+		adminPassword  string // Set ADMIN_PASSWORD env for basic auth tests
 		wantStatus     int
 		wantContext    bool // Should token info be in context?
 	}{
@@ -90,8 +91,8 @@ func TestTokenAuthMiddleware(t *testing.T) {
 			wantStatus: http.StatusUnauthorized,
 		},
 		{
-			name:       "invalid format - no Bearer prefix",
-			authHeader: "Basic dGVzdDp0ZXN0",
+			name:       "invalid format - unknown prefix",
+			authHeader: "Digest abc123",
 			wantStatus: http.StatusUnauthorized,
 		},
 		{
@@ -115,6 +116,11 @@ func TestTokenAuthMiddleware(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Set ADMIN_PASSWORD env if needed for basic auth tests
+			if tt.adminPassword != "" {
+				t.Setenv("ADMIN_PASSWORD", tt.adminPassword)
+			}
+
 			// Setup mock storage
 			mock := &mockStorageWithToken{
 				mockStorage: &mockStorage{},
@@ -236,6 +242,100 @@ func TestGetTokenInfoFromContext(t *testing.T) {
 			}
 			if result.Name != tt.expectedTokenInfo.Name {
 				t.Errorf("expected Name %s, got %s", tt.expectedTokenInfo.Name, result.Name)
+			}
+		})
+	}
+}
+
+func TestTokenAuthMiddlewareBasicAuth(t *testing.T) {
+	tests := []struct {
+		name          string
+		username      string
+		password      string
+		adminPassword string // Value for ADMIN_PASSWORD env var
+		wantStatus    int
+		wantContext   bool
+	}{
+		{
+			name:          "valid basic auth",
+			username:      "admin",
+			password:      "correct-password",
+			adminPassword: "correct-password",
+			wantStatus:    http.StatusOK,
+			wantContext:   true,
+		},
+		{
+			name:          "invalid password",
+			username:      "admin",
+			password:      "wrong-password",
+			adminPassword: "correct-password",
+			wantStatus:    http.StatusUnauthorized,
+		},
+		{
+			name:          "wrong username",
+			username:      "other-user",
+			password:      "correct-password",
+			adminPassword: "correct-password",
+			wantStatus:    http.StatusUnauthorized,
+		},
+		{
+			name:          "no admin password configured",
+			username:      "admin",
+			password:      "any-password",
+			adminPassword: "", // Empty ADMIN_PASSWORD
+			wantStatus:    http.StatusUnauthorized,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Set ADMIN_PASSWORD env
+			t.Setenv("ADMIN_PASSWORD", tt.adminPassword)
+
+			// Setup mock storage
+			mock := &mockStorageWithToken{
+				mockStorage: &mockStorage{},
+			}
+
+			h := NewHandler(mock, NewSessionStore(24*time.Hour), new(slog.LevelVar), slog.Default())
+
+			// Create test handler that checks context
+			var contextHadToken bool
+			testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				tokenInfo := GetTokenInfoFromContext(r.Context())
+				contextHadToken = (tokenInfo != nil)
+
+				if tt.wantContext && tokenInfo != nil {
+					if tokenInfo.Name != "basic-auth-admin" {
+						t.Errorf("expected token name 'basic-auth-admin', got %s", tokenInfo.Name)
+					}
+				}
+
+				w.WriteHeader(http.StatusOK)
+			})
+
+			// Apply middleware
+			handler := h.TokenAuthMiddleware(testHandler)
+
+			// Create request with basic auth
+			req := httptest.NewRequest("GET", "/api/test", nil)
+			req.SetBasicAuth(tt.username, tt.password)
+			w := httptest.NewRecorder()
+
+			// Execute
+			handler.ServeHTTP(w, req)
+
+			// Check status
+			if w.Code != tt.wantStatus {
+				t.Errorf("expected status %d, got %d", tt.wantStatus, w.Code)
+			}
+
+			// Check context
+			if tt.wantContext && !contextHadToken {
+				t.Error("expected token info in context, got none")
+			}
+			if !tt.wantContext && contextHadToken {
+				t.Error("expected no token info in context, but got one")
 			}
 		})
 	}

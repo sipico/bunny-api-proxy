@@ -602,3 +602,56 @@ func TestSessionMiddlewareExpiredSession(t *testing.T) {
 		t.Errorf("expected status 401, got %d", w.Code)
 	}
 }
+
+// TestValidatePassword tests the password validation method
+func TestValidatePassword(t *testing.T) {
+	tests := []struct {
+		name          string
+		password      string
+		adminPassword string // Value for ADMIN_PASSWORD env var
+		expected      bool
+	}{
+		{
+			name:          "correct password",
+			password:      "correct-password",
+			adminPassword: "correct-password",
+			expected:      true,
+		},
+		{
+			name:          "incorrect password",
+			password:      "wrong-password",
+			adminPassword: "correct-password",
+			expected:      false,
+		},
+		{
+			name:          "empty password input",
+			password:      "",
+			adminPassword: "correct-password",
+			expected:      false,
+		},
+		{
+			name:          "no admin password configured",
+			password:      "any-password",
+			adminPassword: "",
+			expected:      false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Set ADMIN_PASSWORD env
+			if tt.adminPassword != "" {
+				t.Setenv("ADMIN_PASSWORD", tt.adminPassword)
+			} else {
+				os.Unsetenv("ADMIN_PASSWORD")
+			}
+
+			store := NewSessionStore(1 * time.Hour)
+			result := store.ValidatePassword(tt.password)
+
+			if result != tt.expected {
+				t.Errorf("expected %v, got %v", tt.expected, result)
+			}
+		})
+	}
+}
