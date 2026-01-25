@@ -4,6 +4,6 @@
 profile: coverage.txt
 
 threshold:
-  file: 75
-  package: 75
-  total: 75
+  file: 85
+  package: 85
+  total: 85
