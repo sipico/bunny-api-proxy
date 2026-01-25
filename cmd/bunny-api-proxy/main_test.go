@@ -187,3 +187,54 @@ func TestGetHTTPPort(t *testing.T) {
 		})
 	}
 }
+
+func TestRun(t *testing.T) {
+	tests := []struct {
+		name         string
+		envValue     string
+		expectedAddr string
+	}{
+		{
+			name:         "run with default port",
+			envValue:     "",
+			expectedAddr: ":8080",
+		},
+		{
+			name:         "run with custom port",
+			envValue:     "9999",
+			expectedAddr: ":9999",
+		},
+		{
+			name:         "run with another custom port",
+			envValue:     "3000",
+			expectedAddr: ":3000",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Save original env value
+			originalValue := os.Getenv("HTTP_PORT")
+			defer func() {
+				_ = os.Setenv("HTTP_PORT", originalValue)
+			}()
+
+			// Set test env value
+			if tt.envValue == "" {
+				_ = os.Unsetenv("HTTP_PORT")
+			} else {
+				_ = os.Setenv("HTTP_PORT", tt.envValue)
+			}
+
+			addr, router := run()
+
+			if addr != tt.expectedAddr {
+				t.Errorf("expected addr %q, got %q", tt.expectedAddr, addr)
+			}
+
+			if router == nil {
+				t.Error("expected non-nil router")
+			}
+		})
+	}
+}
