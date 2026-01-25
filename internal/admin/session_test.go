@@ -48,6 +48,34 @@ func (m *mockStorageForSession) DeleteAdminToken(ctx context.Context, id int64) 
 	return nil
 }
 
+func (m *mockStorageForSession) ListScopedKeys(ctx context.Context) ([]*storage.ScopedKey, error) {
+	return make([]*storage.ScopedKey, 0), nil
+}
+
+func (m *mockStorageForSession) GetScopedKey(ctx context.Context, id int64) (*storage.ScopedKey, error) {
+	return nil, storage.ErrNotFound
+}
+
+func (m *mockStorageForSession) CreateScopedKey(ctx context.Context, name, apiKey string) (int64, error) {
+	return 0, nil
+}
+
+func (m *mockStorageForSession) DeleteScopedKey(ctx context.Context, id int64) error {
+	return nil
+}
+
+func (m *mockStorageForSession) GetPermissions(ctx context.Context, keyID int64) ([]*storage.Permission, error) {
+	return make([]*storage.Permission, 0), nil
+}
+
+func (m *mockStorageForSession) AddPermission(ctx context.Context, scopedKeyID int64, perm *storage.Permission) (int64, error) {
+	return 0, nil
+}
+
+func (m *mockStorageForSession) DeletePermission(ctx context.Context, id int64) error {
+	return nil
+}
+
 // TestSessionStoreCreateSession tests session creation
 func TestSessionStoreCreateSession(t *testing.T) {
 	t.Run("generates unique session IDs", func(t *testing.T) {

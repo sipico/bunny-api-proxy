@@ -55,6 +55,10 @@ func (m *mockStorageForWeb) GetScopedKeyByHash(ctx context.Context, keyHash stri
 	return nil, storage.ErrNotFound
 }
 
+func (m *mockStorageForWeb) GetScopedKey(ctx context.Context, id int64) (*storage.ScopedKey, error) {
+	return nil, storage.ErrNotFound
+}
+
 func (m *mockStorageForWeb) ListScopedKeys(ctx context.Context) ([]*storage.ScopedKey, error) {
 	return nil, nil
 }
@@ -502,6 +506,10 @@ func (m *mockStorageWithError) CreateScopedKey(ctx context.Context, name string,
 }
 
 func (m *mockStorageWithError) GetScopedKeyByHash(ctx context.Context, keyHash string) (*storage.ScopedKey, error) {
+	return nil, storage.ErrNotFound
+}
+
+func (m *mockStorageWithError) GetScopedKey(ctx context.Context, id int64) (*storage.ScopedKey, error) {
 	return nil, storage.ErrNotFound
 }
 

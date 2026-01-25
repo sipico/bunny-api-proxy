@@ -34,6 +34,16 @@ func (h *Handler) NewRouter() chi.Router {
 		r.Get("/", h.HandleDashboard)
 		r.Get("/master-key", h.HandleMasterKeyForm)
 		r.Post("/master-key", h.HandleSetMasterKey)
+
+		// Key and permission management (Issue 91)
+		r.Get("/keys", h.HandleListKeys)
+		r.Get("/keys/new", h.HandleNewKeyForm)
+		r.Post("/keys", h.HandleCreateKey)
+		r.Get("/keys/{id}", h.HandleKeyDetail)
+		r.Post("/keys/{id}/delete", h.HandleDeleteKey)
+		r.Get("/keys/{id}/permissions/new", h.HandleAddPermissionForm)
+		r.Post("/keys/{id}/permissions", h.HandleAddPermission)
+		r.Post("/keys/{id}/permissions/{pid}/delete", h.HandleDeletePermission)
 	})
 
 	return r

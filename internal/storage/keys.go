@@ -65,6 +65,27 @@ func (s *SQLiteStorage) GetScopedKeyByHash(ctx context.Context, keyHash string) 
 	return &sk, nil
 }
 
+// GetScopedKey retrieves a scoped key by ID.
+// This is used in the admin UI to view key details.
+// Returns ErrNotFound if the key doesn't exist.
+func (s *SQLiteStorage) GetScopedKey(ctx context.Context, id int64) (*ScopedKey, error) {
+	var sk ScopedKey
+
+	err := s.db.QueryRowContext(ctx,
+		"SELECT id, key_hash, name, created_at, updated_at FROM scoped_keys WHERE id = ?",
+		id).
+		Scan(&sk.ID, &sk.KeyHash, &sk.Name, &sk.CreatedAt, &sk.UpdatedAt)
+
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("failed to get scoped key: %w", err)
+	}
+
+	return &sk, nil
+}
+
 // ListScopedKeys returns all scoped keys (for admin UI).
 // Returns empty slice if no keys exist.
 func (s *SQLiteStorage) ListScopedKeys(ctx context.Context) ([]*ScopedKey, error) {

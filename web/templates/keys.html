@@ -1,0 +1,36 @@
+{{define "keys_content"}}
+<h1>API Keys</h1>
+<p>Manage scoped API keys for the proxy.</p>
+
+<a href="/admin/keys/new" style="display: inline-block; margin-bottom: 1rem; padding: 0.75rem 1.5rem; background: #27ae60; color: white; border-radius: 4px; text-decoration: none; cursor: pointer;">Create New Key</a>
+
+{{if .Keys}}
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Created</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {{range .Keys}}
+        <tr>
+            <td><a href="/admin/keys/{{.ID}}">{{.Name}}</a></td>
+            <td>{{.CreatedAt.Format "2006-01-02 15:04:05"}}</td>
+            <td>
+                <a href="/admin/keys/{{.ID}}">View</a> |
+                <form action="/admin/keys/{{.ID}}/delete" method="post" style="display: inline;">
+                    <button type="submit" onclick="return confirm('Delete this key?')" style="background: #e74c3c; padding: 0.5rem 1rem; color: white; border: none; border-radius: 4px; cursor: pointer;">Delete</button>
+                </form>
+            </td>
+        </tr>
+        {{end}}
+    </tbody>
+</table>
+{{else}}
+<div class="alert alert-info">
+    No API keys configured yet. <a href="/admin/keys/new">Create one now</a>.
+</div>
+{{end}}
+{{end}}

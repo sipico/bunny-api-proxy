@@ -44,6 +44,34 @@ func (m *mockStorageWithTokenCRUD) DeleteAdminToken(ctx context.Context, id int6
 	return nil
 }
 
+func (m *mockStorageWithTokenCRUD) ListScopedKeys(ctx context.Context) ([]*storage.ScopedKey, error) {
+	return make([]*storage.ScopedKey, 0), nil
+}
+
+func (m *mockStorageWithTokenCRUD) GetScopedKey(ctx context.Context, id int64) (*storage.ScopedKey, error) {
+	return nil, storage.ErrNotFound
+}
+
+func (m *mockStorageWithTokenCRUD) CreateScopedKey(ctx context.Context, name, apiKey string) (int64, error) {
+	return 0, nil
+}
+
+func (m *mockStorageWithTokenCRUD) DeleteScopedKey(ctx context.Context, id int64) error {
+	return nil
+}
+
+func (m *mockStorageWithTokenCRUD) GetPermissions(ctx context.Context, keyID int64) ([]*storage.Permission, error) {
+	return make([]*storage.Permission, 0), nil
+}
+
+func (m *mockStorageWithTokenCRUD) AddPermission(ctx context.Context, scopedKeyID int64, perm *storage.Permission) (int64, error) {
+	return 0, nil
+}
+
+func (m *mockStorageWithTokenCRUD) DeletePermission(ctx context.Context, id int64) error {
+	return nil
+}
+
 func TestHandleSetLogLevel(t *testing.T) {
 	tests := []struct {
 		name       string

@@ -218,12 +218,13 @@
     <nav>
         <a href="/admin">Dashboard</a>
         <a href="/admin/master-key">Master Key</a>
+        <a href="/admin/keys">API Keys</a>
         <form action="/admin/logout" method="post" style="display: inline; margin: 0;">
             <button type="submit">Logout</button>
         </form>
     </nav>
     <main>
-        {{template "content" .}}
+        {{if .RenderedHTML}}{{.RenderedHTML}}{{else}}{{template "content" .}}{{end}}
     </main>
 </body>
 </html>
