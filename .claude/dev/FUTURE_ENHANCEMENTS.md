@@ -222,6 +222,11 @@ This document tracks features and improvements deferred from MVP to keep scope m
 
 ### Documentation
 
+- [ ] **CHANGELOG.md maintenance** - Version history and breaking changes
+  - Decide on format (Keep a Changelog, Conventional Changelog, etc.)
+  - Determine update process (manual, automated from commits, CI integration)
+  - Define what constitutes a changelog entry
+  - Link from API.md and README.md once established
 - [ ] **User guide** - How to deploy and configure
 - [ ] **API reference** - All endpoints documented
 - [ ] **Contributing guide** - How to contribute to the project

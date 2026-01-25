@@ -1094,5 +1094,3 @@ All API requests are logged with structured JSON logging. Check server logs for:
 ## Version
 
 Current API version: 1.0.0
-
-See [CHANGELOG.md](../CHANGELOG.md) for version history and breaking changes.
