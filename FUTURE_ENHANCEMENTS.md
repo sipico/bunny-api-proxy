@@ -93,6 +93,42 @@ This document tracks features and improvements deferred from MVP to keep scope m
 - [ ] **Audit log UI** - View/search audit trail in admin interface
 - [ ] **Audit log export** - Download logs for compliance
 
+### Debug Logging
+
+- [ ] **Comprehensive DEBUG mode logging** - Complete request/response visibility for troubleshooting
+  - **Proxy debug logging** - When running in DEBUG mode:
+    - Log incoming client requests (full headers, body, query parameters)
+    - Log outgoing requests to bunny.net API endpoints (full headers, body, query parameters)
+    - Log responses from bunny.net API endpoints (full headers, body, status codes)
+    - Log responses sent back to client (full headers, body, status codes)
+    - Log admin interface requests and responses (full headers, body, query parameters)
+  - **MockBunny debug logging** - When mock server runs in DEBUG mode:
+    - Log received API requests (full headers, body, query parameters)
+    - Log API responses being sent (full headers, body, status codes)
+    - Log state updates with before/after state snapshots
+    - Log the complete updated state after each mutation
+  - **Sensitive data masking** - Automatic redaction of secrets in logs:
+    - Tokens/API keys: Show first 4 + last 4 characters (e.g., `abcd...xyz9`)
+    - Passwords with length-based masking:
+      - >= 12 chars: first 4 + last 4 characters
+      - 10-11 chars: first 3 + last 3 characters
+      - 8-9 chars: first 2 + last 2 characters
+      - 6-7 chars: first 1 + last 1 character
+      - < 6 chars: fully redacted (security concern anyway)
+    - Apply masking to: Authorization headers, X-AccessKey headers, password fields, API tokens
+  - **Configuration** - Environment variable or config flag to enable/disable DEBUG mode
+  - **Performance** - Ensure logging doesn't significantly impact proxy throughput
+  - **Log format** - Structured logging (JSON) for easy parsing and analysis
+  - **Log correlation** - Request ID tracking across all log entries for a single request
+
+  _Note: Details to be worked out during implementation:_
+  - Exact masking algorithm for edge cases
+  - Which specific headers/fields to mask vs. show completely
+  - Log rotation strategy for high-volume DEBUG mode
+  - Whether to support different DEBUG levels (e.g., DEBUG_VERBOSE, DEBUG_MINIMAL)
+  - How to handle binary/multipart data in logs
+  - Integration with existing logging infrastructure
+
 ---
 
 ## Admin UI
