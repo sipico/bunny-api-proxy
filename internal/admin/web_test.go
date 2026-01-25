@@ -2,6 +2,7 @@ package admin
 
 import (
 	"context"
+	"html/template"
 	"io"
 	"log/slog"
 	"net/http"
@@ -392,10 +393,11 @@ func TestHandleSetMasterKeyParseFormError(t *testing.T) {
 		slog.New(slog.NewTextHandler(io.Discard, nil)),
 	)
 
-	// Create request with invalid form encoding
-	req := httptest.NewRequest("POST", "/admin/master-key", nil)
+	// Create a body that will cause ParseForm to fail
+	// Use a failing reader that returns an error
+	failingBody := &failingReader{}
+	req := httptest.NewRequest("POST", "/admin/master-key", failingBody)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.ContentLength = 999999999 // Force ParseForm to fail
 
 	w := httptest.NewRecorder()
 
@@ -404,6 +406,13 @@ func TestHandleSetMasterKeyParseFormError(t *testing.T) {
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("expected status 400, got %d", w.Code)
 	}
+}
+
+// failingReader always returns an error when Read is called
+type failingReader struct{}
+
+func (f *failingReader) Read(p []byte) (n int, err error) {
+	return 0, io.ErrUnexpectedEOF
 }
 
 func TestHandleMasterKeyFormStorageError(t *testing.T) {
@@ -429,17 +438,17 @@ func TestHandleMasterKeyFormStorageError(t *testing.T) {
 }
 
 func TestHandleDashboardTemplateExecuteError(t *testing.T) {
-	// Create a handler with a template that will fail to execute
+	// Create a template object that is not nil but will fail on ExecuteTemplate
+	// because the template name "layout.html" doesn't exist in it
+	badTmpl := template.New("empty")
+
 	h := &Handler{
 		storage:      &mockStorageForWeb{},
 		sessionStore: NewSessionStore(0),
 		logger:       slog.New(slog.NewTextHandler(io.Discard, nil)),
-		// Use nil templates to trigger the error path, but we already have a check for nil
-		// Instead, create invalid template that references undefined field
-		// This is hard to test without actual template execution errors
+		templates:    badTmpl,
 	}
 
-	// For now, just test the nil case
 	req := httptest.NewRequest("GET", "/admin", nil)
 	w := httptest.NewRecorder()
 
@@ -451,11 +460,15 @@ func TestHandleDashboardTemplateExecuteError(t *testing.T) {
 }
 
 func TestHandleMasterKeyFormTemplateExecuteError(t *testing.T) {
+	// Create a template object that is not nil but will fail on ExecuteTemplate
+	// because the template name "layout.html" doesn't exist in it
+	badTmpl := template.New("empty")
+
 	h := &Handler{
 		storage:      &mockStorageForWeb{},
 		sessionStore: NewSessionStore(0),
 		logger:       slog.New(slog.NewTextHandler(io.Discard, nil)),
-		// nil templates
+		templates:    badTmpl,
 	}
 
 	req := httptest.NewRequest("GET", "/admin/master-key", nil)
