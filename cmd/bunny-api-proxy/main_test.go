@@ -2725,3 +2725,52 @@ func TestStartActualServer(t *testing.T) {
 		t.Error("server did not stop after shutdown")
 	}
 }
+
+func TestRunInitializeComponentsInvalidLogLevel(t *testing.T) {
+	encryptionKey := strings.Repeat("a", 32)
+	adminPassword := "test-admin-password"
+
+	oldEncKey := os.Getenv("ENCRYPTION_KEY")
+	oldAdminPw := os.Getenv("ADMIN_PASSWORD")
+	oldDataPath := os.Getenv("DATA_PATH")
+	oldLogLevel := os.Getenv("LOG_LEVEL")
+
+	defer func() {
+		if oldEncKey != "" {
+			os.Setenv("ENCRYPTION_KEY", oldEncKey)
+		} else {
+			os.Unsetenv("ENCRYPTION_KEY")
+		}
+		if oldAdminPw != "" {
+			os.Setenv("ADMIN_PASSWORD", oldAdminPw)
+		} else {
+			os.Unsetenv("ADMIN_PASSWORD")
+		}
+		if oldDataPath != "" {
+			os.Setenv("DATA_PATH", oldDataPath)
+		} else {
+			os.Unsetenv("DATA_PATH")
+		}
+		if oldLogLevel != "" {
+			os.Setenv("LOG_LEVEL", oldLogLevel)
+		} else {
+			os.Unsetenv("LOG_LEVEL")
+		}
+	}()
+
+	os.Setenv("ENCRYPTION_KEY", encryptionKey)
+	os.Setenv("ADMIN_PASSWORD", adminPassword)
+	os.Setenv("LOG_LEVEL", "INVALID_LEVEL")
+
+	// Call run() with invalid log level
+	err := run()
+
+	// Expect an error containing "invalid log level"
+	if err == nil {
+		t.Fatal("expected error from run() with invalid LOG_LEVEL, got nil")
+	}
+
+	if !strings.Contains(err.Error(), "invalid log level") {
+		t.Errorf("expected error containing 'invalid log level', got: %v", err)
+	}
+}
