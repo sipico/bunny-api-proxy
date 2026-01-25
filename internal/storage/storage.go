@@ -14,6 +14,7 @@ type Storage interface {
 	// Scoped key operations
 	CreateScopedKey(ctx context.Context, name string, key string) (int64, error)
 	GetScopedKeyByHash(ctx context.Context, keyHash string) (*ScopedKey, error)
+	GetScopedKey(ctx context.Context, id int64) (*ScopedKey, error)
 	ListScopedKeys(ctx context.Context) ([]*ScopedKey, error)
 	DeleteScopedKey(ctx context.Context, id int64) error
 

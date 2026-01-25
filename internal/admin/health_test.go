@@ -45,6 +45,34 @@ func (m *mockStorage) DeleteAdminToken(ctx context.Context, id int64) error {
 	return nil
 }
 
+func (m *mockStorage) ListScopedKeys(ctx context.Context) ([]*storage.ScopedKey, error) {
+	return make([]*storage.ScopedKey, 0), nil
+}
+
+func (m *mockStorage) GetScopedKey(ctx context.Context, id int64) (*storage.ScopedKey, error) {
+	return nil, storage.ErrNotFound
+}
+
+func (m *mockStorage) CreateScopedKey(ctx context.Context, name, apiKey string) (int64, error) {
+	return 0, nil
+}
+
+func (m *mockStorage) DeleteScopedKey(ctx context.Context, id int64) error {
+	return nil
+}
+
+func (m *mockStorage) GetPermissions(ctx context.Context, keyID int64) ([]*storage.Permission, error) {
+	return make([]*storage.Permission, 0), nil
+}
+
+func (m *mockStorage) AddPermission(ctx context.Context, scopedKeyID int64, perm *storage.Permission) (int64, error) {
+	return 0, nil
+}
+
+func (m *mockStorage) DeletePermission(ctx context.Context, id int64) error {
+	return nil
+}
+
 func TestHandleHealth(t *testing.T) {
 	// Test case 1: Returns 200 OK with status
 	h := NewHandler(&mockStorage{}, NewSessionStore(0), new(slog.LevelVar), slog.Default())

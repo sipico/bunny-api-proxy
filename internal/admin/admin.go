@@ -47,6 +47,17 @@ type Storage interface {
 	CreateAdminToken(ctx context.Context, name, token string) (int64, error)
 	ListAdminTokens(ctx context.Context) ([]*storage.AdminToken, error)
 	DeleteAdminToken(ctx context.Context, id int64) error
+
+	// Scoped key operations (Issue 91)
+	ListScopedKeys(ctx context.Context) ([]*storage.ScopedKey, error)
+	GetScopedKey(ctx context.Context, id int64) (*storage.ScopedKey, error)
+	CreateScopedKey(ctx context.Context, name, apiKey string) (int64, error)
+	DeleteScopedKey(ctx context.Context, id int64) error
+
+	// Permission operations (Issue 91)
+	GetPermissions(ctx context.Context, keyID int64) ([]*storage.Permission, error)
+	AddPermission(ctx context.Context, scopedKeyID int64, perm *storage.Permission) (int64, error)
+	DeletePermission(ctx context.Context, id int64) error
 }
 
 // NewHandler creates an admin handler

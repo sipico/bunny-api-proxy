@@ -183,6 +183,62 @@ func TestGetScopedKeyByHashNotFound(t *testing.T) {
 	}
 }
 
+// TestGetScopedKey verifies that GetScopedKey retrieves a key by ID.
+func TestGetScopedKey(t *testing.T) {
+	encryptionKey := make([]byte, 32)
+	_, _ = rand.Read(encryptionKey)
+
+	s, err := New(":memory:", encryptionKey)
+	if err != nil {
+		t.Fatalf("failed to create storage: %v", err)
+	}
+	defer func() { _ = s.Close() }()
+	ctx := context.Background()
+
+	// Create a key
+	id, err := s.CreateScopedKey(ctx, "test-key", "my-secret-key")
+	if err != nil {
+		t.Fatalf("failed to create key: %v", err)
+	}
+
+	// Retrieve by ID
+	key, err := s.GetScopedKey(ctx, id)
+	if err != nil {
+		t.Fatalf("failed to get key by ID: %v", err)
+	}
+
+	if key.ID != id {
+		t.Errorf("expected ID %d, got %d", id, key.ID)
+	}
+
+	if key.Name != "test-key" {
+		t.Errorf("expected name 'test-key', got '%s'", key.Name)
+	}
+
+	if key.KeyHash == "" {
+		t.Errorf("expected non-empty key hash")
+	}
+}
+
+// TestGetScopedKeyNotFound verifies ErrNotFound for non-existent ID.
+func TestGetScopedKeyNotFound(t *testing.T) {
+	encryptionKey := make([]byte, 32)
+	_, _ = rand.Read(encryptionKey)
+
+	s, err := New(":memory:", encryptionKey)
+	if err != nil {
+		t.Fatalf("failed to create storage: %v", err)
+	}
+	defer func() { _ = s.Close() }()
+	ctx := context.Background()
+
+	// Try to get non-existent key
+	_, err = s.GetScopedKey(ctx, 999)
+	if err != ErrNotFound {
+		t.Errorf("expected ErrNotFound, got: %v", err)
+	}
+}
+
 // TestListScopedKeys verifies listing of scoped keys.
 func TestListScopedKeys(t *testing.T) {
 	encryptionKey := make([]byte, 32)

@@ -1,0 +1,62 @@
+{{define "key_detail_content"}}
+<h1>Key Details</h1>
+
+{{if .Key}}
+<div style="background: white; padding: 1.5rem; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 1.5rem;">
+    <h2>{{.Key.Name}}</h2>
+    <p>
+        <strong>ID:</strong> {{.Key.ID}}<br>
+        <strong>Created:</strong> {{.Key.CreatedAt.Format "2006-01-02 15:04:05"}}<br>
+        <strong>Key Hash:</strong> <code>{{.Key.KeyHash}}</code>
+    </p>
+</div>
+
+<h2>Permissions</h2>
+{{if .Permissions}}
+<table>
+    <thead>
+        <tr>
+            <th>Zone ID</th>
+            <th>Allowed Actions</th>
+            <th>Record Types</th>
+            <th>Created</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {{range .Permissions}}
+        <tr>
+            <td>{{.ZoneID}}</td>
+            <td>
+                {{range $i, $action := .AllowedActions}}{{if gt $i 0}}, {{end}}{{$action}}{{end}}
+            </td>
+            <td>
+                {{range $i, $type := .RecordTypes}}{{if gt $i 0}}, {{end}}{{$type}}{{end}}
+            </td>
+            <td>{{.CreatedAt.Format "2006-01-02 15:04:05"}}</td>
+            <td>
+                <form action="/admin/keys/{{.ScopedKeyID}}/permissions/{{.ID}}/delete" method="post" style="display: inline;">
+                    <button type="submit" onclick="return confirm('Delete this permission?')" style="background: #e74c3c; padding: 0.5rem 1rem; color: white; border: none; border-radius: 4px; cursor: pointer;">Delete</button>
+                </form>
+            </td>
+        </tr>
+        {{end}}
+    </tbody>
+</table>
+{{else}}
+<div class="alert alert-info">
+    No permissions configured for this key.
+</div>
+{{end}}
+
+<a href="/admin/keys/{{.Key.ID}}/permissions/new" style="display: inline-block; margin-top: 1rem; padding: 0.75rem 1.5rem; background: #27ae60; color: white; border-radius: 4px; text-decoration: none; cursor: pointer;">Add Permission</a>
+
+<div style="margin-top: 2rem;">
+    <a href="/admin/keys">Back to Keys</a>
+</div>
+{{else}}
+<div class="alert alert-error">
+    Key not found.
+</div>
+{{end}}
+{{end}}

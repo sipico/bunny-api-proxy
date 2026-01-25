@@ -1,0 +1,30 @@
+{{define "permission_form_content"}}
+<h1>Add Permission</h1>
+
+{{if .Key}}
+<p>Adding permission to key: <strong>{{.Key.Name}}</strong></p>
+
+<form method="post" action="/admin/keys/{{.Key.ID}}/permissions">
+    <label for="zone_id">Zone ID:</label>
+    <input type="number" id="zone_id" name="zone_id" required placeholder="e.g., 12345" min="1">
+
+    <label for="allowed_actions">Allowed Actions (comma-separated):</label>
+    <input type="text" id="allowed_actions" name="allowed_actions" required placeholder="e.g., list_records, add_record, delete_record">
+
+    <label for="record_types">Record Types (comma-separated):</label>
+    <input type="text" id="record_types" name="record_types" required placeholder="e.g., TXT, A, AAAA">
+
+    <button type="submit">Add Permission</button>
+</form>
+
+<p><small>Actions: list_records, add_record, delete_record<br>Record Types: TXT, A, AAAA, CNAME, MX, NS, SRV, CAA</small></p>
+
+<div style="margin-top: 2rem;">
+    <a href="/admin/keys/{{.Key.ID}}">Back to Key Details</a>
+</div>
+{{else}}
+<div class="alert alert-error">
+    Key not found.
+</div>
+{{end}}
+{{end}}
