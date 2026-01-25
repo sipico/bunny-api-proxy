@@ -133,6 +133,14 @@ This document tracks features and improvements deferred from MVP to keep scope m
 
 ## Admin UI
 
+### Static Web Assets
+
+- [ ] **Implement web/static/ directory** - CSS, JavaScript, and HTMX assets
+  - Design session needed for look and feel
+  - Layout and UI/UX decisions
+  - Currently templates use inline styles
+  - Move to proper static asset pipeline
+
 ### Enhanced Features
 
 - [ ] **Dark mode** - Because why not
