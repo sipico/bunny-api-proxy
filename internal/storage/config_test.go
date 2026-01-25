@@ -397,3 +397,59 @@ func TestCloseClosesDatabase(t *testing.T) {
 		t.Error("expected error after close")
 	}
 }
+
+// TestCloseWithNilDatabase tests that Close() handles nil database gracefully.
+func TestCloseWithNilDatabase(t *testing.T) {
+	storage := &SQLiteStorage{
+		db:            nil,
+		encryptionKey: make([]byte, 32),
+	}
+
+	// Close should return nil when db is nil
+	err := storage.Close()
+	if err != nil {
+		t.Errorf("close with nil db should return nil, got %v", err)
+	}
+}
+
+// TestNewWithInvalidDatabasePath tests that New() handles database open errors.
+func TestNewWithInvalidDatabasePath(t *testing.T) {
+	key := make([]byte, 32)
+	_, _ = rand.Read(key)
+
+	// Try to open database in non-existent directory
+	storage, err := New("/nonexistent/path/to/db.sqlite3", key)
+	if err == nil {
+		t.Error("expected error when opening database in non-existent path")
+		if storage != nil {
+			_ = storage.Close()
+		}
+	}
+}
+
+// TestSetMasterAPIKeyWithBadEncryptedData tests GetMasterAPIKey with corrupted encrypted data.
+func TestGetMasterAPIKeyWithBadEncryptedData(t *testing.T) {
+	key := make([]byte, 32)
+	_, _ = rand.Read(key)
+
+	storage, err := New(":memory:", key)
+	if err != nil {
+		t.Fatalf("failed to create storage: %v", err)
+	}
+	defer func() { _ = storage.Close() }()
+
+	ctx := context.Background()
+
+	// Manually insert bad encrypted data into the database
+	query := "INSERT INTO config (id, master_api_key_encrypted) VALUES (1, ?)"
+	_, err = storage.db.ExecContext(ctx, query, []byte("invalid-encrypted-data"))
+	if err != nil {
+		t.Fatalf("failed to insert bad encrypted data: %v", err)
+	}
+
+	// Try to get the key - should fail on decryption
+	_, err = storage.GetMasterAPIKey(ctx)
+	if err == nil {
+		t.Error("expected error when decrypting bad data")
+	}
+}
