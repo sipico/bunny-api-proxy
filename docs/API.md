@@ -1089,8 +1089,3 @@ All API requests are logged with structured JSON logging. Check server logs for:
 - Admin token operations
 - Record modifications
 
----
-
-## Version
-
-Current API version: 1.0.0
