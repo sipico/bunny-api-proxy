@@ -6,7 +6,7 @@ Project context and conventions for AI assistants working on this codebase.
 
 Bunny API Proxy is an API proxy for bunny.net that enables scoped/limited API keys. It sits between clients (e.g., ACME clients for DNS-01 validation) and the bunny.net API, validating requests against defined permissions before forwarding.
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed technical decisions.
+See [ARCHITECTURE.md](../ARCHITECTURE.md) for detailed technical decisions.
 
 ## Communication Conventions
 
@@ -17,7 +17,7 @@ Discussions should cover one question or decision at a time for clarity. Avoid p
 Architecture and technology decisions require documented pros and cons. Present options in a clear format (tables work well) with rationale for recommendations.
 
 ### Scope management
-Out-of-scope ideas and future enhancements go in [FUTURE_ENHANCEMENTS.md](FUTURE_ENHANCEMENTS.md), not into current work. When scope creep is detected, acknowledge the idea, add it to the future enhancements file, and refocus on the current task.
+Out-of-scope ideas and future enhancements go in [FUTURE_ENHANCEMENTS.md](dev/FUTURE_ENHANCEMENTS.md), not into current work. When scope creep is detected, acknowledge the idea, add it to the future enhancements file, and refocus on the current task.
 
 ## Development Conventions
 
@@ -113,9 +113,9 @@ migrations/          # Database migrations
 
 ## Key Files
 
-- [ARCHITECTURE.md](ARCHITECTURE.md) - Technical decisions and rationale
-- [FUTURE_ENHANCEMENTS.md](FUTURE_ENHANCEMENTS.md) - Deferred features and ideas
-- [docs/SUBAGENT_WORKFLOW.md](docs/SUBAGENT_WORKFLOW.md) - Cost-effective sub-agent patterns
+- [ARCHITECTURE.md](../ARCHITECTURE.md) - Technical decisions and rationale
+- [FUTURE_ENHANCEMENTS.md](dev/FUTURE_ENHANCEMENTS.md) - Deferred features and ideas
+- [SUBAGENT_WORKFLOW.md](dev/SUBAGENT_WORKFLOW.md) - Cost-effective sub-agent patterns
 - `.github/workflows/ci.yml` - CI/CD pipeline
 
 ## Sub-Agent Workflow
@@ -126,7 +126,7 @@ For implementation tasks, use Haiku sub-agents to save ~99% on costs:
 2. **Haiku (sub-agent):** Implements code, tests, runs validation
 3. **Opus (coordinator):** Reviews and merges PRs
 
-See [docs/SUBAGENT_WORKFLOW.md](docs/SUBAGENT_WORKFLOW.md) for detailed patterns.
+See [dev/SUBAGENT_WORKFLOW.md](dev/SUBAGENT_WORKFLOW.md) for detailed patterns.
 
 **Quick reference:**
 - Issue = source of truth (full spec)
