@@ -10,6 +10,7 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/sipico/bunny-api-proxy/internal/auth"
 	"github.com/sipico/bunny-api-proxy/internal/bunny"
 )
 
@@ -116,6 +117,26 @@ func (h *Handler) HandleListZones(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Filter zones by permission if scoped key
+	keyInfo := auth.GetKeyInfo(r.Context())
+	if keyInfo != nil && !auth.HasAllZonesPermission(keyInfo) {
+		permittedIDs := auth.GetPermittedZoneIDs(keyInfo)
+		idSet := make(map[int64]bool)
+		for _, id := range permittedIDs {
+			idSet[id] = true
+		}
+
+		filtered := make([]bunny.Zone, 0)
+		for _, zone := range result.Items {
+			if idSet[zone.ID] {
+				filtered = append(filtered, zone)
+			}
+		}
+		result.Items = filtered
+		result.TotalItems = len(filtered)
+		result.HasMoreItems = false
+	}
+
 	// Log the request
 	h.logger.Info("list zones", "page", opts.Page, "perPage", opts.PerPage, "search", opts.Search)
 
@@ -144,6 +165,25 @@ func (h *Handler) HandleGetZone(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Filter records by record type if scoped key
+	keyInfo := auth.GetKeyInfo(r.Context())
+	if keyInfo != nil {
+		permittedTypes := auth.GetPermittedRecordTypes(keyInfo, zoneID)
+		if permittedTypes != nil {
+			filtered := make([]bunny.Record, 0)
+			typeSet := make(map[string]bool)
+			for _, t := range permittedTypes {
+				typeSet[t] = true
+			}
+			for _, record := range zone.Records {
+				if typeSet[record.Type] {
+					filtered = append(filtered, record)
+				}
+			}
+			zone.Records = filtered
+		}
+	}
+
 	// Log the request
 	h.logger.Info("get zone", "zone_id", zoneID)
 
@@ -170,6 +210,25 @@ func (h *Handler) HandleListRecords(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		handleBunnyError(w, err)
 		return
+	}
+
+	// Filter records by record type if scoped key
+	keyInfo := auth.GetKeyInfo(r.Context())
+	if keyInfo != nil {
+		permittedTypes := auth.GetPermittedRecordTypes(keyInfo, zoneID)
+		if permittedTypes != nil {
+			filtered := make([]bunny.Record, 0)
+			typeSet := make(map[string]bool)
+			for _, t := range permittedTypes {
+				typeSet[t] = true
+			}
+			for _, record := range zone.Records {
+				if typeSet[record.Type] {
+					filtered = append(filtered, record)
+				}
+			}
+			zone.Records = filtered
+		}
 	}
 
 	// Log the request

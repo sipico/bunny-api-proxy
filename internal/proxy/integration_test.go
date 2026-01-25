@@ -122,7 +122,8 @@ func TestIntegration_ListZones(t *testing.T) {
 	defer mockBunny.Close()
 
 	zoneID1 := mockBunny.AddZone("example.com")
-	zoneID2 := mockBunny.AddZone("test.com")
+	// Create a second zone to verify filtering works (only zone1 permitted)
+	mockBunny.AddZone("test.com")
 
 	// Create bunny client pointing to mock
 	bunnyClient := bunny.NewClient("master-key", bunny.WithBaseURL(mockBunny.URL()))
@@ -155,17 +156,14 @@ func TestIntegration_ListZones(t *testing.T) {
 		t.Fatalf("failed to decode response: %v", err)
 	}
 
-	if len(resp.Items) != 2 {
-		t.Errorf("expected 2 zones, got %d", len(resp.Items))
+	// With response filtering, only the permitted zone (zoneID1) should be returned
+	if len(resp.Items) != 1 {
+		t.Errorf("expected 1 zone (filtered), got %d", len(resp.Items))
 	}
 
-	// Verify zones are in response
-	foundIDs := make(map[int64]bool)
-	for _, zone := range resp.Items {
-		foundIDs[zone.ID] = true
-	}
-	if !foundIDs[zoneID1] || !foundIDs[zoneID2] {
-		t.Errorf("not all zones found in response")
+	// Verify only the permitted zone is in response
+	if len(resp.Items) > 0 && resp.Items[0].ID != zoneID1 {
+		t.Errorf("expected zone %d, got %d", zoneID1, resp.Items[0].ID)
 	}
 }
 
@@ -253,8 +251,16 @@ func TestIntegration_ListRecords(t *testing.T) {
 		t.Fatalf("failed to decode response: %v", err)
 	}
 
-	if len(recs) != 3 {
-		t.Errorf("expected 3 records, got %d", len(recs))
+	// With response filtering, only TXT records should be returned (2 out of 3)
+	if len(recs) != 2 {
+		t.Errorf("expected 2 TXT records (filtered), got %d", len(recs))
+	}
+
+	// Verify only TXT records are present
+	for _, rec := range recs {
+		if rec.Type != "TXT" {
+			t.Errorf("expected TXT record, got %s", rec.Type)
+		}
 	}
 }
 
@@ -520,5 +526,245 @@ func TestIntegration_Forbidden_WrongRecordType(t *testing.T) {
 	}
 	if resp["error"] != "permission denied" {
 		t.Errorf("expected error 'permission denied', got %q", resp["error"])
+	}
+}
+
+// TestIntegration_ListZones_FilteredByPermission tests that ListZones filters to permitted zones only.
+func TestIntegration_ListZones_FilteredByPermission(t *testing.T) {
+	mockBunny := mockbunny.New()
+	defer mockBunny.Close()
+
+	// Create multiple zones
+	zoneID1 := mockBunny.AddZone("allowed1.com")
+	zoneID2 := mockBunny.AddZone("allowed2.com")
+	zoneID3 := mockBunny.AddZone("forbidden.com")
+
+	bunnyClient := bunny.NewClient("master-key", bunny.WithBaseURL(mockBunny.URL()))
+
+	// Create storage with permission for only zoneID1 and zoneID2
+	encryptionKey := []byte("0123456789abcdef0123456789abcdef")
+	db, err := storage.New(":memory:", encryptionKey)
+	if err != nil {
+		t.Fatalf("failed to create storage: %v", err)
+	}
+	defer db.Close()
+
+	keyID, err := db.CreateScopedKey(context.Background(), "Scoped Key", "scoped-key")
+	if err != nil {
+		t.Fatalf("failed to create key: %v", err)
+	}
+
+	// Add permission for zoneID1
+	_, err = db.AddPermission(context.Background(), keyID, &storage.Permission{
+		ZoneID:         zoneID1,
+		AllowedActions: []string{"list_records"},
+		RecordTypes:    []string{"A", "AAAA", "TXT", "CNAME"},
+	})
+	if err != nil {
+		t.Fatalf("failed to add permission for zone 1: %v", err)
+	}
+
+	// Add permission for zoneID2
+	_, err = db.AddPermission(context.Background(), keyID, &storage.Permission{
+		ZoneID:         zoneID2,
+		AllowedActions: []string{"list_records"},
+		RecordTypes:    []string{"A", "AAAA", "TXT", "CNAME"},
+	})
+	if err != nil {
+		t.Fatalf("failed to add permission for zone 2: %v", err)
+	}
+
+	validator := auth.NewValidator(db)
+	authMiddleware := auth.Middleware(validator)
+
+	proxyHandler := NewHandler(bunnyClient, nil)
+	proxyRouter := NewRouter(proxyHandler, authMiddleware)
+	router := proxyRouter
+
+	// Request list zones
+	req := httptest.NewRequest("GET", "/dnszone", nil)
+	req.Header.Set("AccessKey", "scoped-key")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status 200, got %d", w.Code)
+	}
+
+	var resp bunny.ListZonesResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	// Should only include zones 1 and 2, not 3
+	if len(resp.Items) != 2 {
+		t.Errorf("expected 2 zones after filtering, got %d", len(resp.Items))
+	}
+
+	// Verify only allowed zones are present
+	foundZones := make(map[int64]bool)
+	for _, zone := range resp.Items {
+		if zone.ID == zoneID3 {
+			t.Errorf("zone %d (forbidden) should not be in response", zoneID3)
+		}
+		foundZones[zone.ID] = true
+	}
+
+	// Verify allowed zones are present
+	if !foundZones[zoneID1] || !foundZones[zoneID2] {
+		t.Errorf("not all allowed zones found in response")
+	}
+}
+
+// Note: TestIntegration_ListZones_AllZonesPermission is not implemented because
+// the storage layer currently requires ZoneID > 0, which prevents creating
+// wildcard permissions with ZoneID = 0. The filtering logic supports this case,
+// but storage validation would need to be updated to test it.
+
+// TestIntegration_GetZone_FilteredRecordTypes tests that GetZone filters records by permitted types.
+func TestIntegration_GetZone_FilteredRecordTypes(t *testing.T) {
+	mockBunny := mockbunny.New()
+	defer mockBunny.Close()
+
+	// Add zone with multiple record types
+	records := []mockbunny.Record{
+		{Type: "A", Name: "www", Value: "1.2.3.4"},
+		{Type: "AAAA", Name: "www", Value: "2001:db8::1"},
+		{Type: "TXT", Name: "_acme", Value: "validation-string"},
+		{Type: "CNAME", Name: "alias", Value: "www.example.com"},
+	}
+	zoneID := mockBunny.AddZoneWithRecords("example.com", records)
+
+	bunnyClient := bunny.NewClient("master-key", bunny.WithBaseURL(mockBunny.URL()))
+
+	// Create storage with permission for only TXT records
+	encryptionKey := []byte("0123456789abcdef0123456789abcdef")
+	db, err := storage.New(":memory:", encryptionKey)
+	if err != nil {
+		t.Fatalf("failed to create storage: %v", err)
+	}
+	defer db.Close()
+
+	keyID, err := db.CreateScopedKey(context.Background(), "Limited Key", "limited-key")
+	if err != nil {
+		t.Fatalf("failed to create key: %v", err)
+	}
+
+	// Add permission for zone with only TXT records
+	_, err = db.AddPermission(context.Background(), keyID, &storage.Permission{
+		ZoneID:         zoneID,
+		AllowedActions: []string{"list_records"},
+		RecordTypes:    []string{"TXT"}, // Only TXT
+	})
+	if err != nil {
+		t.Fatalf("failed to add permission: %v", err)
+	}
+
+	validator := auth.NewValidator(db)
+	authMiddleware := auth.Middleware(validator)
+
+	proxyHandler := NewHandler(bunnyClient, nil)
+	proxyRouter := NewRouter(proxyHandler, authMiddleware)
+	router := proxyRouter
+
+	// Request zone details
+	req := httptest.NewRequest("GET", fmt.Sprintf("/dnszone/%d", zoneID), nil)
+	req.Header.Set("AccessKey", "limited-key")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status 200, got %d", w.Code)
+	}
+
+	var zone bunny.Zone
+	if err := json.NewDecoder(w.Body).Decode(&zone); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	// Should only have TXT records (1 out of 4)
+	if len(zone.Records) != 1 {
+		t.Errorf("expected 1 TXT record after filtering, got %d", len(zone.Records))
+	}
+
+	if len(zone.Records) > 0 && zone.Records[0].Type != "TXT" {
+		t.Errorf("expected TXT record, got %s", zone.Records[0].Type)
+	}
+}
+
+// TestIntegration_ListRecords_FilteredRecordTypes tests that ListRecords filters by permitted types.
+func TestIntegration_ListRecords_FilteredRecordTypes(t *testing.T) {
+	mockBunny := mockbunny.New()
+	defer mockBunny.Close()
+
+	// Add zone with multiple record types
+	records := []mockbunny.Record{
+		{Type: "A", Name: "www", Value: "1.2.3.4"},
+		{Type: "TXT", Name: "_acme1", Value: "token1"},
+		{Type: "TXT", Name: "_acme2", Value: "token2"},
+		{Type: "CNAME", Name: "alias", Value: "www.example.com"},
+	}
+	zoneID := mockBunny.AddZoneWithRecords("example.com", records)
+
+	bunnyClient := bunny.NewClient("master-key", bunny.WithBaseURL(mockBunny.URL()))
+
+	// Create storage with permission for A and TXT records only
+	encryptionKey := []byte("0123456789abcdef0123456789abcdef")
+	db, err := storage.New(":memory:", encryptionKey)
+	if err != nil {
+		t.Fatalf("failed to create storage: %v", err)
+	}
+	defer db.Close()
+
+	keyID, err := db.CreateScopedKey(context.Background(), "TXT Key", "txt-key")
+	if err != nil {
+		t.Fatalf("failed to create key: %v", err)
+	}
+
+	// Add permission for zone with A and TXT records
+	_, err = db.AddPermission(context.Background(), keyID, &storage.Permission{
+		ZoneID:         zoneID,
+		AllowedActions: []string{"list_records"},
+		RecordTypes:    []string{"A", "TXT"}, // Only A and TXT
+	})
+	if err != nil {
+		t.Fatalf("failed to add permission: %v", err)
+	}
+
+	validator := auth.NewValidator(db)
+	authMiddleware := auth.Middleware(validator)
+
+	proxyHandler := NewHandler(bunnyClient, nil)
+	proxyRouter := NewRouter(proxyHandler, authMiddleware)
+	router := proxyRouter
+
+	// Request records
+	req := httptest.NewRequest("GET", fmt.Sprintf("/dnszone/%d/records", zoneID), nil)
+	req.Header.Set("AccessKey", "txt-key")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status 200, got %d", w.Code)
+	}
+
+	var recs []bunny.Record
+	if err := json.NewDecoder(w.Body).Decode(&recs); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	// Should have 3 records (1 A + 2 TXT), not CNAME
+	if len(recs) != 3 {
+		t.Errorf("expected 3 records after filtering, got %d", len(recs))
+	}
+
+	// Verify only A and TXT records are present
+	for _, record := range recs {
+		if record.Type != "A" && record.Type != "TXT" {
+			t.Errorf("unexpected record type %s in filtered records", record.Type)
+		}
 	}
 }

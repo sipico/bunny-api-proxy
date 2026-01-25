@@ -10,7 +10,10 @@ import (
 // contextKey for storing KeyInfo in context
 type contextKey string
 
-const keyInfoContextKey contextKey = "keyInfo"
+const (
+	// KeyInfoContextKey is the context key for storing KeyInfo
+	KeyInfoContextKey contextKey = "keyInfo"
+)
 
 // Middleware returns Chi-compatible middleware for API key validation
 func Middleware(v *Validator) func(http.Handler) http.Handler {
@@ -48,7 +51,7 @@ func Middleware(v *Validator) func(http.Handler) http.Handler {
 			}
 
 			// Attach KeyInfo to context and continue
-			ctx := context.WithValue(r.Context(), keyInfoContextKey, keyInfo)
+			ctx := context.WithValue(r.Context(), KeyInfoContextKey, keyInfo)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
@@ -56,7 +59,7 @@ func Middleware(v *Validator) func(http.Handler) http.Handler {
 
 // GetKeyInfo retrieves KeyInfo from request context
 func GetKeyInfo(ctx context.Context) *KeyInfo {
-	if v := ctx.Value(keyInfoContextKey); v != nil {
+	if v := ctx.Value(KeyInfoContextKey); v != nil {
 		if info, ok := v.(*KeyInfo); ok {
 			return info
 		}
