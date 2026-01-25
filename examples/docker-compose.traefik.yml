@@ -1,0 +1,201 @@
+version: '3.9'
+
+# Bunny API Proxy with Traefik Reverse Proxy
+# Production-ready configuration with:
+# - Automatic HTTPS/TLS certificates via Let's Encrypt
+# - Load balancing and routing
+# - Security headers and middleware
+#
+# Usage:
+#   1. Edit .env file with your settings
+#   2. Update TRAEFIK_DOMAIN to your domain (e.g., api.example.com)
+#   3. docker-compose -f examples/docker-compose.traefik.yml up -d
+#
+# Features:
+# - Traefik handles all TLS/HTTPS termination (port 443)
+# - HTTP (port 80) redirects to HTTPS
+# - Let's Encrypt ACME DNS challenges for wildcard certs
+# - Health checks and automatic service discovery
+# - Separate networks for isolation
+
+services:
+  traefik:
+    image: traefik:v2.10
+    container_name: traefik
+
+    # Traefik configuration via command-line arguments
+    command:
+      # Entry points (listening ports)
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+
+      # API and Dashboard (DANGEROUS: disable in production, or protect with auth)
+      - "--api.dashboard=false"
+      - "--api.debug=false"
+
+      # Provider: Docker (auto-discover services with labels)
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=traefik"
+
+      # ACME/Let's Encrypt configuration
+      - "--certificatesresolvers.letsencrypt.acme.dnschallenge=true"
+      # Important: Set DNS provider based on your DNS hosting
+      # Examples: route53, cloudflare, digitalocean, azure, etc.
+      # See: https://doc.traefik.io/traefik/https/acme/#dns-challenge-providers
+      - "--certificatesresolvers.letsencrypt.acme.dnschallenge.provider=route53"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+      - "--certificatesresolvers.letsencrypt.acme.email=admin@example.com"  # CHANGE THIS
+
+      # Logging
+      - "--log.level=info"
+      - "--accesslog=true"
+
+    environment:
+      # AWS Route53 credentials (if using Route53 for DNS challenges)
+      # Set these or use IAM instance roles on EC2
+      # AWS_ACCESS_KEY_ID: your-access-key
+      # AWS_SECRET_ACCESS_KEY: your-secret-key
+      # AWS_REGION: us-east-1
+
+      # Alternative: Cloudflare credentials
+      # CLOUDFLARE_EMAIL: your-email@example.com
+      # CLOUDFLARE_API_KEY: your-api-key
+
+      # See https://doc.traefik.io/traefik/https/acme/#dns-challenge-providers
+      # for your DNS provider setup
+      pass_credentials: "true"
+
+    ports:
+      # Port 80 (HTTP): redirects to HTTPS
+      - "80:80"
+      # Port 443 (HTTPS): secure traffic
+      - "443:443"
+
+    volumes:
+      # Docker socket: allows Traefik to discover services
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # ACME persistent storage (Let's Encrypt certificates)
+      - traefik_certs:/letsencrypt
+
+    networks:
+      - traefik
+
+    restart: unless-stopped
+
+    # Security settings
+    cap_drop:
+      - CAP_NET_RAW
+      - CAP_NET_ADMIN
+      - CAP_SYS_ADMIN
+
+    # Logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    labels:
+      com.example.description: "Traefik reverse proxy with Let's Encrypt"
+
+  bunny-api-proxy:
+    image: sipico/bunny-api-proxy:latest
+    container_name: bunny-api-proxy
+
+    env_file: ../.env
+
+    # Don't expose port directly - Traefik handles traffic
+    # (Traefik connects to port 8080 internally)
+    expose:
+      - "8080"
+
+    volumes:
+      - bunny_data:/data
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+    restart: unless-stopped
+
+    # Network: only on traefik network (isolated from host)
+    networks:
+      - traefik
+
+    cap_drop:
+      - CAP_NET_RAW
+      - CAP_NET_ADMIN
+      - CAP_SYS_ADMIN
+
+    read_only: true
+
+    tmpfs:
+      - /tmp
+      - /run
+
+    deploy:
+      resources:
+        requests:
+          cpus: '0.1'
+          memory: 128M
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
+    # Traefik labels: service discovery and routing configuration
+    labels:
+      # Enable service discovery (required)
+      - "traefik.enable=true"
+
+      # Service definition (for Docker provider)
+      - "traefik.http.services.bunny-api-proxy.loadbalancer.server.port=8080"
+
+      # Router: HTTP to HTTPS redirect
+      # Matches: http://api.example.com/* -> https://api.example.com/*
+      - "traefik.http.routers.bunny-api-proxy-http.rule=Host(`api.example.com`)"  # CHANGE DOMAIN
+      - "traefik.http.routers.bunny-api-proxy-http.entrypoints=web"
+      - "traefik.http.routers.bunny-api-proxy-http.middlewares=redirect-to-https"
+
+      # Router: HTTPS with TLS
+      - "traefik.http.routers.bunny-api-proxy-https.rule=Host(`api.example.com`)"  # CHANGE DOMAIN
+      - "traefik.http.routers.bunny-api-proxy-https.entrypoints=websecure"
+      - "traefik.http.routers.bunny-api-proxy-https.tls=true"
+      - "traefik.http.routers.bunny-api-proxy-https.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.bunny-api-proxy-https.service=bunny-api-proxy"
+
+      # Middleware: redirect HTTP to HTTPS
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.permanent=true"
+
+      # Middleware: security headers (optional but recommended)
+      - "traefik.http.middlewares.security-headers.headers.customresponseheaders.X-Content-Type-Options=nosniff"
+      - "traefik.http.middlewares.security-headers.headers.customresponseheaders.X-Frame-Options=DENY"
+      - "traefik.http.middlewares.security-headers.headers.customresponseheaders.X-XSS-Protection=1; mode=block"
+
+      com.example.description: "Bunny API Proxy (behind Traefik)"
+
+# Named volumes
+volumes:
+  bunny_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data
+  traefik_certs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./traefik/certs
+
+# Network for service isolation
+# Traefik and bunny-api-proxy communicate on this network
+# Not exposed to host except for Traefik's ports 80/443
+networks:
+  traefik:
+    driver: bridge

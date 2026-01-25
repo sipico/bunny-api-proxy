@@ -1,0 +1,123 @@
+# Systemd service file for Bunny API Proxy
+# Runs the proxy natively on Linux (without Docker)
+#
+# Installation Steps:
+#
+# 1. Create service user (non-root account):
+#    sudo useradd --system --home /var/lib/bunny-api-proxy --shell /usr/sbin/nologin bunny-proxy
+#
+# 2. Create data directory:
+#    sudo mkdir -p /var/lib/bunny-api-proxy
+#    sudo chown bunny-proxy:bunny-proxy /var/lib/bunny-api-proxy
+#    sudo chmod 700 /var/lib/bunny-api-proxy
+#
+# 3. Create environment file from example:
+#    sudo cp .env.example /etc/bunny-api-proxy/.env
+#    sudo chown root:bunny-proxy /etc/bunny-api-proxy/.env
+#    sudo chmod 640 /etc/bunny-api-proxy/.env
+#    (Edit /etc/bunny-api-proxy/.env and change DATA_PATH=/var/lib/bunny-api-proxy/proxy.db)
+#
+# 4. Download/build the binary:
+#    sudo wget https://github.com/sipico/bunny-api-proxy/releases/download/v2026.01.1/bunny-api-proxy-linux-amd64 \
+#      -O /usr/local/bin/bunny-api-proxy
+#    sudo chmod 755 /usr/local/bin/bunny-api-proxy
+#
+# 5. Copy this service file:
+#    sudo cp bunny-api-proxy.service /etc/systemd/system/
+#
+# 6. Enable and start the service:
+#    sudo systemctl daemon-reload
+#    sudo systemctl enable bunny-api-proxy
+#    sudo systemctl start bunny-api-proxy
+#
+# 7. Verify it's running:
+#    sudo systemctl status bunny-api-proxy
+#    curl http://localhost:8080/health
+#
+# Management commands:
+#    sudo systemctl start bunny-api-proxy          # Start the service
+#    sudo systemctl stop bunny-api-proxy           # Stop the service
+#    sudo systemctl restart bunny-api-proxy        # Restart (reload config)
+#    sudo systemctl status bunny-api-proxy         # Check status
+#    sudo journalctl -u bunny-api-proxy -f         # View logs (follow)
+#    sudo journalctl -u bunny-api-proxy --since 1h # View last hour logs
+
+[Unit]
+Description=Bunny API Proxy - API proxy for bunny.net with scoped API keys
+Documentation=https://github.com/sipico/bunny-api-proxy
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+
+# User and group (created by installation steps above)
+User=bunny-proxy
+Group=bunny-proxy
+
+# Working directory
+WorkingDirectory=/var/lib/bunny-api-proxy
+
+# Load environment variables from config file
+EnvironmentFile=/etc/bunny-api-proxy/.env
+
+# Start the executable
+ExecStart=/usr/local/bin/bunny-api-proxy
+
+# Auto-restart on failure
+Restart=always
+RestartSec=5s
+
+# Security hardening - prevent privilege escalation
+NoNewPrivileges=true
+
+# Restrict process capabilities (drop unnecessary Linux capabilities)
+# These prevent unauthorized system access even if the proxy is compromised
+CapabilityBoundingSet=~CAP_NET_RAW CAP_NET_ADMIN CAP_SYS_ADMIN
+CapabilityBoundingSet=~CAP_SYS_MODULE CAP_AUDIT_WRITE CAP_MAC_ADMIN
+
+# Use a private /tmp directory (isolated from system)
+PrivateTmp=true
+
+# Protect kernel logs from process
+ProtectKernelLogs=true
+
+# Protect kernel modules
+ProtectKernelModules=true
+
+# Set up read-only /proc (limits information disclosure)
+ProtectProc=strict
+
+# Make /sys read-only
+ProtectSystem=strict
+ReadWritePaths=/var/lib/bunny-api-proxy
+
+# Hide /home directories
+ProtectHome=true
+
+# Disable access to devices
+NoDevices=true
+
+# Resource limits (prevent denial-of-service)
+# Adjust based on your expected load
+LimitNOFILE=65536
+LimitNPROC=512
+
+# Memory limits (optional - uncomment if you have memory constraints)
+# MemoryLimit=256M
+# MemoryMax=512M
+
+# CPU limits (optional - throttle if needed)
+# CPUQuota=50%
+
+# Restart on watchdog timeout (systemd watchdog)
+WatchdogSec=30s
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=bunny-api-proxy
+
+[Install]
+# Start on system boot
+WantedBy=multi-user.target
