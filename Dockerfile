@@ -1,8 +1,8 @@
 # Build stage
 FROM golang:1.24-alpine AS builder
 
-# Install build dependencies
-RUN apk add --no-cache git
+# Install build dependencies (including gcc and musl-dev for CGO/SQLite)
+RUN apk add --no-cache git gcc musl-dev
 
 WORKDIR /app
 
@@ -15,8 +15,8 @@ RUN go mod download
 # Copy source code
 COPY . .
 
-# Build the binary
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags '-extldflags "-static"' -o bunny-api-proxy ./cmd/bunny-api-proxy
+# Build the binary (CGO enabled for SQLite)
+RUN CGO_ENABLED=1 GOOS=linux go build -a -ldflags '-linkmode external -extldflags "-static"' -o bunny-api-proxy ./cmd/bunny-api-proxy
 
 # Final stage
 FROM alpine:latest
