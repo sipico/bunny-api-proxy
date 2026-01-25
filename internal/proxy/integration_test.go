@@ -9,20 +9,11 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/sipico/bunny-api-proxy/internal/auth"
 	"github.com/sipico/bunny-api-proxy/internal/bunny"
 	"github.com/sipico/bunny-api-proxy/internal/storage"
 	"github.com/sipico/bunny-api-proxy/internal/testutil/mockbunny"
 )
-
-// wrapWithAPIMount wraps a router at /api to match production setup.
-// This is necessary because the auth middleware patterns expect /api/dnszone paths.
-func wrapWithAPIMount(proxyRouter http.Handler) http.Handler {
-	r := chi.NewRouter()
-	r.Mount("/api", proxyRouter)
-	return r
-}
 
 // setupTestStorage creates an in-memory SQLite database with test data.
 // It creates a test scoped key and sets up permissions for testing.
@@ -146,10 +137,10 @@ func TestIntegration_ListZones(t *testing.T) {
 	// Create router
 	proxyHandler := NewHandler(bunnyClient, nil)
 	proxyRouter := NewRouter(proxyHandler, authMiddleware)
-	router := wrapWithAPIMount(proxyRouter)
+	router := proxyRouter
 
 	// Make test request
-	req := httptest.NewRequest("GET", "/api/dnszone", nil)
+	req := httptest.NewRequest("GET", "/dnszone", nil)
 	req.Header.Set("Authorization", "Bearer test-key-123")
 	w := httptest.NewRecorder()
 
@@ -195,10 +186,10 @@ func TestIntegration_GetZone(t *testing.T) {
 
 	proxyHandler := NewHandler(bunnyClient, nil)
 	proxyRouter := NewRouter(proxyHandler, authMiddleware)
-	router := wrapWithAPIMount(proxyRouter)
+	router := proxyRouter
 
 	// Request specific zone
-	req := httptest.NewRequest("GET", fmt.Sprintf("/api/dnszone/%d", zoneID), nil)
+	req := httptest.NewRequest("GET", fmt.Sprintf("/dnszone/%d", zoneID), nil)
 	req.Header.Set("Authorization", "Bearer test-key-123")
 	w := httptest.NewRecorder()
 
@@ -244,10 +235,10 @@ func TestIntegration_ListRecords(t *testing.T) {
 
 	proxyHandler := NewHandler(bunnyClient, nil)
 	proxyRouter := NewRouter(proxyHandler, authMiddleware)
-	router := wrapWithAPIMount(proxyRouter)
+	router := proxyRouter
 
 	// Request records
-	req := httptest.NewRequest("GET", fmt.Sprintf("/api/dnszone/%d/records", zoneID), nil)
+	req := httptest.NewRequest("GET", fmt.Sprintf("/dnszone/%d/records", zoneID), nil)
 	req.Header.Set("Authorization", "Bearer test-key-123")
 	w := httptest.NewRecorder()
 
@@ -284,7 +275,7 @@ func TestIntegration_AddRecord(t *testing.T) {
 
 	proxyHandler := NewHandler(bunnyClient, nil)
 	proxyRouter := NewRouter(proxyHandler, authMiddleware)
-	router := wrapWithAPIMount(proxyRouter)
+	router := proxyRouter
 
 	// Add a TXT record
 	recordReq := bunny.AddRecordRequest{
@@ -297,7 +288,7 @@ func TestIntegration_AddRecord(t *testing.T) {
 		t.Fatalf("failed to marshal request: %v", err)
 	}
 
-	req := httptest.NewRequest("POST", fmt.Sprintf("/api/dnszone/%d/records", zoneID), bytes.NewReader(body))
+	req := httptest.NewRequest("POST", fmt.Sprintf("/dnszone/%d/records", zoneID), bytes.NewReader(body))
 	req.Header.Set("Authorization", "Bearer test-key-123")
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
@@ -342,7 +333,7 @@ func TestIntegration_DeleteRecord(t *testing.T) {
 
 	proxyHandler := NewHandler(bunnyClient, nil)
 	proxyRouter := NewRouter(proxyHandler, authMiddleware)
-	router := wrapWithAPIMount(proxyRouter)
+	router := proxyRouter
 
 	// Get the zone to find record ID
 	zone := mockBunny.GetZone(zoneID)
@@ -352,7 +343,7 @@ func TestIntegration_DeleteRecord(t *testing.T) {
 	recordID := zone.Records[0].ID
 
 	// Delete the record
-	req := httptest.NewRequest("DELETE", fmt.Sprintf("/api/dnszone/%d/records/%d", zoneID, recordID), nil)
+	req := httptest.NewRequest("DELETE", fmt.Sprintf("/dnszone/%d/records/%d", zoneID, recordID), nil)
 	req.Header.Set("Authorization", "Bearer test-key-123")
 	w := httptest.NewRecorder()
 
@@ -379,10 +370,10 @@ func TestIntegration_Unauthorized_NoKey(t *testing.T) {
 
 	proxyHandler := NewHandler(bunnyClient, nil)
 	proxyRouter := NewRouter(proxyHandler, authMiddleware)
-	router := wrapWithAPIMount(proxyRouter)
+	router := proxyRouter
 
 	// Request without Authorization header
-	req := httptest.NewRequest("GET", "/api/dnszone", nil)
+	req := httptest.NewRequest("GET", "/dnszone", nil)
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
@@ -416,10 +407,10 @@ func TestIntegration_Unauthorized_InvalidKey(t *testing.T) {
 
 	proxyHandler := NewHandler(bunnyClient, nil)
 	proxyRouter := NewRouter(proxyHandler, authMiddleware)
-	router := wrapWithAPIMount(proxyRouter)
+	router := proxyRouter
 
 	// Request with invalid key
-	req := httptest.NewRequest("GET", "/api/dnszone", nil)
+	req := httptest.NewRequest("GET", "/dnszone", nil)
 	req.Header.Set("Authorization", "Bearer invalid-key-xyz")
 	w := httptest.NewRecorder()
 
@@ -456,10 +447,10 @@ func TestIntegration_Forbidden_WrongZone(t *testing.T) {
 
 	proxyHandler := NewHandler(bunnyClient, nil)
 	proxyRouter := NewRouter(proxyHandler, authMiddleware)
-	router := wrapWithAPIMount(proxyRouter)
+	router := proxyRouter
 
 	// Try to access zone with permission
-	req := httptest.NewRequest("GET", fmt.Sprintf("/api/dnszone/%d/records", zoneID1), nil)
+	req := httptest.NewRequest("GET", fmt.Sprintf("/dnszone/%d/records", zoneID1), nil)
 	req.Header.Set("Authorization", "Bearer valid-key")
 	w := httptest.NewRecorder()
 
@@ -470,7 +461,7 @@ func TestIntegration_Forbidden_WrongZone(t *testing.T) {
 	}
 
 	// Try to access zone without permission (not in storage permissions)
-	req2 := httptest.NewRequest("GET", fmt.Sprintf("/api/dnszone/%d/records", zoneID2), nil)
+	req2 := httptest.NewRequest("GET", fmt.Sprintf("/dnszone/%d/records", zoneID2), nil)
 	req2.Header.Set("Authorization", "Bearer valid-key")
 	w2 := httptest.NewRecorder()
 
@@ -499,7 +490,7 @@ func TestIntegration_Forbidden_WrongRecordType(t *testing.T) {
 
 	proxyHandler := NewHandler(bunnyClient, nil)
 	proxyRouter := NewRouter(proxyHandler, authMiddleware)
-	router := wrapWithAPIMount(proxyRouter)
+	router := proxyRouter
 
 	// Try to add an A record (not allowed)
 	recordReq := bunny.AddRecordRequest{
@@ -512,7 +503,7 @@ func TestIntegration_Forbidden_WrongRecordType(t *testing.T) {
 		t.Fatalf("failed to marshal request: %v", err)
 	}
 
-	req := httptest.NewRequest("POST", fmt.Sprintf("/api/dnszone/%d/records", zoneID), bytes.NewReader(body))
+	req := httptest.NewRequest("POST", fmt.Sprintf("/dnszone/%d/records", zoneID), bytes.NewReader(body))
 	req.Header.Set("Authorization", "Bearer restricted-key")
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()

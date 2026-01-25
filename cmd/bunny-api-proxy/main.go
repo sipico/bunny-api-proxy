@@ -93,8 +93,8 @@ func initializeComponents(cfg *config.Config) (*serverComponents, error) {
 
 	r.Get("/health", healthHandler)
 	r.Get("/ready", readyHandler(store))
-	r.Mount("/api", proxyRouter)
 	r.Mount("/admin", adminRouter)
+	r.Mount("/", proxyRouter)
 
 	return &serverComponents{
 		logger:      logger,

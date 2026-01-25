@@ -21,33 +21,33 @@ func TestParseRequest(t *testing.T) {
 		{
 			name:       "list zones",
 			method:     "GET",
-			path:       "/api/dnszone",
+			path:       "/dnszone",
 			wantAction: ActionListZones,
 		},
 		{
 			name:       "list zones with trailing slash",
 			method:     "GET",
-			path:       "/api/dnszone/",
+			path:       "/dnszone/",
 			wantAction: ActionListZones,
 		},
 		{
 			name:       "get zone",
 			method:     "GET",
-			path:       "/api/dnszone/123",
+			path:       "/dnszone/123",
 			wantAction: ActionGetZone,
 			wantZoneID: 123,
 		},
 		{
 			name:       "list records",
 			method:     "GET",
-			path:       "/api/dnszone/456/records",
+			path:       "/dnszone/456/records",
 			wantAction: ActionListRecords,
 			wantZoneID: 456,
 		},
 		{
 			name:       "add record",
 			method:     "POST",
-			path:       "/api/dnszone/789/records",
+			path:       "/dnszone/789/records",
 			body:       `{"Type":"TXT","Name":"test","Value":"hello"}`,
 			wantAction: ActionAddRecord,
 			wantZoneID: 789,
@@ -56,7 +56,7 @@ func TestParseRequest(t *testing.T) {
 		{
 			name:       "delete record",
 			method:     "DELETE",
-			path:       "/api/dnszone/123/records/456",
+			path:       "/dnszone/123/records/456",
 			wantAction: ActionDeleteRecord,
 			wantZoneID: 123,
 		},
@@ -69,7 +69,7 @@ func TestParseRequest(t *testing.T) {
 		{
 			name:    "invalid method for path",
 			method:  "PUT",
-			path:    "/api/dnszone/123",
+			path:    "/dnszone/123",
 			wantErr: true,
 		},
 	}
@@ -110,7 +110,7 @@ func TestParseRequest(t *testing.T) {
 
 func TestParseRequest_BodyPreserved(t *testing.T) {
 	body := `{"Type":"A","Name":"www","Value":"1.2.3.4"}`
-	req := httptest.NewRequest("POST", "/api/dnszone/123/records", strings.NewReader(body))
+	req := httptest.NewRequest("POST", "/dnszone/123/records", strings.NewReader(body))
 
 	_, err := ParseRequest(req)
 	if err != nil {

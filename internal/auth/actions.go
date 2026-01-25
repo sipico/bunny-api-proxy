@@ -11,13 +11,12 @@ import (
 	"strconv"
 )
 
-// URL patterns for DNS API endpoints
-// Note: The proxy is mounted at /api, so paths include the /api prefix
+// URL patterns for DNS API endpoints (matching bunny.net API paths)
 var (
-	listZonesPattern    = regexp.MustCompile(`^/api/dnszone/?$`)
-	getZonePattern      = regexp.MustCompile(`^/api/dnszone/(\d+)/?$`)
-	recordsPattern      = regexp.MustCompile(`^/api/dnszone/(\d+)/records/?$`)
-	deleteRecordPattern = regexp.MustCompile(`^/api/dnszone/(\d+)/records/(\d+)/?$`)
+	listZonesPattern    = regexp.MustCompile(`^/dnszone/?$`)
+	getZonePattern      = regexp.MustCompile(`^/dnszone/(\d+)/?$`)
+	recordsPattern      = regexp.MustCompile(`^/dnszone/(\d+)/records/?$`)
+	deleteRecordPattern = regexp.MustCompile(`^/dnszone/(\d+)/records/(\d+)/?$`)
 )
 
 // ParseRequest extracts action, zone ID, and record type from HTTP request.
