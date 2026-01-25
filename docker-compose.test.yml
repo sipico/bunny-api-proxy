@@ -35,12 +35,23 @@ services:
       retries: 3
       start_period: 10s
     volumes:
-      - proxy-data:/data
+      - /tmp/proxy-data:/data
+
+  test-runner:
+    build:
+      context: .
+      dockerfile: Dockerfile.testrunner
+    environment:
+      - PROXY_URL=http://proxy:8080
+      - MOCKBUNNY_URL=http://mockbunny:8081
+      - ADMIN_PASSWORD=testpassword123
+    depends_on:
+      proxy:
+        condition: service_healthy
+    networks:
+      - test-network
 
 networks:
   test-network:
     driver: bridge
     internal: true
-
-volumes:
-  proxy-data:
