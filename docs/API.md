@@ -485,7 +485,7 @@ curl -X POST http://localhost:8080/admin/login \
   -d "password=your-admin-password"
 ```
 
-**Example Response (302 Found - Redirect):**
+**Example Response (303 See Other - Redirect):**
 Redirects to `/admin` with `admin_session` cookie set.
 
 **Error Responses:**
@@ -803,7 +803,7 @@ Update the master bunny.net API key via HTML form.
 **Form Parameters:**
 - `key` - The master bunny.net API key
 
-**Response:** 302 Found - Redirects to `/admin/master-key`
+**Response:** 303 See Other - Redirects to `/admin/master-key`
 
 ---
 
@@ -851,7 +851,7 @@ Delete an admin token.
 **Path Parameters:**
 - `id` - The token ID
 
-**Response:** 302 Found - Redirects to `/admin/tokens`
+**Response:** 303 See Other - Redirects to `/admin/tokens`
 
 ---
 
@@ -886,7 +886,7 @@ Create a new scoped API key via HTML form.
 - `name` - Descriptive name for the key
 - `api_key` - The API key value (user-provided or auto-generated)
 
-**Response:** 302 Found - Redirects to `/admin/keys`
+**Response:** 303 See Other - Redirects to `/admin/keys`
 
 ---
 
@@ -910,7 +910,7 @@ Delete a scoped API key and all its permissions.
 **Path Parameters:**
 - `id` - The key ID
 
-**Response:** 302 Found - Redirects to `/admin/keys`
+**Response:** 303 See Other - Redirects to `/admin/keys`
 
 ---
 
@@ -943,7 +943,7 @@ Add a permission to a scoped key.
 - `allowed_actions` - Comma-separated list of actions (list_zones, get_zone, list_records, add_record, delete_record)
 - `record_types` - Comma-separated list of DNS record types (A, AAAA, CNAME, TXT, MX, NS, SRV, CAA, etc.)
 
-**Response:** 302 Found - Redirects to `/admin/keys/{id}`
+**Response:** 303 See Other - Redirects to `/admin/keys/{id}`
 
 ---
 
@@ -956,7 +956,7 @@ Delete a permission from a scoped key.
 - `id` - The key ID
 - `pid` - The permission ID
 
-**Response:** 302 Found - Redirects to `/admin/keys/{id}`
+**Response:** 303 See Other - Redirects to `/admin/keys/{id}`
 
 ---
 
