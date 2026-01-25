@@ -151,3 +151,9 @@ func (s *Server) GetState() map[int64]Zone {
 	}
 	return result
 }
+
+// Handler returns the HTTP handler for use with a standalone server.
+// This allows running mockbunny outside of httptest.
+func (s *Server) Handler() chi.Router {
+	return s.router
+}
