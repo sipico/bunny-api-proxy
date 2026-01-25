@@ -18,7 +18,7 @@ func TestMiddleware_MissingAuth(t *testing.T) {
 		t.Error("handler should not be called")
 	}))
 
-	req := httptest.NewRequest("GET", "/dnszone", nil)
+	req := httptest.NewRequest("GET", "/api/dnszone", nil)
 	rec := httptest.NewRecorder()
 
 	handler.ServeHTTP(rec, req)
@@ -43,7 +43,7 @@ func TestMiddleware_InvalidBearerFormat(t *testing.T) {
 		t.Error("handler should not be called")
 	}))
 
-	req := httptest.NewRequest("GET", "/dnszone", nil)
+	req := httptest.NewRequest("GET", "/api/dnszone", nil)
 	req.Header.Set("Authorization", "InvalidFormat")
 	rec := httptest.NewRecorder()
 
@@ -61,7 +61,7 @@ func TestMiddleware_InvalidAPIKey(t *testing.T) {
 		t.Error("handler should not be called")
 	}))
 
-	req := httptest.NewRequest("GET", "/dnszone", nil)
+	req := httptest.NewRequest("GET", "/api/dnszone", nil)
 	req.Header.Set("Authorization", "Bearer invalid-key")
 	rec := httptest.NewRecorder()
 
@@ -87,7 +87,7 @@ func TestMiddleware_ListZonesNoAuth(t *testing.T) {
 		t.Error("handler should not be called")
 	}))
 
-	req := httptest.NewRequest("GET", "/dnszone", nil)
+	req := httptest.NewRequest("GET", "/api/dnszone", nil)
 	rec := httptest.NewRecorder()
 
 	handler.ServeHTTP(rec, req)
@@ -104,7 +104,7 @@ func TestMiddleware_ValidatorInternalError(t *testing.T) {
 		t.Error("handler should not be called")
 	}))
 
-	req := httptest.NewRequest("GET", "/dnszone", nil)
+	req := httptest.NewRequest("GET", "/api/dnszone", nil)
 	req.Header.Set("Authorization", "Bearer test-key")
 	rec := httptest.NewRecorder()
 
@@ -162,7 +162,7 @@ func TestGetKeyInfo_MultipleContextValues(t *testing.T) {
 }
 
 func TestExtractBearerToken_ValidToken(t *testing.T) {
-	req := httptest.NewRequest("GET", "/dnszone", nil)
+	req := httptest.NewRequest("GET", "/api/dnszone", nil)
 	req.Header.Set("Authorization", "Bearer mytoken123")
 
 	token := extractBearerToken(req)
@@ -173,7 +173,7 @@ func TestExtractBearerToken_ValidToken(t *testing.T) {
 }
 
 func TestExtractBearerToken_CaseInsensitive(t *testing.T) {
-	req := httptest.NewRequest("GET", "/dnszone", nil)
+	req := httptest.NewRequest("GET", "/api/dnszone", nil)
 	req.Header.Set("Authorization", "bearer mytoken123")
 
 	token := extractBearerToken(req)
@@ -184,7 +184,7 @@ func TestExtractBearerToken_CaseInsensitive(t *testing.T) {
 }
 
 func TestExtractBearerToken_MixedCase(t *testing.T) {
-	req := httptest.NewRequest("GET", "/dnszone", nil)
+	req := httptest.NewRequest("GET", "/api/dnszone", nil)
 	req.Header.Set("Authorization", "BeArEr mytoken123")
 
 	token := extractBearerToken(req)
@@ -195,7 +195,7 @@ func TestExtractBearerToken_MixedCase(t *testing.T) {
 }
 
 func TestExtractBearerToken_NoHeader(t *testing.T) {
-	req := httptest.NewRequest("GET", "/dnszone", nil)
+	req := httptest.NewRequest("GET", "/api/dnszone", nil)
 
 	token := extractBearerToken(req)
 
@@ -205,7 +205,7 @@ func TestExtractBearerToken_NoHeader(t *testing.T) {
 }
 
 func TestExtractBearerToken_InvalidFormat(t *testing.T) {
-	req := httptest.NewRequest("GET", "/dnszone", nil)
+	req := httptest.NewRequest("GET", "/api/dnszone", nil)
 	req.Header.Set("Authorization", "InvalidFormat")
 
 	token := extractBearerToken(req)
@@ -216,7 +216,7 @@ func TestExtractBearerToken_InvalidFormat(t *testing.T) {
 }
 
 func TestExtractBearerToken_OnlyBearer(t *testing.T) {
-	req := httptest.NewRequest("GET", "/dnszone", nil)
+	req := httptest.NewRequest("GET", "/api/dnszone", nil)
 	req.Header.Set("Authorization", "Bearer")
 
 	token := extractBearerToken(req)
@@ -227,7 +227,7 @@ func TestExtractBearerToken_OnlyBearer(t *testing.T) {
 }
 
 func TestExtractBearerToken_BearerWithSpaces(t *testing.T) {
-	req := httptest.NewRequest("GET", "/dnszone", nil)
+	req := httptest.NewRequest("GET", "/api/dnszone", nil)
 	req.Header.Set("Authorization", "Bearer token-with-spaces ")
 
 	token := extractBearerToken(req)
@@ -238,7 +238,7 @@ func TestExtractBearerToken_BearerWithSpaces(t *testing.T) {
 }
 
 func TestExtractBearerToken_EmptyToken(t *testing.T) {
-	req := httptest.NewRequest("GET", "/dnszone", nil)
+	req := httptest.NewRequest("GET", "/api/dnszone", nil)
 	req.Header.Set("Authorization", "Bearer ")
 
 	token := extractBearerToken(req)
@@ -335,7 +335,7 @@ func TestWriteJSONError_ContentType(t *testing.T) {
 }
 
 func TestParseRequest_ListZones(t *testing.T) {
-	req := httptest.NewRequest("GET", "/dnszone", nil)
+	req := httptest.NewRequest("GET", "/api/dnszone", nil)
 	parsed, err := ParseRequest(req)
 
 	if err != nil {
@@ -348,7 +348,7 @@ func TestParseRequest_ListZones(t *testing.T) {
 }
 
 func TestParseRequest_ListZonesTrailingSlash(t *testing.T) {
-	req := httptest.NewRequest("GET", "/dnszone/", nil)
+	req := httptest.NewRequest("GET", "/api/dnszone/", nil)
 	parsed, err := ParseRequest(req)
 
 	if err != nil {
@@ -361,7 +361,7 @@ func TestParseRequest_ListZonesTrailingSlash(t *testing.T) {
 }
 
 func TestParseRequest_GetZone(t *testing.T) {
-	req := httptest.NewRequest("GET", "/dnszone/456", nil)
+	req := httptest.NewRequest("GET", "/api/dnszone/456", nil)
 	parsed, err := ParseRequest(req)
 
 	if err != nil {
@@ -377,7 +377,7 @@ func TestParseRequest_GetZone(t *testing.T) {
 }
 
 func TestParseRequest_ListRecords(t *testing.T) {
-	req := httptest.NewRequest("GET", "/dnszone/789/records", nil)
+	req := httptest.NewRequest("GET", "/api/dnszone/789/records", nil)
 	parsed, err := ParseRequest(req)
 
 	if err != nil {
@@ -394,7 +394,7 @@ func TestParseRequest_ListRecords(t *testing.T) {
 
 func TestParseRequest_AddRecord(t *testing.T) {
 	body := `{"Type":"TXT","Name":"test","Value":"hello"}`
-	req := httptest.NewRequest("POST", "/dnszone/123/records", bytes.NewReader([]byte(body)))
+	req := httptest.NewRequest("POST", "/api/dnszone/123/records", bytes.NewReader([]byte(body)))
 	parsed, err := ParseRequest(req)
 
 	if err != nil {
@@ -413,7 +413,7 @@ func TestParseRequest_AddRecord(t *testing.T) {
 }
 
 func TestParseRequest_DeleteRecord(t *testing.T) {
-	req := httptest.NewRequest("DELETE", "/dnszone/111/records/222", nil)
+	req := httptest.NewRequest("DELETE", "/api/dnszone/111/records/222", nil)
 	parsed, err := ParseRequest(req)
 
 	if err != nil {
@@ -438,7 +438,7 @@ func TestParseRequest_InvalidEndpoint(t *testing.T) {
 }
 
 func TestParseRequest_InvalidMethod(t *testing.T) {
-	req := httptest.NewRequest("PUT", "/dnszone/123", nil)
+	req := httptest.NewRequest("PUT", "/api/dnszone/123", nil)
 	_, err := ParseRequest(req)
 
 	if err == nil {
@@ -460,7 +460,7 @@ func TestMiddleware_RespondsWithJSON(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	req := httptest.NewRequest("GET", "/dnszone", nil)
+	req := httptest.NewRequest("GET", "/api/dnszone", nil)
 	rec := httptest.NewRecorder()
 
 	handler.ServeHTTP(rec, req)
@@ -562,7 +562,7 @@ func TestMiddleware_PermissionDeniedPath(t *testing.T) {
 
 	// Request with valid structure but will fail permission check
 	// (no matching zones in permissions)
-	req := httptest.NewRequest("GET", "/dnszone/999/records", nil)
+	req := httptest.NewRequest("GET", "/api/dnszone/999/records", nil)
 	req.Header.Set("Authorization", "Bearer test-key")
 	rec := httptest.NewRecorder()
 
@@ -593,7 +593,7 @@ func TestMiddleware_SuccessfulFlow(t *testing.T) {
 	// 1. Extract bearer token - succeeds
 	// 2. ValidateKey - fails with invalid key
 	// So handler never gets called
-	req := httptest.NewRequest("GET", "/dnszone", nil)
+	req := httptest.NewRequest("GET", "/api/dnszone", nil)
 	req.Header.Set("Authorization", "Bearer test-key")
 	rec := httptest.NewRecorder()
 
@@ -615,7 +615,7 @@ func TestMiddleware_BearerTokenWithSpecialChars(t *testing.T) {
 	}))
 
 	// Bearer token with special characters (common in real API keys)
-	req := httptest.NewRequest("GET", "/dnszone", nil)
+	req := httptest.NewRequest("GET", "/api/dnszone", nil)
 	req.Header.Set("Authorization", "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test")
 	rec := httptest.NewRecorder()
 
@@ -642,7 +642,7 @@ func TestMiddleware_MultipleAuthorizationHeaders(t *testing.T) {
 	}))
 
 	// Only the first Authorization header should be used
-	req := httptest.NewRequest("GET", "/dnszone", nil)
+	req := httptest.NewRequest("GET", "/api/dnszone", nil)
 	req.Header.Add("Authorization", "Bearer key1")
 	req.Header.Add("Authorization", "Bearer key2")
 	rec := httptest.NewRecorder()
@@ -667,7 +667,7 @@ func TestMiddleware_LargeAuthorizationHeader(t *testing.T) {
 		largeKey += "abcdefghijklmnopqrstuvwxyz"
 	}
 
-	req := httptest.NewRequest("GET", "/dnszone", nil)
+	req := httptest.NewRequest("GET", "/api/dnszone", nil)
 	req.Header.Set("Authorization", "Bearer "+largeKey)
 	rec := httptest.NewRecorder()
 
@@ -733,7 +733,7 @@ func TestMiddleware_ForbiddenAccess(t *testing.T) {
 		t.Error("handler should not be called")
 	}))
 
-	req := httptest.NewRequest("GET", "/dnszone/999", nil)
+	req := httptest.NewRequest("GET", "/api/dnszone/999", nil)
 	req.Header.Set("Authorization", "Bearer test-key")
 	rec := httptest.NewRecorder()
 
@@ -767,7 +767,7 @@ func TestMiddleware_SuccessfulRequest(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	req := httptest.NewRequest("GET", "/dnszone", nil)
+	req := httptest.NewRequest("GET", "/api/dnszone", nil)
 	req.Header.Set("Authorization", "Bearer test-key")
 	rec := httptest.NewRecorder()
 
