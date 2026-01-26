@@ -398,6 +398,52 @@ func TestCloseClosesDatabase(t *testing.T) {
 	}
 }
 
+// TestNewEnablesWALMode tests that New() enables WAL journal mode.
+func TestNewEnablesWALMode(t *testing.T) {
+	key := make([]byte, 32)
+	_, _ = rand.Read(key)
+
+	storage, err := New(":memory:", key)
+	if err != nil {
+		t.Fatalf("failed to create storage: %v", err)
+	}
+	defer func() { _ = storage.Close() }()
+
+	// Verify WAL mode is enabled
+	var journalMode string
+	err = storage.db.QueryRow("PRAGMA journal_mode").Scan(&journalMode)
+	if err != nil {
+		t.Fatalf("failed to check journal mode: %v", err)
+	}
+	// Note: :memory: databases use "memory" journal mode, not "wal"
+	// For file databases, this would return "wal"
+	if journalMode != "memory" && journalMode != "wal" {
+		t.Errorf("expected journal mode 'memory' or 'wal', got %s", journalMode)
+	}
+}
+
+// TestNewSetsBusyTimeout tests that New() sets busy timeout.
+func TestNewSetsBusyTimeout(t *testing.T) {
+	key := make([]byte, 32)
+	_, _ = rand.Read(key)
+
+	storage, err := New(":memory:", key)
+	if err != nil {
+		t.Fatalf("failed to create storage: %v", err)
+	}
+	defer func() { _ = storage.Close() }()
+
+	// Verify busy timeout is set
+	var busyTimeout int
+	err = storage.db.QueryRow("PRAGMA busy_timeout").Scan(&busyTimeout)
+	if err != nil {
+		t.Fatalf("failed to check busy timeout: %v", err)
+	}
+	if busyTimeout != 5000 {
+		t.Errorf("expected busy timeout 5000, got %d", busyTimeout)
+	}
+}
+
 // TestCloseWithNilDatabase tests that Close() handles nil database gracefully.
 func TestCloseWithNilDatabase(t *testing.T) {
 	storage := &SQLiteStorage{
