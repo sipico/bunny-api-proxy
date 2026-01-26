@@ -286,8 +286,63 @@ The admin web UI currently has only handler-level unit tests. There are no tests
 - [ ] **PR comments with test results** - Automated feedback on PRs
 - [ ] **Release automation** - Auto-publish Docker images on tag
 
+### Dependency Management (Dependabot)
+
+- [ ] **Add Dependabot configuration** - Automated dependency updates
+  - **Current state:** ARCHITECTURE.md claims "Dependabot enabled" but no `.github/dependabot.yml` exists
+  - **Dockerfile issue:** Using `alpine:latest` which prevents version tracking; should pin (e.g., `alpine:3.21`)
+
+  **Required configuration** (`.github/dependabot.yml`):
+  ```yaml
+  version: 2
+  updates:
+    # Go modules (go.mod)
+    - package-ecosystem: "gomod"
+      directory: "/"
+      schedule:
+        interval: "weekly"
+
+    # Docker base images (Dockerfile)
+    - package-ecosystem: "docker"
+      directory: "/"
+      schedule:
+        interval: "weekly"
+
+    # GitHub Actions versions
+    - package-ecosystem: "github-actions"
+      directory: "/"
+      schedule:
+        interval: "weekly"
+  ```
+
+  **Implementation steps:**
+  1. Pin Alpine version in Dockerfile: `FROM alpine:3.21` (check latest at time of implementation)
+  2. Create `.github/dependabot.yml` with above config
+  3. Update ARCHITECTURE.md if needed (currently claims Dependabot is enabled)
+
+  **What Dependabot will update:**
+  - `go.mod`: chi, go-sqlite3, golang.org/x/crypto
+  - `Dockerfile`: Alpine base image version
+  - `.github/workflows/ci.yml`: actions/checkout, actions/setup-go, etc.
+
+### CI Pipeline Improvements
+
+- [ ] **Add go mod tidy check** - Ensure go.mod and go.sum are clean
+  ```yaml
+  - name: Check go mod tidy
+    run: |
+      go mod tidy
+      git diff --exit-code go.mod go.sum
+  ```
+- [ ] **Consider adding gofumpt** - Stricter formatting than gofmt (2026 best practice)
+- [ ] **Add t.Parallel() to tests** - Faster test execution (currently 0 parallel tests)
+
 ### Documentation
 
+- [ ] **Fix documentation accuracy gaps** - Align docs with implementation
+  - README.md and ARCHITECTURE.md claim "HTMX-based" but UI is plain HTML forms
+  - ARCHITECTURE.md shows `web/static/` directory but it doesn't exist
+  - Fix after deciding: either implement HTMX (Phase 3 of UI testing) or update docs to say "Go templates"
 - [ ] **CHANGELOG.md maintenance** - Version history and breaking changes
   - Decide on format (Keep a Changelog, Conventional Changelog, etc.)
   - Determine update process (manual, automated from commits, CI integration)
