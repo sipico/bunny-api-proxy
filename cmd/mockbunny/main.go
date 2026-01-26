@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/sipico/bunny-api-proxy/internal/testutil/mockbunny"
 )
@@ -54,7 +55,35 @@ func setupShutdownHandler(httpServer *http.Server) <-chan bool {
 	return done
 }
 
+// runHealthCheck performs an HTTP health check against the local server.
+// Returns 0 on success, 1 on failure. Used by container HEALTHCHECK.
+func runHealthCheck() int {
+	port := getPort()
+	return doHealthCheck("http://localhost:" + port + "/admin/state")
+}
+
+// doHealthCheck performs the actual health check HTTP request.
+// Extracted for testability.
+func doHealthCheck(url string) int {
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Get(url)
+	if err != nil {
+		return 1
+	}
+	//nolint:errcheck // Response body close errors are unrecoverable in health check
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return 1
+	}
+	return 0
+}
+
 func main() {
+	// Handle health check subcommand for distroless container health checks
+	if len(os.Args) > 1 && os.Args[1] == "health" {
+		os.Exit(runHealthCheck())
+	}
+
 	port := getPort()
 	server := createServer()
 

@@ -18,11 +18,8 @@ COPY . .
 # Build the binary (CGO disabled - using pure Go SQLite driver)
 RUN CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-s -w' -o bunny-api-proxy ./cmd/bunny-api-proxy
 
-# Final stage
-FROM alpine:3.21
-
-# Install ca-certificates for HTTPS
-RUN apk --no-cache add ca-certificates
+# Final stage - distroless for minimal attack surface
+FROM gcr.io/distroless/static:nonroot
 
 WORKDIR /app
 
@@ -32,19 +29,15 @@ COPY --from=builder /app/bunny-api-proxy .
 # Copy web assets (templates, static files)
 COPY --from=builder /app/web ./web
 
-# Create non-root user
-RUN addgroup -g 1000 bunny && \
-    adduser -D -u 1000 -G bunny bunny && \
-    chown -R bunny:bunny /app
-
-USER bunny
-
 # Expose port
 EXPOSE 8080
 
-# Health check
+# Health check using built-in health subcommand (no shell/wget needed)
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
+  CMD ["/app/bunny-api-proxy", "health"]
 
-# Run the binary
-CMD ["./bunny-api-proxy"]
+# Run as nonroot user (UID 65532, already default in :nonroot variant)
+USER nonroot:nonroot
+
+# Run the binary (exec form required - no shell available)
+ENTRYPOINT ["/app/bunny-api-proxy"]

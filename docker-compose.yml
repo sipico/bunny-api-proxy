@@ -37,8 +37,9 @@ services:
     # Health check ensures container is responding
     # Runs every 30 seconds, considers unhealthy after 3 failures (90 seconds)
     # Used by orchestration tools (Swarm, Kubernetes) for automated recovery
+    # Uses built-in health subcommand (distroless containers have no curl/wget)
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      test: ["CMD", "/app/bunny-api-proxy", "health"]
       interval: 30s
       timeout: 10s
       retries: 3
