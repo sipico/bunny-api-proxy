@@ -327,14 +327,6 @@ The admin web UI currently has only handler-level unit tests. There are no tests
 
 ### CI Pipeline Improvements
 
-- [ ] **Add go mod tidy check** - Ensure go.mod and go.sum are clean
-  ```yaml
-  - name: Check go mod tidy
-    run: |
-      go mod tidy
-      git diff --exit-code go.mod go.sum
-  ```
-- [ ] **Consider adding gofumpt** - Stricter formatting than gofmt (2026 best practice)
 - [ ] **Add t.Parallel() to tests** - Faster test execution (currently 0 parallel tests)
 
 ### Documentation
