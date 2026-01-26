@@ -39,7 +39,7 @@ services:
     # Used by orchestration tools (Swarm, Kubernetes) for automated recovery
     # Uses built-in health subcommand (distroless containers have no curl/wget)
     healthcheck:
-      test: ["/app/bunny-api-proxy", "health"]
+      test: ["CMD", "/app/bunny-api-proxy", "health"]
       interval: 30s
       timeout: 10s
       retries: 3
