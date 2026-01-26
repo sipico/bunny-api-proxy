@@ -1,4 +1,3 @@
-// Package storage provides types and interfaces for SQLite persistence operations.
 package storage
 
 import "time"

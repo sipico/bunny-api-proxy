@@ -1,5 +1,3 @@
-// Package storage provides cryptographic utilities for the bunny-api-proxy.
-// It includes functions for encrypting/decrypting API keys and hashing credentials.
 package storage
 
 import (
