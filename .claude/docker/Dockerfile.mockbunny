@@ -15,23 +15,21 @@ COPY . .
 # Build mockbunny binary
 RUN CGO_ENABLED=0 GOOS=linux go build -o mockbunny ./cmd/mockbunny
 
-# Final stage
-FROM alpine:latest
-
-RUN apk --no-cache add ca-certificates
+# Final stage - distroless for minimal attack surface
+FROM gcr.io/distroless/static:nonroot
 
 WORKDIR /app
 
 COPY --from=builder /app/mockbunny .
 
-# Non-root user
-RUN adduser -D -u 1000 mockbunny
-USER mockbunny
-
 EXPOSE 8081
 
-# Health check
+# Health check using built-in health subcommand (no shell/wget needed)
 HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=3 \
-	CMD wget --no-verbose --tries=1 --spider http://localhost:8081/admin/state || exit 1
+	CMD ["/app/mockbunny", "health"]
 
-CMD ["./mockbunny"]
+# Run as nonroot user (UID 65532, already default in :nonroot variant)
+USER nonroot:nonroot
+
+# Run the binary (exec form required - no shell available)
+ENTRYPOINT ["/app/mockbunny"]

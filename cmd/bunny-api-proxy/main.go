@@ -27,9 +27,29 @@ const version = "2026.01.2"
 const serverShutdownTimeout = 30 * time.Second
 
 func main() {
+	// Handle health check subcommand for distroless container health checks
+	if len(os.Args) > 1 && os.Args[1] == "health" {
+		os.Exit(runHealthCheck())
+	}
+
 	if err := run(); err != nil {
 		log.Fatalf("Server failed: %v", err)
 	}
+}
+
+// runHealthCheck performs an HTTP health check against the local server.
+// Returns 0 on success, 1 on failure. Used by container HEALTHCHECK.
+func runHealthCheck() int {
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Get("http://localhost:8080/health")
+	if err != nil {
+		return 1
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return 1
+	}
+	return 0
 }
 
 // serverComponents holds all initialized server components for testing
