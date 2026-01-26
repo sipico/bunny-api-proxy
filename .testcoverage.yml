@@ -8,6 +8,10 @@ threshold:
   package: 85
   total: 85
 
+# Require explanatory comments for all coverage-ignore annotations
+# This prevents abuse of the exclusion mechanism
+force-annotation-comment: true
+
 # Exclude test utilities from coverage requirements
 # These are helper binaries for E2E testing, not production code
 exclude:

@@ -458,6 +458,27 @@ func TestCloseWithNilDatabase(t *testing.T) {
 	}
 }
 
+// TestSetMasterAPIKeyFailsOnClosedDatabase tests SetMasterAPIKey error path.
+func TestSetMasterAPIKeyFailsOnClosedDatabase(t *testing.T) {
+	key := make([]byte, 32)
+	_, _ = rand.Read(key)
+
+	storage, err := New(":memory:", key)
+	if err != nil {
+		t.Fatalf("failed to create storage: %v", err)
+	}
+
+	// Close the database
+	_ = storage.Close()
+
+	// Try to set master API key - should fail
+	ctx := context.Background()
+	err = storage.SetMasterAPIKey(ctx, "test-key")
+	if err == nil {
+		t.Error("expected error when database is closed")
+	}
+}
+
 // TestNewWithInvalidDatabasePath tests that New() handles database open errors.
 func TestNewWithInvalidDatabasePath(t *testing.T) {
 	key := make([]byte, 32)
