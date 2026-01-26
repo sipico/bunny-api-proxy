@@ -40,11 +40,18 @@ func main() {
 // runHealthCheck performs an HTTP health check against the local server.
 // Returns 0 on success, 1 on failure. Used by container HEALTHCHECK.
 func runHealthCheck() int {
+	return doHealthCheck("http://localhost:8080/health")
+}
+
+// doHealthCheck performs the actual health check HTTP request.
+// Extracted for testability.
+func doHealthCheck(url string) int {
 	client := &http.Client{Timeout: 5 * time.Second}
-	resp, err := client.Get("http://localhost:8080/health")
+	resp, err := client.Get(url)
 	if err != nil {
 		return 1
 	}
+	//nolint:errcheck // Response body close errors are unrecoverable in health check
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		return 1

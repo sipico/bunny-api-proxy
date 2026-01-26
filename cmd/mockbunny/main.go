@@ -59,11 +59,18 @@ func setupShutdownHandler(httpServer *http.Server) <-chan bool {
 // Returns 0 on success, 1 on failure. Used by container HEALTHCHECK.
 func runHealthCheck() int {
 	port := getPort()
+	return doHealthCheck("http://localhost:" + port + "/admin/state")
+}
+
+// doHealthCheck performs the actual health check HTTP request.
+// Extracted for testability.
+func doHealthCheck(url string) int {
 	client := &http.Client{Timeout: 5 * time.Second}
-	resp, err := client.Get("http://localhost:" + port + "/admin/state")
+	resp, err := client.Get(url)
 	if err != nil {
 		return 1
 	}
+	//nolint:errcheck // Response body close errors are unrecoverable in health check
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		return 1

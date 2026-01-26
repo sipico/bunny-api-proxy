@@ -247,3 +247,92 @@ func BenchmarkGetPortAddr(b *testing.B) {
 		_ = getPortAddr("8081")
 	}
 }
+
+// TestDoHealthCheckSuccess tests that doHealthCheck returns 0 when server returns 200 OK
+func TestDoHealthCheckSuccess(t *testing.T) {
+	// Create a test server that returns 200 OK
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"zones":[]}`))
+	}))
+	defer server.Close()
+
+	result := doHealthCheck(server.URL)
+	if result != 0 {
+		t.Errorf("expected doHealthCheck to return 0 for successful response, got %d", result)
+	}
+}
+
+// TestDoHealthCheckNon200Status tests that doHealthCheck returns 1 when server returns non-200 status
+func TestDoHealthCheckNon200Status(t *testing.T) {
+	// Create a test server that returns 503 Service Unavailable
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer server.Close()
+
+	result := doHealthCheck(server.URL)
+	if result != 1 {
+		t.Errorf("expected doHealthCheck to return 1 for non-200 response, got %d", result)
+	}
+}
+
+// TestDoHealthCheckConnectionError tests that doHealthCheck returns 1 when connection fails
+func TestDoHealthCheckConnectionError(t *testing.T) {
+	// Use an invalid URL that will fail to connect
+	result := doHealthCheck("http://localhost:99999/admin/state")
+	if result != 1 {
+		t.Errorf("expected doHealthCheck to return 1 for connection error, got %d", result)
+	}
+}
+
+// TestDoHealthCheck404Status tests that doHealthCheck returns 1 when server returns 404
+func TestDoHealthCheck404Status(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	result := doHealthCheck(server.URL)
+	if result != 1 {
+		t.Errorf("expected doHealthCheck to return 1 for 404 response, got %d", result)
+	}
+}
+
+// TestDoHealthCheck500Status tests that doHealthCheck returns 1 when server returns 500
+func TestDoHealthCheck500Status(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	result := doHealthCheck(server.URL)
+	if result != 1 {
+		t.Errorf("expected doHealthCheck to return 1 for 500 response, got %d", result)
+	}
+}
+
+// TestRunHealthCheckUsesCorrectPort tests that runHealthCheck uses the PORT env var
+func TestRunHealthCheckUsesCorrectPort(t *testing.T) {
+	// Set a port that won't have a server running
+	os.Setenv("PORT", "59999")
+	defer os.Unsetenv("PORT")
+
+	// Should return 1 because no server is running on that port
+	result := runHealthCheck()
+	if result != 1 {
+		t.Errorf("expected runHealthCheck to return 1 when no server is running, got %d", result)
+	}
+}
+
+// TestRunHealthCheckDefaultPort tests that runHealthCheck uses default port when PORT is not set
+func TestRunHealthCheckDefaultPort(t *testing.T) {
+	// Unset PORT to use default
+	os.Unsetenv("PORT")
+
+	// Should return 1 because no server is running on default port 8081
+	result := runHealthCheck()
+	if result != 1 {
+		t.Errorf("expected runHealthCheck to return 1 when no server is running, got %d", result)
+	}
+}
