@@ -1,4 +1,3 @@
-// Package storage handles all database operations for the Bunny API Proxy.
 package storage
 
 import (

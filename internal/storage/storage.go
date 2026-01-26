@@ -1,4 +1,14 @@
-// Package storage provides types and interfaces for SQLite persistence operations.
+// Package storage provides SQLite-based persistence for scoped API keys and configuration.
+//
+// It handles secure storage of:
+//   - Master bunny.net API key (encrypted with AES-256-GCM)
+//   - Scoped proxy API keys (hashed with bcrypt)
+//   - Permissions linking scoped keys to zones and operations
+//   - Admin API tokens (hashed with bcrypt)
+//
+// The Storage interface defines all CRUD operations. The SQLiteStorage implementation
+// uses sqlite3 with foreign key constraints enabled for data integrity.
+// All operations are safe for concurrent use by multiple goroutines.
 package storage
 
 import (
