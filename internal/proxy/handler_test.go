@@ -12,7 +12,9 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/sipico/bunny-api-proxy/internal/auth"
 	"github.com/sipico/bunny-api-proxy/internal/bunny"
+	"github.com/sipico/bunny-api-proxy/internal/storage"
 )
 
 // mockBunnyClient implements BunnyClient for testing with customizable behavior
@@ -63,6 +65,15 @@ func newTestRequest(method, path string, body io.Reader, params map[string]strin
 	r = r.WithContext(context.WithValue(r.Context(), chi.RouteCtxKey, rctx))
 
 	return r
+}
+
+// newTestRequestWithKeyInfo creates a GET test request with Chi URL parameters and KeyInfo in context
+func newTestRequestWithKeyInfo(path string, params map[string]string, keyInfo *auth.KeyInfo) *http.Request {
+	r := newTestRequest(http.MethodGet, path, nil, params)
+
+	// Add KeyInfo to context using the auth package's context key
+	ctx := context.WithValue(r.Context(), auth.KeyInfoContextKey, keyInfo)
+	return r.WithContext(ctx)
 }
 
 // TestNewHandler_WithLogger tests handler creation with non-nil logger
@@ -754,5 +765,436 @@ func TestHandleDeleteRecord_ClientError(t *testing.T) {
 
 	if w.Code != http.StatusInternalServerError {
 		t.Errorf("expected status %d, got %d", http.StatusInternalServerError, w.Code)
+	}
+}
+
+// TestHandleListZones_FiltersToPermittedZones tests filtering zones to permitted zones only.
+func TestHandleListZones_FiltersToPermittedZones(t *testing.T) {
+	zones := &bunny.ListZonesResponse{
+		Items: []bunny.Zone{
+			{ID: 1, Domain: "example.com"},
+			{ID: 2, Domain: "test.com"},
+			{ID: 3, Domain: "other.com"},
+		},
+		TotalItems: 3,
+	}
+
+	client := &mockBunnyClient{
+		listZonesFunc: func(ctx context.Context, opts *bunny.ListZonesOptions) (*bunny.ListZonesResponse, error) {
+			return zones, nil
+		},
+	}
+
+	// Key with permission for zones 1 and 2 only
+	keyInfo := &auth.KeyInfo{
+		KeyID:   1,
+		KeyName: "test-key",
+		Permissions: []*storage.Permission{
+			{ID: 1, ScopedKeyID: 1, ZoneID: 1},
+			{ID: 2, ScopedKeyID: 1, ZoneID: 2},
+		},
+	}
+
+	handler := NewHandler(client, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	w := httptest.NewRecorder()
+	r := newTestRequestWithKeyInfo("/dnszone", map[string]string{}, keyInfo)
+
+	handler.HandleListZones(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status %d, got %d", http.StatusOK, w.Code)
+	}
+
+	var result bunny.ListZonesResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+
+	if len(result.Items) != 2 {
+		t.Errorf("expected 2 zones after filtering, got %d", len(result.Items))
+	}
+
+	if result.TotalItems != 2 {
+		t.Errorf("expected TotalItems=2, got %d", result.TotalItems)
+	}
+
+	if result.HasMoreItems != false {
+		t.Errorf("expected HasMoreItems=false after filtering")
+	}
+
+	// Verify correct zones
+	for _, zone := range result.Items {
+		if zone.ID != 1 && zone.ID != 2 {
+			t.Errorf("unexpected zone ID %d in filtered results", zone.ID)
+		}
+	}
+}
+
+// TestHandleListZones_AllZonesPermission tests that all zones permission returns all zones.
+func TestHandleListZones_AllZonesPermission(t *testing.T) {
+	zones := &bunny.ListZonesResponse{
+		Items: []bunny.Zone{
+			{ID: 1, Domain: "example.com"},
+			{ID: 2, Domain: "test.com"},
+			{ID: 3, Domain: "other.com"},
+		},
+		TotalItems: 3,
+	}
+
+	client := &mockBunnyClient{
+		listZonesFunc: func(ctx context.Context, opts *bunny.ListZonesOptions) (*bunny.ListZonesResponse, error) {
+			return zones, nil
+		},
+	}
+
+	// Key with all zones permission (ZoneID = 0)
+	keyInfo := &auth.KeyInfo{
+		KeyID:   1,
+		KeyName: "test-key",
+		Permissions: []*storage.Permission{
+			{ID: 1, ScopedKeyID: 1, ZoneID: 0}, // All zones
+		},
+	}
+
+	handler := NewHandler(client, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	w := httptest.NewRecorder()
+	r := newTestRequestWithKeyInfo("/dnszone", map[string]string{}, keyInfo)
+
+	handler.HandleListZones(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status %d, got %d", http.StatusOK, w.Code)
+	}
+
+	var result bunny.ListZonesResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+
+	if len(result.Items) != 3 {
+		t.Errorf("expected 3 zones (all zones), got %d", len(result.Items))
+	}
+
+	if result.TotalItems != 3 {
+		t.Errorf("expected TotalItems=3, got %d", result.TotalItems)
+	}
+}
+
+// TestHandleListZones_EmptyAfterFilter tests that filtering can result in empty zones.
+func TestHandleListZones_EmptyAfterFilter(t *testing.T) {
+	zones := &bunny.ListZonesResponse{
+		Items: []bunny.Zone{
+			{ID: 1, Domain: "example.com"},
+			{ID: 2, Domain: "test.com"},
+		},
+		TotalItems: 2,
+	}
+
+	client := &mockBunnyClient{
+		listZonesFunc: func(ctx context.Context, opts *bunny.ListZonesOptions) (*bunny.ListZonesResponse, error) {
+			return zones, nil
+		},
+	}
+
+	// Key with permission for zone 999 (doesn't exist in response)
+	keyInfo := &auth.KeyInfo{
+		KeyID:   1,
+		KeyName: "test-key",
+		Permissions: []*storage.Permission{
+			{ID: 1, ScopedKeyID: 1, ZoneID: 999},
+		},
+	}
+
+	handler := NewHandler(client, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	w := httptest.NewRecorder()
+	r := newTestRequestWithKeyInfo("/dnszone", map[string]string{}, keyInfo)
+
+	handler.HandleListZones(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status %d, got %d", http.StatusOK, w.Code)
+	}
+
+	var result bunny.ListZonesResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+
+	if len(result.Items) != 0 {
+		t.Errorf("expected 0 zones after filtering, got %d", len(result.Items))
+	}
+
+	if result.TotalItems != 0 {
+		t.Errorf("expected TotalItems=0, got %d", result.TotalItems)
+	}
+}
+
+// TestHandleGetZone_FiltersRecordTypes tests filtering records by type.
+func TestHandleGetZone_FiltersRecordTypes(t *testing.T) {
+	zone := &bunny.Zone{
+		ID:     123,
+		Domain: "example.com",
+		Records: []bunny.Record{
+			{ID: 1, Type: "A", Name: "www"},
+			{ID: 2, Type: "AAAA", Name: "www"},
+			{ID: 3, Type: "TXT", Name: "_acme-challenge"},
+			{ID: 4, Type: "CNAME", Name: "alias"},
+		},
+	}
+
+	client := &mockBunnyClient{
+		getZoneFunc: func(ctx context.Context, id int64) (*bunny.Zone, error) {
+			return zone, nil
+		},
+	}
+
+	// Key with permission for A and AAAA records only
+	keyInfo := &auth.KeyInfo{
+		KeyID:   1,
+		KeyName: "test-key",
+		Permissions: []*storage.Permission{
+			{
+				ID:          1,
+				ScopedKeyID: 1,
+				ZoneID:      123,
+				RecordTypes: []string{"A", "AAAA"},
+			},
+		},
+	}
+
+	handler := NewHandler(client, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	w := httptest.NewRecorder()
+	r := newTestRequestWithKeyInfo("/dnszone/123", map[string]string{"zoneID": "123"}, keyInfo)
+
+	handler.HandleGetZone(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status %d, got %d", http.StatusOK, w.Code)
+	}
+
+	var result bunny.Zone
+	if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+
+	if len(result.Records) != 2 {
+		t.Errorf("expected 2 records after filtering, got %d", len(result.Records))
+	}
+
+	for _, record := range result.Records {
+		if record.Type != "A" && record.Type != "AAAA" {
+			t.Errorf("unexpected record type %s in filtered results", record.Type)
+		}
+	}
+}
+
+// TestHandleGetZone_AllRecordTypes tests that empty RecordTypes allows all types.
+func TestHandleGetZone_AllRecordTypes(t *testing.T) {
+	zone := &bunny.Zone{
+		ID:     123,
+		Domain: "example.com",
+		Records: []bunny.Record{
+			{ID: 1, Type: "A", Name: "www"},
+			{ID: 2, Type: "TXT", Name: "_acme-challenge"},
+		},
+	}
+
+	client := &mockBunnyClient{
+		getZoneFunc: func(ctx context.Context, id int64) (*bunny.Zone, error) {
+			return zone, nil
+		},
+	}
+
+	// Key with all record types allowed (empty RecordTypes)
+	keyInfo := &auth.KeyInfo{
+		KeyID:   1,
+		KeyName: "test-key",
+		Permissions: []*storage.Permission{
+			{
+				ID:          1,
+				ScopedKeyID: 1,
+				ZoneID:      123,
+				RecordTypes: []string{}, // All types
+			},
+		},
+	}
+
+	handler := NewHandler(client, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	w := httptest.NewRecorder()
+	r := newTestRequestWithKeyInfo("/dnszone/123", map[string]string{"zoneID": "123"}, keyInfo)
+
+	handler.HandleGetZone(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status %d, got %d", http.StatusOK, w.Code)
+	}
+
+	var result bunny.Zone
+	if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+
+	if len(result.Records) != 2 {
+		t.Errorf("expected 2 records (all types allowed), got %d", len(result.Records))
+	}
+}
+
+// TestHandleGetZone_EmptyRecordsAfterFilter tests filtering that results in empty records.
+func TestHandleGetZone_EmptyRecordsAfterFilter(t *testing.T) {
+	zone := &bunny.Zone{
+		ID:     123,
+		Domain: "example.com",
+		Records: []bunny.Record{
+			{ID: 1, Type: "A", Name: "www"},
+			{ID: 2, Type: "AAAA", Name: "www"},
+		},
+	}
+
+	client := &mockBunnyClient{
+		getZoneFunc: func(ctx context.Context, id int64) (*bunny.Zone, error) {
+			return zone, nil
+		},
+	}
+
+	// Key with permission for TXT records only (none exist)
+	keyInfo := &auth.KeyInfo{
+		KeyID:   1,
+		KeyName: "test-key",
+		Permissions: []*storage.Permission{
+			{
+				ID:          1,
+				ScopedKeyID: 1,
+				ZoneID:      123,
+				RecordTypes: []string{"TXT"},
+			},
+		},
+	}
+
+	handler := NewHandler(client, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	w := httptest.NewRecorder()
+	r := newTestRequestWithKeyInfo("/dnszone/123", map[string]string{"zoneID": "123"}, keyInfo)
+
+	handler.HandleGetZone(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status %d, got %d", http.StatusOK, w.Code)
+	}
+
+	var result bunny.Zone
+	if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+
+	if len(result.Records) != 0 {
+		t.Errorf("expected 0 records after filtering, got %d", len(result.Records))
+	}
+}
+
+// TestHandleListRecords_FiltersRecordTypes tests filtering records in list endpoint.
+func TestHandleListRecords_FiltersRecordTypes(t *testing.T) {
+	zone := &bunny.Zone{
+		ID:     123,
+		Domain: "example.com",
+		Records: []bunny.Record{
+			{ID: 1, Type: "TXT", Name: "_acme-challenge"},
+			{ID: 2, Type: "A", Name: "www"},
+			{ID: 3, Type: "TXT", Name: "_dnsauth"},
+		},
+	}
+
+	client := &mockBunnyClient{
+		getZoneFunc: func(ctx context.Context, id int64) (*bunny.Zone, error) {
+			return zone, nil
+		},
+	}
+
+	// Key with permission for TXT records only
+	keyInfo := &auth.KeyInfo{
+		KeyID:   1,
+		KeyName: "test-key",
+		Permissions: []*storage.Permission{
+			{
+				ID:          1,
+				ScopedKeyID: 1,
+				ZoneID:      123,
+				RecordTypes: []string{"TXT"},
+			},
+		},
+	}
+
+	handler := NewHandler(client, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	w := httptest.NewRecorder()
+	r := newTestRequestWithKeyInfo("/dnszone/123/records", map[string]string{"zoneID": "123"}, keyInfo)
+
+	handler.HandleListRecords(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status %d, got %d", http.StatusOK, w.Code)
+	}
+
+	var result []bunny.Record
+	if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+
+	if len(result) != 2 {
+		t.Errorf("expected 2 TXT records after filtering, got %d", len(result))
+	}
+
+	for _, record := range result {
+		if record.Type != "TXT" {
+			t.Errorf("unexpected record type %s in filtered results", record.Type)
+		}
+	}
+}
+
+// TestHandleListRecords_EmptyAfterFilter tests filtering that results in empty records.
+func TestHandleListRecords_EmptyAfterFilter(t *testing.T) {
+	zone := &bunny.Zone{
+		ID:     123,
+		Domain: "example.com",
+		Records: []bunny.Record{
+			{ID: 1, Type: "A", Name: "www"},
+			{ID: 2, Type: "AAAA", Name: "www"},
+		},
+	}
+
+	client := &mockBunnyClient{
+		getZoneFunc: func(ctx context.Context, id int64) (*bunny.Zone, error) {
+			return zone, nil
+		},
+	}
+
+	// Key with permission for CNAME records only (none exist)
+	keyInfo := &auth.KeyInfo{
+		KeyID:   1,
+		KeyName: "test-key",
+		Permissions: []*storage.Permission{
+			{
+				ID:          1,
+				ScopedKeyID: 1,
+				ZoneID:      123,
+				RecordTypes: []string{"CNAME"},
+			},
+		},
+	}
+
+	handler := NewHandler(client, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	w := httptest.NewRecorder()
+	r := newTestRequestWithKeyInfo("/dnszone/123/records", map[string]string{"zoneID": "123"}, keyInfo)
+
+	handler.HandleListRecords(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status %d, got %d", http.StatusOK, w.Code)
+	}
+
+	var result []bunny.Record
+	if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+
+	if len(result) != 0 {
+		t.Errorf("expected 0 records after filtering, got %d", len(result))
 	}
 }

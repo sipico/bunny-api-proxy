@@ -23,7 +23,7 @@ import (
 	"github.com/sipico/bunny-api-proxy/internal/storage"
 )
 
-const version = "2026.01.1"
+const version = "2026.01.2"
 const serverShutdownTimeout = 30 * time.Second
 
 func main() {

@@ -125,7 +125,7 @@ func TestMiddleware_ValidatorInternalError(t *testing.T) {
 
 func TestGetKeyInfo_ReturnsCorrectValue(t *testing.T) {
 	keyInfo := &KeyInfo{KeyID: 42, KeyName: "test-key"}
-	ctx := context.WithValue(context.Background(), keyInfoContextKey, keyInfo)
+	ctx := context.WithValue(context.Background(), KeyInfoContextKey, keyInfo)
 
 	got := GetKeyInfo(ctx)
 
@@ -152,7 +152,7 @@ func TestGetKeyInfo_ReturnsNilWhenNotInContext(t *testing.T) {
 func TestGetKeyInfo_MultipleContextValues(t *testing.T) {
 	keyInfo := &KeyInfo{KeyID: 1, KeyName: "key1"}
 	ctx := context.WithValue(context.Background(), contextKey("other"), "value")
-	ctx = context.WithValue(ctx, keyInfoContextKey, keyInfo)
+	ctx = context.WithValue(ctx, KeyInfoContextKey, keyInfo)
 
 	got := GetKeyInfo(ctx)
 
@@ -487,7 +487,7 @@ func TestMiddleware_ParseRequestErrorPath(t *testing.T) {
 			return
 		}
 
-		ctx := context.WithValue(r.Context(), keyInfoContextKey, keyInfo)
+		ctx := context.WithValue(r.Context(), KeyInfoContextKey, keyInfo)
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		}).ServeHTTP(w, r.WithContext(ctx))
@@ -537,7 +537,7 @@ func TestMiddleware_PermissionDeniedPath(t *testing.T) {
 			return
 		}
 
-		ctx := context.WithValue(r.Context(), keyInfoContextKey, keyInfo)
+		ctx := context.WithValue(r.Context(), KeyInfoContextKey, keyInfo)
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		}).ServeHTTP(w, r.WithContext(ctx))

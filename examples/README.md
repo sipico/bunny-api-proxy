@@ -173,7 +173,7 @@ sudo nano /etc/bunny-api-proxy/.env
 
 ```bash
 # Option A: From releases
-sudo wget https://github.com/sipico/bunny-api-proxy/releases/download/v2026.01.1/bunny-api-proxy-linux-amd64 \
+sudo wget https://github.com/sipico/bunny-api-proxy/releases/download/v2026.01.2/bunny-api-proxy-linux-amd64 \
   -O /usr/local/bin/bunny-api-proxy
 sudo chmod 755 /usr/local/bin/bunny-api-proxy
 
@@ -758,8 +758,8 @@ See `../.env.example` for complete configuration options:
 
 ### Version Information
 
-All examples reference version `2026.01.1`:
-- Docker image: `sipico/bunny-api-proxy:latest` or `sipico/bunny-api-proxy:v2026.01.1`
+All examples reference version `2026.01.2`:
+- Docker image: `sipico/bunny-api-proxy:latest` or `sipico/bunny-api-proxy:v2026.01.2`
 - Binary releases: https://github.com/sipico/bunny-api-proxy/releases
 
 ## Next Steps
