@@ -226,12 +226,11 @@ The admin web UI currently has only handler-level unit tests. There are no tests
 
 ### SQLite Driver
 
-- [ ] **Switch to modernc.org/sqlite** - Pure Go SQLite driver (no CGO)
-  - Would enable simpler builds and easier cross-compilation
-  - Would allow scratch/distroless base images
-  - Currently using `mattn/go-sqlite3` which requires CGO
-  - Evaluate performance implications before switching
-  - Note: modernc.org/sqlite is less battle-tested but actively maintained
+- [x] **Switch to modernc.org/sqlite** - Pure Go SQLite driver (no CGO) ✅ COMPLETED
+  - Enables simpler builds (no gcc/musl-dev needed)
+  - Enables easier cross-compilation
+  - Performance: ~75% of CGO version for inserts, comparable for queries, better for concurrent ops
+  - See PR #136 for implementation details
 
 ### Docker
 
