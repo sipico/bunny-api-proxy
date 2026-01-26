@@ -33,6 +33,23 @@ func New(dbPath string, encryptionKey []byte) (*SQLiteStorage, error) {
 		return nil, fmt.Errorf("failed to initialize schema: %w", err)
 	}
 
+	// Enable WAL mode for better concurrent access support
+	if _, err := db.Exec("PRAGMA journal_mode = WAL"); err != nil {
+		_ = db.Close() //nolint:errcheck
+		return nil, fmt.Errorf("failed to set WAL mode: %w", err)
+	}
+
+	// Set busy timeout to wait for locks instead of failing immediately (5 seconds)
+	if _, err := db.Exec("PRAGMA busy_timeout = 5000"); err != nil {
+		_ = db.Close() //nolint:errcheck
+		return nil, fmt.Errorf("failed to set busy timeout: %w", err)
+	}
+
+	// Configure connection pool for concurrent access
+	// modernc.org/sqlite requires single connection for in-process file databases
+	// to avoid "database is locked" errors
+	db.SetMaxOpenConns(1)
+
 	// Enable foreign key constraints
 	if _, err := db.Exec("PRAGMA foreign_keys = ON"); err != nil {
 		_ = db.Close() //nolint:errcheck
