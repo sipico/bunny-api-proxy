@@ -590,7 +590,7 @@ func TestMiddleware_SuccessfulFlow(t *testing.T) {
 	}
 }
 
-func TestMiddleware_BearerTokenWithSpecialChars(t *testing.T) {
+func TestMiddleware_AccessKeyWithSpecialChars(t *testing.T) {
 	mockStorage := &mockStorage{}
 	validator := &Validator{storage: mockStorage}
 	handler := Middleware(validator)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

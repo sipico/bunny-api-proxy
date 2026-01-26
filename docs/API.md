@@ -7,7 +7,7 @@ Complete API documentation for the Bunny API Proxy, which provides a secure, sco
 The Bunny API Proxy is structured with three main API categories:
 
 1. **Proxy API** - DNS endpoints that require scoped API key authentication
-2. **Admin REST API** - Management endpoints with Bearer token or Basic auth
+2. **Admin REST API** - Management endpoints with AccessKey token or Basic auth
 3. **Admin Web UI** - HTML interface with session-based authentication
 4. **Health Endpoints** - Service health and readiness checks
 
@@ -563,7 +563,7 @@ curl http://localhost:8080/admin/ready
 
 Change the runtime log level.
 
-**Authentication:** Bearer token or Basic auth required
+**Authentication:** AccessKey or Basic auth required
 **Response:** 200 OK
 
 **Request Body (JSON):**
@@ -596,7 +596,7 @@ curl -X POST http://localhost:8080/admin/api/loglevel \
 
 List all admin tokens (names and IDs only - tokens are never returned after creation).
 
-**Authentication:** Bearer token or Basic auth required
+**Authentication:** AccessKey or Basic auth required
 **Response:** 200 OK
 
 **Example Request:**
@@ -627,7 +627,7 @@ curl -X GET http://localhost:8080/admin/api/tokens \
 
 Create a new admin token.
 
-**Authentication:** Bearer token or Basic auth required
+**Authentication:** AccessKey or Basic auth required
 **Response:** 201 Created
 
 **Request Body (JSON):**
@@ -666,7 +666,7 @@ curl -X POST http://localhost:8080/admin/api/tokens \
 
 Delete an admin token by ID.
 
-**Authentication:** Bearer token or Basic auth required
+**Authentication:** AccessKey or Basic auth required
 **Path Parameters:**
 - `id` - The token ID
 
@@ -687,7 +687,7 @@ curl -X DELETE http://localhost:8080/admin/api/tokens/1 \
 
 Set the master bunny.net API key (can only be set once).
 
-**Authentication:** Bearer token or Basic auth required
+**Authentication:** AccessKey or Basic auth required
 **Response:** 201 Created (if successful) or 409 Conflict (if already set)
 
 **Request Body (JSON):**
@@ -725,7 +725,7 @@ curl -X PUT http://localhost:8080/admin/api/master-key \
 
 Create a new scoped API key with permissions in one operation.
 
-**Authentication:** Bearer token or Basic auth required
+**Authentication:** AccessKey or Basic auth required
 **Response:** 201 Created
 
 **Request Body (JSON):**
