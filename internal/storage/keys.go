@@ -6,7 +6,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/mattn/go-sqlite3"
+	"modernc.org/sqlite"
+	sqlite3 "modernc.org/sqlite/lib"
 )
 
 // CreateScopedKey creates a new scoped API key with bcrypt hash.
@@ -26,9 +27,9 @@ func (s *SQLiteStorage) CreateScopedKey(ctx context.Context, name string, key st
 
 	if err != nil {
 		// Check if this is a UNIQUE constraint violation
-		var sqliteErr sqlite3.Error
+		var sqliteErr *sqlite.Error
 		if errors.As(err, &sqliteErr) {
-			if sqliteErr.Code == sqlite3.ErrConstraint {
+			if sqliteErr.Code() == sqlite3.SQLITE_CONSTRAINT {
 				return 0, ErrDuplicate
 			}
 		}

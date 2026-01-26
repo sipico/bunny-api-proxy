@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"testing"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 // TestInitSchema verifies that InitSchema creates all required tables and indexes.
 func TestInitSchema(t *testing.T) {
-	db, err := sql.Open("sqlite3", ":memory:")
+	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("failed to open database: %v", err)
 	}
@@ -48,7 +48,7 @@ func TestInitSchema(t *testing.T) {
 
 // TestInitSchemaIdempotent verifies that InitSchema can be called multiple times without errors.
 func TestInitSchemaIdempotent(t *testing.T) {
-	db, err := sql.Open("sqlite3", ":memory:")
+	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("failed to open database: %v", err)
 	}
@@ -74,7 +74,7 @@ func TestInitSchemaIdempotent(t *testing.T) {
 
 // TestForeignKeyCascadeDelete verifies that deleting a scoped key cascades to permissions.
 func TestForeignKeyCascadeDelete(t *testing.T) {
-	db, err := sql.Open("sqlite3", ":memory:")
+	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("failed to open database: %v", err)
 	}
@@ -127,7 +127,7 @@ func TestForeignKeyCascadeDelete(t *testing.T) {
 
 // TestForeignKeyConstraint verifies that inserting a permission with non-existent scoped key fails.
 func TestForeignKeyConstraint(t *testing.T) {
-	db, err := sql.Open("sqlite3", ":memory:")
+	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("failed to open database: %v", err)
 	}
@@ -149,7 +149,7 @@ func TestForeignKeyConstraint(t *testing.T) {
 
 // TestMigrateSchema verifies that MigrateSchema works correctly.
 func TestMigrateSchema(t *testing.T) {
-	db, err := sql.Open("sqlite3", ":memory:")
+	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("failed to open database: %v", err)
 	}
@@ -173,7 +173,7 @@ func TestMigrateSchema(t *testing.T) {
 
 // TestConfigTableStructure verifies the config table has correct schema.
 func TestConfigTableStructure(t *testing.T) {
-	db, err := sql.Open("sqlite3", ":memory:")
+	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("failed to open database: %v", err)
 	}
@@ -216,7 +216,7 @@ func TestConfigTableStructure(t *testing.T) {
 
 // TestScopedKeysTableStructure verifies the scoped_keys table has correct schema.
 func TestScopedKeysTableStructure(t *testing.T) {
-	db, err := sql.Open("sqlite3", ":memory:")
+	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("failed to open database: %v", err)
 	}
@@ -259,7 +259,7 @@ func TestScopedKeysTableStructure(t *testing.T) {
 
 // TestPermissionsTableStructure verifies the permissions table has correct schema.
 func TestPermissionsTableStructure(t *testing.T) {
-	db, err := sql.Open("sqlite3", ":memory:")
+	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("failed to open database: %v", err)
 	}
@@ -302,7 +302,7 @@ func TestPermissionsTableStructure(t *testing.T) {
 
 // TestAdminTokensTableStructure verifies the admin_tokens table has correct schema.
 func TestAdminTokensTableStructure(t *testing.T) {
-	db, err := sql.Open("sqlite3", ":memory:")
+	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("failed to open database: %v", err)
 	}
@@ -345,7 +345,7 @@ func TestAdminTokensTableStructure(t *testing.T) {
 
 // TestInitSchemaWithClosedDB verifies that InitSchema handles database errors.
 func TestInitSchemaWithClosedDB(t *testing.T) {
-	db, err := sql.Open("sqlite3", ":memory:")
+	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("failed to open database: %v", err)
 	}
@@ -362,7 +362,7 @@ func TestInitSchemaWithClosedDB(t *testing.T) {
 
 // TestInitSchemaMultipleCalls verifies that InitSchema maintains consistency.
 func TestInitSchemaMultipleCalls(t *testing.T) {
-	db, err := sql.Open("sqlite3", ":memory:")
+	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("failed to open database: %v", err)
 	}
@@ -398,7 +398,7 @@ func TestInitSchemaMultipleCalls(t *testing.T) {
 
 // TestInitSchemaUniqueConstraints verifies that unique constraints are enforced.
 func TestInitSchemaUniqueConstraints(t *testing.T) {
-	db, err := sql.Open("sqlite3", ":memory:")
+	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("failed to open database: %v", err)
 	}
@@ -423,7 +423,7 @@ func TestInitSchemaUniqueConstraints(t *testing.T) {
 
 // TestInitSchemaConfigPrimaryKeyConstraint verifies config table's single-row constraint.
 func TestInitSchemaConfigPrimaryKeyConstraint(t *testing.T) {
-	db, err := sql.Open("sqlite3", ":memory:")
+	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("failed to open database: %v", err)
 	}
@@ -442,7 +442,7 @@ func TestInitSchemaConfigPrimaryKeyConstraint(t *testing.T) {
 
 // TestSchemaPermissionsInsert verifies that we can insert and retrieve permissions.
 func TestSchemaPermissionsInsert(t *testing.T) {
-	db, err := sql.Open("sqlite3", ":memory:")
+	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("failed to open database: %v", err)
 	}
@@ -479,7 +479,7 @@ func TestSchemaPermissionsInsert(t *testing.T) {
 
 // TestSchemaAdminTokens verifies admin token table operations.
 func TestSchemaAdminTokens(t *testing.T) {
-	db, err := sql.Open("sqlite3", ":memory:")
+	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("failed to open database: %v", err)
 	}
@@ -509,7 +509,7 @@ func TestSchemaAdminTokens(t *testing.T) {
 
 // TestSchemaConfigInsert verifies that config can be stored.
 func TestSchemaConfigInsert(t *testing.T) {
-	db, err := sql.Open("sqlite3", ":memory:")
+	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("failed to open database: %v", err)
 	}
@@ -534,7 +534,7 @@ func TestSchemaConfigInsert(t *testing.T) {
 
 // TestSchemaIndexUsage verifies that indexes can be queried.
 func TestSchemaIndexUsage(t *testing.T) {
-	db, err := sql.Open("sqlite3", ":memory:")
+	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("failed to open database: %v", err)
 	}
