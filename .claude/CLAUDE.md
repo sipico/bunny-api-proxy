@@ -22,7 +22,7 @@ Out-of-scope ideas and future enhancements go in [FUTURE_ENHANCEMENTS.md](dev/FU
 ## Development Conventions
 
 ### Test-Driven Development
-Write tests first, then implementation. Tests are the safety net since there's no local development environment.
+Write tests first, then implementation. Tests are the safety net.
 
 ### Code quality
 - All code must pass `golangci-lint` (strict)
@@ -37,77 +37,41 @@ Write tests first, then implementation. Tests are the safety net since there's n
 - Prefer simplicity over cleverness
 
 ### Git workflow
-- All development happens via GitHub (no local environment)
-- All validation happens via GitHub Actions
 - Commit messages should be clear and descriptive
 - Never commit secrets or API keys
+- CI validates all changes via GitHub Actions
 
-### Checking GitHub Actions CI Status
+### Local Validation
 
-When validating CI runs, use WebFetch with timestamp parameters to bypass the 15-minute cache:
+Run before pushing to catch issues early:
 
 ```bash
-# Get current timestamp
-date +%s
-
-# Use timestamp in URL to bypass cache
-https://github.com/sipico/bunny-api-proxy/actions?t=<timestamp>
-https://github.com/sipico/bunny-api-proxy/actions/runs/<run_id>?t=<timestamp>
+make lint tidy test
 ```
 
-**What WebFetch provides:**
-- Run status (success/failure/in progress)
-- Individual job statuses and timing (Test, Lint, Security Scan, Build, Docker Build)
-- Error messages and failure reasons
-- Artifact information
+### GitHub CLI
 
-**What WebFetch cannot access:**
-- Detailed step-by-step logs (requires authentication)
-- Raw log output
-
-**Best practices:**
-- Use timestamp parameters for every CI check to ensure fresh data
-- Check CI status once or twice after pushing, don't sleep in loops
-- Report visible status/errors; accept that raw logs aren't accessible
-- For failed runs, WebFetch typically shows enough error detail to diagnose issues
-
-## Build & Test Commands
+Use `gh` with `--repo` for GitHub operations:
 
 ```bash
-# Format code
-gofmt -w .
-
-# Run linter
-golangci-lint run
-
-# Run tests with coverage
-go test -race -cover ./...
-
-# Check coverage (per-file, per-package, total >= 85%)
-make coverage
-
-# Security check
-govulncheck ./...
-
-# Build
-go build -o bunny-api-proxy ./cmd/bunny-api-proxy
-
-# Build Docker image
-docker build -t bunny-api-proxy .
+gh issue list --repo sipico/bunny-api-proxy
+gh pr view 123 --repo sipico/bunny-api-proxy
+gh run list --repo sipico/bunny-api-proxy
+gh run view <run-id> --repo sipico/bunny-api-proxy --log-failed
 ```
 
 ## Project Structure
 
 ```
-cmd/bunny-api-proxy/ # Entry point
-internal/            # Private application code
-  proxy/             # Core proxy logic
-  auth/              # Key validation, permissions
-  storage/           # SQLite operations
-  admin/             # Admin UI handlers
-  bunny/             # bunny.net API client
-  testutil/mockbunny/ # Mock server for testing
-web/                 # Templates and static files
+cmd/bunny-api-proxy/    # Entry point
+internal/               # Private application code
+  proxy/                # Core proxy logic
+  auth/                 # Key validation, permissions
+  storage/              # SQLite operations
+  admin/                # Admin UI handlers
+  bunny/                # bunny.net API client
+  testutil/mockbunny/   # Mock server for testing
+web/templates/          # HTML templates
 ```
 
 ## Key Files

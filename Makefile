@@ -1,4 +1,4 @@
-.PHONY: test coverage lint build
+.PHONY: test coverage lint tidy build
 
 # Run tests with coverage
 test:
@@ -11,6 +11,11 @@ coverage: test
 # Run linter
 lint:
 	golangci-lint run
+
+# Check go.mod and go.sum are tidy
+tidy:
+	go mod tidy
+	git diff --exit-code go.mod go.sum
 
 # Build binary
 build:
