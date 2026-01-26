@@ -5,7 +5,7 @@ metadata:
   namespace: default  # Change to your namespace
   labels:
     app: bunny-api-proxy
-    version: "2026.01.1"
+    version: "2026.01.2"
 spec:
   # Number of replicas
   # SQLite: Keep at 1 (single writer limitation)
@@ -27,7 +27,7 @@ spec:
     metadata:
       labels:
         app: bunny-api-proxy
-        version: "2026.01.1"
+        version: "2026.01.2"
       annotations:
         prometheus.io/scrape: "true"
         prometheus.io/port: "8080"

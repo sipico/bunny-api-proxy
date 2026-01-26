@@ -48,6 +48,7 @@ This project uses **Calendar Versioning (CalVer)** with the format `YYYY.0M.MICR
 **Examples:**
 - `2026.01.1` - First release in January 2026
 - `2026.01.2` - Second release in January 2026
+- `2026.01.3` - Third release in January 2026
 - `2026.02.1` - First release in February 2026
 
 **Rationale:**

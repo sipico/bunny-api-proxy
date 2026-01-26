@@ -1507,8 +1507,8 @@ func TestVersionConstant(t *testing.T) {
 	if version == "" {
 		t.Error("version constant should not be empty")
 	}
-	if version != "2026.01.1" {
-		t.Errorf("expected version 2026.01.1, got %s", version)
+	if version != "2026.01.2" {
+		t.Errorf("expected version 2026.01.2, got %s", version)
 	}
 }
 
