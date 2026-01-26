@@ -339,10 +339,6 @@ The admin web UI currently has only handler-level unit tests. There are no tests
 
 ### Documentation
 
-- [ ] **Fix documentation accuracy gaps** - Align docs with implementation
-  - README.md and ARCHITECTURE.md claim "HTMX-based" but UI is plain HTML forms
-  - ARCHITECTURE.md shows `web/static/` directory but it doesn't exist
-  - Fix after deciding: either implement HTMX (Phase 3 of UI testing) or update docs to say "Go templates"
 - [ ] **CHANGELOG.md maintenance** - Version history and breaking changes
   - Decide on format (Keep a Changelog, Conventional Changelog, etc.)
   - Determine update process (manual, automated from commits, CI integration)
