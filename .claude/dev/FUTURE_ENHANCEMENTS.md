@@ -4,6 +4,68 @@ This document tracks features and improvements deferred from MVP to keep scope m
 
 ---
 
+## UI End-to-End Testing (Priority)
+
+The admin web UI currently has only handler-level unit tests. There are no tests that simulate a real user navigating through the interface, maintaining session state, and completing multi-step workflows. This gap needs to be addressed before adding more UI complexity.
+
+### Current State
+
+- **What exists:** HTTP handler unit tests (test individual endpoints return correct status/content)
+- **What's missing:** Integrated user flow tests that simulate browser behavior
+- **Documentation mismatch:** README claims "HTMX-based" but implementation is plain HTML forms
+
+### Phase 1: Research (Required First)
+
+- [ ] **Research modern UI testing approaches for Go + GitHub Actions (2026)**
+  - Evaluate headless browser options: Playwright, Chromedp, Rod, Selenium
+  - Consider Go-native vs external test runners
+  - Assess GitHub Actions integration (Docker services, browser installation, artifacts)
+  - Look at: execution speed, flakiness, maintainability, debugging experience
+  - Investigate whether tests can run against the existing E2E Docker Compose setup
+  - Document findings with pros/cons comparison
+
+### Phase 2: Test Current HTML UI
+
+- [ ] **Implement UI test framework for plain HTML forms**
+  - Must work in GitHub Actions (reproducible, no local dependencies)
+  - Must integrate with mockbunny for realistic API responses
+  - Should capture screenshots/traces on failure for debugging
+
+- [ ] **Core user journey tests**
+  - Login flow: visit login page → submit credentials → verify session established
+  - Master key setup: login → navigate to master key → set key → verify saved
+  - Scoped key lifecycle: create key → view details → add permission → delete key
+  - Admin token management: create token → list tokens → delete token
+  - Session expiry: verify session timeout behavior
+  - Error scenarios: invalid login, permission denied, not found pages
+
+- [ ] **Multi-step workflow tests with mockbunny**
+  - Create scoped key → add permission for zone → use proxy API → verify filtering works
+  - Full ACME DNS-01 simulation: create TXT-only key → add record → delete record
+
+### Phase 3: HTMX Migration (After Phase 2)
+
+- [ ] **Implement actual HTMX in admin UI** (currently documented but not implemented)
+  - Add HTMX library to templates
+  - Convert forms to use `hx-post`, `hx-swap` for partial page updates
+  - Add loading indicators, inline validation
+  - Reuse Phase 2 test framework to verify HTMX interactions work correctly
+
+### CI Integration Considerations
+
+**When to run UI tests:**
+- Option A: Always run (ensures nothing breaks, but adds CI time)
+- Option B: Run only when UI-related files change (`web/`, `internal/admin/`, templates)
+- Option C: Run on PR to main only (not on every push to feature branches)
+- Recommendation: Start with Option A until tests are stable, then consider B or C
+
+**Test isolation:**
+- UI tests should use the same Docker Compose setup as E2E tests
+- Each test should start with clean state (fresh database)
+- Tests should not depend on execution order
+
+---
+
 ## API Coverage
 
 ### Additional bunny.net APIs
@@ -25,18 +87,19 @@ This document tracks features and improvements deferred from MVP to keep scope m
 
 ### Response Filtering (Data Privacy)
 
-- [ ] **Filter ListZones response** - Return only zones the scoped key has permission for
-  - Currently: Key for Zone A can see Zones B, C in ListZones response
-  - Desired: ListZones returns only zones with matching permissions
-  - Implementation: Add `FilterResponse()` function in proxy handlers
-  - Empty result = empty array (valid response, not error)
-  - Note: Request validation prevents privilege escalation; this adds data privacy
+- [x] **Filter ListZones response** - ✅ IMPLEMENTED (PR #126)
+  - Scoped keys now only see zones they have permission for
+  - Record types are filtered in GetZone and ListRecords responses
+  - See `internal/proxy/handler.go` for implementation
 
 ### Pattern Matching
 
 - [ ] **Zone name patterns** - e.g., "all .nl domains", "zones containing 'prod'"
 - [ ] **Record name patterns** - Regex filters on record names (e.g., `^_acme-challenge\.`)
 - [ ] **Wildcard zone access** - `zone_id: *` for all zones
+  - Note: Auth layer already supports `ZoneID=0` as "all zones" (`internal/auth/auth.go:160-165`)
+  - But storage layer prevents creating such permissions (`internal/storage/permissions.go:14`)
+  - Implementation: Update storage validation to allow `ZoneID=0`, add UI support
 
 ### Advanced Scoping
 
@@ -133,6 +196,8 @@ This document tracks features and improvements deferred from MVP to keep scope m
 
 ## Admin UI
 
+**Current state:** Plain HTML forms with Go templates and inline styles. Documentation claims "HTMX-based" but HTMX is not actually implemented. See "UI End-to-End Testing" section above - UI tests should be implemented BEFORE adding HTMX.
+
 ### Static Web Assets
 
 - [ ] **Implement web/static/ directory** - CSS, JavaScript, and HTMX assets
@@ -140,6 +205,7 @@ This document tracks features and improvements deferred from MVP to keep scope m
   - Layout and UI/UX decisions
   - Currently templates use inline styles
   - Move to proper static asset pipeline
+  - **Prerequisite:** Complete UI E2E testing framework (Phase 2) first
 
 ### Enhanced Features
 
