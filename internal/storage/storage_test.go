@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 // TestCompleteWorkflow exercises the entire storage system end-to-end.

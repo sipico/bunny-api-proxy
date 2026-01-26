@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 // TestInitSchema verifies that InitSchema creates all required tables and indexes.
