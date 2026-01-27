@@ -249,3 +249,57 @@ Our decision to go fully API-only (removing UI entirely) is a valid simplificati
 ## Sources
 
 *Research synthesized from: HashiCorp Vault/Consul documentation, Traefik documentation, Portainer and NGINX Proxy Manager marketing materials, Reddit discussions (r/devops, r/selfhosted, r/homelab), ServerFault threads, Gitea issue #18346, Grafana plugin-e2e documentation, chromedp and rod GitHub repositories, Playwright and Cypress documentation.*
+
+---
+
+## Feedback Request: Review of Final Design
+
+Based on the initial research, we made final design decisions and requested feedback.
+
+### Your Key Recommendations (from initial research)
+
+1. API-first with optional minimal web UI
+2. If UI kept, make it read-only or view-limited
+3. Bootstrap via CLI init command or environment token (like Vault/Nomad)
+4. Chromedp for Go-native testing
+5. Concern about "sqlite-web" CSRF vulnerability as example of UI security risk
+
+### Our Final Design Decisions
+
+We aligned with most recommendations, but made specific choices:
+
+1. **Removed UI entirely** - Not "optional minimal," completely gone
+   - Your research noted: "expert practitioners lean CLI-first"
+   - We took this to its logical conclusion for automation-focused users
+
+2. **Bootstrap using bunny.net API key** - Not CLI init, not env token
+   - User already has bunny.net key (required as env var for proxying)
+   - First API call with bunny.net key creates admin token
+   - Once admin exists, bunny.net key locked out of /api/*
+   - Simpler than Vault's init/unseal pattern - no separate bootstrap credential
+
+3. **Unified token model** - Single `tokens` table with `is_admin` flag
+   - Not separate admin_tokens + scoped_keys tables
+   - Admin and zone permissions are orthogonal
+
+4. **Recovery via SQL** - If admin token lost:
+   ```
+   sqlite3 /data/proxy.db "DELETE FROM tokens WHERE is_admin = 1;"
+   ```
+   Returns system to UNCONFIGURED, allowing bunny.net key to bootstrap again
+
+### Questions Asked
+
+1. **On bootstrap pattern:** You cited Vault's `operator init` and Nomad's `acl bootstrap` as examples. Our pattern is different - we use an existing credential (bunny.net key) rather than generating a new one. You noted "if you have the master key, you already have god-mode access anyway." Does this make our approach sound?
+
+2. **On removing UI completely:** You recommended "read-only or view-limited" if keeping UI. We went further - no UI at all. Your research found "21% of developers programmatically provision infrastructure." We're targeting that 21%. Is removing UI too aggressive for homelab users who might expect it?
+
+3. **On permanent lockout:** Once any admin token exists, bunny.net key can never access /api/* again. You mentioned tools should "allow regenerating admin tokens." Our approach requires SQL access for recovery. Is this acceptable?
+
+4. **On unified tokens:** You didn't specifically recommend this. Is combining admin tokens and scoped keys into one table with `is_admin` flag a good simplification, or does it introduce confusion?
+
+5. **CSRF concern you raised:** You noted sqlite-web's CSRF vulnerability. Since we removed UI entirely, this attack vector is eliminated. Are there any API-level security concerns we should watch for instead?
+
+### Feedback Response
+
+*(To be added)*

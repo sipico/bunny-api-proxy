@@ -240,3 +240,55 @@ jQuery-like interface for parsing HTML from Go templates:
 ## Sources
 
 *Research synthesized from analysis of: Traefik, Caddy, lego, external-dns, dex, Nginx Proxy Manager, Gitea, Grafana, Woodpecker CI documentation and source code; industry surveys on DevOps tooling preferences; testing framework benchmarks and adoption statistics.*
+
+---
+
+## Feedback Request: Review of Final Design
+
+Based on the initial research, we made final design decisions and requested feedback.
+
+### Your Key Recommendations (from initial research)
+
+1. HTMX-enhanced web application with Go's html/template
+2. Hybrid authentication: sessions for UI, tokens for API
+3. OIDC-aware bootstrap integrating with deployment environment
+4. Testing pyramid: 80% unit (httptest/goquery), 10% API contract, 10% E2E (Playwright)
+5. SQLite in WAL mode for internal state
+
+### Our Final Design Decisions
+
+We diverged from some recommendations:
+
+1. **Removed UI entirely** - Not HTMX-enhanced, completely API-only
+   - Rationale: Target users are DevOps/SRE running ACME automation; they prefer CLI/API
+   - Eliminates session management, CSRF, XSS concerns entirely
+
+2. **Simpler bootstrap** - Using bunny.net API key directly, not OIDC
+   - User already has bunny.net key (required as env var)
+   - First API call with bunny.net key creates admin token
+   - Once admin exists, bunny.net key is locked out of /api/* forever
+   - Rationale: Single-container deployment, no identity provider available
+
+3. **Unified token model** - Single `tokens` table with `is_admin` flag
+   - Orthogonal: admin capability and zone permissions are independent
+   - Token can be admin-only, scoped-only, or both
+
+4. **Testing simplification** - Since no UI, just API tests
+   - httptest for all endpoint testing
+   - No browser automation needed
+
+### Questions Asked
+
+1. **On removing UI entirely:** You recommended UI as an "observability layer." We're removing it completely. Is this too aggressive? Your research noted Traefik's dashboard is read-only - but we're going further by having no dashboard at all.
+
+2. **On bootstrap without OIDC:** You emphasized OIDC/Workload identity as high security. Our approach (bunny.net key → admin token → lockout) is simpler but doesn't integrate with identity providers. For a single-container homelab/DevOps tool, is this acceptable?
+
+3. **On permanent master key lockout:** Once an admin token exists, the bunny.net API key can never access /api/* again. The only recovery is SQL deletion. Is permanent lockout correct, or should there be a programmatic recovery path?
+
+4. **On the "persistence paradox":** You noted SQLite's ease of deployment vs. difficulty of HA/DR. Our recovery procedure requires direct SQLite access. Is this acceptable for the target audience?
+
+5. **Any security concerns** with using the upstream bunny.net API key as the bootstrap mechanism?
+
+### Feedback Response
+
+*(To be added)*
