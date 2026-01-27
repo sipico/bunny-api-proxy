@@ -1,57 +1,467 @@
-# List DNS Zones - bunny.net API
+> ## Documentation Index
+> Fetch the complete documentation index at: https://docs.bunny.net/llms.txt
+> Use this file to discover all available pages before exploring further.
 
-> **Source:** Official bunny.net API Documentation
-> **URL:** https://docs.bunny.net/reference/dnszonepublic_index.md
+# List DNS Zones
 
-## Overview
+> The list of DNS Zones on the account.
 
-The bunny.net API enables programmatic management of DNS zones. This endpoint retrieves a paginated list of DNS zones associated with an account.
 
-## Endpoint Details
 
-**Path:** `/dnszone`
-**Method:** GET
-**Base URL:** `https://api.bunny.net`
+## OpenAPI
 
-## Request Parameters
+````yaml https://core-api-public-docs.b-cdn.net/docs/v3/public.json get /dnszone
+openapi: 3.0.0
+info:
+  title: bunny.net API
+  description: >-
+    <img src='https://bunny.net/v2/images/bunnynet-logo-dark.svg' style='width:
+    200px;' alt='bunny.net Logo'>
+                   Learn how to use the [bunny.net](https://bunny.net "bunny.net - The content delivery platform that truly hops.") API. Everything that can be done with the control panel can also be achieved with our API documented on this page. To learn how to use the storage API, have a look at our <a href='https://bunnycdnstorage.docs.apiary.io/#'>storage API documentation</a>
+                   <h2>Third party API clients:</h2> 
+                   <br/>
+                   We currently do not maintain an official API library, but you can use one of the third party ones provided here:<br/><br/>
+                   <a rel='nofollow' href='https://github.com/codewithmark/bunnycdn'>https://github.com/codewithmark/bunnycdn</a> (bunny.net PHP library, thanks to <a rel="nofollow" href='https://codewithmark.com'>Code With Mark</a>)
+                   <br/><br/>
+                   <i style='font-size: 11px;'><b>Note that third party clients are not maintained or developed by bunny.net so we unfortunately cannot offer support for them.</b></i>
+  termsOfService: https://bunny.net/tos
+  contact:
+    name: bunny.net
+    url: https://docs.bunny.net
+    email: support@bunny.net
+  version: 1.0.0
+servers:
+  - url: https://api.bunny.net
+    description: bunny.net API Server
+security: []
+paths:
+  /dnszone:
+    get:
+      tags:
+        - DNS Zone
+      summary: List DNS Zones
+      description: The list of DNS Zones on the account.
+      operationId: DnsZonePublic_Index
+      parameters:
+        - name: page
+          in: query
+          description: ''
+          schema:
+            type: integer
+            format: int32
+            default: 1
+        - name: perPage
+          in: query
+          description: ''
+          schema:
+            type: integer
+            format: int32
+            minimum: 5
+            maximum: 1000
+            default: 1000
+        - name: search
+          in: query
+          description: The search term that will be used to filter the results
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The list of DNS Zones on the account.
+          x-nullable: false
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginationListModelOfDnsZoneModel'
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/PaginationListModelOfDnsZoneModel'
+        '400':
+          x-nullable: false
+          description: Failed removing hostname
+          content:
+            application/json:
+              schema:
+                $ref: f2306f15-d639-43bc-ba70-80858292260c
+            application/xml:
+              schema:
+                $ref: f2306f15-d639-43bc-ba70-80858292260c
+        '401':
+          description: The request authorization failed
+        '500':
+          description: Internal Server Error
+        '503':
+          description: The service is currently unavailable
+      security:
+        - AccessKey:
+            - SubuserAPIDns
+            - SubuserAPIManage
+            - SubuserDns
+            - SubuserManage
+            - User
+            - UserApi
+components:
+  schemas:
+    PaginationListModelOfDnsZoneModel:
+      type: object
+      required:
+        - CurrentPage
+        - TotalItems
+        - HasMoreItems
+      properties:
+        Items:
+          type: array
+          items:
+            $ref: '#/components/schemas/DnsZoneModel'
+        CurrentPage:
+          type: integer
+          format: int32
+        TotalItems:
+          type: integer
+          format: int32
+        HasMoreItems:
+          type: boolean
+    DnsZoneModel:
+      type: object
+      additionalProperties: false
+      properties:
+        Id:
+          type: integer
+          format: int64
+        Domain:
+          type: string
+          nullable: true
+        Records:
+          type: array
+          items:
+            $ref: '#/components/schemas/DnsRecordModel'
+          nullable: true
+        DateModified:
+          type: string
+          format: date-time
+        DateCreated:
+          type: string
+          format: date-time
+        NameserversDetected:
+          type: boolean
+        CustomNameserversEnabled:
+          type: boolean
+        Nameserver1:
+          type: string
+          nullable: true
+        Nameserver2:
+          type: string
+          nullable: true
+        SoaEmail:
+          type: string
+          nullable: true
+        NameserversNextCheck:
+          type: string
+          format: date-time
+        LoggingEnabled:
+          type: boolean
+        LoggingIPAnonymizationEnabled:
+          type: boolean
+          description: Determines if the TLS 1 is enabled on the DNS Zone
+        LogAnonymizationType:
+          allOf:
+            - $ref: '#/components/schemas/LogAnonymizationType'
+          nullable: true
+          description: Sets the log anonymization type for this zone
+        DnsSecEnabled:
+          type: boolean
+          description: Determines if DNSSEC is enabled for this DNS Zone
+        CertificateKeyType:
+          description: The private key type to use for automatic certificates
+          allOf:
+            - $ref: '#/components/schemas/PrivateKeyType'
+      required:
+        - Id
+        - DateModified
+        - DateCreated
+        - NameserversDetected
+        - CustomNameserversEnabled
+        - NameserversNextCheck
+        - LoggingEnabled
+        - LoggingIPAnonymizationEnabled
+        - DnsSecEnabled
+    DnsRecordModel:
+      type: object
+      additionalProperties: false
+      properties:
+        Id:
+          type: integer
+          format: int64
+        Type:
+          $ref: '#/components/schemas/DnsRecordTypes'
+        Ttl:
+          type: integer
+          format: int32
+        Value:
+          type: string
+          nullable: true
+        Name:
+          type: string
+          nullable: true
+        Weight:
+          type: integer
+          format: int32
+        Priority:
+          type: integer
+          format: int32
+        Port:
+          type: integer
+          format: int32
+        Flags:
+          type: integer
+          minimum: 0
+          maximum: 255
+        Tag:
+          type: string
+          nullable: true
+        Accelerated:
+          type: boolean
+        AcceleratedPullZoneId:
+          type: integer
+          format: int64
+        LinkName:
+          type: string
+          nullable: true
+        IPGeoLocationInfo:
+          nullable: true
+          oneOf:
+            - $ref: '#/components/schemas/GeoDnsLocationModel'
+        GeolocationInfo:
+          nullable: true
+          oneOf:
+            - $ref: '#/components/schemas/DnsRecordGeoLocationInfo'
+        MonitorStatus:
+          nullable: true
+          oneOf:
+            - $ref: '#/components/schemas/DnsMonitoringStatus'
+        MonitorType:
+          $ref: '#/components/schemas/DnsMonitoringType'
+        GeolocationLatitude:
+          type: number
+          format: double
+        GeolocationLongitude:
+          type: number
+          format: double
+        EnviromentalVariables:
+          type: array
+          items:
+            $ref: '#/components/schemas/DnsRecordEnviromentalVariableModel'
+          nullable: true
+        LatencyZone:
+          type: string
+          nullable: true
+        SmartRoutingType:
+          $ref: '#/components/schemas/DnsSmartRoutingType'
+        Disabled:
+          type: boolean
+        Comment:
+          type: string
+          nullable: true
+        AutoSslIssuance:
+          type: boolean
+      required:
+        - Id
+        - Ttl
+        - Weight
+        - Priority
+        - Port
+        - Accelerated
+        - AcceleratedPullZoneId
+        - GeolocationLatitude
+        - GeolocationLongitude
+        - Disabled
+        - AutoSslIssuance
+    LogAnonymizationType:
+      type: string
+      description: 0 = OneDigit<br/>1 = Drop
+      x-enumNames:
+        - OneDigit
+        - Drop
+      enum:
+        - OneDigit
+        - Drop
+      x-enum-varnames:
+        - OneDigit
+        - Drop
+      example: OneDigit
+    PrivateKeyType:
+      type: string
+      description: 0 = Ecdsa<br/>1 = Rsa
+      x-enumNames:
+        - Ecdsa
+        - Rsa
+      enum:
+        - Ecdsa
+        - Rsa
+      x-enum-varnames:
+        - Ecdsa
+        - Rsa
+      example: Ecdsa
+    DnsRecordTypes:
+      type: string
+      description: >-
+        0 = A<br/>1 = AAAA<br/>2 = CNAME<br/>3 = TXT<br/>4 = MX<br/>5 =
+        SPF<br/>6 = Flatten<br/>7 = PullZone<br/>8 = SRV<br/>9 = CAA<br/>10 =
+        PTR<br/>11 = Script<br/>12 = NS
+      x-enumNames:
+        - A
+        - AAAA
+        - CNAME
+        - TXT
+        - MX
+        - SPF
+        - Flatten
+        - PullZone
+        - SRV
+        - CAA
+        - PTR
+        - Script
+        - NS
+      enum:
+        - A
+        - AAAA
+        - CNAME
+        - TXT
+        - MX
+        - SPF
+        - Flatten
+        - PullZone
+        - SRV
+        - CAA
+        - PTR
+        - Script
+        - NS
+      x-enum-varnames:
+        - A
+        - AAAA
+        - CNAME
+        - TXT
+        - MX
+        - SPF
+        - Flatten
+        - PullZone
+        - SRV
+        - CAA
+        - PTR
+        - Script
+        - NS
+      example: A
+    GeoDnsLocationModel:
+      type: object
+      additionalProperties: false
+      properties:
+        CountryCode:
+          type: string
+          nullable: true
+          description: The ISO country code of the location
+        Country:
+          type: string
+          nullable: true
+          description: The name of the country of the location
+        ASN:
+          type: integer
+          format: int64
+          description: The ASN of the IP organization
+        OrganizationName:
+          type: string
+          nullable: true
+          description: The mame of the organization that owns the IP
+        City:
+          type: string
+          nullable: true
+          description: The name of the city of the location
+      required:
+        - ASN
+      description: Billing model contains data summary about the user's billing
+    DnsRecordGeoLocationInfo:
+      type: object
+      additionalProperties: false
+      properties:
+        Country:
+          type: string
+          nullable: true
+        City:
+          type: string
+          nullable: true
+        Latitude:
+          type: number
+          format: double
+        Longitude:
+          type: number
+          format: double
+      required:
+        - Latitude
+        - Longitude
+    DnsMonitoringStatus:
+      type: string
+      description: 0 = Unknown<br/>1 = Online<br/>2 = Offline
+      x-enumNames:
+        - Unknown
+        - Online
+        - Offline
+      enum:
+        - Unknown
+        - Online
+        - Offline
+      x-enum-varnames:
+        - Unknown
+        - Online
+        - Offline
+      example: Unknown
+    DnsMonitoringType:
+      type: string
+      description: 0 = None<br/>1 = Ping<br/>2 = Http<br/>3 = Monitor
+      x-enumNames:
+        - None
+        - Ping
+        - Http
+        - Monitor
+      enum:
+        - None
+        - Ping
+        - Http
+        - Monitor
+      x-enum-varnames:
+        - None
+        - Ping
+        - Http
+        - Monitor
+      example: None
+    DnsRecordEnviromentalVariableModel:
+      type: object
+      additionalProperties: false
+      properties:
+        Name:
+          type: string
+          nullable: true
+        Value:
+          type: string
+          nullable: true
+    DnsSmartRoutingType:
+      type: string
+      description: 0 = None<br/>1 = Latency<br/>2 = Geolocation
+      x-enumNames:
+        - None
+        - Latency
+        - Geolocation
+      enum:
+        - None
+        - Latency
+        - Geolocation
+      x-enum-varnames:
+        - None
+        - Latency
+        - Geolocation
+      example: None
+  securitySchemes:
+    AccessKey:
+      type: apiKey
+      description: API Access Key authorization header
+      name: AccessKey
+      in: header
 
-The endpoint accepts three optional query parameters:
-
-- **page** (integer, default: 1): Specifies which result page to retrieve
-- **perPage** (integer, default: 1000, range: 5-1000): Controls results per page
-- **search** (string): Filters zones using a search term
-
-## Response Structure
-
-A successful request returns a paginated collection containing:
-
-- **Items**: Array of DNS zone objects
-- **CurrentPage**: The current page number
-- **TotalItems**: Total zone count
-- **HasMoreItems**: Boolean indicating additional pages exist
-
-## DNS Zone Properties
-
-Each zone object includes:
-
-- **Id**: Unique identifier (int64)
-- **Domain**: Zone domain name
-- **Records**: Array of DNS records with types (A, AAAA, CNAME, TXT, MX, NS, SRV, CAA, etc.)
-- **DateCreated/DateModified**: Timestamp fields
-- **NameserversDetected**: Detection status
-- **CustomNameserversEnabled**: Custom nameserver configuration
-- **DnsSecEnabled**: DNSSEC activation status
-- **LoggingEnabled**: Query logging status
-- **CertificateKeyType**: Ecdsa or Rsa options
-
-## Authentication
-
-Requests require an API access key passed via the `AccessKey` header. Authorized roles include SubuserAPIDns, SubuserAPIManage, SubuserDns, SubuserManage, User, and UserApi.
-
-## Response Codes
-
-- **200**: Successfully retrieved zones
-- **400**: Invalid request parameters
-- **401**: Authentication failed
-- **500**: Server error
-- **503**: Service unavailable
+````

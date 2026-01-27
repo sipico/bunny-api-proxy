@@ -6,12 +6,14 @@ This directory contains the complete official markdown documentation files from 
 
 These files serve as the official reference for implementing API calls to bunny.net's DNS Zone management endpoints. They contain:
 
-- Complete endpoint specifications with all parameters
-- Full request/response schemas
-- All supported fields and their data types
-- Error responses and status codes
-- Authentication requirements
-- Example requests and responses
+- **Complete OpenAPI 3.0.0 specifications** (embedded in each file)
+- Full request/response schemas with property definitions
+- All supported fields, data types, and constraints
+- Parameter definitions with defaults and validation rules
+- Authentication requirements and permission scopes
+- Error responses with all possible status codes
+- Real-world examples from the API
+- Constraints, min/max values, and formats
 
 ## File Organization
 
@@ -35,6 +37,8 @@ These files serve as the official reference for implementing API calls to bunny.
 - **[dnszone-statistics.md](dnszone-statistics.md)** - Get DNS query statistics (GET `/dnszone/{id}/statistics`)
 - **[dnszone-export.md](dnszone-export.md)** - Export DNS records (GET `/dnszone/{id}/export`)
 - **[dnszone-import.md](dnszone-import.md)** - Import DNS records (POST `/dnszone/{id}/import`)
+- **[dnszone-records-scan-get.md](dnszone-records-scan-get.md)** - Get latest record scan result (GET `/dnszone/{zoneId}/records/scan`)
+- **[dnszone-records-scan-trigger.md](dnszone-records-scan-trigger.md)** - Trigger record scan (POST `/dnszone/records/scan`)
 
 ### DNSSEC Management
 
@@ -44,36 +48,52 @@ These files serve as the official reference for implementing API calls to bunny.
 ### Advanced Features
 
 - **[dnszone-certificate-issue.md](dnszone-certificate-issue.md)** - Issue wildcard certificate (POST `/dnszone/{zoneId}/certificate/issue`)
-- **[dnszone-records-scan.md](dnszone-records-scan.md)** - Scan for pre-existing DNS records (POST/GET `/dnszone/records/scan`, `/dnszone/{zoneId}/records/scan`)
 
-## OpenAPI Specification
+## Source Information
 
-The complete official bunny.net API specification is available in machine-readable OpenAPI 3.0.0 format:
+### Official Documentation Location
 
-- **[openapi-v3.json](openapi-v3.json)** - Full OpenAPI specification (247 KB)
-  - Use this for programmatic API client generation
-  - Contains all endpoint definitions, schemas, and validation rules
+**Primary Source:** https://docs.bunny.net/api-reference/core/dns-zone/
+
+All 17 endpoint documentation files were extracted directly from bunny.net's official API documentation at this location. Each markdown file includes:
+- Complete OpenAPI 3.0.0 specification embedded in YAML format
+- Request/response schemas with all properties and constraints
+- Parameter definitions with types, defaults, and validation rules
+- Authentication requirements and permission scopes
+- Full error response documentation
+
+This is the **most complete and current** official documentation for the bunny.net DNS Zone API.
+
+### OpenAPI Specification
+
+The complete official bunny.net API specification is also available in machine-readable format:
+
+- **[openapi-v3.json](openapi-v3.json)** - Full OpenAPI 3.0.0 specification (247 KB)
   - Original source: https://core-api-public-docs.b-cdn.net/docs/v3/public.json
-
-## Source
-
-14 endpoint documentation files were extracted from the official bunny.net API reference at [https://docs.bunny.net/reference/bunnynet-api-overview](https://docs.bunny.net/reference/bunnynet-api-overview)
-
-2 additional endpoint files (certificate issuance and record scanning) were documented from the official OpenAPI 3.0.0 specification.
 
 Last updated: 2026-01-27
 
 ## Endpoint Summary
 
-**Total Endpoints:** 16 DNS Zone API endpoints
+**Total Endpoints:** 17 DNS Zone API endpoints (all endpoints documented)
 
-| Category | Count |
-|----------|-------|
-| Zone Management | 5 |
-| Record Management | 3 |
-| Zone Operations | 4 |
-| DNSSEC Management | 2 |
-| Advanced Features | 2 |
+| Category | Count | Coverage |
+|----------|-------|----------|
+| Zone Management | 5 | List, Get, Add, Update, Delete |
+| Record Management | 3 | Add, Update, Delete |
+| Zone Operations | 5 | Availability, Statistics, Export, Import, Scan (2 endpoints) |
+| DNSSEC Management | 2 | Enable, Disable |
+| Advanced Features | 2 | Certificate issuance, Record scanning |
+
+## Key Features of Official Documentation
+
+✅ **Complete OpenAPI Specs** - Every endpoint includes the full OpenAPI 3.0.0 specification embedded in YAML format
+✅ **Real-world Examples** - Actual request/response examples from the bunny.net API
+✅ **Detailed Schemas** - Complete request and response model definitions with all properties
+✅ **Error Documentation** - All possible error codes and their detailed meanings
+✅ **Authentication Details** - Required scopes and permission requirements for each endpoint
+✅ **Validation Rules** - Field constraints, min/max values, formats, and type information
+✅ **Constraint Details** - Parameter ranges, allowed values, and validation requirements
 
 ## Related Documentation
 

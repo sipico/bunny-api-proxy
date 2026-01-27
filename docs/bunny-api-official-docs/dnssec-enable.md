@@ -1,52 +1,134 @@
+> ## Documentation Index
+> Fetch the complete documentation index at: https://docs.bunny.net/llms.txt
+> Use this file to discover all available pages before exploring further.
+
 # Enable DNSSEC on a DNS Zone
 
-> **Source:** Official bunny.net API Documentation
-> **URL:** https://docs.bunny.net/reference/managednszonednssecendpoint_enablednssecdnszone.md
+> Returns the DS record information for the DNS Zone with the given ID
 
-## Overview
 
-This API endpoint allows you to activate DNSSEC security for a DNS zone through the bunny.net platform.
 
-## Endpoint Details
+## OpenAPI
 
-**Path:** `/dnszone/{id}/dnssec`
+````yaml https://core-api-public-docs.b-cdn.net/docs/v3/public.json post /dnszone/{id}/dnssec
+openapi: 3.0.0
+info:
+  title: bunny.net API
+  description: >-
+    <img src='https://bunny.net/v2/images/bunnynet-logo-dark.svg' style='width:
+    200px;' alt='bunny.net Logo'>
+                   Learn how to use the [bunny.net](https://bunny.net "bunny.net - The content delivery platform that truly hops.") API. Everything that can be done with the control panel can also be achieved with our API documented on this page. To learn how to use the storage API, have a look at our <a href='https://bunnycdnstorage.docs.apiary.io/#'>storage API documentation</a>
+                   <h2>Third party API clients:</h2> 
+                   <br/>
+                   We currently do not maintain an official API library, but you can use one of the third party ones provided here:<br/><br/>
+                   <a rel='nofollow' href='https://github.com/codewithmark/bunnycdn'>https://github.com/codewithmark/bunnycdn</a> (bunny.net PHP library, thanks to <a rel="nofollow" href='https://codewithmark.com'>Code With Mark</a>)
+                   <br/><br/>
+                   <i style='font-size: 11px;'><b>Note that third party clients are not maintained or developed by bunny.net so we unfortunately cannot offer support for them.</b></i>
+  termsOfService: https://bunny.net/tos
+  contact:
+    name: bunny.net
+    url: https://docs.bunny.net
+    email: support@bunny.net
+  version: 1.0.0
+servers:
+  - url: https://api.bunny.net
+    description: bunny.net API Server
+security: []
+paths:
+  /dnszone/{id}/dnssec:
+    post:
+      tags:
+        - DNS Zone
+      summary: Enable DNSSEC on a DNS Zone
+      description: Returns the DS record information for the DNS Zone with the given ID
+      operationId: ManageDnsZoneDnsSecEndpoint_EnableDnsSecDnsZone
+      parameters:
+        - name: id
+          in: path
+          description: The ID of the DNS Zone for which DNSSEC will be enabled
+          schema:
+            type: integer
+            format: int64
+          required: true
+      responses:
+        '200':
+          description: Returns the DS record information for the DNS Zone with the given ID
+          x-nullable: false
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DnsSecDsRecordModel'
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/DnsSecDsRecordModel'
+        '400':
+          x-nullable: false
+          description: Failed removing hostname
+          content:
+            application/json:
+              schema:
+                $ref: f2306f15-d639-43bc-ba70-80858292260c
+            application/xml:
+              schema:
+                $ref: f2306f15-d639-43bc-ba70-80858292260c
+        '401':
+          description: The request authorization failed
+        '404':
+          description: The DNS Zone with the requested ID does not exist
+        '500':
+          description: Internal Server Error
+        '503':
+          description: The service is currently unavailable
+      security:
+        - AccessKey:
+            - SubuserAPIDns
+            - SubuserAPIManage
+            - SubuserDns
+            - SubuserManage
+            - User
+            - UserApi
+components:
+  schemas:
+    DnsSecDsRecordModel:
+      type: object
+      additionalProperties: false
+      properties:
+        Enabled:
+          type: boolean
+        DsRecord:
+          type: string
+          nullable: true
+        Digest:
+          type: string
+          nullable: true
+        DigestType:
+          type: string
+          nullable: true
+        Algorithm:
+          type: integer
+          format: int32
+        PublicKey:
+          type: string
+          nullable: true
+        KeyTag:
+          type: integer
+          format: int32
+        Flags:
+          type: integer
+          format: int32
+        DsConfigured:
+          type: boolean
+      required:
+        - Enabled
+        - Algorithm
+        - KeyTag
+        - Flags
+        - DsConfigured
+  securitySchemes:
+    AccessKey:
+      type: apiKey
+      description: API Access Key authorization header
+      name: AccessKey
+      in: header
 
-**Method:** POST
-
-**Base URL:** `https://api.bunny.net`
-
-## Parameters
-
-- **id** (required, path parameter): The identifier of the DNS zone where DNSSEC will be activated. Must be an integer (int64 format).
-
-## Authentication
-
-This endpoint requires one of the following authorization scopes:
-- SubuserAPIDns
-- SubuserAPIManage
-- SubuserDns
-- SubuserManage
-- User
-- UserApi
-
-Authentication is provided via an API Access Key in the request header.
-
-## Response (HTTP 200)
-
-Upon successful activation, the API returns DNSSEC configuration details including:
-
-- **Enabled:** Boolean indicating DNSSEC status
-- **DsRecord:** The DS record value
-- **Digest & DigestType:** Hash information for validation
-- **Algorithm & KeyTag:** Cryptographic identifiers
-- **PublicKey:** The public key component
-- **Flags:** Configuration flags
-- **DsConfigured:** Whether the DS record has been configured at the parent zone
-
-## Error Responses
-
-- **400:** Configuration failure with error details
-- **401:** Authorization unsuccessful
-- **404:** Specified DNS zone not found
-- **500:** Server error
-- **503:** Service unavailable
+````
