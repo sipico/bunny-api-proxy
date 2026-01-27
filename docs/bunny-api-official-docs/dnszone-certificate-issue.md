@@ -1,21 +1,17 @@
-# Issue Wildcard Certificate for DNS Zone
+# Issue New Wildcard Certificate
 
-> **Source:** bunny.net API OpenAPI Specification v3.0.0
-> **Location:** openapi-v3.json (paths[/dnszone/{zoneId}/certificate/issue].post)
+> **Source:** Official bunny.net API Documentation
+> **URL:** https://docs.bunny.net/api-reference/core/dns-zone/issue-new-wildcard-certificate.md
+
+## Overview
+
+This endpoint allows you to issue a new wildcard certificate for a DNS zone through the bunny.net API.
 
 ## Endpoint Details
 
-**Path:** `/dnszone/{zoneId}/certificate/issue`
-
 **Method:** POST
-
-**Operation ID:** `DnsZonePublic_IssueWildcardCertificate`
-
+**Path:** `/dnszone/{zoneId}/certificate/issue`
 **Base URL:** `https://api.bunny.net`
-
-## Purpose
-
-Issue a new wildcard SSL/TLS certificate for a DNS zone. This endpoint enables automated certificate provisioning for the specified zone.
 
 ## Parameters
 
@@ -23,30 +19,37 @@ Issue a new wildcard SSL/TLS certificate for a DNS zone. This endpoint enables a
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| zoneId | int64 | Yes | The DNS Zone ID for which to issue the certificate |
+| zoneId | integer | Yes | The DNS Zone ID requiring the new certificate |
 
 ## Request Body
 
-The endpoint requires a request body with the following structure:
+The request requires JSON or XML content with the following structure:
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| (model fields) | | | Defined in `IssueWildcardCertificateRequestModel` (see OpenAPI spec for details) |
+| Domain | string | No | Optional domain name for the certificate |
+
+**Example:**
+```json
+{
+  "Domain": "example.com"
+}
+```
 
 ## Response Codes
 
 | Status | Description |
 |--------|-------------|
-| 200 | A certificate has been issued successfully |
-| 400 | Failed to issue a new certificate; returns ApiErrorData with error details |
-| 401 | The request authorization failed |
+| 200 | "A certificate has been issued successfully" |
+| 400 | Failed to issue a new certificate |
+| 401 | Request authorization failed |
 | 404 | The DNS Zone with the requested ID does not exist |
 | 500 | Internal Server Error |
-| 503 | The service is currently unavailable |
+| 503 | Service currently unavailable |
 
 ## Authentication
 
-Requires `AccessKey` header with one of these permission scopes:
+This endpoint requires one of the following security scopes:
 - SubuserAPIDns
 - SubuserAPIManage
 - SubuserDns
@@ -54,23 +57,14 @@ Requires `AccessKey` header with one of these permission scopes:
 - User
 - UserApi
 
+Authentication uses an API Access Key passed via the `AccessKey` header.
+
 ## Content Types
 
 Supports both `application/json` and `application/xml` request/response formats.
-
-## Error Response Format
-
-Failed requests (400) return standard ApiErrorData:
-```json
-{
-  "ErrorKey": "string",
-  "Field": "string",
-  "Message": "string"
-}
-```
 
 ## Notes
 
 - Wildcard certificates cover the domain and all subdomains (e.g., `*.example.com`)
 - The zone must exist and be properly configured before issuing a certificate
-- Certificate issuance may take time to complete
+- Certificate issuance is asynchronous and may take time to complete
