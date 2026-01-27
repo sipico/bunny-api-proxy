@@ -178,7 +178,7 @@ For a single-container, SQLite-based tool, the trade-offs strongly favor API-onl
 
 | Concern | API-only | Full Web UI |
 |---------|----------|-------------|
-| Authentication | Bearer tokens, stateless | Sessions, cookies, CSRF tokens |
+| Authentication | AccessKey tokens, stateless | Sessions, cookies, CSRF tokens |
 | XSS risk | None | Requires CSP, input sanitization |
 | Session hijacking | N/A | Active threat vector |
 | CORS complexity | Simple | Requires careful configuration |
