@@ -168,7 +168,7 @@ docker run -d -e BUNNY_API_KEY=real-bunny-key -p 8080:8080 sipico/bunny-api-prox
 
 # 2. Create first admin token (using bunny.net key as auth)
 curl -X POST http://localhost:8080/api/tokens \
-  -H "Authorization: Bearer real-bunny-key" \
+  -H "AccessKey: real-bunny-key" \
   -H "Content-Type: application/json" \
   -d '{"name": "admin", "is_admin": true, "zones": [0]}'
 
@@ -180,7 +180,7 @@ curl -X POST http://localhost:8080/api/tokens \
 
 # 4. Create scoped token for certbot
 curl -X POST http://localhost:8080/api/tokens \
-  -H "Authorization: Bearer generated-token-save-this" \
+  -H "AccessKey: generated-token-save-this" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "certbot-example.com",
@@ -232,6 +232,21 @@ Requires token with appropriate permissions.
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/health` | Health check (no auth required) |
+
+### Authentication Header
+
+All authenticated endpoints use the `AccessKey` header (NOT `Authorization: Bearer`):
+
+```
+AccessKey: your-token-here
+```
+
+**Why `AccessKey`?**
+
+This matches the bunny.net API authentication format exactly. Benefits:
+- Drop-in replacement: clients can switch between direct bunny.net and proxy by changing only the URL
+- Existing tools (certbot bunny plugin, lego, etc.) work without modification
+- No code changes needed in client applications
 
 ---
 
@@ -364,7 +379,7 @@ curl http://localhost:8080/health
 
 # Create admin token (using bunny.net key)
 curl -X POST http://localhost:8080/api/tokens \
-  -H "Authorization: Bearer my-real-bunny-net-api-key" \
+  -H "AccessKey: my-real-bunny-net-api-key" \
   -H "Content-Type: application/json" \
   -d '{"name": "primary-admin", "is_admin": true, "zones": [0]}'
 
@@ -376,7 +391,7 @@ ADMIN_TOKEN="a1b2c3d4..."
 
 # Verify bunny.net key is locked out
 curl -X GET http://localhost:8080/api/tokens \
-  -H "Authorization: Bearer my-real-bunny-net-api-key"
+  -H "AccessKey: my-real-bunny-net-api-key"
 
 # Response: 403
 # {"error": "master_key_locked", "message": "Master API key cannot access admin endpoints..."}
@@ -386,7 +401,7 @@ curl -X GET http://localhost:8080/api/tokens \
 
 # Create token for certbot (TXT records only, specific zone)
 curl -X POST http://localhost:8080/api/tokens \
-  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H "AccessKey: $ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "certbot-example-com",
@@ -406,17 +421,17 @@ CERTBOT_TOKEN="x9y8z7..."
 
 # List zones (only sees permitted zones)
 curl http://localhost:8080/dnszone \
-  -H "Authorization: Bearer $CERTBOT_TOKEN"
+  -H "AccessKey: $CERTBOT_TOKEN"
 
 # Add TXT record
 curl -X PUT http://localhost:8080/dnszone/123456/records \
-  -H "Authorization: Bearer $CERTBOT_TOKEN" \
+  -H "AccessKey: $CERTBOT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"type": "TXT", "name": "_acme-challenge", "value": "xxx", "ttl": 60}'
 
 # Try to add A record (rejected - TXT only)
 curl -X PUT http://localhost:8080/dnszone/123456/records \
-  -H "Authorization: Bearer $CERTBOT_TOKEN" \
+  -H "AccessKey: $CERTBOT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"type": "A", "name": "www", "value": "1.2.3.4", "ttl": 300}'
 
@@ -428,7 +443,7 @@ curl -X PUT http://localhost:8080/dnszone/123456/records \
 
 # List all tokens
 curl http://localhost:8080/api/tokens \
-  -H "Authorization: Bearer $ADMIN_TOKEN"
+  -H "AccessKey: $ADMIN_TOKEN"
 
 # Response:
 # [
@@ -438,20 +453,20 @@ curl http://localhost:8080/api/tokens \
 
 # Try to delete last admin (rejected)
 curl -X DELETE http://localhost:8080/api/tokens/1 \
-  -H "Authorization: Bearer $ADMIN_TOKEN"
+  -H "AccessKey: $ADMIN_TOKEN"
 
 # Response: 409
 # {"error": "cannot_delete_last_admin", "message": "Cannot delete the last admin token..."}
 
 # Create second admin first
 curl -X POST http://localhost:8080/api/tokens \
-  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H "AccessKey: $ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"name": "backup-admin", "is_admin": true, "zones": [0]}'
 
 # Now can delete first admin
 curl -X DELETE http://localhost:8080/api/tokens/1 \
-  -H "Authorization: Bearer $ADMIN_TOKEN"
+  -H "AccessKey: $ADMIN_TOKEN"
 
 # Response: 204 No Content
 ```
