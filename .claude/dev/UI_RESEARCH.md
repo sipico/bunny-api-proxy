@@ -451,39 +451,55 @@ Gemini recommended HTMX-enhanced UI with hybrid auth (sessions for UI, tokens fo
 
 ### ChatGPT (Deep Research)
 
-**Date:** *(pending)*
+**Date:** 2026-01-27
 **Model:** ChatGPT with browsing/research
 
-#### Findings
+Full research document: [UI_RESEARCH_CHATGPT.md](UI_RESEARCH_CHATGPT.md)
 
-*(To be added when research completes)*
+#### Key Findings
 
-#### Sources
+- No industry mandate; tools split between UI-optional and API-only
+- Experienced DevOps teams: "you end up using the CLI way more than the console"
+- UI adds session/CSRF/XSS complexity vs. stateless API tokens
+- Bootstrap via CLI init commands or environment tokens is common (Vault, Nomad)
+- Chromedp recommended for Go-native testing; Playwright if multi-browser needed
+- Gitea evaluating Playwright/Cypress for E2E testing
 
-*(To be added when research completes)*
+#### Recommendation Summary
+
+API-first design with an optional, minimal web UI. If UI is kept, make it read-only or view-limited. Core CRUD operations should remain API-driven. For testing, lean toward Chromedp (Go-native) initially.
 
 ---
 
 ## Consolidated Recommendations
 
-*(ChatGPT research pending)*
-
 | Topic | Claude Opus | Google Gemini | ChatGPT | Consensus |
 |-------|-------------|---------------|---------|-----------|
-| Admin interface | API-first + optional read-only dashboard | HTMX UI as observability layer | - | API-first |
-| Bootstrap method | CLI init command | OIDC/Workload identity | - | TBD |
-| UI testing (HTML) | httptest + goquery | httptest + goquery (80%) | - | httptest + goquery |
-| Browser testing | Rod (if needed) | Playwright-go (10% E2E) | - | Rod or Playwright |
+| Admin interface | API-first, remove UI | HTMX UI as observability layer | API-first + optional read-only UI | **API-first** ✓ |
+| Bootstrap method | Bunny.net key as bootstrap | OIDC/Workload identity | CLI init or env token | **Bunny.net key** (simplest) |
+| UI testing (HTML) | httptest + goquery | httptest + goquery (80%) | httptest for simple cases | **httptest + goquery** ✓ |
+| Browser testing | Rod (if needed) | Playwright-go (10% E2E) | Chromedp for Go-native | **Rod or Chromedp** (Go-native) |
 
-**Note:** Both sources agree on API-first architecture. Gemini's recommendation for HTMX UI was for observability, not configuration—aligning with our API-only decision for the configuration layer.
+### Consensus Analysis
+
+**All three sources agree:**
+1. **API-first architecture** is the right approach for DevOps/SRE-focused tools
+2. **CLI/automation preferred** by experienced practitioners over web UIs
+3. **UI is optional** - useful for onboarding/observability, not primary control
+4. **httptest + goquery** sufficient for testing plain HTML forms
+5. **Go-native browser testing** (Rod, Chromedp) preferred over Node-based tools
+
+**Our decision:** API-only (removing UI entirely) is a valid simplification. All sources support API-first; we're simply taking it to its logical conclusion for a tool targeting automation users.
 
 ---
 
 ## Action Items
 
-*(To be determined after consolidating all research)*
+Research complete. See [API_ONLY_DESIGN.md](API_ONLY_DESIGN.md) for implementation specification.
 
-- [ ] Complete API endpoints (missing CRUD operations)
-- [ ] Implement CLI bootstrap command
-- [ ] Decide on UI fate (read-only dashboard vs remove vs extract)
-- [ ] Update FUTURE_ENHANCEMENTS.md with revised plan
+- [x] Complete research (Claude Opus, Gemini, ChatGPT)
+- [x] Decide on UI fate → **Remove entirely, go API-only**
+- [x] Design bootstrap flow → **Bunny.net key as bootstrap token**
+- [x] Document unified token model
+- [ ] Update FUTURE_ENHANCEMENTS.md with revised plan (pending user feedback)
+- [ ] Implement API-only design (future work)
