@@ -2,15 +2,15 @@
 > Fetch the complete documentation index at: https://docs.bunny.net/llms.txt
 > Use this file to discover all available pages before exploring further.
 
-# Disable DNSSEC on a DNS Zone
+# Issue new wildcard certificate
 
-> Disables DNSSEC for the DNS Zone with the given ID
+> A certificate has been issued successfully
 
 
 
 ## OpenAPI
 
-````yaml https://core-api-public-docs.b-cdn.net/docs/v3/public.json delete /dnszone/{id}/dnssec
+````yaml https://core-api-public-docs.b-cdn.net/docs/v3/public.json post /dnszone/{zoneId}/certificate/issue
 openapi: 3.0.0
 info:
   title: bunny.net API
@@ -35,35 +35,36 @@ servers:
     description: bunny.net API Server
 security: []
 paths:
-  /dnszone/{id}/dnssec:
-    delete:
+  /dnszone/{zoneId}/certificate/issue:
+    post:
       tags:
         - DNS Zone
-      summary: Disable DNSSEC on a DNS Zone
-      description: Disables DNSSEC for the DNS Zone with the given ID
-      operationId: ManageDnsZoneDnsSecEndpoint_DisableDnsSecDnsZone
+      summary: Issue new wildcard certificate
+      description: A certificate has been issued successfully
+      operationId: DnsZonePublic_IssueWildcardCertificate
       parameters:
-        - name: id
+        - name: zoneId
           in: path
-          description: The ID of the DNS Zone for which DNSSEC will be disabled
+          description: The DNS Zone ID requiring a new certificate.
           schema:
             type: integer
             format: int64
           required: true
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IssueWildcardCertificateRequestModel'
+          application/xml:
+            schema:
+              $ref: '#/components/schemas/IssueWildcardCertificateRequestModel'
+        required: true
       responses:
         '200':
-          description: Disables DNSSEC for the DNS Zone with the given ID
-          x-nullable: false
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DnsSecDsRecordModel'
-            application/xml:
-              schema:
-                $ref: '#/components/schemas/DnsSecDsRecordModel'
+          description: A certificate has been issued successfully
         '400':
+          description: Failed to issue a new certificate
           x-nullable: false
-          description: Failed removing hostname
           content:
             application/json:
               schema:
@@ -74,7 +75,7 @@ paths:
         '401':
           description: The request authorization failed
         '404':
-          description: The DNS Zone with the requested ID does not exist
+          description: The DNS Zone with the requested ID does not exist.
         '500':
           description: Internal Server Error
         '503':
@@ -89,41 +90,13 @@ paths:
             - UserApi
 components:
   schemas:
-    DnsSecDsRecordModel:
+    IssueWildcardCertificateRequestModel:
       type: object
       additionalProperties: false
       properties:
-        Enabled:
-          type: boolean
-        DsRecord:
+        Domain:
           type: string
           nullable: true
-        Digest:
-          type: string
-          nullable: true
-        DigestType:
-          type: string
-          nullable: true
-        Algorithm:
-          type: integer
-          format: int32
-        PublicKey:
-          type: string
-          nullable: true
-        KeyTag:
-          type: integer
-          format: int32
-        Flags:
-          type: integer
-          format: int32
-        DsConfigured:
-          type: boolean
-      required:
-        - Enabled
-        - Algorithm
-        - KeyTag
-        - Flags
-        - DsConfigured
   securitySchemes:
     AccessKey:
       type: apiKey

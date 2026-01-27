@@ -2,15 +2,13 @@
 > Fetch the complete documentation index at: https://docs.bunny.net/llms.txt
 > Use this file to discover all available pages before exploring further.
 
-# Disable DNSSEC on a DNS Zone
-
-> Disables DNSSEC for the DNS Zone with the given ID
+# Get the latest DNS record scan result for a DNS Zone
 
 
 
 ## OpenAPI
 
-````yaml https://core-api-public-docs.b-cdn.net/docs/v3/public.json delete /dnszone/{id}/dnssec
+````yaml https://core-api-public-docs.b-cdn.net/docs/v3/public.json get /dnszone/{zoneId}/records/scan
 openapi: 3.0.0
 info:
   title: bunny.net API
@@ -35,32 +33,31 @@ servers:
     description: bunny.net API Server
 security: []
 paths:
-  /dnszone/{id}/dnssec:
-    delete:
+  /dnszone/{zoneId}/records/scan:
+    get:
       tags:
         - DNS Zone
-      summary: Disable DNSSEC on a DNS Zone
-      description: Disables DNSSEC for the DNS Zone with the given ID
-      operationId: ManageDnsZoneDnsSecEndpoint_DisableDnsSecDnsZone
+      summary: Get the latest DNS record scan result for a DNS Zone
+      operationId: TriggerDnsZoneRecordScan_GetLatestScan
       parameters:
-        - name: id
+        - name: zoneId
           in: path
-          description: The ID of the DNS Zone for which DNSSEC will be disabled
+          description: The DNS Zone ID
           schema:
             type: integer
             format: int64
           required: true
       responses:
         '200':
-          description: Disables DNSSEC for the DNS Zone with the given ID
+          description: Latest DNS record scan job details
           x-nullable: false
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DnsSecDsRecordModel'
+                $ref: '#/components/schemas/DnsZoneRecordScanJobResponse'
             application/xml:
               schema:
-                $ref: '#/components/schemas/DnsSecDsRecordModel'
+                $ref: '#/components/schemas/DnsZoneRecordScanJobResponse'
         '400':
           x-nullable: false
           description: Failed removing hostname
@@ -74,7 +71,7 @@ paths:
         '401':
           description: The request authorization failed
         '404':
-          description: The DNS Zone with the requested ID does not exist
+          description: No scan found or DNS Zone not found
         '500':
           description: Internal Server Error
         '503':
@@ -89,41 +86,142 @@ paths:
             - UserApi
 components:
   schemas:
-    DnsSecDsRecordModel:
+    DnsZoneRecordScanJobResponse:
       type: object
       additionalProperties: false
       properties:
-        Enabled:
-          type: boolean
-        DsRecord:
+        JobId:
+          type: string
+          format: uuid
+        ZoneId:
+          type: integer
+          format: int64
+          nullable: true
+        Domain:
           type: string
           nullable: true
-        Digest:
+        AccountId:
           type: string
           nullable: true
-        DigestType:
+        Status:
+          nullable: true
+          oneOf:
+            - $ref: '#/components/schemas/DnsZoneScanJobStatus'
+        CreatedAt:
+          type: string
+          format: date-time
+        CompletedAt:
+          type: string
+          format: date-time
+          nullable: true
+        Records:
+          type: array
+          items:
+            $ref: '#/components/schemas/DnsZoneDiscoveredRecordModel'
+          nullable: true
+        Error:
           type: string
           nullable: true
-        Algorithm:
+      required:
+        - JobId
+    DnsZoneScanJobStatus:
+      type: string
+      enum:
+        - Pending
+        - InProgress
+        - Completed
+        - Failed
+      x-enumNames:
+        - Pending
+        - InProgress
+        - Completed
+        - Failed
+      description: 0 = Pending<br/>1 = InProgress<br/>2 = Completed<br/>3 = Failed
+      example: Pending
+    DnsZoneDiscoveredRecordModel:
+      type: object
+      additionalProperties: false
+      properties:
+        Name:
+          type: string
+          nullable: true
+          description: Record name relative to the zone. '@' represents apex.
+        Type:
+          allOf:
+            - $ref: '#/components/schemas/DnsZoneDiscoveredRecordType'
+          nullable: true
+        Ttl:
           type: integer
           format: int32
-        PublicKey:
+          nullable: true
+        Value:
           type: string
           nullable: true
-        KeyTag:
+        Priority:
           type: integer
           format: int32
-        Flags:
+          nullable: true
+        Weight:
           type: integer
           format: int32
-        DsConfigured:
+          nullable: true
+        Port:
+          type: integer
+          format: int32
+          nullable: true
+        IsProxied:
           type: boolean
       required:
-        - Enabled
-        - Algorithm
-        - KeyTag
-        - Flags
-        - DsConfigured
+        - IsProxied
+    DnsZoneDiscoveredRecordType:
+      type: string
+      description: >-
+        0 = A<br/>1 = AAAA<br/>2 = CNAME<br/>3 = TXT<br/>4 = MX<br/>8 =
+        SRV<br/>9 = CAA<br/>10 = PTR<br/>12 = NS<br/>13 = Svcb<br/>14 =
+        HTTPS<br/>15 = TLSA<br/>16 = SOA
+      x-enumNames:
+        - A
+        - AAAA
+        - CNAME
+        - TXT
+        - MX
+        - SRV
+        - CAA
+        - PTR
+        - NS
+        - Svcb
+        - HTTPS
+        - TLSA
+        - SOA
+      enum:
+        - A
+        - AAAA
+        - CNAME
+        - TXT
+        - MX
+        - SRV
+        - CAA
+        - PTR
+        - NS
+        - Svcb
+        - HTTPS
+        - TLSA
+        - SOA
+      x-enum-varnames:
+        - A
+        - AAAA
+        - CNAME
+        - TXT
+        - MX
+        - SRV
+        - CAA
+        - PTR
+        - NS
+        - Svcb
+        - HTTPS
+        - TLSA
+        - SOA
+      example: A
   securitySchemes:
     AccessKey:
       type: apiKey

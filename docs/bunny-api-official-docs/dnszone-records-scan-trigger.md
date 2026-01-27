@@ -2,15 +2,13 @@
 > Fetch the complete documentation index at: https://docs.bunny.net/llms.txt
 > Use this file to discover all available pages before exploring further.
 
-# Disable DNSSEC on a DNS Zone
-
-> Disables DNSSEC for the DNS Zone with the given ID
+# Trigger a background scan for pre-existing DNS records. Can use ZoneId for existing zones or Domain for pre-zone creation scenarios.
 
 
 
 ## OpenAPI
 
-````yaml https://core-api-public-docs.b-cdn.net/docs/v3/public.json delete /dnszone/{id}/dnssec
+````yaml https://core-api-public-docs.b-cdn.net/docs/v3/public.json post /dnszone/records/scan
 openapi: 3.0.0
 info:
   title: bunny.net API
@@ -35,42 +33,39 @@ servers:
     description: bunny.net API Server
 security: []
 paths:
-  /dnszone/{id}/dnssec:
-    delete:
+  /dnszone/records/scan:
+    post:
       tags:
         - DNS Zone
-      summary: Disable DNSSEC on a DNS Zone
-      description: Disables DNSSEC for the DNS Zone with the given ID
-      operationId: ManageDnsZoneDnsSecEndpoint_DisableDnsSecDnsZone
-      parameters:
-        - name: id
-          in: path
-          description: The ID of the DNS Zone for which DNSSEC will be disabled
-          schema:
-            type: integer
-            format: int64
-          required: true
+      summary: >-
+        Trigger a background scan for pre-existing DNS records. Can use ZoneId
+        for existing zones or Domain for pre-zone creation scenarios.
+      operationId: TriggerDnsZoneRecordScan_TriggerScan
+      parameters: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TriggerDnsZoneRecordScanRequest'
+          application/xml:
+            schema:
+              $ref: '#/components/schemas/TriggerDnsZoneRecordScanRequest'
+        required: true
       responses:
         '200':
-          description: Disables DNSSEC for the DNS Zone with the given ID
+          description: DNS record scan job triggered successfully
           x-nullable: false
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DnsSecDsRecordModel'
+                $ref: '#/components/schemas/DnsZoneRecordScanTriggerResponse'
             application/xml:
               schema:
-                $ref: '#/components/schemas/DnsSecDsRecordModel'
+                $ref: '#/components/schemas/DnsZoneRecordScanTriggerResponse'
         '400':
-          x-nullable: false
-          description: Failed removing hostname
-          content:
-            application/json:
-              schema:
-                $ref: f2306f15-d639-43bc-ba70-80858292260c
-            application/xml:
-              schema:
-                $ref: f2306f15-d639-43bc-ba70-80858292260c
+          description: >-
+            Invalid request - either ZoneId or Domain must be provided, but not
+            both
         '401':
           description: The request authorization failed
         '404':
@@ -89,41 +84,50 @@ paths:
             - UserApi
 components:
   schemas:
-    DnsSecDsRecordModel:
+    TriggerDnsZoneRecordScanRequest:
       type: object
       additionalProperties: false
       properties:
-        Enabled:
-          type: boolean
-        DsRecord:
-          type: string
-          nullable: true
-        Digest:
-          type: string
-          nullable: true
-        DigestType:
-          type: string
-          nullable: true
-        Algorithm:
+        ZoneId:
           type: integer
-          format: int32
-        PublicKey:
+          format: int64
+          nullable: true
+          description: >-
+            The ID of the DNS Zone to scan. Either ZoneId or Domain must be
+            provided, but not both.
+        Domain:
           type: string
           nullable: true
-        KeyTag:
-          type: integer
-          format: int32
-        Flags:
-          type: integer
-          format: int32
-        DsConfigured:
-          type: boolean
+          description: >-
+            The domain name to scan. Either ZoneId or Domain must be provided,
+            but not both. Can be used even before creating the DNS zone.
+    DnsZoneRecordScanTriggerResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        JobId:
+          type: string
+          format: uuid
+        Status:
+          nullable: true
+          oneOf:
+            - $ref: '#/components/schemas/DnsZoneScanJobStatus'
       required:
-        - Enabled
-        - Algorithm
-        - KeyTag
-        - Flags
-        - DsConfigured
+        - JobId
+    DnsZoneScanJobStatus:
+      type: string
+      enum:
+        - Pending
+        - InProgress
+        - Completed
+        - Failed
+      x-enumNames:
+        - Pending
+        - InProgress
+        - Completed
+        - Failed
+      description: 0 = Pending<br/>1 = InProgress<br/>2 = Completed<br/>3 = Failed
+      example: Pending
   securitySchemes:
     AccessKey:
       type: apiKey

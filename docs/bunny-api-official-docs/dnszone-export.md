@@ -1,49 +1,88 @@
-# bunny.net API Export Documentation
+> ## Documentation Index
+> Fetch the complete documentation index at: https://docs.bunny.net/llms.txt
+> Use this file to discover all available pages before exploring further.
 
-> **Source:** Official bunny.net API Documentation
-> **URL:** https://docs.bunny.net/reference/dnszonepublic_export.md
+# Export
 
-## Overview
+> Returns the model determinining if the zone is available or not
 
-The bunny.net API enables programmatic access to features available in the control panel. The documentation covers the DNS Zone export endpoint, which allows retrieval of DNS zone configurations.
 
-## API Endpoint
 
-**Path:** `/dnszone/{id}/export`
+## OpenAPI
 
-**Method:** GET
+````yaml https://core-api-public-docs.b-cdn.net/docs/v3/public.json get /dnszone/{id}/export
+openapi: 3.0.0
+info:
+  title: bunny.net API
+  description: >-
+    <img src='https://bunny.net/v2/images/bunnynet-logo-dark.svg' style='width:
+    200px;' alt='bunny.net Logo'>
+                   Learn how to use the [bunny.net](https://bunny.net "bunny.net - The content delivery platform that truly hops.") API. Everything that can be done with the control panel can also be achieved with our API documented on this page. To learn how to use the storage API, have a look at our <a href='https://bunnycdnstorage.docs.apiary.io/#'>storage API documentation</a>
+                   <h2>Third party API clients:</h2> 
+                   <br/>
+                   We currently do not maintain an official API library, but you can use one of the third party ones provided here:<br/><br/>
+                   <a rel='nofollow' href='https://github.com/codewithmark/bunnycdn'>https://github.com/codewithmark/bunnycdn</a> (bunny.net PHP library, thanks to <a rel="nofollow" href='https://codewithmark.com'>Code With Mark</a>)
+                   <br/><br/>
+                   <i style='font-size: 11px;'><b>Note that third party clients are not maintained or developed by bunny.net so we unfortunately cannot offer support for them.</b></i>
+  termsOfService: https://bunny.net/tos
+  contact:
+    name: bunny.net
+    url: https://docs.bunny.net
+    email: support@bunny.net
+  version: 1.0.0
+servers:
+  - url: https://api.bunny.net
+    description: bunny.net API Server
+security: []
+paths:
+  /dnszone/{id}/export:
+    get:
+      tags:
+        - DNS Zone
+      summary: Export
+      description: Returns the model determinining if the zone is available or not
+      operationId: DnsZonePublic_Export
+      parameters:
+        - name: id
+          in: path
+          description: ''
+          schema:
+            type: integer
+            format: int64
+          required: true
+      responses:
+        '200':
+          description: Returns the model determinining if the zone is available or not
+        '400':
+          description: Failed checking the zone availability
+          x-nullable: false
+          content:
+            application/json:
+              schema:
+                $ref: f2306f15-d639-43bc-ba70-80858292260c
+            application/xml:
+              schema:
+                $ref: f2306f15-d639-43bc-ba70-80858292260c
+        '401':
+          description: The request authorization failed
+        '500':
+          description: Internal Server Error
+        '503':
+          description: The service is currently unavailable
+      security:
+        - AccessKey:
+            - SubuserAPIDns
+            - SubuserAPIManage
+            - SubuserDns
+            - SubuserManage
+            - User
+            - UserApi
+components:
+  securitySchemes:
+    AccessKey:
+      type: apiKey
+      description: API Access Key authorization header
+      name: AccessKey
+      in: header
 
-**Base URL:** `https://api.bunny.net`
-
-## Parameters
-
-The endpoint requires a single path parameter:
-- **id** (integer, int64, required): The DNS zone identifier
-
-## Authentication
-
-This endpoint uses API key-based authentication via the `AccessKey` header. The following permission scopes are accepted:
-- SubuserAPIDns
-- SubuserAPIManage
-- SubuserDns
-- SubuserManage
-- User
-- UserApi
-
-## Responses
-
-| Status | Description |
-|--------|-------------|
-| 200 | Successful export returning HttpResponseMessage object |
-| 400 | Failed operation with error details (ErrorKey, Field, Message) |
-| 401 | Authorization failure |
-| 500 | Internal server error |
-| 503 | Service unavailable |
-
-## Content Types
-
-Responses are available in both JSON and XML formats.
-
-## Additional Resources
-
-For storage API documentation, refer to the dedicated storage API guide. The API is generated using Dynamic OpenAPI Generator v1.0.0.
+````

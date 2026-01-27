@@ -1,42 +1,99 @@
-# Check DNS Zone Availability Endpoint
+> ## Documentation Index
+> Fetch the complete documentation index at: https://docs.bunny.net/llms.txt
+> Use this file to discover all available pages before exploring further.
 
-> **Source:** Official bunny.net API Documentation
-> **URL:** https://docs.bunny.net/reference/dnszonepublic_checkavailability.md
+# Check the DNS zone availability
 
-**Endpoint Path:** `/dnszone/checkavailability`
+> Returns the model determinining if the zone is available or not
 
-**HTTP Method:** POST
 
-**Summary:** "Check the DNS zone availability"
 
-**Operation ID:** DnsZonePublic_CheckAvailability
+## OpenAPI
 
-## Request
+````yaml https://core-api-public-docs.b-cdn.net/docs/v3/public.json post /dnszone/checkavailability
+openapi: 3.0.0
+info:
+  title: bunny.net API
+  description: >-
+    <img src='https://bunny.net/v2/images/bunnynet-logo-dark.svg' style='width:
+    200px;' alt='bunny.net Logo'>
+                   Learn how to use the [bunny.net](https://bunny.net "bunny.net - The content delivery platform that truly hops.") API. Everything that can be done with the control panel can also be achieved with our API documented on this page. To learn how to use the storage API, have a look at our <a href='https://bunnycdnstorage.docs.apiary.io/#'>storage API documentation</a>
+                   <h2>Third party API clients:</h2> 
+                   <br/>
+                   We currently do not maintain an official API library, but you can use one of the third party ones provided here:<br/><br/>
+                   <a rel='nofollow' href='https://github.com/codewithmark/bunnycdn'>https://github.com/codewithmark/bunnycdn</a> (bunny.net PHP library, thanks to <a rel="nofollow" href='https://codewithmark.com'>Code With Mark</a>)
+                   <br/><br/>
+                   <i style='font-size: 11px;'><b>Note that third party clients are not maintained or developed by bunny.net so we unfortunately cannot offer support for them.</b></i>
+  termsOfService: https://bunny.net/tos
+  contact:
+    name: bunny.net
+    url: https://docs.bunny.net
+    email: support@bunny.net
+  version: 1.0.0
+servers:
+  - url: https://api.bunny.net
+    description: bunny.net API Server
+security: []
+paths:
+  /dnszone/checkavailability:
+    post:
+      tags:
+        - DNS Zone
+      summary: Check the DNS zone availability
+      description: Returns the model determinining if the zone is available or not
+      operationId: DnsZonePublic_CheckAvailability
+      parameters: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ZoneAvailabilityRequestModel'
+          application/xml:
+            schema:
+              $ref: '#/components/schemas/ZoneAvailabilityRequestModel'
+        required: true
+      responses:
+        '200':
+          description: Returns the model determinining if the zone is available or not
+        '400':
+          description: Failed checking the zone availability
+          x-nullable: false
+          content:
+            application/json:
+              schema:
+                $ref: f2306f15-d639-43bc-ba70-80858292260c
+            application/xml:
+              schema:
+                $ref: f2306f15-d639-43bc-ba70-80858292260c
+        '401':
+          description: The request authorization failed
+        '500':
+          description: Internal Server Error
+        '503':
+          description: The service is currently unavailable
+      security:
+        - AccessKey:
+            - SubuserAPIDns
+            - SubuserAPIManage
+            - SubuserDns
+            - SubuserManage
+            - User
+            - UserApi
+components:
+  schemas:
+    ZoneAvailabilityRequestModel:
+      type: object
+      additionalProperties: false
+      properties:
+        Name:
+          type: string
+          nullable: true
+          description: Determines the name of the zone that we are checking
+  securitySchemes:
+    AccessKey:
+      type: apiKey
+      description: API Access Key authorization header
+      name: AccessKey
+      in: header
 
-**Content Types:** application/json, application/xml
-
-**Request Body:**
-- Property: `Name` (string, required)
-- Description: "Determines the name of the zone that we are checking"
-
-## Responses
-
-| Status | Description |
-|--------|-------------|
-| 200 | Success - Returns HttpResponseMessage object |
-| 400 | Failed removing hostname - Returns ApiErrorData with ErrorKey, Field, and Message |
-| 401 | Authorization failed |
-| 500 | Internal Server Error |
-| 503 | Service unavailable |
-
-## Authentication
-
-Requires `AccessKey` header with one of these scopes:
-- SubuserAPIDns
-- SubuserAPIManage
-- SubuserDns
-- SubuserManage
-- User
-- UserApi
-
-**Base URL:** https://api.bunny.net
+````

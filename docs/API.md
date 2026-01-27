@@ -4,12 +4,16 @@ Complete API documentation for the Bunny API Proxy, which provides a secure, sco
 
 ## Overview
 
-The Bunny API Proxy is structured with three main API categories:
+The Bunny API Proxy enables controlled access to bunny.net's DNS management APIs through scoped API keys. It sits between clients (like ACME clients, automation tools, etc.) and the bunny.net API, enforcing permission boundaries.
 
-1. **Proxy API** - DNS endpoints that require scoped API key authentication
-2. **Admin REST API** - Management endpoints with AccessKey token or Basic auth
-3. **Admin Web UI** - HTML interface with session-based authentication
-4. **Health Endpoints** - Service health and readiness checks
+All APIs listen on port 8080 (configurable via `HTTP_PORT` environment variable).
+
+### API Categories
+
+1. **Admin REST API** - Master key, admin tokens, and scoped API key management
+2. **Admin Web UI** - HTML interface for administrative tasks (session-based)
+3. **DNS Proxy API** - Scoped access to bunny.net DNS endpoints (AccessKey required)
+4. **Health Endpoints** - Service health and readiness checks (no auth)
 
 ## Base URL
 
@@ -17,584 +21,33 @@ The Bunny API Proxy is structured with three main API categories:
 http://localhost:8080
 ```
 
-The server listens on port 8080 by default (configurable via `HTTP_PORT` environment variable).
+---
 
 ---
 
-## Health Endpoints
+## Admin REST API
 
-### GET /health
+Endpoints for managing the proxy's master key, admin tokens, and scoped API keys.
 
-Basic health check - indicates the process is alive.
+### Authentication Methods
 
-**Authentication:** None
-**Response:** 200 OK
-
-**Example Request:**
-```bash
-curl -X GET http://localhost:8080/health
-```
-
-**Example Response:**
-```json
-{
-  "status": "ok"
-}
-```
-
----
-
-### GET /ready
-
-Readiness check - indicates the service is ready to serve requests (database connected).
-
-**Authentication:** None
-**Response:** 200 OK if ready, 503 Service Unavailable if database is not accessible
-
-**Example Request:**
-```bash
-curl -X GET http://localhost:8080/ready
-```
-
-**Example Response (Ready):**
-```json
-{
-  "status": "ok",
-  "database": "connected"
-}
-```
-
-**Example Response (Not Ready):**
-```json
-{
-  "status": "error",
-  "database": "not configured"
-}
-```
-
----
-
-## Proxy API Endpoints (DNS)
-
-The proxy API provides scoped access to bunny.net's DNS management APIs. All endpoints require authentication via the `AccessKey` header with a valid scoped API key.
-
-### Authentication
-
-Each request must include an `AccessKey` header with a valid scoped API key:
-
-```
-AccessKey: <scoped-api-key>
-```
-
-Requests without a valid key will be rejected with a `401 Unauthorized` response.
-
-### Permissions
-
-Each scoped API key has associated permissions that define:
-- **Allowed zones** - Which DNS zones can be accessed
-- **Allowed actions** - Which operations are permitted (list, add, delete)
-- **Record types** - Which DNS record types can be modified (A, CNAME, TXT, etc.)
-
-### Common Error Responses
-
-| Status Code | Description |
-|---|---|
-| 400 | Bad Request - Invalid parameters or malformed request |
-| 401 | Unauthorized - Invalid or missing API key |
-| 404 | Not Found - Resource does not exist |
-| 502 | Bad Gateway - Upstream bunny.net API authentication failed |
-| 500 | Internal Server Error - Server error or upstream API error |
-
----
-
-### GET /dnszone
-
-List all accessible DNS zones with optional filtering and pagination.
-
-**Authentication:** Required (AccessKey header)
-**Permissions Required:** `list_zones` action
-
-**Query Parameters:**
-
-| Parameter | Type | Description |
-|---|---|---|
-| `page` | integer | Page number (1-indexed), default: 1 |
-| `perPage` | integer | Items per page, default: 10 |
-| `search` | string | Search filter by zone name |
-
-**Example Request:**
-```bash
-curl -X GET "http://localhost:8080/dnszone?page=1&perPage=10&search=example" \
-  -H "AccessKey: your-scoped-api-key"
-```
-
-**Example Response (200 OK):**
-```json
-{
-  "CurrentPage": 1,
-  "TotalItems": 5,
-  "HasMoreItems": false,
-  "Items": [
-    {
-      "Id": 123456,
-      "Domain": "example.com",
-      "Records": [],
-      "DateModified": "2025-01-20T10:30:00Z",
-      "DateCreated": "2025-01-15T08:00:00Z",
-      "NameserversDetected": true,
-      "CustomNameserversEnabled": false,
-      "Nameserver1": "ns1.bunny.net",
-      "Nameserver2": "ns2.bunny.net",
-      "SoaEmail": "admin@example.com",
-      "LoggingEnabled": false,
-      "LoggingIPAnonymization": true,
-      "DnsSecEnabled": false,
-      "CertificateKeyType": ""
-    }
-  ]
-}
-```
-
----
-
-### GET /dnszone/{zoneID}
-
-Retrieve a single DNS zone by ID, including all its records.
-
-**Authentication:** Required (AccessKey header)
-**Permissions Required:** `list_zones` action
-**Path Parameters:**
-
-| Parameter | Type | Description |
-|---|---|---|
-| `zoneID` | integer | The zone ID |
-
-**Example Request:**
-```bash
-curl -X GET http://localhost:8080/dnszone/123456 \
-  -H "AccessKey: your-scoped-api-key"
-```
-
-**Example Response (200 OK):**
-```json
-{
-  "Id": 123456,
-  "Domain": "example.com",
-  "Records": [
-    {
-      "Id": 456789,
-      "Type": "A",
-      "Name": "www",
-      "Value": "192.0.2.1",
-      "Ttl": 3600,
-      "Priority": 0,
-      "Weight": 0,
-      "Port": 0,
-      "Flags": 0,
-      "Tag": "",
-      "Accelerated": false,
-      "AcceleratedPullZoneId": 0,
-      "MonitorStatus": "active",
-      "MonitorType": "none",
-      "GeolocationLatitude": 0,
-      "GeolocationLongitude": 0,
-      "LatencyZone": "",
-      "SmartRoutingType": "",
-      "Disabled": false,
-      "Comment": ""
-    },
-    {
-      "Id": 456790,
-      "Type": "TXT",
-      "Name": "_acme-challenge",
-      "Value": "validation-string",
-      "Ttl": 300,
-      "Priority": 0,
-      "Weight": 0,
-      "Port": 0,
-      "Flags": 0,
-      "Tag": "",
-      "Accelerated": false,
-      "AcceleratedPullZoneId": 0,
-      "MonitorStatus": "active",
-      "MonitorType": "none",
-      "GeolocationLatitude": 0,
-      "GeolocationLongitude": 0,
-      "LatencyZone": "",
-      "SmartRoutingType": "",
-      "Disabled": false,
-      "Comment": ""
-    }
-  ],
-  "DateModified": "2025-01-20T10:30:00Z",
-  "DateCreated": "2025-01-15T08:00:00Z",
-  "NameserversDetected": true,
-  "CustomNameserversEnabled": false,
-  "Nameserver1": "ns1.bunny.net",
-  "Nameserver2": "ns2.bunny.net",
-  "SoaEmail": "admin@example.com",
-  "LoggingEnabled": false,
-  "LoggingIPAnonymization": true,
-  "DnsSecEnabled": false
-}
-```
-
-**Error Responses:**
-- `400 Bad Request` - Invalid zone ID
-- `401 Unauthorized` - Invalid API key
-- `404 Not Found` - Zone does not exist
-- `502 Bad Gateway` - Upstream authentication failed
-
----
-
-### GET /dnszone/{zoneID}/records
-
-List all DNS records for a specific zone.
-
-**Authentication:** Required (AccessKey header)
-**Permissions Required:** `list_records` action
-**Path Parameters:**
-
-| Parameter | Type | Description |
-|---|---|---|
-| `zoneID` | integer | The zone ID |
-
-**Example Request:**
-```bash
-curl -X GET http://localhost:8080/dnszone/123456/records \
-  -H "AccessKey: your-scoped-api-key"
-```
-
-**Example Response (200 OK):**
-```json
-[
-  {
-    "Id": 456789,
-    "Type": "A",
-    "Name": "www",
-    "Value": "192.0.2.1",
-    "Ttl": 3600,
-    "Priority": 0,
-    "Weight": 0,
-    "Port": 0,
-    "Flags": 0,
-    "Tag": "",
-    "Accelerated": false,
-    "AcceleratedPullZoneId": 0,
-    "MonitorStatus": "active",
-    "MonitorType": "none",
-    "GeolocationLatitude": 0,
-    "GeolocationLongitude": 0,
-    "LatencyZone": "",
-    "SmartRoutingType": "",
-    "Disabled": false,
-    "Comment": ""
-  },
-  {
-    "Id": 456790,
-    "Type": "TXT",
-    "Name": "_acme-challenge",
-    "Value": "validation-string",
-    "Ttl": 300,
-    "Priority": 0,
-    "Weight": 0,
-    "Port": 0,
-    "Flags": 0,
-    "Tag": "",
-    "Accelerated": false,
-    "AcceleratedPullZoneId": 0,
-    "MonitorStatus": "active",
-    "MonitorType": "none",
-    "GeolocationLatitude": 0,
-    "GeolocationLongitude": 0,
-    "LatencyZone": "",
-    "SmartRoutingType": "",
-    "Disabled": false,
-    "Comment": ""
-  }
-]
-```
-
-**Error Responses:**
-- `400 Bad Request` - Invalid zone ID
-- `401 Unauthorized` - Invalid API key
-- `404 Not Found` - Zone does not exist
-- `502 Bad Gateway` - Upstream authentication failed
-
----
-
-### POST /dnszone/{zoneID}/records
-
-Create a new DNS record in the specified zone.
-
-**Authentication:** Required (AccessKey header)
-**Permissions Required:** `add_record` action
-**Path Parameters:**
-
-| Parameter | Type | Description |
-|---|---|---|
-| `zoneID` | integer | The zone ID |
-
-**Request Body (JSON):**
-
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `Type` | string | Yes | DNS record type (A, AAAA, CNAME, TXT, MX, NS, SRV, CAA, etc.) |
-| `Name` | string | Yes | Subdomain name (e.g., "www" or "_acme-challenge") |
-| `Value` | string | Yes | Record value (IP address, domain, text, etc.) |
-| `Ttl` | integer | No | Time to live in seconds (default: 3600) |
-| `Priority` | integer | No | Priority for MX records (default: 0) |
-| `Weight` | integer | No | Weight for SRV records (default: 0) |
-| `Port` | integer | No | Port for SRV records (default: 0) |
-| `Flags` | integer | No | Flags for CAA records (default: 0) |
-| `Tag` | string | No | Tag for CAA records |
-| `Disabled` | boolean | No | Whether the record is disabled (default: false) |
-| `Comment` | string | No | Comment or description for the record |
-
-**Example Request (A Record):**
-```bash
-curl -X POST http://localhost:8080/dnszone/123456/records \
-  -H "AccessKey: your-scoped-api-key" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "Type": "A",
-    "Name": "www",
-    "Value": "192.0.2.1",
-    "Ttl": 3600
-  }'
-```
-
-**Example Request (TXT Record for ACME DNS-01):**
-```bash
-curl -X POST http://localhost:8080/dnszone/123456/records \
-  -H "AccessKey: your-scoped-api-key" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "Type": "TXT",
-    "Name": "_acme-challenge",
-    "Value": "validation-string-from-acme",
-    "Ttl": 300
-  }'
-```
-
-**Example Response (201 Created):**
-```json
-{
-  "Id": 789012,
-  "Type": "TXT",
-  "Name": "_acme-challenge",
-  "Value": "validation-string-from-acme",
-  "Ttl": 300,
-  "Priority": 0,
-  "Weight": 0,
-  "Port": 0,
-  "Flags": 0,
-  "Tag": "",
-  "Accelerated": false,
-  "AcceleratedPullZoneId": 0,
-  "MonitorStatus": "active",
-  "MonitorType": "none",
-  "GeolocationLatitude": 0,
-  "GeolocationLongitude": 0,
-  "LatencyZone": "",
-  "SmartRoutingType": "",
-  "Disabled": false,
-  "Comment": ""
-}
-```
-
-**Error Responses:**
-- `400 Bad Request` - Invalid zone ID or malformed request body
-- `401 Unauthorized` - Invalid API key or insufficient permissions
-- `404 Not Found` - Zone does not exist
-- `502 Bad Gateway` - Upstream authentication failed
-- `500 Internal Server Error` - Server error or upstream API error
-
----
-
-### DELETE /dnszone/{zoneID}/records/{recordID}
-
-Delete a DNS record from the specified zone.
-
-**Authentication:** Required (AccessKey header)
-**Permissions Required:** `delete_record` action
-**Path Parameters:**
-
-| Parameter | Type | Description |
-|---|---|---|
-| `zoneID` | integer | The zone ID |
-| `recordID` | integer | The record ID to delete |
-
-**Example Request:**
-```bash
-curl -X DELETE http://localhost:8080/dnszone/123456/records/789012 \
-  -H "AccessKey: your-scoped-api-key"
-```
-
-**Example Response (204 No Content):**
-```
-(empty body)
-```
-
-**Error Responses:**
-- `400 Bad Request` - Invalid zone ID or record ID
-- `401 Unauthorized` - Invalid API key or insufficient permissions
-- `404 Not Found` - Zone or record does not exist
-- `502 Bad Gateway` - Upstream authentication failed
-- `500 Internal Server Error` - Server error or upstream API error
-
----
-
-## Admin API Endpoints (REST)
-
-Admin endpoints for managing the proxy itself (master API key, scoped keys, admin tokens, and log level).
-
-### Authentication
-
-Admin API endpoints support two authentication methods:
-
-#### 1. AccessKey Token (Recommended)
-Use an AccessKey token created via the admin UI or API:
+**AccessKey Token (Recommended):**
 ```
 AccessKey: <admin-token>
 ```
 
-#### 2. Basic Auth (Bootstrap Only)
-For initial setup before tokens exist:
+**Basic Auth (Bootstrap Only):**
 ```
 Authorization: Basic base64(admin:<ADMIN_PASSWORD>)
 ```
 
-The `ADMIN_PASSWORD` environment variable must be set for Basic auth to work.
+Basic auth is only available if `ADMIN_PASSWORD` environment variable is set. Use it for initial setup before creating tokens.
 
-### Admin Public Endpoints
-
-#### POST /admin/login
-
-Authenticate and create an admin session via HTML form.
-
-**Authentication:** None (form-based)
-**Request Format:** HTML form data
-
-**Form Parameters:**
-- `password` - The admin password
-
-**Example Request:**
-```bash
-curl -X POST http://localhost:8080/admin/login \
-  -d "password=your-admin-password"
-```
-
-**Example Response (303 See Other - Redirect):**
-Redirects to `/admin` with `admin_session` cookie set.
-
-**Error Responses:**
-- `401 Unauthorized` - Invalid password
-- `500 Internal Server Error` - Server configuration error
-
----
-
-#### POST /admin/logout
-
-Invalidate the admin session and clear the session cookie.
-
-**Authentication:** Session cookie required
-**Response:** 200 OK
-
-**Example Request:**
-```bash
-curl -X POST http://localhost:8080/admin/logout \
-  -b "admin_session=<session-id>"
-```
-
-**Example Response:**
-```
-Logged out
-```
-
----
-
-#### GET /admin/health
-
-Health check endpoint (no auth required).
-
-**Authentication:** None
-**Response:** 200 OK
-
-**Example Request:**
-```bash
-curl http://localhost:8080/admin/health
-```
-
-**Example Response:**
-```json
-{
-  "status": "ok"
-}
-```
-
----
-
-#### GET /admin/ready
-
-Readiness check - verifies database connectivity.
-
-**Authentication:** None
-**Response:** 200 OK if ready, 503 Service Unavailable otherwise
-
-**Example Request:**
-```bash
-curl http://localhost:8080/admin/ready
-```
-
-**Example Response (Ready):**
-```json
-{
-  "status": "ok",
-  "database": "connected"
-}
-```
-
----
-
-### Admin REST API Endpoints
-
-#### POST /admin/api/loglevel
-
-Change the runtime log level.
-
-**Authentication:** AccessKey or Basic auth required
-**Response:** 200 OK
-
-**Request Body (JSON):**
-```json
-{
-  "level": "debug|info|warn|error"
-}
-```
-
-**Example Request:**
-```bash
-curl -X POST http://localhost:8080/admin/api/loglevel \
-  -H "AccessKey: <admin-token>" \
-  -H "Content-Type: application/json" \
-  -d '{"level": "debug"}'
-```
-
-**Example Response:**
-```json
-{
-  "level": "debug"
-}
-```
-
-**Valid Levels:** `debug`, `info`, `warn`, `error`
-
----
+### Managing Admin Tokens
 
 #### GET /admin/api/tokens
 
-List all admin tokens (names and IDs only - tokens are never returned after creation).
+List all admin tokens (names and creation dates only - full tokens are never returned).
 
 **Authentication:** AccessKey or Basic auth required
 **Response:** 200 OK
@@ -630,15 +83,13 @@ Create a new admin token.
 **Authentication:** AccessKey or Basic auth required
 **Response:** 201 Created
 
-**Request Body (JSON):**
+**Request Body:**
 ```json
 {
   "name": "token-name",
   "token": "your-token-value"
 }
 ```
-
-**Note:** The token value is shown only once in the response. Store it securely immediately.
 
 **Example Request:**
 ```bash
@@ -647,7 +98,7 @@ curl -X POST http://localhost:8080/admin/api/tokens \
   -H "Content-Type: application/json" \
   -d '{
     "name": "my-new-token",
-    "token": "my-secret-token-value"
+    "token": "my-secret-value"
   }'
 ```
 
@@ -656,20 +107,20 @@ curl -X POST http://localhost:8080/admin/api/tokens \
 {
   "id": 3,
   "name": "my-new-token",
-  "token": "my-secret-token-value"
+  "token": "my-secret-value"
 }
 ```
+
+**Note:** The token is shown only once. Store it securely immediately - it cannot be retrieved later.
 
 ---
 
 #### DELETE /admin/api/tokens/{id}
 
-Delete an admin token by ID.
+Delete an admin token.
 
 **Authentication:** AccessKey or Basic auth required
-**Path Parameters:**
-- `id` - The token ID
-
+**Path Parameters:** `id` - The token ID
 **Response:** 204 No Content
 
 **Example Request:**
@@ -678,19 +129,18 @@ curl -X DELETE http://localhost:8080/admin/api/tokens/1 \
   -H "AccessKey: <admin-token>"
 ```
 
-**Error Responses:**
-- `404 Not Found` - Token does not exist
-
 ---
+
+### Master API Key Management
 
 #### PUT /admin/api/master-key
 
 Set the master bunny.net API key (can only be set once).
 
 **Authentication:** AccessKey or Basic auth required
-**Response:** 201 Created (if successful) or 409 Conflict (if already set)
+**Response:** 201 Created or 409 Conflict (if already set)
 
-**Request Body (JSON):**
+**Request Body:**
 ```json
 {
   "api_key": "bunny.net-api-key"
@@ -705,30 +155,25 @@ curl -X PUT http://localhost:8080/admin/api/master-key \
   -d '{"api_key": "12345abcde-bunny-api-key"}'
 ```
 
-**Example Response (Success):**
+**Example Response:**
 ```json
 {
   "status": "ok"
 }
 ```
 
-**Example Response (Already Set):**
-```json
-{
-  "error": "master key already set"
-}
-```
-
 ---
+
+### Scoped API Key Management
 
 #### POST /admin/api/keys
 
-Create a new scoped API key with permissions in one operation.
+Create a new scoped API key with specific zone and action permissions.
 
 **Authentication:** AccessKey or Basic auth required
 **Response:** 201 Created
 
-**Request Body (JSON):**
+**Request Body:**
 ```json
 {
   "name": "key-name",
@@ -739,12 +184,12 @@ Create a new scoped API key with permissions in one operation.
 ```
 
 **Parameters:**
-- `name` (string, required) - Descriptive name for the key
-- `zones` (array of integers, required) - Zone IDs this key can access
-- `actions` (array of strings, required) - Allowed actions: `list_zones`, `get_zone`, `list_records`, `add_record`, `delete_record`
-- `record_types` (array of strings, required) - DNS record types the key can modify
+- `name` - Descriptive name for the key
+- `zones` - Zone IDs this key can access
+- `actions` - Allowed actions: `list_zones`, `get_zone`, `list_records`, `add_record`, `delete_record`
+- `record_types` - DNS record types the key can modify
 
-**Example Request:**
+**Example Request (ACME DNS-01 Client):**
 ```bash
 curl -X POST http://localhost:8080/admin/api/keys \
   -H "AccessKey: <admin-token>" \
@@ -765,15 +210,72 @@ curl -X POST http://localhost:8080/admin/api/keys \
 }
 ```
 
-**Note:** The key is shown only once in the response. Store it securely immediately.
+**Note:** The key is shown only once. Store it securely immediately.
 
 ---
 
-## Admin Web UI Endpoints
+### Log Level Management
 
-HTML interface for managing the proxy. All endpoints require session authentication via the `admin_session` cookie.
+#### POST /admin/api/loglevel
 
-### GET /admin
+Change the runtime log level.
+
+**Authentication:** AccessKey or Basic auth required
+**Response:** 200 OK
+
+**Request Body:**
+```json
+{
+  "level": "debug|info|warn|error"
+}
+```
+
+**Example Request:**
+```bash
+curl -X POST http://localhost:8080/admin/api/loglevel \
+  -H "AccessKey: <admin-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"level": "debug"}'
+```
+
+**Example Response:**
+```json
+{
+  "level": "debug"
+}
+```
+
+---
+
+## Admin Web UI
+
+HTML interface for administrative management. All endpoints require session authentication via the `admin_session` cookie.
+
+### Session Management
+
+#### POST /admin/login
+
+Authenticate and create an admin session.
+
+**Authentication:** None
+**Request Format:** HTML form data
+**Form Parameters:** `password` - The admin password
+**Response:** 303 See Other (redirects to /admin with session cookie)
+
+---
+
+#### POST /admin/logout
+
+Invalidate the current admin session.
+
+**Authentication:** Session cookie required
+**Response:** 200 OK
+
+---
+
+### Dashboard
+
+#### GET /admin
 
 Admin dashboard home page.
 
@@ -786,7 +288,7 @@ Admin dashboard home page.
 
 #### GET /admin/master-key
 
-Display the master API key management form. Shows a masked version of the current key if set.
+Display the master API key management form.
 
 **Authentication:** Session cookie required
 **Response:** 200 OK (HTML)
@@ -795,15 +297,10 @@ Display the master API key management form. Shows a masked version of the curren
 
 #### POST /admin/master-key
 
-Update the master bunny.net API key via HTML form.
+Update the master bunny.net API key via form.
 
 **Authentication:** Session cookie required
-**Request Format:** HTML form data
-
-**Form Parameters:**
-- `key` - The master bunny.net API key
-
-**Response:** 303 See Other - Redirects to `/admin/master-key`
+**Response:** 303 See Other (redirects to /admin/master-key)
 
 ---
 
@@ -820,7 +317,7 @@ Display list of all admin tokens.
 
 #### GET /admin/tokens/new
 
-Display form to create a new admin token. The system automatically generates a secure token.
+Display form to create a new admin token.
 
 **Authentication:** Session cookie required
 **Response:** 200 OK (HTML)
@@ -829,17 +326,10 @@ Display form to create a new admin token. The system automatically generates a s
 
 #### POST /admin/tokens
 
-Create a new admin token via HTML form.
+Create a new admin token via form. The system automatically generates the token.
 
 **Authentication:** Session cookie required
-**Request Format:** HTML form data
-
-**Form Parameters:**
-- `name` - Descriptive name for the token
-
-**Response:** 200 OK (HTML with generated token displayed)
-
-The response displays the generated token only once - users must copy it immediately as it cannot be retrieved later.
+**Response:** 200 OK (HTML with generated token displayed once)
 
 ---
 
@@ -848,10 +338,7 @@ The response displays the generated token only once - users must copy it immedia
 Delete an admin token.
 
 **Authentication:** Session cookie required
-**Path Parameters:**
-- `id` - The token ID
-
-**Response:** 303 See Other - Redirects to `/admin/tokens`
+**Response:** 303 See Other (redirects to /admin/tokens)
 
 ---
 
@@ -877,16 +364,10 @@ Display form to create a new scoped API key.
 
 #### POST /admin/keys
 
-Create a new scoped API key via HTML form.
+Create a new scoped API key via form.
 
 **Authentication:** Session cookie required
-**Request Format:** HTML form data
-
-**Form Parameters:**
-- `name` - Descriptive name for the key
-- `api_key` - The API key value (user-provided or auto-generated)
-
-**Response:** 303 See Other - Redirects to `/admin/keys`
+**Response:** 303 See Other (redirects to /admin/keys)
 
 ---
 
@@ -895,9 +376,6 @@ Create a new scoped API key via HTML form.
 Display detailed view of a scoped key including all permissions.
 
 **Authentication:** Session cookie required
-**Path Parameters:**
-- `id` - The key ID
-
 **Response:** 200 OK (HTML)
 
 ---
@@ -907,10 +385,7 @@ Display detailed view of a scoped key including all permissions.
 Delete a scoped API key and all its permissions.
 
 **Authentication:** Session cookie required
-**Path Parameters:**
-- `id` - The key ID
-
-**Response:** 303 See Other - Redirects to `/admin/keys`
+**Response:** 303 See Other (redirects to /admin/keys)
 
 ---
 
@@ -921,9 +396,6 @@ Delete a scoped API key and all its permissions.
 Display form to add a new permission to a scoped key.
 
 **Authentication:** Session cookie required
-**Path Parameters:**
-- `id` - The key ID
-
 **Response:** 200 OK (HTML)
 
 ---
@@ -933,17 +405,12 @@ Display form to add a new permission to a scoped key.
 Add a permission to a scoped key.
 
 **Authentication:** Session cookie required
-**Path Parameters:**
-- `id` - The key ID
-
-**Request Format:** HTML form data
-
 **Form Parameters:**
 - `zone_id` - The zone ID
-- `allowed_actions` - Comma-separated list of actions (list_zones, get_zone, list_records, add_record, delete_record)
-- `record_types` - Comma-separated list of DNS record types (A, AAAA, CNAME, TXT, MX, NS, SRV, CAA, etc.)
+- `allowed_actions` - Comma-separated list of actions
+- `record_types` - Comma-separated list of DNS record types
 
-**Response:** 303 See Other - Redirects to `/admin/keys/{id}`
+**Response:** 303 See Other (redirects to /admin/keys/{id})
 
 ---
 
@@ -952,11 +419,180 @@ Add a permission to a scoped key.
 Delete a permission from a scoped key.
 
 **Authentication:** Session cookie required
-**Path Parameters:**
-- `id` - The key ID
-- `pid` - The permission ID
+**Response:** 303 See Other (redirects to /admin/keys/{id})
 
-**Response:** 303 See Other - Redirects to `/admin/keys/{id}`
+---
+
+## DNS Proxy API (Scoped Access)
+
+The DNS proxy API provides scoped, controlled access to bunny.net's DNS management APIs. All endpoints require a valid scoped API key via the `AccessKey` header.
+
+### Authentication
+
+Each request must include an `AccessKey` header with a valid scoped API key:
+
+```
+AccessKey: <scoped-api-key>
+```
+
+Requests without a valid key will be rejected with a `401 Unauthorized` response.
+
+### Authorization
+
+Each scoped API key has associated permissions that define:
+- **Allowed zones** - Which DNS zones can be accessed
+- **Allowed actions** - Which operations are permitted (list_zones, add_record, delete_record, etc.)
+- **Record types** - Which DNS record types can be modified (A, AAAA, CNAME, TXT, MX, etc.)
+
+### Implemented Endpoints
+
+The proxy currently implements 4 MVP endpoints for ACME DNS-01 challenge validation. For complete specifications and all 17 bunny.net DNS Zone API endpoints, see the [Official bunny.net API Documentation](bunny-api-official-docs/).
+
+| Operation | Method | Path |
+|-----------|--------|------|
+| List DNS Zones | GET | `/dnszone` |
+| Get DNS Zone Details | GET | `/dnszone/{zoneID}` |
+| Add DNS Record | POST | `/dnszone/{zoneID}/records` |
+| Delete DNS Record | DELETE | `/dnszone/{zoneID}/records/{recordID}` |
+
+For details on request/response formats and full specifications for all bunny.net endpoints, refer to the [Official bunny.net DNS Zone API Documentation](bunny-api-official-docs/).
+
+---
+
+### GET /dnszone
+
+List all accessible DNS zones with optional filtering and pagination.
+
+**Authentication:** AccessKey required
+**Permissions Required:** `list_zones` action
+
+**Query Parameters:**
+- `page` - Page number (default: 1)
+- `perPage` - Items per page (default: 10)
+- `search` - Filter by zone name
+
+**Example Request:**
+```bash
+curl -X GET "http://localhost:8080/dnszone?page=1&perPage=10" \
+  -H "AccessKey: your-scoped-api-key"
+```
+
+See [Official Documentation](bunny-api-official-docs/dnszone-list.md) for complete response schema.
+
+---
+
+### GET /dnszone/{zoneID}
+
+Retrieve a single DNS zone by ID, including all its records.
+
+**Authentication:** AccessKey required
+**Permissions Required:** `list_zones` action
+**Path Parameters:** `zoneID` - The zone ID
+
+**Example Request:**
+```bash
+curl -X GET http://localhost:8080/dnszone/123456 \
+  -H "AccessKey: your-scoped-api-key"
+```
+
+See [Official Documentation](bunny-api-official-docs/dnszone-get.md) for complete response schema.
+
+---
+
+### POST /dnszone/{zoneID}/records
+
+Create a new DNS record in the specified zone.
+
+**Authentication:** AccessKey required
+**Permissions Required:** `add_record` action
+**Path Parameters:** `zoneID` - The zone ID
+
+**Required Fields:**
+- `Type` - DNS record type (A, AAAA, CNAME, TXT, MX, NS, SRV, CAA, etc.)
+- `Name` - Subdomain name (e.g., "www" or "_acme-challenge")
+- `Value` - Record value (IP address, domain, text, etc.)
+
+**Optional Fields:** `Ttl`, `Priority`, `Weight`, `Port`, `Flags`, `Tag`, `Disabled`, `Comment`
+
+**Example Request (ACME DNS-01):**
+```bash
+curl -X POST http://localhost:8080/dnszone/123456/records \
+  -H "AccessKey: your-scoped-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "Type": "TXT",
+    "Name": "_acme-challenge",
+    "Value": "validation-string",
+    "Ttl": 300
+  }'
+```
+
+See [Official Documentation](bunny-api-official-docs/dnszone-add-record.md) for complete request/response schema.
+
+---
+
+### DELETE /dnszone/{zoneID}/records/{recordID}
+
+Delete a DNS record from the specified zone.
+
+**Authentication:** AccessKey required
+**Permissions Required:** `delete_record` action
+**Path Parameters:**
+- `zoneID` - The zone ID
+- `recordID` - The record ID to delete
+
+**Example Request:**
+```bash
+curl -X DELETE http://localhost:8080/dnszone/123456/records/789012 \
+  -H "AccessKey: your-scoped-api-key"
+```
+
+**Response:** 204 No Content
+
+---
+
+## Health Endpoints
+
+### GET /health
+
+Basic health check - indicates the process is alive.
+
+**Authentication:** None
+**Response:** 200 OK
+
+**Example Request:**
+```bash
+curl http://localhost:8080/health
+```
+
+**Example Response:**
+```json
+{
+  "status": "ok"
+}
+```
+
+---
+
+### GET /ready
+
+Readiness check - indicates the service is ready to serve requests (database connected).
+
+**Authentication:** None
+**Response:** 200 OK if ready, 503 Service Unavailable otherwise
+
+**Example Request:**
+```bash
+curl http://localhost:8080/ready
+```
+
+**Example Response (Ready):**
+```json
+{
+  "status": "ok",
+  "database": "connected"
+}
+```
 
 ---
 
@@ -1088,4 +724,22 @@ All API requests are logged with structured JSON logging. Check server logs for:
 - API key creation/deletion
 - Admin token operations
 - Record modifications
+
+---
+
+## Reference: Official bunny.net API Documentation
+
+For complete specifications of all bunny.net DNS Zone API endpoints (both MVP and future), see the dedicated documentation directory:
+
+- **[Official API Docs](bunny-api-official-docs/)** - All 17 endpoints with complete OpenAPI specifications and reference material
+- **[OpenAPI Specification](bunny-api-official-docs/openapi-v3.json)** - Machine-readable format for tools and code generation
+
+The proxy currently implements the **4 MVP endpoints** shown above. Additional bunny.net endpoints can be integrated into the proxy by:
+
+1. Adding the endpoint to the proxy's routing configuration
+2. Applying permission checks (zone access, allowed actions, record types)
+3. Forwarding the request to bunny.net's API
+4. Returning the scoped response to the client
+
+See the project architecture documentation for details on extending the proxy.
 
