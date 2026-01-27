@@ -291,4 +291,48 @@ We diverged from some recommendations:
 
 ### Feedback Response
 
-*(To be added)*
+Your final design reflects a pragmatic shift toward the **"Headless Infrastructure"** trend, prioritizing operational stability and security over graphical convenience. For a tool targeted at DevOps and SRE professionals, these choices align well with the industry's movement toward **GitOps and Infrastructure-as-Code (IaC)** principles.
+
+Below is a critical review of your specific design decisions and answers to your questions.
+
+#### Review of Design Divergences
+
+* **API-Only Strategy:** This is a bold but defensible move. Industry leaders like **Caddy** have demonstrated that providing a robust JSON API and human-readable configuration is often preferred by technical users over a GUI. By removing the UI, you effectively eliminate entire classes of web-based vulnerabilities (XSS, CSRF, Session Fixation), which is critical for an edge proxy.
+
+* **Bunny.net Key Bootstrap:** This approach solves the **"Secret Zero"** paradox (needing a secret to get a secret) by leveraging a pre-existing trust relationship. It follows an **"environment seeding"** pattern commonly used in containerized infrastructure where initial state is derived from environment variables.
+
+* **Unified Token Model:** Independent admin and zone permissions represent a standard implementation of **Role-Based Access Control (RBAC)**. This flexibility is superior to rigid hierarchies, as it allows for "audit-only" admin accounts or "record-only" automation tokens.
+
+---
+
+#### Specific Feedback and Answers
+
+**1. On Removing the UI Entirely**
+
+Removing the UI is not "too aggressive" for your target audience (DevOps/SRE). Elite engineering teams often reject "ClickOps" because it introduces configuration drift that is difficult to audit or replicate in CI/CD pipelines. However, to maintain the "observability layer" benefits, you should ensure the proxy exposes a **metrics endpoint** (e.g., in Prometheus format). This allows users to build their own dashboards in standard tools like **Grafana**, which practitioners overwhelmingly prefer for observability over custom, built-in UIs.
+
+**2. Bootstrap without OIDC**
+
+For a single-container homelab tool, skipping OIDC is acceptable and arguably more user-friendly. OIDC setup is notoriously complex and often requires an external identity provider (IdP) that many homelab users do not run. Your approach follows the **"Factory Bootstrap"** pattern, where initial credentials are derived from the host environment. It is a common pattern for self-hosted DevOps tools.
+
+**3. Permanent Master Key Lockout**
+
+Permanent lockout of the upstream key from the administrative API is a strong security control, but it creates high friction for recovery. While **HashiCorp Vault** uses a similar "burn-once" logic for its root token, it provides "unseal keys" for emergency recovery.
+
+* **Recommendation:** Instead of requiring manual SQL deletion, implement a **CLI-based recovery command** within the container (e.g., `proxy-tool create-admin --token=xxx`). This provides a programmatic path for users with host-level access (Docker exec) without exposing the API to remote brute-force attacks.
+
+**4. The Persistence Paradox and Target Audience**
+
+Direct SQLite access for recovery is perfectly acceptable for SREs and DevOps engineers. This audience is comfortable with CLI tools and expects infrastructure components to be "plumbable." SQLite is increasingly viewed as the **"superior choice"** for single-server production workloads because it eliminates the overhead and failure modes of networked databases like Postgres or MariaDB. Standard tools like the `sqlite3` CLI already provide robust recovery and repair mechanisms (`.recover` and `.dump`) that your users will likely already know how to use.
+
+**5. Security Concerns with Upstream API Key Bootstrap**
+
+The primary security risk is **Log Exposure**. During the "first call" that creates the admin token, the upstream bunny.net API key might be printed to standard output or captured in container logs if not handled carefully.
+
+* **Mitigation:** Ensure your logging middleware explicitly masks the `AccessKey` header and any "bootstrap" payloads.
+
+* **Idempotency:** Ensure the bootstrap endpoint is strictly idempotent; if an admin already exists, the proxy must return a generic `403 Forbidden` or `404 Not Found` rather than confirming the validity of the bunny.net key to prevent attackers from using it as a probe.
+
+#### Final Recommendation
+
+Your design is technically sound and highly secure. The transition from a browser-heavy strategy to an **API-first, CLI-supported** model reflects the maturity of the 2026 DevOps ecosystem. Focus your testing efforts on **API Contract Testing** to ensure that your ACME clients and automation scripts don't break as you iterate on the token model.
