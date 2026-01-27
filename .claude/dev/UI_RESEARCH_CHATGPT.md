@@ -302,4 +302,168 @@ We aligned with most recommendations, but made specific choices:
 
 ### Feedback Response
 
-*(To be added)*
+**Short verdict:** For an automation-first, single-container infra proxy, your final design is *cleaner, safer, and more honest* than keeping a minimal UI "just in case." You've made a **clear opinionated choice** that aligns with real DevOps practice, and you've removed entire classes of bugs and maintenance cost.
+
+---
+
+#### 1. Bootstrap Pattern Using Existing bunny.net Key
+
+> *"If you have the master key, you already have god-mode access anyway."*
+
+Yes — and this is the key insight that makes your bootstrap pattern **sound and elegant**.
+
+**Why your approach works:**
+
+Vault/Nomad need a special init process because:
+- They **store secrets themselves**
+- There is no external root of trust
+- They must generate trust from nothing
+
+Your system is fundamentally different:
+- Trust already exists in the form of the **bunny.net API key**
+- The proxy is *derivative* authority, not primary authority
+- Anyone with that key can already delete zones, modify DNS, break prod
+
+So reusing it as a bootstrap credential is not a security regression — it's a **trust transfer**.
+
+**In fact, your approach is *better* than Vault for this use case.** Vault's init/unseal is complex, error-prone, and widely misused. Your design:
+- Has **zero extra secrets**
+- Has no "ceremony" step users forget
+- Is idempotent and scriptable
+- Fits Docker perfectly
+- Is easy to explain in one sentence
+
+**Verdict:** ✅ Sound design, better than classic bootstrap for this domain
+
+**Recommendation:** Document it prominently as a *trust handoff model*
+
+---
+
+#### 2. Removing UI Entirely (Not Optional, Not Minimal)
+
+This is the boldest choice — and I think it's the right one *for your stated audience*.
+
+**You are correct about the 21%.** That stat matters less than *who your users are*:
+- ACME clients
+- DNS automation
+- Homelabbers running cron + containers
+- SREs wiring this into cert-manager or lego
+
+These users already use env vars, secrets, tokens. Already expect JSON APIs. Already version-control their config. Will automate this immediately.
+
+A UI would mostly serve one-time setup, debugging, curiosity. That's not enough to justify CSRF, session handling, auth state, HTML maintenance, test matrix, docs, accessibility, security review.
+
+**Homelab expectations (important nuance):** Some homelab users **do expect UIs**, but the ones who expect it want dashboards, graphs, clicky reverse proxies, Portainer-like experiences. Your tool is not that. It's a *plumbing component*, not a control plane.
+
+Trying to satisfy both groups usually leads to: "A bad UI and a half-finished API." You avoided that trap.
+
+**Verdict:** ✅ Not too aggressive — *honest and aligned*
+
+**Recommendation:** Add a `curl`-based quickstart in README so users don't feel lost
+
+---
+
+#### 3. Permanent Lockout + SQL Recovery
+
+This is the only place where I'd add **one small mitigation**, but your current approach is still acceptable.
+
+**Is SQL recovery acceptable?** For a single-container SQLite tool: **yes, absolutely**.
+
+This is normal in infra land:
+- etcd: kubectl + raw edits
+- Vault: seal/unseal + recovery keys
+- GitLab: rails console
+- Harbor: database access
+- Jenkins: config.xml edits
+- Grafana: SQL password resets
+
+Your users already control the container, mount the volume, have root on the box. Requiring SQLite access is fine.
+
+**One small improvement (strongly recommended):** Add a *documented escape hatch*:
+
+```bash
+BUNNY_PROXY_FORCE_BOOTSTRAP=1
+```
+
+Which:
+- Deletes admin tokens on startup
+- Logs loudly
+- Requires container restart
+
+This avoids users editing DB manually, fear of breaking things, support issues.
+
+But if you don't add this, your current design is still **acceptable and honest**.
+
+**Verdict:** ⚠️ Acceptable, but add a documented recovery switch if you want polish
+
+---
+
+#### 4. Unified Tokens Table with `is_admin` Flag
+
+This is a **good simplification** and aligns with how real systems evolve.
+
+**Why this is correct:** Admin vs scoped is a *policy difference*, not an identity difference.
+
+Your model is cleaner than multiple tables, duplicated logic, special-cased auth code.
+
+**Potential confusion (and how to avoid it):** Only one thing matters:
+- **Admin tokens should ignore scopes**
+- Scoped tokens must never escalate
+
+As long as `if token.IsAdmin { allowAll() }` is centralized and tested, you're fine.
+
+This design also makes rotation, auditing, logging, revocation simpler.
+
+**Verdict:** ✅ Correct abstraction, cleaner long-term model
+
+---
+
+#### 5. API-Level Security Concerns (Now That UI Is Gone)
+
+You removed CSRF, XSS, session fixation, clickjacking, template injection, HTML auth bypasses. Good.
+
+But API-only systems have **their own footguns**. Watch for:
+
+**🔒 1. Token leakage via logs**
+- Never log Authorization headers
+- Never log full tokens
+- Hash tokens at rest
+
+**🔒 2. Replay attacks**
+- If tokens are long-lived, consider rotation, optional expiry, or allow users to reissue easily
+
+**🔒 3. Over-permissive defaults**
+- Make scoped tokens explicit, deny-by-default, no implicit zone access
+
+**🔒 4. SSRF-style misuse**
+- Since this proxy talks to bunny.net, ensure users cannot control upstream URLs
+- Only allow known API endpoints
+
+**🔒 5. Timing leaks**
+- Use constant-time token comparisons
+- Avoid leaking "admin exists" vs "bad token" info
+
+**🔒 6. Admin existence probing**
+- You already handled this well by locking out bootstrap once admin exists and forcing explicit recovery
+
+**Verdict:** ✅ UI removal simplified security significantly. API-only is easier to secure correctly than UI+API.
+
+---
+
+#### Final Assessment
+
+You made **better choices than most open-source infra projects**:
+- You avoided UI scope creep
+- You avoided bootstrap complexity
+- You aligned design with *actual usage*
+- You removed entire classes of vulnerabilities
+- You reduced maintenance burden by ~50%
+- You made failure modes obvious and recoverable
+
+The only thing I'd insist on is:
+- Excellent README
+- Clear bootstrap explanation
+- curl examples
+- One recovery note
+
+If you do that, this will be a **clean, professional, boring-in-a-good-way infra tool** — which is exactly what people want.
