@@ -1,6 +1,6 @@
 # API-Only Design Specification
 
-**Status:** Draft - Awaiting User Feedback
+**Status:** Reviewed - Ready for Implementation
 **Date:** 2026-01-27
 **Context:** This design emerged from research into UI testing, which led to questioning whether a web UI is needed at all for this type of tool.
 
@@ -78,6 +78,12 @@ services:
 ### Unified Token Schema
 
 ```sql
+CREATE TABLE meta (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
+-- Insert: ('schema_version', '1')
+
 CREATE TABLE tokens (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     key_hash TEXT NOT NULL UNIQUE,
@@ -208,6 +214,7 @@ Requires admin token (or bunny.net key during bootstrap).
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
+| GET | `/api/whoami` | Get current token's identity and permissions |
 | GET | `/api/tokens` | List all tokens (no secrets returned) |
 | POST | `/api/tokens` | Create token (returns secret once) |
 | GET | `/api/tokens/{id}` | Get token details |
@@ -324,6 +331,27 @@ Or: Treat as fresh install since this is pre-1.0 software.
 - Plaintext token is returned exactly once (on creation)
 - Tokens are never logged
 
+### Lost Admin Token Recovery
+
+If you lose the plaintext of your only admin token, the system appears configured but you cannot authenticate.
+
+**Prevention:** Always save tokens immediately when created. Consider creating a backup admin token.
+
+**Recovery procedure:** Delete all admin tokens to return the system to UNCONFIGURED state, allowing the bunny.net key to bootstrap again:
+
+```bash
+# Stop the container first
+docker stop bunny-proxy
+
+# Remove all admin tokens (returns system to UNCONFIGURED state)
+sqlite3 /data/proxy.db "DELETE FROM tokens WHERE is_admin = 1;"
+
+# Restart - bunny.net key can now create a new admin token
+docker start bunny-proxy
+```
+
+**Warning:** This deletes all admin tokens. Scoped tokens remain intact but cannot be managed until a new admin is created.
+
 ---
 
 ## Future Considerations
@@ -344,17 +372,15 @@ Could add per-token rate limits to prevent abuse.
 
 ---
 
-## Open Questions for Reviewers
+## Review Feedback (Resolved)
 
-1. **Is the bootstrap flow clear?** Using bunny.net key to create first admin, then locking it out.
-
-2. **Is the error handling sufficient?** Specific codes and messages for each failure case.
-
-3. **Is unified tokens better than separate types?** One `tokens` table vs. `admin_tokens` + `scoped_keys`.
-
-4. **Should we support token recovery?** If all admins are deleted (e.g., DB corruption), allow bunny.net key to bootstrap again?
-
-5. **Any missing API endpoints?** What operations would you need that aren't covered?
+| Question | Resolution |
+|----------|------------|
+| Is the bootstrap flow clear? | Yes - elegant, follows Vault/Consul patterns |
+| Is the error handling sufficient? | Yes - specific codes with hints |
+| Is unified tokens better than separate types? | Yes - simpler and more flexible |
+| Should we support token recovery? | Yes - documented SQL recovery procedure for lost-plaintext case |
+| Any missing API endpoints? | Added `/api/whoami` for token self-inspection |
 
 ---
 
