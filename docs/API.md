@@ -731,8 +731,7 @@ All API requests are logged with structured JSON logging. Check server logs for:
 
 For complete specifications of all bunny.net DNS Zone API endpoints (both MVP and future), see the dedicated documentation directory:
 
-- **[Official API Docs](bunny-api-official-docs/)** - 16 endpoints documented with full specifications
-- **[Comprehensive Integration Guide](bunny-dnszone-api.md)** - Examples, data models, and integration patterns
+- **[Official API Docs](bunny-api-official-docs/)** - All 17 endpoints with complete OpenAPI specifications and reference material
 - **[OpenAPI Specification](bunny-api-official-docs/openapi-v3.json)** - Machine-readable format for tools and code generation
 
 The proxy currently implements the **4 MVP endpoints** shown above. Additional bunny.net endpoints can be integrated into the proxy by:

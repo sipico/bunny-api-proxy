@@ -259,4 +259,3 @@ The API accepts and returns both JSON and XML:
 ## Related Documentation
 
 - **[../API.md](../API.md)** - Bunny API Proxy implementation details and exposed proxy endpoints
-- **[../bunny-api-reference.md](../bunny-api-reference.md)** - Quick reference for the 4 MVP proxy endpoints
