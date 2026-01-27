@@ -427,27 +427,25 @@ func TestHTMXKeyCreation(t *testing.T) {
 
 ### Google Gemini (Deep Research)
 
-**Date:** *(pending)*
+**Date:** 2026-01-27
 **Model:** Gemini with Deep Research
 
-#### Research Plan
+Full research document: [UI_RESEARCH_GEMINI.md](UI_RESEARCH_GEMINI.md)
 
-1. Research the 2024-2026 industry status for infrastructure and DevOps tools like Traefik, Caddy, Vault, and Portainer to determine if they prioritize Web UIs or API-only/CLI interfaces.
-2. Analyze community discussions on Reddit (r/devops, r/selfhosted, r/homelab) and Hacker News to identify practitioner preferences and pain points regarding Web UIs vs. CLI-only management for infrastructure proxies.
-3. Investigate security implications and maintenance trade-offs for Go-based, single-container tools using SQLite, specifically focusing on session management (CSRF/XSS) vs. token-based API authentication.
-4. Research bootstrap and initial setup patterns for headless or API-first tools, looking at HashiCorp Vault's init process, environment variable configurations, and bootstrap tokens.
-5. Compare end-to-end UI testing frameworks suitable for Go web applications, including Playwright, Chromedp, Rod, and Cypress, evaluating their Go-native capabilities and performance in 2026.
-6. Evaluate CI/CD integration for these testing tools within GitHub Actions, focusing on browser setup complexity, Docker-in-Docker support, and debugging features like trace recordings.
-7. Examine Go-specific testing alternatives that bypass browser automation, such as the net/http/httptest package combined with HTML parsers like goquery for stateful session testing.
-8. Audit the GitHub repositories of prominent Go projects like Gitea, Grafana, and Traefik to identify their current UI testing stacks and determine if they use full browser automation or lighter-weight methods.
+#### Key Findings
 
-#### Findings
+- Industry trend toward API-first, with UI as observability layer only
+- Traefik dashboard is read-only by default to prevent "ClickOps" drift
+- Caddy's lack of GUI seen as strength, not weakness
+- Tools forcing GUI-only interaction rejected by elite engineering teams
+- Bootstrap should integrate with CI/CD identities, not manual web forms
+- Playwright emerged as market leader (~45% adoption) for E2E testing
+- Native Go options (Chromedp, Rod) are Chromium-only but faster
+- Testing pyramid: 80% unit/integration, 10% API contract, 10% E2E
 
-*(To be added when research completes)*
+#### Recommendation Summary
 
-#### Sources
-
-*(To be added when research completes)*
+Gemini recommended HTMX-enhanced UI with hybrid auth (sessions for UI, tokens for API). However, this assumes keeping a UI. Our API-only decision simplifies the architecture further.
 
 ---
 
@@ -468,14 +466,16 @@ func TestHTMXKeyCreation(t *testing.T) {
 
 ## Consolidated Recommendations
 
-*(To be completed after all research sources are gathered)*
+*(ChatGPT research pending)*
 
 | Topic | Claude Opus | Google Gemini | ChatGPT | Consensus |
 |-------|-------------|---------------|---------|-----------|
-| Admin interface | API-first + optional read-only dashboard | - | - | - |
-| Bootstrap method | CLI init command | - | - | - |
-| UI testing (HTML) | httptest + goquery | - | - | - |
-| Browser testing | Rod (if needed) | - | - | - |
+| Admin interface | API-first + optional read-only dashboard | HTMX UI as observability layer | - | API-first |
+| Bootstrap method | CLI init command | OIDC/Workload identity | - | TBD |
+| UI testing (HTML) | httptest + goquery | httptest + goquery (80%) | - | httptest + goquery |
+| Browser testing | Rod (if needed) | Playwright-go (10% E2E) | - | Rod or Playwright |
+
+**Note:** Both sources agree on API-first architecture. Gemini's recommendation for HTMX UI was for observability, not configuration—aligning with our API-only decision for the configuration layer.
 
 ---
 
