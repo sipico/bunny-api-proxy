@@ -4,12 +4,42 @@ Complete API documentation for the Bunny API Proxy, which provides a secure, sco
 
 ## Overview
 
-The Bunny API Proxy is structured with three main API categories:
+The Bunny API Proxy enables controlled access to bunny.net's DNS management APIs through scoped API keys. It sits between clients (like ACME clients, automation tools, etc.) and the bunny.net API, enforcing permission boundaries.
 
-1. **Proxy API** - DNS endpoints that require scoped API key authentication
-2. **Admin REST API** - Management endpoints with AccessKey token or Basic auth
-3. **Admin Web UI** - HTML interface with session-based authentication
-4. **Health Endpoints** - Service health and readiness checks
+### API Structure
+
+The proxy exposes four main API categories:
+
+1. **Proxy API** (Port 8080) - DNS endpoints that require scoped API key authentication
+2. **Admin REST API** (Port 8080) - Management endpoints with AccessKey token or Basic auth
+3. **Admin Web UI** (Port 8080) - HTML interface with session-based authentication
+4. **Health Endpoints** (Port 8080) - Service health and readiness checks
+
+## Exposed DNS Proxy Endpoints
+
+### MVP Endpoints (Implemented)
+
+These endpoints directly proxy to bunny.net's DNS API with permission checking:
+
+| Operation | Method | Path | Upstream |
+|-----------|--------|------|----------|
+| List DNS Zones | GET | `/dnszone` | GET `/dnszone` |
+| Get DNS Zone | GET | `/dnszone/{zoneID}` | GET `/dnszone/{id}` |
+| Add DNS Record | POST | `/dnszone/{zoneID}/records` | PUT `/dnszone/{zoneId}/records` |
+| Delete DNS Record | DELETE | `/dnszone/{zoneID}/records/{recordID}` | DELETE `/dnszone/{zoneId}/records/{id}` |
+
+**Use Case:** ACME DNS-01 challenge validation, scoped DNS record management
+
+### Future Endpoints
+
+The following bunny.net endpoints are available upstream but not yet exposed through the proxy. See [bunny-api-official-docs/](bunny-api-official-docs/) for complete specifications:
+
+- Zone management (add, update, delete zones)
+- Record update operations
+- Advanced features (DNSSEC, certificate issuance, record scanning)
+- Zone statistics and import/export
+
+**For complete bunny.net API specifications**, refer to the [Official bunny.net DNS Zone API Documentation](bunny-api-official-docs/) directory.
 
 ## Base URL
 
@@ -1088,4 +1118,23 @@ All API requests are logged with structured JSON logging. Check server logs for:
 - API key creation/deletion
 - Admin token operations
 - Record modifications
+
+---
+
+## Reference: Official bunny.net API Documentation
+
+For complete specifications of all bunny.net DNS Zone API endpoints (both MVP and future), see the dedicated documentation directory:
+
+- **[Official API Docs](bunny-api-official-docs/)** - 16 endpoints documented with full specifications
+- **[Comprehensive Integration Guide](bunny-dnszone-api.md)** - Examples, data models, and integration patterns
+- **[OpenAPI Specification](bunny-api-official-docs/openapi-v3.json)** - Machine-readable format for tools and code generation
+
+The proxy currently implements the **4 MVP endpoints** shown above. Additional bunny.net endpoints can be integrated into the proxy by:
+
+1. Adding the endpoint to the proxy's routing configuration
+2. Applying permission checks (zone access, allowed actions, record types)
+3. Forwarding the request to bunny.net's API
+4. Returning the scoped response to the client
+
+See the project architecture documentation for details on extending the proxy.
 

@@ -41,13 +41,42 @@ These files serve as the official reference for implementing API calls to bunny.
 - **[dnssec-enable.md](dnssec-enable.md)** - Enable DNSSEC (POST `/dnszone/{id}/dnssec`)
 - **[dnssec-disable.md](dnssec-disable.md)** - Disable DNSSEC (DELETE `/dnszone/{id}/dnssec`)
 
+### Advanced Features
+
+- **[dnszone-certificate-issue.md](dnszone-certificate-issue.md)** - Issue wildcard certificate (POST `/dnszone/{zoneId}/certificate/issue`)
+- **[dnszone-records-scan.md](dnszone-records-scan.md)** - Scan for pre-existing DNS records (POST/GET `/dnszone/records/scan`, `/dnszone/{zoneId}/records/scan`)
+
+## OpenAPI Specification
+
+The complete official bunny.net API specification is available in machine-readable OpenAPI 3.0.0 format:
+
+- **[openapi-v3.json](openapi-v3.json)** - Full OpenAPI specification (247 KB)
+  - Use this for programmatic API client generation
+  - Contains all endpoint definitions, schemas, and validation rules
+  - Original source: https://core-api-public-docs.b-cdn.net/docs/v3/public.json
+
 ## Source
 
-These documentation files were extracted from the official bunny.net API reference at [https://docs.bunny.net/reference/bunnynet-api-overview](https://docs.bunny.net/reference/bunnynet-api-overview)
+14 endpoint documentation files were extracted from the official bunny.net API reference at [https://docs.bunny.net/reference/bunnynet-api-overview](https://docs.bunny.net/reference/bunnynet-api-overview)
 
-Last updated: 2025-01-25
+2 additional endpoint files (certificate issuance and record scanning) were documented from the official OpenAPI 3.0.0 specification.
+
+Last updated: 2026-01-27
+
+## Endpoint Summary
+
+**Total Endpoints:** 16 DNS Zone API endpoints
+
+| Category | Count |
+|----------|-------|
+| Zone Management | 5 |
+| Record Management | 3 |
+| Zone Operations | 4 |
+| DNSSEC Management | 2 |
+| Advanced Features | 2 |
 
 ## Related Documentation
 
 - **[bunny-dnszone-api.md](../bunny-dnszone-api.md)** - Comprehensive integration guide with examples and data models
 - **[bunny-api-reference.md](../bunny-api-reference.md)** - MVP endpoints quick reference
+- **[../API.md](../API.md)** - Bunny API Proxy implementation and exposed endpoints
