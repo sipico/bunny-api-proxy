@@ -1,6 +1,6 @@
 # API-Only Implementation Plan
 
-**Status:** Draft
+**Status:** Ready - Issues Created
 **Date:** 2026-01-28
 **Parent Document:** [API_ONLY_DESIGN.md](./API_ONLY_DESIGN.md)
 **Workflow Reference:** [SUBAGENT_WORKFLOW.md](./SUBAGENT_WORKFLOW.md)
@@ -490,16 +490,16 @@ type APIError struct {
 
 | Issue | Title | Branch Name | Worktree Path | Status |
 |-------|-------|-------------|---------------|--------|
-| #XX | Schema Migration | `claude/issue-XX-w0xPw` | `/home/user/bunny-api-proxy-wt-XX` | Pending |
-| #XX | Storage Layer - Token CRUD | `claude/issue-XX-w0xPw` | `/home/user/bunny-api-proxy-wt-XX` | Pending |
-| #XX | Bootstrap Logic | `claude/issue-XX-w0xPw` | `/home/user/bunny-api-proxy-wt-XX` | Pending |
-| #XX | Auth Middleware Update | `claude/issue-XX-w0xPw` | `/home/user/bunny-api-proxy-wt-XX` | Pending |
-| #XX | Admin API Handlers | `claude/issue-XX-w0xPw` | `/home/user/bunny-api-proxy-wt-XX` | Pending |
-| #XX | Remove Web UI | `claude/issue-XX-w0xPw` | `/home/user/bunny-api-proxy-wt-XX` | Pending |
-| #XX | Update Configuration | `claude/issue-XX-w0xPw` | `/home/user/bunny-api-proxy-wt-XX` | Pending |
-| #XX | Standardize Error Responses | `claude/issue-XX-w0xPw` | `/home/user/bunny-api-proxy-wt-XX` | Pending |
-| #XX | Integration Tests | `claude/issue-XX-w0xPw` | `/home/user/bunny-api-proxy-wt-XX` | Pending |
-| #XX | Documentation Updates | `claude/issue-XX-w0xPw` | `/home/user/bunny-api-proxy-wt-XX` | Pending |
+| [#143](https://github.com/sipico/bunny-api-proxy/issues/143) | Schema Migration | `claude/issue-143-w0xPw` | `/home/user/bunny-api-proxy-wt-143` | Pending |
+| [#144](https://github.com/sipico/bunny-api-proxy/issues/144) | Storage Layer - Token CRUD | `claude/issue-144-w0xPw` | `/home/user/bunny-api-proxy-wt-144` | Pending |
+| [#145](https://github.com/sipico/bunny-api-proxy/issues/145) | Bootstrap Logic | `claude/issue-145-w0xPw` | `/home/user/bunny-api-proxy-wt-145` | Pending |
+| [#146](https://github.com/sipico/bunny-api-proxy/issues/146) | Auth Middleware Update | `claude/issue-146-w0xPw` | `/home/user/bunny-api-proxy-wt-146` | Pending |
+| [#147](https://github.com/sipico/bunny-api-proxy/issues/147) | Admin API Handlers | `claude/issue-147-w0xPw` | `/home/user/bunny-api-proxy-wt-147` | Pending |
+| [#148](https://github.com/sipico/bunny-api-proxy/issues/148) | Remove Web UI | `claude/issue-148-w0xPw` | `/home/user/bunny-api-proxy-wt-148` | Pending |
+| [#149](https://github.com/sipico/bunny-api-proxy/issues/149) | Update Configuration | `claude/issue-149-w0xPw` | `/home/user/bunny-api-proxy-wt-149` | Pending |
+| [#150](https://github.com/sipico/bunny-api-proxy/issues/150) | Standardize Error Responses | `claude/issue-150-w0xPw` | `/home/user/bunny-api-proxy-wt-150` | Pending |
+| [#151](https://github.com/sipico/bunny-api-proxy/issues/151) | Integration Tests | `claude/issue-151-w0xPw` | `/home/user/bunny-api-proxy-wt-151` | Pending |
+| [#152](https://github.com/sipico/bunny-api-proxy/issues/152) | Documentation Updates | `claude/issue-152-w0xPw` | `/home/user/bunny-api-proxy-wt-152` | Pending |
 
 ---
 
@@ -507,9 +507,9 @@ type APIError struct {
 
 | Files | Conflicting Issues | Resolution Strategy |
 |-------|-------------------|---------------------|
-| `internal/admin/router.go` | #5, #6 | Merge #5 first, then #6 removes routes |
-| `internal/admin/api.go` | #5, #8 | Merge #5 first, then #8 adds error helpers |
-| `internal/storage/storage.go` | #1, #2 | Merge #1 first, then #2 adds interface |
+| `internal/admin/router.go` | #147, #148 | Merge #147 first, then #148 removes routes |
+| `internal/admin/api.go` | #147, #150 | Merge #147 first, then #150 adds error helpers |
+| `internal/storage/storage.go` | #143, #144 | Merge #143 first, then #144 adds interface |
 
 ---
 
@@ -528,26 +528,26 @@ Based on SUBAGENT_WORKFLOW.md data:
 
 | Task Type | Est. Output Tokens | Est. Haiku Cost |
 |-----------|-------------------|-----------------|
-| Schema (#1) | ~7K | $0.20 |
-| Storage (#2) | ~20K | $0.80 |
-| Bootstrap (#3) | ~15K | $0.60 |
-| Auth (#4) | ~15K | $0.60 |
-| Handlers (#5) | ~30K | $1.20 |
-| Remove UI (#6) | ~10K | $0.40 |
-| Config (#7) | ~8K | $0.30 |
-| Errors (#8) | ~8K | $0.30 |
-| Integration (#9) | ~25K | $1.00 |
-| Docs (#10) | ~5K | $0.20 |
+| Schema (#143) | ~7K | $0.20 |
+| Storage (#144) | ~20K | $0.80 |
+| Bootstrap (#145) | ~15K | $0.60 |
+| Auth (#146) | ~15K | $0.60 |
+| Handlers (#147) | ~30K | $1.20 |
+| Remove UI (#148) | ~10K | $0.40 |
+| Config (#149) | ~8K | $0.30 |
+| Errors (#150) | ~8K | $0.30 |
+| Integration (#151) | ~25K | $1.00 |
+| Docs (#152) | ~5K | $0.20 |
 | **Total** | ~143K | **~$5.60** |
 
 ---
 
 ## Next Steps
 
-1. [ ] Review this plan
-2. [ ] Create GitHub issues for each sub-task
-3. [ ] Execute Phase 1 (sequential: #1 → #2)
-4. [ ] Execute Phase 2 (sequential: #3 → #4 → #5)
-5. [ ] Execute Phase 3 (parallel: #6, #7, #8)
-6. [ ] Execute Phase 4 (sequential: #9 → #10)
+1. [x] Review this plan
+2. [x] Create GitHub issues for each sub-task
+3. [ ] Execute Phase 1 (sequential: #143 → #144)
+4. [ ] Execute Phase 2 (sequential: #145 → #146 → #147)
+5. [ ] Execute Phase 3 (parallel: #148, #149, #150)
+6. [ ] Execute Phase 4 (sequential: #151 → #152)
 7. [ ] Final review and release
