@@ -9,42 +9,32 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-// TestNewValidatesEncryptionKey tests that New() rejects invalid encryption keys.
-func TestNewValidatesEncryptionKey(t *testing.T) {
+// TestNewIgnoresEncryptionKey tests that New() accepts any key (deprecated parameter).
+func TestNewIgnoresEncryptionKey(t *testing.T) {
 	tests := []struct {
-		name        string
-		keyLength   int
-		expectError bool
+		name      string
+		keyLength int
 	}{
-		{"valid 32-byte key", 32, false},
-		{"invalid 16-byte key", 16, true},
-		{"invalid 24-byte key", 24, true},
-		{"invalid 64-byte key", 64, true},
-		{"invalid empty key", 0, true},
+		{"nil key", 0},
+		{"16-byte key", 16},
+		{"32-byte key", 32},
+		{"64-byte key", 64},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			key := make([]byte, tt.keyLength)
+			var key []byte
 			if tt.keyLength > 0 {
+				key = make([]byte, tt.keyLength)
 				_, _ = rand.Read(key)
 			}
 
 			storage, err := New(":memory:", key)
-			if tt.expectError {
-				if err == nil {
-					t.Error("expected error, got nil")
-				}
-				if err != ErrInvalidKey {
-					t.Errorf("expected ErrInvalidKey, got %v", err)
-				}
-			} else {
-				if err != nil {
-					t.Errorf("unexpected error: %v", err)
-				}
-				if storage != nil {
-					_ = storage.Close()
-				}
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if storage != nil {
+				_ = storage.Close()
 			}
 		})
 	}
@@ -99,12 +89,9 @@ func TestNewInitializesSchema(t *testing.T) {
 	}
 }
 
-// TestSetGetMasterAPIKeyRoundTrip tests that setting and getting API key works.
+// TestSetGetMasterAPIKeyRoundTrip tests that setting and getting API key hash works.
 func TestSetGetMasterAPIKeyRoundTrip(t *testing.T) {
-	key := make([]byte, 32)
-	_, _ = rand.Read(key)
-
-	storage, err := New(":memory:", key)
+	storage, err := New(":memory:", nil)
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
 	}
@@ -119,23 +106,21 @@ func TestSetGetMasterAPIKeyRoundTrip(t *testing.T) {
 		t.Fatalf("failed to set master API key: %v", err)
 	}
 
-	// Get the key back
-	retrievedKey, err := storage.GetMasterAPIKey(ctx)
+	// Get the hash back
+	hash, err := storage.GetMasterAPIKeyHash(ctx)
 	if err != nil {
-		t.Fatalf("failed to get master API key: %v", err)
+		t.Fatalf("failed to get master API key hash: %v", err)
 	}
 
-	if retrievedKey != testKey {
-		t.Errorf("expected %s, got %s", testKey, retrievedKey)
+	// Verify the hash is a valid hex string (64 chars for SHA256)
+	if len(hash) != 64 {
+		t.Errorf("expected hash length 64, got %d", len(hash))
 	}
 }
 
 // TestSetMasterAPIKeyUpdatesExistingKey tests that setting overwrites existing key.
 func TestSetMasterAPIKeyUpdatesExistingKey(t *testing.T) {
-	key := make([]byte, 32)
-	_, _ = rand.Read(key)
-
-	storage, err := New(":memory:", key)
+	storage, err := New(":memory:", nil)
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
 	}
@@ -151,13 +136,13 @@ func TestSetMasterAPIKeyUpdatesExistingKey(t *testing.T) {
 		t.Fatalf("failed to set first key: %v", err)
 	}
 
-	// Verify first key is set
-	retrieved, err := storage.GetMasterAPIKey(ctx)
+	// Verify first key is set by validating it
+	valid, err := storage.ValidateMasterAPIKey(ctx, firstKey)
 	if err != nil {
-		t.Fatalf("failed to get first key: %v", err)
+		t.Fatalf("failed to validate first key: %v", err)
 	}
-	if retrieved != firstKey {
-		t.Errorf("expected %s, got %s", firstKey, retrieved)
+	if !valid {
+		t.Error("first key should be valid")
 	}
 
 	// Set second key
@@ -167,21 +152,27 @@ func TestSetMasterAPIKeyUpdatesExistingKey(t *testing.T) {
 	}
 
 	// Verify second key overwrote first
-	retrieved, err = storage.GetMasterAPIKey(ctx)
+	valid, err = storage.ValidateMasterAPIKey(ctx, secondKey)
 	if err != nil {
-		t.Fatalf("failed to get second key: %v", err)
+		t.Fatalf("failed to validate second key: %v", err)
 	}
-	if retrieved != secondKey {
-		t.Errorf("expected %s, got %s", secondKey, retrieved)
+	if !valid {
+		t.Error("second key should be valid")
+	}
+
+	// Verify first key is no longer valid
+	valid, err = storage.ValidateMasterAPIKey(ctx, firstKey)
+	if err != nil {
+		t.Fatalf("failed to validate first key: %v", err)
+	}
+	if valid {
+		t.Error("first key should no longer be valid")
 	}
 }
 
-// TestGetMasterAPIKeyReturnsErrorWhenNotSet tests that GetMasterAPIKey returns ErrNotFound.
-func TestGetMasterAPIKeyReturnsErrorWhenNotSet(t *testing.T) {
-	key := make([]byte, 32)
-	_, _ = rand.Read(key)
-
-	storage, err := New(":memory:", key)
+// TestGetMasterAPIKeyHashReturnsErrorWhenNotSet tests that GetMasterAPIKeyHash returns ErrNotFound.
+func TestGetMasterAPIKeyHashReturnsErrorWhenNotSet(t *testing.T) {
+	storage, err := New(":memory:", nil)
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
 	}
@@ -189,10 +180,10 @@ func TestGetMasterAPIKeyReturnsErrorWhenNotSet(t *testing.T) {
 
 	ctx := context.Background()
 
-	// Try to get key before setting
-	_, err = storage.GetMasterAPIKey(ctx)
+	// Try to get hash before setting
+	_, err = storage.GetMasterAPIKeyHash(ctx)
 	if err == nil {
-		t.Error("expected error when getting unset key")
+		t.Error("expected error when getting unset key hash")
 	}
 	if err != ErrNotFound {
 		t.Errorf("expected ErrNotFound, got %v", err)
@@ -201,10 +192,7 @@ func TestGetMasterAPIKeyReturnsErrorWhenNotSet(t *testing.T) {
 
 // TestSetMasterAPIKeyContextCancellation tests context cancellation handling.
 func TestSetMasterAPIKeyContextCancellation(t *testing.T) {
-	key := make([]byte, 32)
-	_, _ = rand.Read(key)
-
-	storage, err := New(":memory:", key)
+	storage, err := New(":memory:", nil)
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
 	}
@@ -220,12 +208,9 @@ func TestSetMasterAPIKeyContextCancellation(t *testing.T) {
 	}
 }
 
-// TestGetMasterAPIKeyContextCancellation tests context cancellation handling.
-func TestGetMasterAPIKeyContextCancellation(t *testing.T) {
-	key := make([]byte, 32)
-	_, _ = rand.Read(key)
-
-	storage, err := New(":memory:", key)
+// TestGetMasterAPIKeyHashContextCancellation tests context cancellation handling.
+func TestGetMasterAPIKeyHashContextCancellation(t *testing.T) {
+	storage, err := New(":memory:", nil)
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
 	}
@@ -239,22 +224,19 @@ func TestGetMasterAPIKeyContextCancellation(t *testing.T) {
 		t.Fatalf("failed to set key: %v", err)
 	}
 
-	// Try to get with cancelled context
+	// Try to get hash with cancelled context
 	ctxCancel, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel immediately
 
-	_, err = storage.GetMasterAPIKey(ctxCancel)
+	_, err = storage.GetMasterAPIKeyHash(ctxCancel)
 	if err == nil {
 		t.Error("expected error with cancelled context")
 	}
 }
 
-// TestMasterAPIKeyIsEncrypted tests that the key is actually encrypted in the database.
-func TestMasterAPIKeyIsEncrypted(t *testing.T) {
-	key := make([]byte, 32)
-	_, _ = rand.Read(key)
-
-	storage, err := New(":memory:", key)
+// TestMasterAPIKeyIsHashed tests that the key is actually hashed in the database.
+func TestMasterAPIKeyIsHashed(t *testing.T) {
+	storage, err := New(":memory:", nil)
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
 	}
@@ -269,118 +251,83 @@ func TestMasterAPIKeyIsEncrypted(t *testing.T) {
 		t.Fatalf("failed to set master API key: %v", err)
 	}
 
-	// Query the raw encrypted value
-	query := "SELECT master_api_key_encrypted FROM config WHERE id = 1"
-	var encryptedHex []byte
-	err = storage.db.QueryRow(query).Scan(&encryptedHex)
+	// Query the raw hash value
+	query := "SELECT master_api_key_hash FROM config WHERE id = 1"
+	var hash string
+	err = storage.db.QueryRow(query).Scan(&hash)
 	if err != nil {
-		t.Fatalf("failed to query encrypted key: %v", err)
+		t.Fatalf("failed to query hash: %v", err)
 	}
 
 	// Verify it's not the plaintext key
-	if string(encryptedHex) == testKey {
-		t.Error("key should be encrypted, not plaintext")
+	if hash == testKey {
+		t.Error("key should be hashed, not plaintext")
+	}
+
+	// Verify the hash is a valid hex string (64 chars for SHA256)
+	if len(hash) != 64 {
+		t.Errorf("expected hash length 64, got %d", len(hash))
 	}
 }
 
-// TestDifferentEncryptionKeysProduceDifferentCiphertexts tests encryption isolation.
-func TestDifferentEncryptionKeysProduceDifferentCiphertexts(t *testing.T) {
-	key1 := make([]byte, 32)
-	_, _ = rand.Read(key1)
-	key2 := make([]byte, 32)
-	_, _ = rand.Read(key2)
-
-	storage1, err := New(":memory:", key1)
+// TestValidateMasterAPIKeySucceeds tests that ValidateMasterAPIKey returns true for correct key.
+func TestValidateMasterAPIKeySucceeds(t *testing.T) {
+	storage, err := New(":memory:", nil)
 	if err != nil {
-		t.Fatalf("failed to create storage1: %v", err)
+		t.Fatalf("failed to create storage: %v", err)
 	}
-	defer func() { _ = storage1.Close() }()
-
-	storage2, err := New(":memory:", key2)
-	if err != nil {
-		t.Fatalf("failed to create storage2: %v", err)
-	}
-	defer func() { _ = storage2.Close() }()
+	defer func() { _ = storage.Close() }()
 
 	ctx := context.Background()
 	testKey := "test-api-key"
 
-	// Set same key with different encryption keys
-	err = storage1.SetMasterAPIKey(ctx, testKey)
-	if err != nil {
-		t.Fatalf("failed to set key in storage1: %v", err)
-	}
-
-	err = storage2.SetMasterAPIKey(ctx, testKey)
-	if err != nil {
-		t.Fatalf("failed to set key in storage2: %v", err)
-	}
-
-	// Get encrypted values
-	query := "SELECT master_api_key_encrypted FROM config WHERE id = 1"
-	var encrypted1, encrypted2 []byte
-	err = storage1.db.QueryRow(query).Scan(&encrypted1)
-	if err != nil {
-		t.Fatalf("failed to query encrypted key from storage1: %v", err)
-	}
-
-	err = storage2.db.QueryRow(query).Scan(&encrypted2)
-	if err != nil {
-		t.Fatalf("failed to query encrypted key from storage2: %v", err)
-	}
-
-	// Should be different due to different encryption keys and random nonces
-	if string(encrypted1) == string(encrypted2) {
-		t.Error("encrypted values should differ with different encryption keys")
-	}
-}
-
-// TestWrongEncryptionKeyFailsDecryption tests that wrong key fails to decrypt.
-func TestWrongEncryptionKeyFailsDecryption(t *testing.T) {
-	key1 := make([]byte, 32)
-	_, _ = rand.Read(key1)
-	key2 := make([]byte, 32)
-	_, _ = rand.Read(key2)
-
-	// Set key with first encryption key
-	storage1, err := New(":memory:", key1)
-	if err != nil {
-		t.Fatalf("failed to create storage1: %v", err)
-	}
-	defer func() { _ = storage1.Close() }()
-
-	ctx := context.Background()
-	testKey := "test-api-key"
-
-	err = storage1.SetMasterAPIKey(ctx, testKey)
+	// Set the key
+	err = storage.SetMasterAPIKey(ctx, testKey)
 	if err != nil {
 		t.Fatalf("failed to set key: %v", err)
 	}
 
-	// Get the encrypted value
-	query := "SELECT master_api_key_encrypted FROM config WHERE id = 1"
-	var encrypted []byte
-	err = storage1.db.QueryRow(query).Scan(&encrypted)
+	// Validate with correct key
+	valid, err := storage.ValidateMasterAPIKey(ctx, testKey)
 	if err != nil {
-		t.Fatalf("failed to query encrypted key: %v", err)
+		t.Fatalf("failed to validate key: %v", err)
+	}
+	if !valid {
+		t.Error("validation should succeed for correct key")
+	}
+}
+
+// TestValidateMasterAPIKeyFailsForWrongKey tests that ValidateMasterAPIKey returns false for wrong key.
+func TestValidateMasterAPIKeyFailsForWrongKey(t *testing.T) {
+	storage, err := New(":memory:", nil)
+	if err != nil {
+		t.Fatalf("failed to create storage: %v", err)
+	}
+	defer func() { _ = storage.Close() }()
+
+	ctx := context.Background()
+	testKey := "test-api-key"
+	wrongKey := "wrong-api-key"
+
+	// Set the key
+	err = storage.SetMasterAPIKey(ctx, testKey)
+	if err != nil {
+		t.Fatalf("failed to set key: %v", err)
 	}
 
-	// Try to decrypt with wrong key
-	_, err = DecryptAPIKey(encrypted, key2)
-	if err == nil {
-		t.Error("decryption should fail with wrong key")
+	// Validate with wrong key
+	valid, err := storage.ValidateMasterAPIKey(ctx, wrongKey)
+	if err != nil {
+		t.Fatalf("failed to validate key: %v", err)
 	}
-	if err != ErrDecryption {
-		t.Errorf("expected ErrDecryption, got %v", err)
+	if valid {
+		t.Error("validation should fail for wrong key")
 	}
 }
 
 // TestCloseClosesDatabase tests that Close() properly closes the database.
 func TestCloseClosesDatabase(t *testing.T) {
-	key := make([]byte, 32)
-	_, _ = rand.Read(key)
-
-	storage, err := New(":memory:", key)
+	storage, err := New(":memory:", nil)
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
 	}
@@ -400,10 +347,7 @@ func TestCloseClosesDatabase(t *testing.T) {
 
 // TestNewEnablesWALMode tests that New() enables WAL journal mode.
 func TestNewEnablesWALMode(t *testing.T) {
-	key := make([]byte, 32)
-	_, _ = rand.Read(key)
-
-	storage, err := New(":memory:", key)
+	storage, err := New(":memory:", nil)
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
 	}
@@ -424,10 +368,7 @@ func TestNewEnablesWALMode(t *testing.T) {
 
 // TestNewSetsBusyTimeout tests that New() sets busy timeout.
 func TestNewSetsBusyTimeout(t *testing.T) {
-	key := make([]byte, 32)
-	_, _ = rand.Read(key)
-
-	storage, err := New(":memory:", key)
+	storage, err := New(":memory:", nil)
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
 	}
@@ -447,8 +388,7 @@ func TestNewSetsBusyTimeout(t *testing.T) {
 // TestCloseWithNilDatabase tests that Close() handles nil database gracefully.
 func TestCloseWithNilDatabase(t *testing.T) {
 	storage := &SQLiteStorage{
-		db:            nil,
-		encryptionKey: make([]byte, 32),
+		db: nil,
 	}
 
 	// Close should return nil when db is nil
@@ -460,10 +400,7 @@ func TestCloseWithNilDatabase(t *testing.T) {
 
 // TestSetMasterAPIKeyFailsOnClosedDatabase tests SetMasterAPIKey error path.
 func TestSetMasterAPIKeyFailsOnClosedDatabase(t *testing.T) {
-	key := make([]byte, 32)
-	_, _ = rand.Read(key)
-
-	storage, err := New(":memory:", key)
+	storage, err := New(":memory:", nil)
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
 	}
@@ -481,11 +418,8 @@ func TestSetMasterAPIKeyFailsOnClosedDatabase(t *testing.T) {
 
 // TestNewWithInvalidDatabasePath tests that New() handles database open errors.
 func TestNewWithInvalidDatabasePath(t *testing.T) {
-	key := make([]byte, 32)
-	_, _ = rand.Read(key)
-
 	// Try to open database in non-existent directory
-	storage, err := New("/nonexistent/path/to/db.sqlite3", key)
+	storage, err := New("/nonexistent/path/to/db.sqlite3", nil)
 	if err == nil {
 		t.Error("expected error when opening database in non-existent path")
 		if storage != nil {
@@ -494,12 +428,9 @@ func TestNewWithInvalidDatabasePath(t *testing.T) {
 	}
 }
 
-// TestSetMasterAPIKeyWithBadEncryptedData tests GetMasterAPIKey with corrupted encrypted data.
-func TestGetMasterAPIKeyWithBadEncryptedData(t *testing.T) {
-	key := make([]byte, 32)
-	_, _ = rand.Read(key)
-
-	storage, err := New(":memory:", key)
+// TestValidateMasterAPIKeyReturnsErrorWhenNotSet tests ValidateMasterAPIKey error handling.
+func TestValidateMasterAPIKeyReturnsErrorWhenNotSet(t *testing.T) {
+	storage, err := New(":memory:", nil)
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
 	}
@@ -507,16 +438,12 @@ func TestGetMasterAPIKeyWithBadEncryptedData(t *testing.T) {
 
 	ctx := context.Background()
 
-	// Manually insert bad encrypted data into the database
-	query := "INSERT INTO config (id, master_api_key_encrypted) VALUES (1, ?)"
-	_, err = storage.db.ExecContext(ctx, query, []byte("invalid-encrypted-data"))
-	if err != nil {
-		t.Fatalf("failed to insert bad encrypted data: %v", err)
-	}
-
-	// Try to get the key - should fail on decryption
-	_, err = storage.GetMasterAPIKey(ctx)
+	// Try to validate before setting a key
+	_, err = storage.ValidateMasterAPIKey(ctx, "test-key")
 	if err == nil {
-		t.Error("expected error when decrypting bad data")
+		t.Error("expected error when validating before key is set")
+	}
+	if err != ErrNotFound {
+		t.Errorf("expected ErrNotFound, got %v", err)
 	}
 }

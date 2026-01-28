@@ -40,13 +40,13 @@ func TestCompleteWorkflow(t *testing.T) {
 		t.Fatalf("SetMasterAPIKey failed: %v", err)
 	}
 
-	// Step 2: Verify master key retrieval
-	retrievedKey, err := s.GetMasterAPIKey(ctx)
+	// Step 2: Verify master key validation
+	valid, err := s.ValidateMasterAPIKey(ctx, masterKey)
 	if err != nil {
-		t.Fatalf("GetMasterAPIKey failed: %v", err)
+		t.Fatalf("ValidateMasterAPIKey failed: %v", err)
 	}
-	if retrievedKey != masterKey {
-		t.Errorf("expected master key %q, got %q", masterKey, retrievedKey)
+	if !valid {
+		t.Errorf("master key validation failed")
 	}
 
 	// Step 3: Create multiple scoped keys
@@ -133,12 +133,12 @@ func TestCompleteWorkflow(t *testing.T) {
 	}
 
 	// Step 10: Verify updated master key
-	retrievedKey, err = s.GetMasterAPIKey(ctx)
+	valid, err = s.ValidateMasterAPIKey(ctx, newMasterKey)
 	if err != nil {
-		t.Fatalf("GetMasterAPIKey failed after update: %v", err)
+		t.Fatalf("ValidateMasterAPIKey failed after update: %v", err)
 	}
-	if retrievedKey != newMasterKey {
-		t.Errorf("expected updated master key %q, got %q", newMasterKey, retrievedKey)
+	if !valid {
+		t.Errorf("updated master key validation failed")
 	}
 
 	// Step 11: Delete a permission
@@ -508,7 +508,7 @@ func TestErrorCases(t *testing.T) {
 		}
 		defer func() { _ = freshS.Close() }()
 
-		_, err = freshS.GetMasterAPIKey(ctx)
+		_, err = freshS.GetMasterAPIKeyHash(ctx)
 		if err == nil {
 			t.Error("expected error for unset master key, got nil")
 		}
@@ -598,12 +598,12 @@ func TestDataPersistence(t *testing.T) {
 	defer func() { _ = s2.Close() }()
 
 	// Phase 4: Verify master key persisted
-	retrievedMasterKey, err := s2.GetMasterAPIKey(ctx)
+	valid, err := s2.ValidateMasterAPIKey(ctx, masterKey)
 	if err != nil {
-		t.Fatalf("GetMasterAPIKey failed: %v", err)
+		t.Fatalf("ValidateMasterAPIKey failed: %v", err)
 	}
-	if retrievedMasterKey != masterKey {
-		t.Errorf("expected master key %q, got %q", masterKey, retrievedMasterKey)
+	if !valid {
+		t.Errorf("master key persistence validation failed")
 	}
 
 	// Phase 5: Verify scoped keys persisted
