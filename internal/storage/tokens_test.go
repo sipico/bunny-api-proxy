@@ -810,3 +810,346 @@ func TestTokenCascadeDelete(t *testing.T) {
 		t.Errorf("expected 0 permissions after token delete, got %d", len(perms))
 	}
 }
+
+// TestCreateTokenWithCancelledContext tests CreateToken with cancelled context.
+func TestCreateTokenWithCancelledContext(t *testing.T) {
+	encryptionKey := make([]byte, 32)
+	_, _ = rand.Read(encryptionKey)
+
+	s, err := New(":memory:", encryptionKey)
+	if err != nil {
+		t.Fatalf("failed to create storage: %v", err)
+	}
+	defer func() { _ = s.Close() }()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	hash, _ := HashKey("test-key")
+	_, err = s.CreateToken(ctx, "test-token", false, hash)
+	if err == nil {
+		t.Errorf("expected error with cancelled context, got nil")
+	}
+}
+
+// TestGetTokenByHashWithCancelledContext tests GetTokenByHash with cancelled context.
+func TestGetTokenByHashWithCancelledContext(t *testing.T) {
+	encryptionKey := make([]byte, 32)
+	_, _ = rand.Read(encryptionKey)
+
+	s, err := New(":memory:", encryptionKey)
+	if err != nil {
+		t.Fatalf("failed to create storage: %v", err)
+	}
+	defer func() { _ = s.Close() }()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, err = s.GetTokenByHash(ctx, "some-hash")
+	if err == nil {
+		t.Errorf("expected error with cancelled context, got nil")
+	}
+}
+
+// TestGetTokenByIDWithCancelledContext tests GetTokenByID with cancelled context.
+func TestGetTokenByIDWithCancelledContext(t *testing.T) {
+	encryptionKey := make([]byte, 32)
+	_, _ = rand.Read(encryptionKey)
+
+	s, err := New(":memory:", encryptionKey)
+	if err != nil {
+		t.Fatalf("failed to create storage: %v", err)
+	}
+	defer func() { _ = s.Close() }()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, err = s.GetTokenByID(ctx, 123)
+	if err == nil {
+		t.Errorf("expected error with cancelled context, got nil")
+	}
+}
+
+// TestListTokensWithCancelledContext tests ListTokens with cancelled context.
+func TestListTokensWithCancelledContext(t *testing.T) {
+	encryptionKey := make([]byte, 32)
+	_, _ = rand.Read(encryptionKey)
+
+	s, err := New(":memory:", encryptionKey)
+	if err != nil {
+		t.Fatalf("failed to create storage: %v", err)
+	}
+	defer func() { _ = s.Close() }()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, err = s.ListTokens(ctx)
+	if err == nil {
+		t.Errorf("expected error with cancelled context, got nil")
+	}
+}
+
+// TestDeleteTokenWithCancelledContext tests DeleteToken with cancelled context.
+func TestDeleteTokenWithCancelledContext(t *testing.T) {
+	encryptionKey := make([]byte, 32)
+	_, _ = rand.Read(encryptionKey)
+
+	s, err := New(":memory:", encryptionKey)
+	if err != nil {
+		t.Fatalf("failed to create storage: %v", err)
+	}
+	defer func() { _ = s.Close() }()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	err = s.DeleteToken(ctx, 123)
+	if err == nil {
+		t.Errorf("expected error with cancelled context, got nil")
+	}
+}
+
+// TestHasAnyAdminTokenWithCancelledContext tests HasAnyAdminToken with cancelled context.
+func TestHasAnyAdminTokenWithCancelledContext(t *testing.T) {
+	encryptionKey := make([]byte, 32)
+	_, _ = rand.Read(encryptionKey)
+
+	s, err := New(":memory:", encryptionKey)
+	if err != nil {
+		t.Fatalf("failed to create storage: %v", err)
+	}
+	defer func() { _ = s.Close() }()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, err = s.HasAnyAdminToken(ctx)
+	if err == nil {
+		t.Errorf("expected error with cancelled context, got nil")
+	}
+}
+
+// TestCountAdminTokensWithCancelledContext tests CountAdminTokens with cancelled context.
+func TestCountAdminTokensWithCancelledContext(t *testing.T) {
+	encryptionKey := make([]byte, 32)
+	_, _ = rand.Read(encryptionKey)
+
+	s, err := New(":memory:", encryptionKey)
+	if err != nil {
+		t.Fatalf("failed to create storage: %v", err)
+	}
+	defer func() { _ = s.Close() }()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, err = s.CountAdminTokens(ctx)
+	if err == nil {
+		t.Errorf("expected error with cancelled context, got nil")
+	}
+}
+
+// TestAddPermissionInvalidZoneID tests validation of ZoneID in AddPermissionForToken.
+func TestAddPermissionInvalidZoneID(t *testing.T) {
+	encryptionKey := make([]byte, 32)
+	_, _ = rand.Read(encryptionKey)
+
+	s, err := New(":memory:", encryptionKey)
+	if err != nil {
+		t.Fatalf("failed to create storage: %v", err)
+	}
+	defer func() { _ = s.Close() }()
+	ctx := context.Background()
+
+	// Create a token
+	hash, _ := HashKey("test-key")
+	token, _ := s.CreateToken(ctx, "test-token", false, hash)
+
+	// Try to add permission with invalid ZoneID
+	perm := &Permission{
+		ZoneID:         0, // Invalid
+		AllowedActions: []string{"list_records"},
+		RecordTypes:    []string{"TXT"},
+	}
+
+	_, err = s.AddPermissionForToken(ctx, token.ID, perm)
+	if err == nil {
+		t.Fatalf("expected error for invalid ZoneID, got nil")
+	}
+
+	if !strings.Contains(err.Error(), "invalid zone ID") {
+		t.Errorf("expected 'invalid zone ID' error, got: %v", err)
+	}
+}
+
+// TestAddPermissionEmptyActions tests validation of AllowedActions in AddPermissionForToken.
+func TestAddPermissionEmptyActions(t *testing.T) {
+	encryptionKey := make([]byte, 32)
+	_, _ = rand.Read(encryptionKey)
+
+	s, err := New(":memory:", encryptionKey)
+	if err != nil {
+		t.Fatalf("failed to create storage: %v", err)
+	}
+	defer func() { _ = s.Close() }()
+	ctx := context.Background()
+
+	// Create a token
+	hash, _ := HashKey("test-key")
+	token, _ := s.CreateToken(ctx, "test-token", false, hash)
+
+	// Try to add permission with empty AllowedActions
+	perm := &Permission{
+		ZoneID:         12345,
+		AllowedActions: []string{}, // Empty
+		RecordTypes:    []string{"TXT"},
+	}
+
+	_, err = s.AddPermissionForToken(ctx, token.ID, perm)
+	if err == nil {
+		t.Fatalf("expected error for empty AllowedActions, got nil")
+	}
+
+	if !strings.Contains(err.Error(), "allowed actions cannot be empty") {
+		t.Errorf("expected 'allowed actions cannot be empty' error, got: %v", err)
+	}
+}
+
+// TestAddPermissionEmptyRecordTypes tests validation of RecordTypes in AddPermissionForToken.
+func TestAddPermissionEmptyRecordTypes(t *testing.T) {
+	encryptionKey := make([]byte, 32)
+	_, _ = rand.Read(encryptionKey)
+
+	s, err := New(":memory:", encryptionKey)
+	if err != nil {
+		t.Fatalf("failed to create storage: %v", err)
+	}
+	defer func() { _ = s.Close() }()
+	ctx := context.Background()
+
+	// Create a token
+	hash, _ := HashKey("test-key")
+	token, _ := s.CreateToken(ctx, "test-token", false, hash)
+
+	// Try to add permission with empty RecordTypes
+	perm := &Permission{
+		ZoneID:         12345,
+		AllowedActions: []string{"list_records"},
+		RecordTypes:    []string{}, // Empty
+	}
+
+	_, err = s.AddPermissionForToken(ctx, token.ID, perm)
+	if err == nil {
+		t.Fatalf("expected error for empty RecordTypes, got nil")
+	}
+
+	if !strings.Contains(err.Error(), "record types cannot be empty") {
+		t.Errorf("expected 'record types cannot be empty' error, got: %v", err)
+	}
+}
+
+// TestAddPermissionWithCancelledContext tests AddPermissionForToken with cancelled context.
+func TestAddPermissionWithCancelledContext(t *testing.T) {
+	encryptionKey := make([]byte, 32)
+	_, _ = rand.Read(encryptionKey)
+
+	s, err := New(":memory:", encryptionKey)
+	if err != nil {
+		t.Fatalf("failed to create storage: %v", err)
+	}
+	defer func() { _ = s.Close() }()
+
+	// Create a token in non-cancelled context first
+	ctx := context.Background()
+	hash, _ := HashKey("test-key")
+	token, _ := s.CreateToken(ctx, "test-token", false, hash)
+
+	// Then use cancelled context for AddPermission
+	ctxCancelled, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	perm := &Permission{
+		ZoneID:         12345,
+		AllowedActions: []string{"list_records"},
+		RecordTypes:    []string{"TXT"},
+	}
+
+	_, err = s.AddPermissionForToken(ctxCancelled, token.ID, perm)
+	if err == nil {
+		t.Errorf("expected error with cancelled context, got nil")
+	}
+}
+
+// TestRemovePermissionWithCancelledContext tests RemovePermission with cancelled context.
+func TestRemovePermissionWithCancelledContext(t *testing.T) {
+	encryptionKey := make([]byte, 32)
+	_, _ = rand.Read(encryptionKey)
+
+	s, err := New(":memory:", encryptionKey)
+	if err != nil {
+		t.Fatalf("failed to create storage: %v", err)
+	}
+	defer func() { _ = s.Close() }()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	err = s.RemovePermission(ctx, 999)
+	if err == nil {
+		t.Errorf("expected error with cancelled context, got nil")
+	}
+}
+
+// TestGetPermissionsForTokenWithCancelledContext tests GetPermissionsForToken with cancelled context.
+func TestGetPermissionsForTokenWithCancelledContext(t *testing.T) {
+	encryptionKey := make([]byte, 32)
+	_, _ = rand.Read(encryptionKey)
+
+	s, err := New(":memory:", encryptionKey)
+	if err != nil {
+		t.Fatalf("failed to create storage: %v", err)
+	}
+	defer func() { _ = s.Close() }()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, err = s.GetPermissionsForToken(ctx, 123)
+	if err == nil {
+		t.Errorf("expected error with cancelled context, got nil")
+	}
+}
+
+// TestGetPermissionsEmptyList tests that GetPermissionsForToken returns empty slice, not nil.
+func TestGetPermissionsEmptyList(t *testing.T) {
+	encryptionKey := make([]byte, 32)
+	_, _ = rand.Read(encryptionKey)
+
+	s, err := New(":memory:", encryptionKey)
+	if err != nil {
+		t.Fatalf("failed to create storage: %v", err)
+	}
+	defer func() { _ = s.Close() }()
+	ctx := context.Background()
+
+	// Create a token with no permissions
+	hash, _ := HashKey("test-key")
+	token, _ := s.CreateToken(ctx, "test-token", false, hash)
+
+	// Get permissions for token with no permissions
+	perms, err := s.GetPermissionsForToken(ctx, token.ID)
+	if err != nil {
+		t.Fatalf("failed to get permissions: %v", err)
+	}
+
+	if perms == nil {
+		t.Errorf("expected empty slice, not nil")
+	}
+
+	if len(perms) != 0 {
+		t.Errorf("expected 0 permissions, got %d", len(perms))
+	}
+}
