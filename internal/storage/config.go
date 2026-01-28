@@ -76,6 +76,15 @@ func (s *SQLiteStorage) SetMasterAPIKey(ctx context.Context, apiKey string) erro
 	return nil
 }
 
+// GetMasterAPIKey is required by the Storage interface.
+// NOTE: The actual implementation only stores the hash, not the plain key.
+// This method returns an empty string as the plain key is not retrievable.
+// Use ValidateMasterAPIKey to verify a key instead.
+func (s *SQLiteStorage) GetMasterAPIKey(ctx context.Context) (string, error) {
+	// The plain key is not stored, only the hash. Return empty string.
+	return "", nil
+}
+
 // GetMasterAPIKeyHash retrieves the hash of the master bunny.net API key.
 // Returns ErrNotFound if no key is configured.
 func (s *SQLiteStorage) GetMasterAPIKeyHash(ctx context.Context) (string, error) {
