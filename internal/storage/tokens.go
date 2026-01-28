@@ -22,9 +22,12 @@ func (s *SQLiteStorage) CreateToken(ctx context.Context, name string, isAdmin bo
 
 	if err != nil {
 		// Check if this is a UNIQUE constraint violation
+		// The extended error code for UNIQUE constraint is 2067
 		var sqliteErr *sqlite.Error
 		if errors.As(err, &sqliteErr) {
-			if sqliteErr.Code() == sqlite3.SQLITE_CONSTRAINT {
+			// Check for UNIQUE constraint (extended error code 2067)
+			// or base constraint error code 19
+			if sqliteErr.Code() == 2067 || (sqliteErr.Code()&0xFF) == sqlite3.SQLITE_CONSTRAINT {
 				return nil, ErrDuplicate
 			}
 		}
