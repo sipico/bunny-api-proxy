@@ -313,7 +313,7 @@ func TestIsMasterKey_ConstantTimeComparison(t *testing.T) {
 	correctKey := masterKey
 	incorrectKey := "wrong-key-12345"
 
-	_ = bs.IsMasterKey(correctKey)  // Should return true
+	_ = bs.IsMasterKey(correctKey)   // Should return true
 	_ = bs.IsMasterKey(incorrectKey) // Should return false
 	// If this test runs without timing differences, constant-time comparison works
 }
