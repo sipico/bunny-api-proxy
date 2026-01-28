@@ -1,7 +1,7 @@
 # API-Only Implementation Plan
 
-**Status:** Ready - Issues Created
-**Date:** 2026-01-28
+**Status:** In Progress - Issue #143+#144 Merged
+**Date:** 2026-01-28 (Updated)
 **Parent Document:** [API_ONLY_DESIGN.md](./API_ONLY_DESIGN.md)
 **Workflow Reference:** [SUBAGENT_WORKFLOW.md](./SUBAGENT_WORKFLOW.md)
 
@@ -15,9 +15,18 @@ All sub-issues will use this session ID in branch names.
 
 ---
 
+## Change Log
+
+| Date | Change |
+|------|--------|
+| 2026-01-28 | Initial plan with 10 issues (#143-#152) |
+| 2026-01-28 | Merged #143 + #144: Schema-only change cannot pass CI independently; CRUD operations must be included |
+
+---
+
 ## Executive Summary
 
-This plan breaks the API-only design into **10 small, focused sub-tasks** suitable for Haiku sub-agents. Estimated total: ~$2-3 in Haiku costs.
+This plan breaks the API-only design into **9 focused sub-tasks** suitable for Haiku sub-agents.
 
 **Current State:**
 - Hybrid system: 21 web UI routes + 7 API routes
@@ -38,36 +47,32 @@ This plan breaks the API-only design into **10 small, focused sub-tasks** suitab
 ```
 Phase 1: Foundation
 ┌─────────────────────────────────────────────────────────────┐
-│ #1 Schema Migration (storage/schema.go)                     │
-│     - Create new tokens table                               │
+│ #143 Schema Migration + CRUD Operations                     │
+│     - Create new unified tokens table                       │
 │     - Create new permissions table                          │
-└────────────────────────────┬────────────────────────────────┘
-                             │
-                             ▼
-┌─────────────────────────────────────────────────────────────┐
-│ #2 Storage Layer (storage/tokens.go)                        │
-│     - TokenStore CRUD operations                            │
+│     - Implement TokenStore CRUD operations                  │
 │     - HasAnyAdminToken() for bootstrap check                │
+│     (Merged from #143 + #144 - atomic for green CI)         │
 └────────────────────────────┬────────────────────────────────┘
                              │
 Phase 2: Core Logic          │
                              ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ #3 Bootstrap Logic (auth/bootstrap.go)                      │
+│ #145 Bootstrap Logic (auth/bootstrap.go)                    │
 │     - State machine: UNCONFIGURED vs CONFIGURED             │
 │     - Master key lockout after first admin                  │
 └────────────────────────────┬────────────────────────────────┘
                              │
                              ▼
 ┌────────────────────────────┴────────────────────────────────┐
-│ #4 Auth Middleware Update (auth/middleware.go)              │
+│ #146 Auth Middleware Update (auth/middleware.go)            │
 │     - Unified token validation                              │
 │     - is_admin flag checking                                │
 └────────────────────────────┬────────────────────────────────┘
                              │
                              ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ #5 Admin API Handlers (admin/api.go)                        │
+│ #147 Admin API Handlers (admin/api.go)                      │
 │     - POST /api/tokens (with bootstrap logic)               │
 │     - GET /api/tokens, GET /api/tokens/{id}                 │
 │     - DELETE /api/tokens/{id} (with last-admin protection)  │
@@ -78,8 +83,8 @@ Phase 2: Core Logic          │
 Phase 3: Cleanup (parallel)  │
                              ▼
 ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐
-│ #6 Remove Web   │  │ #7 Update       │  │ #8 Error        │
-│     UI          │  │     Config      │  │     Responses   │
+│ #148 Remove Web │  │ #149 Update     │  │ #150 Error      │
+│      UI         │  │      Config     │  │      Responses  │
 │  - templates    │  │  - Remove       │  │  - Standardize  │
 │  - session.go   │  │    ADMIN_PASS   │  │    error codes  │
 │  - web routes   │  │  - Add LOG_LEVEL│  │    per spec     │
@@ -88,7 +93,7 @@ Phase 3: Cleanup (parallel)  │
                              ▼
 Phase 4: Integration
 ┌─────────────────────────────────────────────────────────────┐
-│ #9 Integration Tests (internal/admin/integration_test.go)   │
+│ #151 Integration Tests (internal/admin/integration_test.go) │
 │     - Full bootstrap flow                                   │
 │     - Token management lifecycle                            │
 │     - Permission enforcement                                │
@@ -96,7 +101,7 @@ Phase 4: Integration
                              │
                              ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ #10 Documentation Updates                                    │
+│ #152 Documentation Updates                                  │
 │     - README.md                                             │
 │     - docker-compose examples                               │
 └─────────────────────────────────────────────────────────────┘
@@ -108,28 +113,32 @@ Phase 4: Integration
 
 | Phase | Issues | Execution | Rationale |
 |-------|--------|-----------|-----------|
-| 1 | #1, #2 | Sequential | Schema first, then storage layer |
-| 2 | #3, #4, #5 | Sequential | Each builds on previous |
-| 3 | #6, #7, #8 | Parallel | Independent cleanup tasks |
-| 4 | #9, #10 | Sequential | Tests need all code, docs last |
+| 1 | #143 | Single issue | Schema + CRUD together for atomic CI |
+| 2 | #145, #146, #147 | Sequential | Each builds on previous |
+| 3 | #148, #149, #150 | Parallel | Independent cleanup tasks |
+| 4 | #151, #152 | Sequential | Tests need all code, docs last |
 
-**Total estimated time:** 5-7 subagent sessions (if sequential) or 4-5 (with Phase 3 parallelization)
+**Total estimated time:** 5-6 subagent sessions (with Phase 3 parallelization)
 
 ---
 
 ## Sub-Task Details
 
-### Issue #1: Schema Migration
+### Issue #143: Schema Migration + CRUD Operations (Merged from #143 + #144)
 
-**Scope:** Create new unified token schema
+**Scope:** Create new unified token schema AND implement TokenStore CRUD operations
+
+> **Note:** These were originally two separate issues. They were merged because the schema change alone breaks existing tests (CRUD code references old table names). Making this atomic ensures CI stays green.
 
 **Files to Create:**
-- None (modify existing)
+- `internal/storage/tokens.go`
+- `internal/storage/tokens_test.go`
 
 **Files to Modify:**
 - `internal/storage/schema.go`
+- `internal/storage/storage.go` (add TokenStore interface)
 
-**Specification:**
+**Schema Specification:**
 ```sql
 -- Remove these tables:
 -- admin_tokens
@@ -155,26 +164,7 @@ CREATE TABLE permissions (
 );
 ```
 
-**Acceptance Criteria:**
-- [ ] Schema defines unified `tokens` table
-- [ ] Schema version updated to `2`
-- [ ] Old tables removed from schema
-- [ ] Tests pass
-
----
-
-### Issue #2: Storage Layer - Token CRUD
-
-**Scope:** Implement TokenStore with CRUD operations
-
-**Files to Create:**
-- `internal/storage/tokens.go`
-- `internal/storage/tokens_test.go`
-
-**Files to Modify:**
-- `internal/storage/storage.go` (add TokenStore interface)
-
-**Specification:**
+**CRUD Specification:**
 ```go
 type TokenStore interface {
     CreateToken(ctx context.Context, name string, isAdmin bool, keyHash string) (*Token, error)
@@ -209,14 +199,19 @@ type Permission struct {
 ```
 
 **Acceptance Criteria:**
+- [ ] Schema defines unified `tokens` table
+- [ ] Schema version updated to `2`
+- [ ] Old tables removed from schema
 - [ ] All TokenStore methods implemented
 - [ ] Unit tests for each method
 - [ ] 95% coverage on tokens.go
 - [ ] Tests pass with `go test ./internal/storage/...`
+- [ ] Linter passes: `golangci-lint run`
+- [ ] CI passes (all checks green)
 
 ---
 
-### Issue #3: Bootstrap Logic
+### Issue #145: Bootstrap Logic
 
 **Scope:** Implement UNCONFIGURED/CONFIGURED state machine
 
@@ -225,7 +220,7 @@ type Permission struct {
 - `internal/auth/bootstrap_test.go`
 
 **Reference Files:**
-- `internal/storage/tokens.go` (from Issue #2)
+- `internal/storage/tokens.go` (from Issue #143)
 
 **Specification:**
 ```go
@@ -259,7 +254,7 @@ func (b *BootstrapService) CanUseMasterKey(ctx context.Context) (bool, error)
 
 ---
 
-### Issue #4: Auth Middleware Update
+### Issue #146: Auth Middleware Update
 
 **Scope:** Update auth middleware for unified tokens
 
@@ -268,8 +263,8 @@ func (b *BootstrapService) CanUseMasterKey(ctx context.Context) (bool, error)
 - `internal/auth/middleware_test.go`
 
 **Reference Files:**
-- `internal/auth/bootstrap.go` (from Issue #3)
-- `internal/storage/tokens.go` (from Issue #2)
+- `internal/auth/bootstrap.go` (from Issue #145)
+- `internal/storage/tokens.go` (from Issue #143)
 
 **Specification:**
 - Remove references to `scoped_keys`
@@ -297,7 +292,7 @@ const (
 
 ---
 
-### Issue #5: Admin API Handlers
+### Issue #147: Admin API Handlers
 
 **Scope:** Implement JSON API endpoints for token management
 
@@ -307,8 +302,8 @@ const (
 - `internal/admin/router.go`
 
 **Reference Files:**
-- `internal/auth/bootstrap.go` (from Issue #3)
-- `internal/storage/tokens.go` (from Issue #2)
+- `internal/auth/bootstrap.go` (from Issue #145)
+- `internal/storage/tokens.go` (from Issue #143)
 
 **Endpoints:**
 | Method | Path | Description |
@@ -347,7 +342,7 @@ const (
 
 ---
 
-### Issue #6: Remove Web UI
+### Issue #148: Remove Web UI
 
 **Scope:** Remove all web UI code and templates
 
@@ -371,7 +366,7 @@ const (
 
 ---
 
-### Issue #7: Update Configuration
+### Issue #149: Update Configuration
 
 **Scope:** Simplify config for API-only mode
 
@@ -396,7 +391,7 @@ const (
 
 ---
 
-### Issue #8: Standardize Error Responses
+### Issue #150: Standardize Error Responses
 
 **Scope:** Implement consistent error response format
 
@@ -432,7 +427,7 @@ type APIError struct {
 
 ---
 
-### Issue #9: Integration Tests
+### Issue #151: Integration Tests
 
 **Scope:** End-to-end tests for full API flow
 
@@ -463,7 +458,7 @@ type APIError struct {
 
 ---
 
-### Issue #10: Documentation Updates
+### Issue #152: Documentation Updates
 
 **Scope:** Update README and examples
 
@@ -490,8 +485,8 @@ type APIError struct {
 
 | Issue | Title | Branch Name | Worktree Path | Status |
 |-------|-------|-------------|---------------|--------|
-| [#143](https://github.com/sipico/bunny-api-proxy/issues/143) | Schema Migration | `claude/issue-143-w0xPw` | `/home/user/bunny-api-proxy-wt-143` | Pending |
-| [#144](https://github.com/sipico/bunny-api-proxy/issues/144) | Storage Layer - Token CRUD | `claude/issue-144-w0xPw` | `/home/user/bunny-api-proxy-wt-144` | Pending |
+| [#143](https://github.com/sipico/bunny-api-proxy/issues/143) | Schema Migration + CRUD | `claude/issue-143-w0xPw` | `/home/user/bunny-api-proxy-wt-143` | In Progress |
+| ~~[#144](https://github.com/sipico/bunny-api-proxy/issues/144)~~ | ~~Storage Layer - Token CRUD~~ | - | - | Merged → #143 |
 | [#145](https://github.com/sipico/bunny-api-proxy/issues/145) | Bootstrap Logic | `claude/issue-145-w0xPw` | `/home/user/bunny-api-proxy-wt-145` | Pending |
 | [#146](https://github.com/sipico/bunny-api-proxy/issues/146) | Auth Middleware Update | `claude/issue-146-w0xPw` | `/home/user/bunny-api-proxy-wt-146` | Pending |
 | [#147](https://github.com/sipico/bunny-api-proxy/issues/147) | Admin API Handlers | `claude/issue-147-w0xPw` | `/home/user/bunny-api-proxy-wt-147` | Pending |
@@ -509,7 +504,6 @@ type APIError struct {
 |-------|-------------------|---------------------|
 | `internal/admin/router.go` | #147, #148 | Merge #147 first, then #148 removes routes |
 | `internal/admin/api.go` | #147, #150 | Merge #147 first, then #150 adds error helpers |
-| `internal/storage/storage.go` | #143, #144 | Merge #143 first, then #144 adds interface |
 
 ---
 
@@ -528,8 +522,7 @@ Based on SUBAGENT_WORKFLOW.md data:
 
 | Task Type | Est. Output Tokens | Est. Haiku Cost |
 |-----------|-------------------|-----------------|
-| Schema (#143) | ~7K | $0.20 |
-| Storage (#144) | ~20K | $0.80 |
+| Schema + CRUD (#143) | ~27K | $1.00 |
 | Bootstrap (#145) | ~15K | $0.60 |
 | Auth (#146) | ~15K | $0.60 |
 | Handlers (#147) | ~30K | $1.20 |
@@ -546,8 +539,9 @@ Based on SUBAGENT_WORKFLOW.md data:
 
 1. [x] Review this plan
 2. [x] Create GitHub issues for each sub-task
-3. [ ] Execute Phase 1 (sequential: #143 → #144)
-4. [ ] Execute Phase 2 (sequential: #145 → #146 → #147)
-5. [ ] Execute Phase 3 (parallel: #148, #149, #150)
-6. [ ] Execute Phase 4 (sequential: #151 → #152)
-7. [ ] Final review and release
+3. [x] Merged #143 + #144 (schema-only change cannot pass CI)
+4. [ ] Execute Phase 1: #143 (Schema + CRUD combined)
+5. [ ] Execute Phase 2 (sequential: #145 → #146 → #147)
+6. [ ] Execute Phase 3 (parallel: #148, #149, #150)
+7. [ ] Execute Phase 4 (sequential: #151 → #152)
+8. [ ] Final review and release
