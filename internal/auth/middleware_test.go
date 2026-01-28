@@ -20,12 +20,12 @@ import (
 // This is separate from mockTokenStore in bootstrap_test.go to allow for more
 // detailed testing of different error conditions.
 type authTestTokenStore struct {
-	tokens          map[string]*storage.Token // keyed by hash
-	permissions     map[int64][]*storage.Permission
-	hasAdminToken   bool
-	getByHashErr    error
-	hasAdminErr     error
-	getPermsErr     error
+	tokens        map[string]*storage.Token // keyed by hash
+	permissions   map[int64][]*storage.Permission
+	hasAdminToken bool
+	getByHashErr  error
+	hasAdminErr   error
+	getPermsErr   error
 }
 
 func newAuthTestTokenStore() *authTestTokenStore {
