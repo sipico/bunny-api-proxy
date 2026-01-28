@@ -6,10 +6,12 @@ import (
 	"fmt"
 )
 
-// AddPermission creates a new permission for a scoped key.
+// AddPermission creates a new permission for a token (or scoped key).
 // The perm.AllowedActions and perm.RecordTypes are JSON-encoded for storage.
 // Returns the new permission ID.
-func (s *SQLiteStorage) AddPermission(ctx context.Context, scopedKeyID int64, perm *Permission) (int64, error) {
+// Note: This method now uses token_id from the unified schema. For backward compatibility,
+// the TokenID field in Permission is used (which was previously ScopedKeyID).
+func (s *SQLiteStorage) AddPermission(ctx context.Context, tokenID int64, perm *Permission) (int64, error) {
 	// Validate input
 	if perm.ZoneID <= 0 {
 		return 0, fmt.Errorf("invalid zone ID: must be greater than 0")
@@ -34,8 +36,8 @@ func (s *SQLiteStorage) AddPermission(ctx context.Context, scopedKeyID int64, pe
 
 	// Insert into database
 	result, err := s.db.ExecContext(ctx,
-		"INSERT INTO permissions (scoped_key_id, zone_id, allowed_actions, record_types) VALUES (?, ?, ?, ?)",
-		scopedKeyID, perm.ZoneID, string(allowedActionsJSON), string(recordTypesJSON))
+		"INSERT INTO permissions (token_id, zone_id, allowed_actions, record_types) VALUES (?, ?, ?, ?)",
+		tokenID, perm.ZoneID, string(allowedActionsJSON), string(recordTypesJSON))
 	if err != nil {
 		return 0, fmt.Errorf("failed to insert permission: %w", err)
 	}
@@ -49,13 +51,15 @@ func (s *SQLiteStorage) AddPermission(ctx context.Context, scopedKeyID int64, pe
 	return id, nil
 }
 
-// GetPermissions retrieves all permissions for a scoped key.
+// GetPermissions retrieves all permissions for a token (or scoped key).
 // Returns empty slice if no permissions exist (not an error).
 // The AllowedActions and RecordTypes are JSON-decoded.
-func (s *SQLiteStorage) GetPermissions(ctx context.Context, scopedKeyID int64) ([]*Permission, error) {
+// Note: This method now uses token_id from the unified schema. For backward compatibility,
+// the TokenID field in Permission is used (which was previously ScopedKeyID).
+func (s *SQLiteStorage) GetPermissions(ctx context.Context, tokenID int64) ([]*Permission, error) {
 	rows, err := s.db.QueryContext(ctx,
-		"SELECT id, scoped_key_id, zone_id, allowed_actions, record_types, created_at FROM permissions WHERE scoped_key_id = ? ORDER BY created_at ASC",
-		scopedKeyID)
+		"SELECT id, token_id, zone_id, allowed_actions, record_types, created_at FROM permissions WHERE token_id = ? ORDER BY created_at ASC",
+		tokenID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query permissions: %w", err)
 	}
@@ -66,7 +70,7 @@ func (s *SQLiteStorage) GetPermissions(ctx context.Context, scopedKeyID int64) (
 		var p Permission
 		var allowedActionsJSON, recordTypesJSON string
 
-		if err := rows.Scan(&p.ID, &p.ScopedKeyID, &p.ZoneID, &allowedActionsJSON, &recordTypesJSON, &p.CreatedAt); err != nil {
+		if err := rows.Scan(&p.ID, &p.TokenID, &p.ZoneID, &allowedActionsJSON, &recordTypesJSON, &p.CreatedAt); err != nil {
 			return nil, fmt.Errorf("failed to scan permission row: %w", err)
 		}
 
