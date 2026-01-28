@@ -2,20 +2,143 @@ package auth
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"strings"
+
+	"github.com/sipico/bunny-api-proxy/internal/storage"
 )
 
-// contextKey for storing KeyInfo in context
+// Authenticator handles authentication for API requests.
+// It supports both master key authentication (during bootstrap) and token authentication.
+type Authenticator struct {
+	tokens    storage.TokenStore
+	bootstrap *BootstrapService
+}
+
+// NewAuthenticator creates a new authentication middleware.
+func NewAuthenticator(tokens storage.TokenStore, bootstrap *BootstrapService) *Authenticator {
+	return &Authenticator{
+		tokens:    tokens,
+		bootstrap: bootstrap,
+	}
+}
+
+// Authenticate is middleware that validates the API key and sets authentication context.
+// It checks in order:
+// 1. Master key (only valid during UNCONFIGURED state)
+// 2. Token from the tokens table (SHA256 hash lookup)
+//
+// On success, it sets:
+// - Token in context (nil for master key)
+// - Permissions in context (nil for master key or admin tokens)
+// - IsMasterKey flag
+// - IsAdmin flag
+func (m *Authenticator) Authenticate(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Extract API key from AccessKey header
+		apiKey := extractAccessKey(r)
+		if apiKey == "" {
+			writeJSONError(w, http.StatusUnauthorized, "missing API key")
+			return
+		}
+
+		ctx := r.Context()
+
+		// First, check if this is the master key (only during UNCONFIGURED state)
+		isMasterKeyValid, err := m.bootstrap.ValidateMasterKey(ctx, apiKey)
+		if err != nil {
+			writeJSONError(w, http.StatusInternalServerError, "internal error")
+			return
+		}
+
+		if isMasterKeyValid {
+			// Master key authenticated - set context and continue
+			ctx = withMasterKey(ctx, true)
+			ctx = withAdmin(ctx, true)
+			// No token or permissions for master key
+			next.ServeHTTP(w, r.WithContext(ctx))
+			return
+		}
+
+		// Try token authentication using SHA256 hash
+		hash := sha256.Sum256([]byte(apiKey))
+		keyHash := hex.EncodeToString(hash[:])
+
+		token, err := m.tokens.GetTokenByHash(ctx, keyHash)
+		if err != nil {
+			if err == storage.ErrNotFound {
+				writeJSONError(w, http.StatusUnauthorized, "invalid API key")
+				return
+			}
+			writeJSONError(w, http.StatusInternalServerError, "internal error")
+			return
+		}
+
+		// Token found - set context
+		ctx = withToken(ctx, token)
+		ctx = withMasterKey(ctx, false)
+		ctx = withAdmin(ctx, token.IsAdmin)
+
+		// Load permissions for scoped tokens
+		if !token.IsAdmin {
+			perms, err := m.loadPermissions(ctx, token.ID)
+			if err != nil {
+				writeJSONError(w, http.StatusInternalServerError, "internal error")
+				return
+			}
+			ctx = withPermissions(ctx, perms)
+		}
+
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+// loadPermissions loads permissions for a token.
+// Uses the PermissionStore interface if available on the tokens store.
+func (m *Authenticator) loadPermissions(ctx context.Context, tokenID int64) ([]*storage.Permission, error) {
+	// Check if the token store also implements GetPermissionsForToken
+	type permissionLoader interface {
+		GetPermissionsForToken(ctx context.Context, tokenID int64) ([]*storage.Permission, error)
+	}
+
+	if loader, ok := m.tokens.(permissionLoader); ok {
+		return loader.GetPermissionsForToken(ctx, tokenID)
+	}
+
+	// No permission loading available - return empty slice
+	return []*storage.Permission{}, nil
+}
+
+// RequireAdmin is middleware that requires admin privileges.
+// It must be used after Authenticate middleware.
+// Returns 403 Forbidden if the request is not from an admin.
+func (m *Authenticator) RequireAdmin(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !IsAdminFromContext(r.Context()) {
+			writeJSONErrorWithCode(w, http.StatusForbidden, "admin_required", "This endpoint requires an admin token.")
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// --- Legacy support for existing Validator-based middleware ---
+// The following functions maintain backward compatibility with existing code.
+
+// contextKey for storing KeyInfo in context (legacy).
 type contextKey string
 
 const (
-	// KeyInfoContextKey is the context key for storing KeyInfo
+	// KeyInfoContextKey is the context key for storing KeyInfo (legacy).
 	KeyInfoContextKey contextKey = "keyInfo"
 )
 
-// Middleware returns Chi-compatible middleware for API key validation
+// Middleware returns Chi-compatible middleware for API key validation (legacy).
+// This middleware uses the old Validator-based authentication.
+// For new code, use Authenticator.Authenticate instead.
 func Middleware(v *Validator) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -57,7 +180,7 @@ func Middleware(v *Validator) func(http.Handler) http.Handler {
 	}
 }
 
-// GetKeyInfo retrieves KeyInfo from request context
+// GetKeyInfo retrieves KeyInfo from request context (legacy).
 func GetKeyInfo(ctx context.Context) *KeyInfo {
 	if v := ctx.Value(KeyInfoContextKey); v != nil {
 		if info, ok := v.(*KeyInfo); ok {
@@ -67,16 +190,33 @@ func GetKeyInfo(ctx context.Context) *KeyInfo {
 	return nil
 }
 
-// extractAccessKey gets API key from "AccessKey" header
+// --- Helper functions ---
+
+// extractAccessKey gets API key from "AccessKey" header.
 func extractAccessKey(r *http.Request) string {
 	return strings.TrimSpace(r.Header.Get("AccessKey"))
 }
 
-// writeJSONError writes a JSON error response
+// writeJSONError writes a JSON error response with just an error message.
 func writeJSONError(w http.ResponseWriter, status int, message string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	err := json.NewEncoder(w).Encode(map[string]string{"error": message})
+	if err != nil {
+		// Encoding errors are not critical for error responses
+		_ = err
+	}
+}
+
+// writeJSONErrorWithCode writes a JSON error response with code and message.
+func writeJSONErrorWithCode(w http.ResponseWriter, status int, code, message string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	resp := map[string]string{
+		"error":   code,
+		"message": message,
+	}
+	err := json.NewEncoder(w).Encode(resp)
 	if err != nil {
 		// Encoding errors are not critical for error responses
 		_ = err
