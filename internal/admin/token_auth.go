@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/sipico/bunny-api-proxy/internal/auth"
 	"github.com/sipico/bunny-api-proxy/internal/storage"
 )
 
@@ -15,55 +16,49 @@ type TokenInfo struct {
 	Name string
 }
 
-// TokenAuthMiddleware validates AccessKey tokens or Basic Auth for admin API
-// It accepts either:
-// - AccessKey token: validated against stored admin tokens
-// - Basic auth: username "admin" with the admin password (for bootstrapping)
+// TokenAuthMiddleware validates AccessKey tokens for admin API
+// It accepts:
+// - AccessKey header: validated against stored admin tokens or master API key
 func (h *Handler) TokenAuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		authHeader := r.Header.Get("Authorization")
 		accessKey := r.Header.Get("AccessKey")
-		if authHeader == "" && accessKey == "" {
+		if accessKey == "" {
 			http.Error(w, "missing API key", http.StatusUnauthorized)
 			return
 		}
 
-		// Check for Basic auth first (for bootstrapping)
-		const basicPrefix = "Basic "
-		if strings.HasPrefix(authHeader, basicPrefix) {
-			username, password, ok := r.BasicAuth()
-			if !ok {
-				http.Error(w, "Invalid Basic auth format", http.StatusUnauthorized)
-				return
-			}
-
-			// Validate against admin credentials
-			if username == "admin" && h.sessionStore.ValidatePassword(password) {
-				// Add a pseudo token info for basic auth
-				tokenInfo := &TokenInfo{
-					ID:   0, // No real token ID for basic auth
-					Name: "basic-auth-admin",
-				}
-				ctx := WithTokenInfo(r.Context(), tokenInfo)
-				h.logger.Debug("admin API request via basic auth")
-				next.ServeHTTP(w, r.WithContext(ctx))
-				return
-			}
-
-			h.logger.Warn("invalid basic auth attempt", "remote_addr", r.RemoteAddr)
-			http.Error(w, "Invalid credentials", http.StatusUnauthorized)
-			return
-		}
-
-		// Check AccessKey header
 		token := strings.TrimSpace(accessKey)
 		if token == "" {
 			http.Error(w, "missing API key", http.StatusUnauthorized)
 			return
 		}
 
-		// Validate token against database
-		adminToken, err := h.storage.ValidateAdminToken(r.Context(), token)
+		ctx := r.Context()
+
+		// First, check if this is the master API key
+		masterKey, err := h.storage.GetMasterAPIKey(ctx)
+		if err == nil && masterKey != "" && token == masterKey {
+			// Master key authenticated - set context flags
+			ctx = auth.WithMasterKey(ctx, true)
+			ctx = auth.WithAdmin(ctx, true)
+			h.logger.Debug("admin API request via master key")
+			next.ServeHTTP(w, r.WithContext(ctx))
+			return
+		}
+
+		// Check against unified tokens (Issue 147)
+		unifiedToken, err := h.validateUnifiedToken(ctx, token)
+		if err == nil && unifiedToken != nil {
+			// Add token and admin status to context
+			ctx = auth.WithToken(ctx, unifiedToken)
+			ctx = auth.WithAdmin(ctx, unifiedToken.IsAdmin)
+			h.logger.Debug("admin API request via unified token", "token_name", unifiedToken.Name, "is_admin", unifiedToken.IsAdmin)
+			next.ServeHTTP(w, r.WithContext(ctx))
+			return
+		}
+
+		// Validate token against legacy admin tokens
+		adminToken, err := h.storage.ValidateAdminToken(ctx, token)
 		if err != nil {
 			if errors.Is(err, storage.ErrNotFound) {
 				h.logger.Warn("invalid admin token attempt", "remote_addr", r.RemoteAddr)
@@ -75,16 +70,39 @@ func (h *Handler) TokenAuthMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		// Add token info to context
+		// Add token info to context (legacy format)
 		tokenInfo := &TokenInfo{
 			ID:   adminToken.ID,
 			Name: adminToken.Name,
 		}
-		ctx := WithTokenInfo(r.Context(), tokenInfo)
+		ctx = WithTokenInfo(ctx, tokenInfo)
+		ctx = auth.WithAdmin(ctx, true) // Legacy admin tokens are always admin
 
-		h.logger.Debug("admin API request", "token_name", tokenInfo.Name)
+		h.logger.Debug("admin API request via legacy token", "token_name", tokenInfo.Name)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+// validateUnifiedToken validates a token against the unified token system.
+// Returns the token if valid, or nil if not found.
+func (h *Handler) validateUnifiedToken(ctx context.Context, token string) (*storage.Token, error) {
+	// Hash the provided token and look it up
+	// The storage layer handles the hashing
+	tokens, err := h.storage.ListTokens(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Hash the provided token for comparison
+	keyHash := auth.HashToken(token)
+
+	for _, t := range tokens {
+		if t.KeyHash == keyHash {
+			return t, nil
+		}
+	}
+
+	return nil, storage.ErrNotFound
 }
 
 // GetTokenInfoFromContext retrieves token info from context

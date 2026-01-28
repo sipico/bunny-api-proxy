@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -129,7 +128,7 @@ func (f *failingWriter) WriteHeader(int) {}
 
 func TestHandleHealth(t *testing.T) {
 	// Test case 1: Returns 200 OK with status
-	h := NewHandler(&mockStorage{}, NewSessionStore(0), new(slog.LevelVar), slog.Default())
+	h := NewHandler(&mockStorage{}, new(slog.LevelVar), slog.Default())
 
 	req := httptest.NewRequest("GET", "/health", nil)
 	w := httptest.NewRecorder()
@@ -178,7 +177,7 @@ func TestHandleReady(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := NewHandler(tt.storage, NewSessionStore(0), new(slog.LevelVar), slog.Default())
+			h := NewHandler(tt.storage, new(slog.LevelVar), slog.Default())
 
 			req := httptest.NewRequest("GET", "/ready", nil)
 			w := httptest.NewRecorder()
@@ -202,7 +201,7 @@ func TestHandleReady(t *testing.T) {
 }
 
 func TestNewRouter(t *testing.T) {
-	h := NewHandler(&mockStorage{}, NewSessionStore(0), new(slog.LevelVar), slog.Default())
+	h := NewHandler(&mockStorage{}, new(slog.LevelVar), slog.Default())
 	router := h.NewRouter()
 
 	// Test that router is created and routes work
@@ -231,76 +230,8 @@ func TestNewRouter(t *testing.T) {
 	}
 }
 
-func TestNewHandler(t *testing.T) {
-	// Test with nil logger (should use default)
-	h := NewHandler(&mockStorage{}, NewSessionStore(0), nil, nil)
-	if h == nil {
-		t.Fatal("expected handler, got nil")
-	}
-	if h.logger == nil {
-		t.Error("expected logger to be set to default")
-	}
-	if h.logLevel == nil {
-		t.Error("expected logLevel to be initialized")
-	}
-
-	// Test with custom logger and logLevel
-	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	logLevel := new(slog.LevelVar)
-	h = NewHandler(&mockStorage{}, NewSessionStore(0), logLevel, logger)
-	if h.logger != logger {
-		t.Error("expected custom logger to be used")
-	}
-	if h.logLevel != logLevel {
-		t.Error("expected custom logLevel to be used")
-	}
-}
-
-func TestContextHelpers(t *testing.T) {
-	ctx := context.Background()
-
-	// Session ID
-	t.Run("session ID", func(t *testing.T) {
-		// Not set
-		_, ok := GetSessionID(ctx)
-		if ok {
-			t.Error("expected no session ID")
-		}
-
-		// Set and retrieve
-		ctx2 := WithSessionID(ctx, "test-session")
-		id, ok := GetSessionID(ctx2)
-		if !ok || id != "test-session" {
-			t.Errorf("expected session ID 'test-session', got %s", id)
-		}
-	})
-
-	// Token info
-	t.Run("token info", func(t *testing.T) {
-		// Not set
-		_, ok := GetTokenInfo(ctx)
-		if ok {
-			t.Error("expected no token info")
-		}
-
-		// Set and retrieve
-		testInfo := map[string]string{"name": "test-token"}
-		ctx2 := WithTokenInfo(ctx, testInfo)
-		info, ok := GetTokenInfo(ctx2)
-		if !ok {
-			t.Error("expected token info to be set")
-		}
-
-		// Type assertion
-		infoMap, ok := info.(map[string]string)
-		if !ok || infoMap["name"] != "test-token" {
-			t.Errorf("expected token info map, got %v", info)
-		}
-	})
-}
-
 func TestHandleHealthEncodingError(t *testing.T) {
-	h := NewHandler(&mockStorage{}, NewSessionStore(0), new(slog.LevelVar), slog.Default())
+	h := NewHandler(&mockStorage{}, new(slog.LevelVar), slog.Default())
 
 	req := httptest.NewRequest("GET", "/health", nil)
 	w := &failingWriter{}
@@ -310,7 +241,7 @@ func TestHandleHealthEncodingError(t *testing.T) {
 }
 
 func TestHandleReadyStorageNilEncodingError(t *testing.T) {
-	h := NewHandler(nil, NewSessionStore(0), new(slog.LevelVar), slog.Default())
+	h := NewHandler(nil, new(slog.LevelVar), slog.Default())
 
 	req := httptest.NewRequest("GET", "/ready", nil)
 	w := &failingWriter{}
@@ -320,7 +251,7 @@ func TestHandleReadyStorageNilEncodingError(t *testing.T) {
 }
 
 func TestHandleReadyStorageConnectedEncodingError(t *testing.T) {
-	h := NewHandler(&mockStorage{}, NewSessionStore(0), new(slog.LevelVar), slog.Default())
+	h := NewHandler(&mockStorage{}, new(slog.LevelVar), slog.Default())
 
 	req := httptest.NewRequest("GET", "/ready", nil)
 	w := &failingWriter{}

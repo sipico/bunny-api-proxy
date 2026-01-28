@@ -4,11 +4,7 @@ package admin
 import (
 	"context"
 	"errors"
-	"fmt"
-	"html/template"
 	"log/slog"
-	"os"
-	"path/filepath"
 
 	"github.com/sipico/bunny-api-proxy/internal/auth"
 	"github.com/sipico/bunny-api-proxy/internal/storage"
@@ -24,12 +20,10 @@ var (
 
 // Handler provides admin endpoints
 type Handler struct {
-	storage      Storage
-	sessionStore *SessionStore
-	logger       *slog.Logger
-	logLevel     *slog.LevelVar
-	templates    *template.Template
-	bootstrap    *auth.BootstrapService
+	storage   Storage
+	logger    *slog.Logger
+	logLevel  *slog.LevelVar
+	bootstrap *auth.BootstrapService
 }
 
 // Storage interface for admin operations
@@ -73,7 +67,7 @@ type Storage interface {
 }
 
 // NewHandler creates an admin handler
-func NewHandler(storage Storage, sessionStore *SessionStore, logLevel *slog.LevelVar, logger *slog.Logger) *Handler {
+func NewHandler(storage Storage, logLevel *slog.LevelVar, logger *slog.Logger) *Handler {
 	if logger == nil {
 		logger = slog.Default()
 	}
@@ -81,36 +75,10 @@ func NewHandler(storage Storage, sessionStore *SessionStore, logLevel *slog.Leve
 		logLevel = new(slog.LevelVar)
 	}
 
-	// Load templates from filesystem
-	// Try multiple locations to support both binary and test execution
-	var tmpl *template.Template
-	var err error
-
-	// Try relative to current directory first (binary execution)
-	tmpl, err = template.ParseGlob("web/templates/*.html")
-	if err != nil {
-		// Try relative to project root (when running from within project)
-		tmpl, err = template.ParseGlob("../../web/templates/*.html")
-		if err != nil {
-			// Try absolute path based on common deployment
-			homeDir, err2 := os.UserHomeDir()
-			if err2 == nil && homeDir != "" {
-				absPath := filepath.Join(homeDir, "bunny-api-proxy", "web", "templates", "*.html")
-				tmpl, err = template.ParseGlob(absPath)
-			}
-		}
-	}
-
-	if err != nil {
-		logger.Warn("failed to load templates", "error", fmt.Sprintf("%v (tried relative and absolute paths)", err))
-	}
-
 	return &Handler{
-		storage:      storage,
-		sessionStore: sessionStore,
-		logLevel:     logLevel,
-		logger:       logger,
-		templates:    tmpl,
+		storage:  storage,
+		logLevel: logLevel,
+		logger:   logger,
 	}
 }
 
@@ -125,20 +93,8 @@ func (h *Handler) SetBootstrapService(bs *auth.BootstrapService) {
 type contextKey string
 
 const (
-	sessionIDKey contextKey = "sessionID"
 	tokenInfoKey contextKey = "tokenInfo"
 )
-
-// WithSessionID attaches session ID to context
-func WithSessionID(ctx context.Context, sessionID string) context.Context {
-	return context.WithValue(ctx, sessionIDKey, sessionID)
-}
-
-// GetSessionID retrieves session ID from context
-func GetSessionID(ctx context.Context) (string, bool) {
-	id, ok := ctx.Value(sessionIDKey).(string)
-	return id, ok
-}
 
 // WithTokenInfo attaches token info to context
 func WithTokenInfo(ctx context.Context, info any) context.Context {
