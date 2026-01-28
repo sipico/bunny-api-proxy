@@ -3,13 +3,573 @@ package auth
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/sipico/bunny-api-proxy/internal/storage"
 )
+
+// --- Mock implementations for testing ---
+
+// authTestTokenStore implements storage.TokenStore for AuthMiddleware tests.
+// This is separate from mockTokenStore in bootstrap_test.go to allow for more
+// detailed testing of different error conditions.
+type authTestTokenStore struct {
+	tokens          map[string]*storage.Token // keyed by hash
+	permissions     map[int64][]*storage.Permission
+	hasAdminToken   bool
+	getByHashErr    error
+	hasAdminErr     error
+	getPermsErr     error
+}
+
+func newAuthTestTokenStore() *authTestTokenStore {
+	return &authTestTokenStore{
+		tokens:      make(map[string]*storage.Token),
+		permissions: make(map[int64][]*storage.Permission),
+	}
+}
+
+func (m *authTestTokenStore) CreateToken(ctx context.Context, name string, isAdmin bool, keyHash string) (*storage.Token, error) {
+	token := &storage.Token{
+		ID:      int64(len(m.tokens) + 1),
+		KeyHash: keyHash,
+		Name:    name,
+		IsAdmin: isAdmin,
+	}
+	m.tokens[keyHash] = token
+	return token, nil
+}
+
+func (m *authTestTokenStore) GetTokenByHash(ctx context.Context, keyHash string) (*storage.Token, error) {
+	if m.getByHashErr != nil {
+		return nil, m.getByHashErr
+	}
+	if token, ok := m.tokens[keyHash]; ok {
+		return token, nil
+	}
+	return nil, storage.ErrNotFound
+}
+
+func (m *authTestTokenStore) GetTokenByID(ctx context.Context, id int64) (*storage.Token, error) {
+	for _, token := range m.tokens {
+		if token.ID == id {
+			return token, nil
+		}
+	}
+	return nil, storage.ErrNotFound
+}
+
+func (m *authTestTokenStore) ListTokens(ctx context.Context) ([]*storage.Token, error) {
+	tokens := make([]*storage.Token, 0, len(m.tokens))
+	for _, t := range m.tokens {
+		tokens = append(tokens, t)
+	}
+	return tokens, nil
+}
+
+func (m *authTestTokenStore) DeleteToken(ctx context.Context, id int64) error {
+	for hash, token := range m.tokens {
+		if token.ID == id {
+			delete(m.tokens, hash)
+			return nil
+		}
+	}
+	return storage.ErrNotFound
+}
+
+func (m *authTestTokenStore) HasAnyAdminToken(ctx context.Context) (bool, error) {
+	if m.hasAdminErr != nil {
+		return false, m.hasAdminErr
+	}
+	return m.hasAdminToken, nil
+}
+
+func (m *authTestTokenStore) GetPermissionsForToken(ctx context.Context, tokenID int64) ([]*storage.Permission, error) {
+	if m.getPermsErr != nil {
+		return nil, m.getPermsErr
+	}
+	if perms, ok := m.permissions[tokenID]; ok {
+		return perms, nil
+	}
+	return []*storage.Permission{}, nil
+}
+
+// addToken adds a token to the mock store using the plaintext key.
+func (m *authTestTokenStore) addToken(id int64, name string, isAdmin bool, plaintextKey string) *storage.Token {
+	hash := sha256.Sum256([]byte(plaintextKey))
+	keyHash := hex.EncodeToString(hash[:])
+	token := &storage.Token{
+		ID:      id,
+		KeyHash: keyHash,
+		Name:    name,
+		IsAdmin: isAdmin,
+	}
+	m.tokens[keyHash] = token
+	return token
+}
+
+// --- Context helper tests ---
+
+func TestTokenFromContext(t *testing.T) {
+	token := &storage.Token{ID: 42, Name: "test-token", IsAdmin: false}
+	ctx := withToken(context.Background(), token)
+
+	got := TokenFromContext(ctx)
+	if got == nil {
+		t.Fatal("TokenFromContext returned nil")
+	}
+	if got.ID != 42 {
+		t.Errorf("TokenFromContext().ID = %d, want 42", got.ID)
+	}
+	if got.Name != "test-token" {
+		t.Errorf("TokenFromContext().Name = %q, want 'test-token'", got.Name)
+	}
+}
+
+func TestTokenFromContext_NotSet(t *testing.T) {
+	ctx := context.Background()
+	got := TokenFromContext(ctx)
+	if got != nil {
+		t.Errorf("TokenFromContext() = %v, want nil", got)
+	}
+}
+
+func TestPermissionsFromContext(t *testing.T) {
+	perms := []*storage.Permission{
+		{ID: 1, ZoneID: 100, AllowedActions: []string{"list_records"}},
+	}
+	ctx := withPermissions(context.Background(), perms)
+
+	got := PermissionsFromContext(ctx)
+	if len(got) != 1 {
+		t.Fatalf("PermissionsFromContext() len = %d, want 1", len(got))
+	}
+	if got[0].ID != 1 {
+		t.Errorf("PermissionsFromContext()[0].ID = %d, want 1", got[0].ID)
+	}
+}
+
+func TestPermissionsFromContext_NotSet(t *testing.T) {
+	ctx := context.Background()
+	got := PermissionsFromContext(ctx)
+	if got != nil {
+		t.Errorf("PermissionsFromContext() = %v, want nil", got)
+	}
+}
+
+func TestIsMasterKeyFromContext(t *testing.T) {
+	tests := []struct {
+		name     string
+		setValue bool
+		want     bool
+	}{
+		{"master key true", true, true},
+		{"master key false", false, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := withMasterKey(context.Background(), tt.setValue)
+			got := IsMasterKeyFromContext(ctx)
+			if got != tt.want {
+				t.Errorf("IsMasterKeyFromContext() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestIsMasterKeyFromContext_NotSet(t *testing.T) {
+	ctx := context.Background()
+	got := IsMasterKeyFromContext(ctx)
+	if got != false {
+		t.Errorf("IsMasterKeyFromContext() = %v, want false", got)
+	}
+}
+
+func TestIsAdminFromContext(t *testing.T) {
+	tests := []struct {
+		name     string
+		setValue bool
+		want     bool
+	}{
+		{"admin true", true, true},
+		{"admin false", false, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := withAdmin(context.Background(), tt.setValue)
+			got := IsAdminFromContext(ctx)
+			if got != tt.want {
+				t.Errorf("IsAdminFromContext() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestIsAdminFromContext_NotSet(t *testing.T) {
+	ctx := context.Background()
+	got := IsAdminFromContext(ctx)
+	if got != false {
+		t.Errorf("IsAdminFromContext() = %v, want false", got)
+	}
+}
+
+// --- AuthMiddleware tests ---
+
+func TestAuthMiddleware_MissingAccessKey(t *testing.T) {
+	tokenStore := newAuthTestTokenStore()
+	bootstrap := NewBootstrapService(tokenStore, "master-key")
+	middleware := NewAuthenticator(tokenStore, bootstrap)
+
+	handler := middleware.Authenticate(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("handler should not be called")
+	}))
+
+	req := httptest.NewRequest("GET", "/api/tokens", nil)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("status = %d, want 401", rec.Code)
+	}
+
+	var resp map[string]string
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if resp["error"] != "missing API key" {
+		t.Errorf("error = %q, want 'missing API key'", resp["error"])
+	}
+}
+
+func TestAuthMiddleware_MasterKey_UnconfiguredState(t *testing.T) {
+	tokenStore := newAuthTestTokenStore()
+	tokenStore.hasAdminToken = false // UNCONFIGURED state
+	bootstrap := NewBootstrapService(tokenStore, "master-key")
+	middleware := NewAuthenticator(tokenStore, bootstrap)
+
+	var gotIsMaster, gotIsAdmin bool
+	handler := middleware.Authenticate(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotIsMaster = IsMasterKeyFromContext(r.Context())
+		gotIsAdmin = IsAdminFromContext(r.Context())
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest("GET", "/api/tokens", nil)
+	req.Header.Set("AccessKey", "master-key")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("status = %d, want 200", rec.Code)
+	}
+	if !gotIsMaster {
+		t.Error("IsMasterKeyFromContext() = false, want true")
+	}
+	if !gotIsAdmin {
+		t.Error("IsAdminFromContext() = false, want true")
+	}
+}
+
+func TestAuthMiddleware_MasterKey_ConfiguredState(t *testing.T) {
+	tokenStore := newAuthTestTokenStore()
+	tokenStore.hasAdminToken = true // CONFIGURED state - master key locked out
+	bootstrap := NewBootstrapService(tokenStore, "master-key")
+	middleware := NewAuthenticator(tokenStore, bootstrap)
+
+	handler := middleware.Authenticate(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("handler should not be called")
+	}))
+
+	req := httptest.NewRequest("GET", "/api/tokens", nil)
+	req.Header.Set("AccessKey", "master-key")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("status = %d, want 401", rec.Code)
+	}
+
+	var resp map[string]string
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if resp["error"] != "invalid API key" {
+		t.Errorf("error = %q, want 'invalid API key'", resp["error"])
+	}
+}
+
+func TestAuthMiddleware_AdminToken(t *testing.T) {
+	tokenStore := newAuthTestTokenStore()
+	tokenStore.hasAdminToken = true
+	tokenStore.addToken(1, "admin-token", true, "admin-key")
+	bootstrap := NewBootstrapService(tokenStore, "master-key")
+	middleware := NewAuthenticator(tokenStore, bootstrap)
+
+	var gotToken *storage.Token
+	var gotIsAdmin, gotIsMaster bool
+	handler := middleware.Authenticate(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotToken = TokenFromContext(r.Context())
+		gotIsAdmin = IsAdminFromContext(r.Context())
+		gotIsMaster = IsMasterKeyFromContext(r.Context())
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest("GET", "/api/tokens", nil)
+	req.Header.Set("AccessKey", "admin-key")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("status = %d, want 200", rec.Code)
+	}
+	if gotToken == nil {
+		t.Fatal("TokenFromContext() = nil, want token")
+	}
+	if gotToken.ID != 1 {
+		t.Errorf("TokenFromContext().ID = %d, want 1", gotToken.ID)
+	}
+	if !gotIsAdmin {
+		t.Error("IsAdminFromContext() = false, want true")
+	}
+	if gotIsMaster {
+		t.Error("IsMasterKeyFromContext() = true, want false")
+	}
+}
+
+func TestAuthMiddleware_ScopedToken(t *testing.T) {
+	tokenStore := newAuthTestTokenStore()
+	tokenStore.hasAdminToken = true
+	token := tokenStore.addToken(2, "scoped-token", false, "scoped-key")
+	tokenStore.permissions[token.ID] = []*storage.Permission{
+		{ID: 1, TokenID: 2, ZoneID: 100, AllowedActions: []string{"list_records"}},
+	}
+	bootstrap := NewBootstrapService(tokenStore, "master-key")
+	middleware := NewAuthenticator(tokenStore, bootstrap)
+
+	var gotToken *storage.Token
+	var gotPerms []*storage.Permission
+	var gotIsAdmin, gotIsMaster bool
+	handler := middleware.Authenticate(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotToken = TokenFromContext(r.Context())
+		gotPerms = PermissionsFromContext(r.Context())
+		gotIsAdmin = IsAdminFromContext(r.Context())
+		gotIsMaster = IsMasterKeyFromContext(r.Context())
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest("GET", "/dnszone", nil)
+	req.Header.Set("AccessKey", "scoped-key")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("status = %d, want 200", rec.Code)
+	}
+	if gotToken == nil {
+		t.Fatal("TokenFromContext() = nil, want token")
+	}
+	if gotToken.ID != 2 {
+		t.Errorf("TokenFromContext().ID = %d, want 2", gotToken.ID)
+	}
+	if gotIsAdmin {
+		t.Error("IsAdminFromContext() = true, want false")
+	}
+	if gotIsMaster {
+		t.Error("IsMasterKeyFromContext() = true, want false")
+	}
+	if len(gotPerms) != 1 {
+		t.Errorf("PermissionsFromContext() len = %d, want 1", len(gotPerms))
+	}
+}
+
+func TestAuthMiddleware_InvalidToken(t *testing.T) {
+	tokenStore := newAuthTestTokenStore()
+	tokenStore.hasAdminToken = true
+	bootstrap := NewBootstrapService(tokenStore, "master-key")
+	middleware := NewAuthenticator(tokenStore, bootstrap)
+
+	handler := middleware.Authenticate(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("handler should not be called")
+	}))
+
+	req := httptest.NewRequest("GET", "/api/tokens", nil)
+	req.Header.Set("AccessKey", "invalid-key")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("status = %d, want 401", rec.Code)
+	}
+
+	var resp map[string]string
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if resp["error"] != "invalid API key" {
+		t.Errorf("error = %q, want 'invalid API key'", resp["error"])
+	}
+}
+
+func TestAuthMiddleware_BootstrapServiceError(t *testing.T) {
+	tokenStore := newAuthTestTokenStore()
+	tokenStore.hasAdminErr = errors.New("database error")
+	bootstrap := NewBootstrapService(tokenStore, "master-key")
+	middleware := NewAuthenticator(tokenStore, bootstrap)
+
+	handler := middleware.Authenticate(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("handler should not be called")
+	}))
+
+	req := httptest.NewRequest("GET", "/api/tokens", nil)
+	req.Header.Set("AccessKey", "master-key")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Errorf("status = %d, want 500", rec.Code)
+	}
+}
+
+func TestAuthMiddleware_TokenStoreError(t *testing.T) {
+	tokenStore := newAuthTestTokenStore()
+	tokenStore.hasAdminToken = true
+	tokenStore.getByHashErr = errors.New("database error")
+	bootstrap := NewBootstrapService(tokenStore, "master-key")
+	middleware := NewAuthenticator(tokenStore, bootstrap)
+
+	handler := middleware.Authenticate(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("handler should not be called")
+	}))
+
+	req := httptest.NewRequest("GET", "/api/tokens", nil)
+	req.Header.Set("AccessKey", "some-key")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Errorf("status = %d, want 500", rec.Code)
+	}
+}
+
+func TestAuthMiddleware_PermissionsLoadError(t *testing.T) {
+	tokenStore := newAuthTestTokenStore()
+	tokenStore.hasAdminToken = true
+	tokenStore.addToken(1, "scoped-token", false, "scoped-key")
+	tokenStore.getPermsErr = errors.New("permission error")
+	bootstrap := NewBootstrapService(tokenStore, "master-key")
+	middleware := NewAuthenticator(tokenStore, bootstrap)
+
+	handler := middleware.Authenticate(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("handler should not be called")
+	}))
+
+	req := httptest.NewRequest("GET", "/dnszone", nil)
+	req.Header.Set("AccessKey", "scoped-key")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Errorf("status = %d, want 500", rec.Code)
+	}
+}
+
+// --- RequireAdmin middleware tests ---
+
+func TestRequireAdmin_AdminUser(t *testing.T) {
+	tokenStore := newAuthTestTokenStore()
+	bootstrap := NewBootstrapService(tokenStore, "master-key")
+	middleware := NewAuthenticator(tokenStore, bootstrap)
+
+	handlerCalled := false
+	handler := middleware.RequireAdmin(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		handlerCalled = true
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest("GET", "/api/tokens", nil)
+	ctx := withAdmin(req.Context(), true)
+	req = req.WithContext(ctx)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("status = %d, want 200", rec.Code)
+	}
+	if !handlerCalled {
+		t.Error("handler should have been called")
+	}
+}
+
+func TestRequireAdmin_NonAdminUser(t *testing.T) {
+	tokenStore := newAuthTestTokenStore()
+	bootstrap := NewBootstrapService(tokenStore, "master-key")
+	middleware := NewAuthenticator(tokenStore, bootstrap)
+
+	handler := middleware.RequireAdmin(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("handler should not be called")
+	}))
+
+	req := httptest.NewRequest("GET", "/api/tokens", nil)
+	ctx := withAdmin(req.Context(), false)
+	req = req.WithContext(ctx)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("status = %d, want 403", rec.Code)
+	}
+
+	var resp map[string]string
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if resp["error"] != "admin_required" {
+		t.Errorf("error = %q, want 'admin_required'", resp["error"])
+	}
+	if resp["message"] != "This endpoint requires an admin token." {
+		t.Errorf("message = %q, want 'This endpoint requires an admin token.'", resp["message"])
+	}
+}
+
+func TestRequireAdmin_NoContextValue(t *testing.T) {
+	tokenStore := newAuthTestTokenStore()
+	bootstrap := NewBootstrapService(tokenStore, "master-key")
+	middleware := NewAuthenticator(tokenStore, bootstrap)
+
+	handler := middleware.RequireAdmin(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("handler should not be called")
+	}))
+
+	req := httptest.NewRequest("GET", "/api/tokens", nil)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("status = %d, want 403", rec.Code)
+	}
+}
+
+// --- Legacy Middleware tests (keep for backward compatibility) ---
 
 func TestMiddleware_MissingAuth(t *testing.T) {
 	mockStorage := &mockStorage{}
@@ -314,6 +874,27 @@ func TestWriteJSONError_ContentType(t *testing.T) {
 
 	if rec.Header().Get("Content-Type") != "application/json" {
 		t.Error("Content-Type header not set correctly")
+	}
+}
+
+func TestWriteJSONErrorWithCode(t *testing.T) {
+	rec := httptest.NewRecorder()
+
+	writeJSONErrorWithCode(rec, http.StatusForbidden, "admin_required", "This endpoint requires an admin token.")
+
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("status = %d, want 403", rec.Code)
+	}
+
+	var resp map[string]string
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if resp["error"] != "admin_required" {
+		t.Errorf("error = %q, want 'admin_required'", resp["error"])
+	}
+	if resp["message"] != "This endpoint requires an admin token." {
+		t.Errorf("message = %q, want 'This endpoint requires an admin token.'", resp["message"])
 	}
 }
 
@@ -767,5 +1348,49 @@ func TestMiddleware_SuccessfulRequest(t *testing.T) {
 	}
 	if gotKeyInfo != nil && gotKeyInfo.KeyID != 1 {
 		t.Errorf("KeyInfo.KeyID = %d, want 1", gotKeyInfo.KeyID)
+	}
+}
+
+// --- Additional tests for new context functionality ---
+
+func TestContextHelpers_MultipleValues(t *testing.T) {
+	// Test setting multiple context values
+	token := &storage.Token{ID: 1, Name: "test"}
+	perms := []*storage.Permission{{ID: 1, ZoneID: 100}}
+
+	ctx := context.Background()
+	ctx = withToken(ctx, token)
+	ctx = withPermissions(ctx, perms)
+	ctx = withMasterKey(ctx, false)
+	ctx = withAdmin(ctx, true)
+
+	// Verify all values are accessible
+	if TokenFromContext(ctx) != token {
+		t.Error("token not correctly set")
+	}
+	if len(PermissionsFromContext(ctx)) != 1 {
+		t.Error("permissions not correctly set")
+	}
+	if IsMasterKeyFromContext(ctx) != false {
+		t.Error("master key flag not correctly set")
+	}
+	if IsAdminFromContext(ctx) != true {
+		t.Error("admin flag not correctly set")
+	}
+}
+
+func TestNewAuthenticator(t *testing.T) {
+	tokenStore := newAuthTestTokenStore()
+	bootstrap := NewBootstrapService(tokenStore, "master-key")
+	middleware := NewAuthenticator(tokenStore, bootstrap)
+
+	if middleware == nil {
+		t.Fatal("NewAuthenticator returned nil")
+	}
+	if middleware.tokens != tokenStore {
+		t.Error("tokens not set correctly")
+	}
+	if middleware.bootstrap != bootstrap {
+		t.Error("bootstrap not set correctly")
 	}
 }
