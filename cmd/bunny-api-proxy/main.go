@@ -109,8 +109,7 @@ func initializeComponents(cfg *config.Config) (*serverComponents, error) {
 	proxyRouter := proxy.NewRouter(proxyHandler, auth.Middleware(validator))
 
 	// 7. Create admin handler and router
-	sessionStore := admin.NewSessionStore(24 * time.Hour)
-	adminHandler := admin.NewHandler(store, sessionStore, logLevel, logger)
+	adminHandler := admin.NewHandler(store, logLevel, logger)
 	adminRouter := adminHandler.NewRouter()
 
 	// 8. Assemble main router

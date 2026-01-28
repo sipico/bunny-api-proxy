@@ -3,10 +3,18 @@ package auth
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 
 	"github.com/sipico/bunny-api-proxy/internal/storage"
 )
+
+// HashToken computes the SHA256 hash of a token for storage lookup.
+func HashToken(token string) string {
+	hash := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(hash[:])
+}
 
 // Action represents an API operation.
 type Action string

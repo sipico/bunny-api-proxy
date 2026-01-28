@@ -26,9 +26,6 @@ WORKDIR /app
 # Copy binary from builder
 COPY --from=builder /app/bunny-api-proxy .
 
-# Copy web assets (templates, static files)
-COPY --from=builder /app/web ./web
-
 # Expose port
 EXPOSE 8080
 

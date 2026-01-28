@@ -189,7 +189,7 @@ func TestHandleSetLogLevel(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			logLevel := new(slog.LevelVar)
 			mock := &mockStorageWithTokenCRUD{mockStorage: &mockStorage{}}
-			h := NewHandler(mock, NewSessionStore(24*time.Hour), logLevel, slog.Default())
+			h := NewHandler(mock, logLevel, slog.Default())
 
 			// Encode body
 			var body io.Reader
@@ -274,7 +274,7 @@ func TestHandleListTokens(t *testing.T) {
 					return tt.tokens, nil
 				},
 			}
-			h := NewHandler(mock, NewSessionStore(24*time.Hour), new(slog.LevelVar), slog.Default())
+			h := NewHandler(mock, new(slog.LevelVar), slog.Default())
 
 			req := httptest.NewRequest("GET", "/api/tokens", nil)
 			w := httptest.NewRecorder()
@@ -376,7 +376,7 @@ func TestHandleCreateToken(t *testing.T) {
 					return tt.mockID, nil
 				},
 			}
-			h := NewHandler(mock, NewSessionStore(24*time.Hour), new(slog.LevelVar), slog.Default())
+			h := NewHandler(mock, new(slog.LevelVar), slog.Default())
 
 			var body io.Reader
 			if str, ok := tt.body.(string); ok {
@@ -459,7 +459,7 @@ func TestHandleDeleteToken(t *testing.T) {
 					return tt.mockErr
 				},
 			}
-			h := NewHandler(mock, NewSessionStore(24*time.Hour), new(slog.LevelVar), slog.Default())
+			h := NewHandler(mock, new(slog.LevelVar), slog.Default())
 
 			// Create a request
 			req := httptest.NewRequest("DELETE", "/api/tokens/"+tt.tokenID, nil)
@@ -533,7 +533,7 @@ func TestHandleSetMasterKeyAPI(t *testing.T) {
 					return tt.mockSetErr
 				},
 			}
-			h := NewHandler(mock, NewSessionStore(24*time.Hour), new(slog.LevelVar), slog.Default())
+			h := NewHandler(mock, new(slog.LevelVar), slog.Default())
 
 			var body io.Reader
 			if str, ok := tt.body.(string); ok {
@@ -691,7 +691,7 @@ func TestHandleCreateKeyAPI(t *testing.T) {
 					return nil // Cleanup always succeeds in tests
 				},
 			}
-			h := NewHandler(mock, NewSessionStore(24*time.Hour), new(slog.LevelVar), slog.Default())
+			h := NewHandler(mock, new(slog.LevelVar), slog.Default())
 
 			var body io.Reader
 			if str, ok := tt.body.(string); ok {
@@ -859,7 +859,7 @@ func TestHandleWhoami(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mock := newMockUnifiedStorage()
-			h := NewHandler(mock, NewSessionStore(24*time.Hour), new(slog.LevelVar), slog.Default())
+			h := NewHandler(mock, new(slog.LevelVar), slog.Default())
 
 			req := httptest.NewRequest("GET", "/api/whoami", nil)
 			if tt.setupCtx != nil {
@@ -923,7 +923,7 @@ func TestHandleListUnifiedTokens(t *testing.T) {
 				}
 				return tt.tokens, nil
 			}
-			h := NewHandler(mock, NewSessionStore(24*time.Hour), new(slog.LevelVar), slog.Default())
+			h := NewHandler(mock, new(slog.LevelVar), slog.Default())
 
 			req := httptest.NewRequest("GET", "/api/tokens", nil)
 			w := httptest.NewRecorder()
@@ -1080,7 +1080,7 @@ func TestHandleCreateUnifiedToken(t *testing.T) {
 				return nil // Cleanup always succeeds
 			}
 
-			h := NewHandler(mock, NewSessionStore(24*time.Hour), new(slog.LevelVar), slog.Default())
+			h := NewHandler(mock, new(slog.LevelVar), slog.Default())
 
 			var body io.Reader
 			if str, ok := tt.body.(string); ok {
@@ -1188,7 +1188,7 @@ func TestHandleGetUnifiedToken(t *testing.T) {
 				return tt.mockPerms, nil
 			}
 
-			h := NewHandler(mock, NewSessionStore(24*time.Hour), new(slog.LevelVar), slog.Default())
+			h := NewHandler(mock, new(slog.LevelVar), slog.Default())
 
 			req := httptest.NewRequest("GET", "/api/tokens/"+tt.tokenID, nil)
 			ctx := chi.NewRouteContext()
@@ -1298,7 +1298,7 @@ func TestHandleDeleteUnifiedToken(t *testing.T) {
 				return tt.adminCount, nil
 			}
 
-			h := NewHandler(mock, NewSessionStore(24*time.Hour), new(slog.LevelVar), slog.Default())
+			h := NewHandler(mock, new(slog.LevelVar), slog.Default())
 
 			req := httptest.NewRequest("DELETE", "/api/tokens/"+tt.tokenID, nil)
 			ctx := chi.NewRouteContext()
@@ -1438,7 +1438,7 @@ func TestHandleAddTokenPermission(t *testing.T) {
 				return perm, nil
 			}
 
-			h := NewHandler(mock, NewSessionStore(24*time.Hour), new(slog.LevelVar), slog.Default())
+			h := NewHandler(mock, new(slog.LevelVar), slog.Default())
 
 			var body io.Reader
 			if tt.body != nil {
@@ -1537,7 +1537,7 @@ func TestHandleDeleteTokenPermission(t *testing.T) {
 				return tt.mockDelErr
 			}
 
-			h := NewHandler(mock, NewSessionStore(24*time.Hour), new(slog.LevelVar), slog.Default())
+			h := NewHandler(mock, new(slog.LevelVar), slog.Default())
 
 			req := httptest.NewRequest("DELETE", "/api/tokens/"+tt.tokenID+"/permissions/"+tt.permID, nil)
 			ctx := chi.NewRouteContext()

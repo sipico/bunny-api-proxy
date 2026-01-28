@@ -60,22 +60,39 @@ func IsAdminFromContext(ctx context.Context) bool {
 	return false
 }
 
-// withToken adds a token to the context.
-func withToken(ctx context.Context, token *storage.Token) context.Context {
+// WithToken adds a token to the context.
+func WithToken(ctx context.Context, token *storage.Token) context.Context {
 	return context.WithValue(ctx, tokenKey, token)
 }
 
-// withPermissions adds permissions to the context.
-func withPermissions(ctx context.Context, perms []*storage.Permission) context.Context {
+// WithPermissions adds permissions to the context.
+func WithPermissions(ctx context.Context, perms []*storage.Permission) context.Context {
 	return context.WithValue(ctx, permissionsKey, perms)
 }
 
-// withMasterKey marks the context as authenticated with master key.
-func withMasterKey(ctx context.Context, isMaster bool) context.Context {
+// WithMasterKey marks the context as authenticated with master key.
+func WithMasterKey(ctx context.Context, isMaster bool) context.Context {
 	return context.WithValue(ctx, masterKeyKey, isMaster)
 }
 
-// withAdmin marks the context as having admin privileges.
-func withAdmin(ctx context.Context, isAdmin bool) context.Context {
+// WithAdmin marks the context as having admin privileges.
+func WithAdmin(ctx context.Context, isAdmin bool) context.Context {
 	return context.WithValue(ctx, adminKey, isAdmin)
+}
+
+// Lowercase aliases for backward compatibility with existing code
+func withToken(ctx context.Context, token *storage.Token) context.Context {
+	return WithToken(ctx, token)
+}
+
+func withPermissions(ctx context.Context, perms []*storage.Permission) context.Context {
+	return WithPermissions(ctx, perms)
+}
+
+func withMasterKey(ctx context.Context, isMaster bool) context.Context {
+	return WithMasterKey(ctx, isMaster)
+}
+
+func withAdmin(ctx context.Context, isAdmin bool) context.Context {
+	return WithAdmin(ctx, isAdmin)
 }
