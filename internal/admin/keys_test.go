@@ -133,7 +133,7 @@ func (m *mockStorageForKeys) AddPermission(ctx context.Context, scopedKeyID int6
 	m.nextPermID++
 	id := m.nextPermID
 	perm.ID = id
-	perm.ScopedKeyID = scopedKeyID
+	perm.TokenID = scopedKeyID
 	perm.CreatedAt = time.Now()
 	if m.permissions == nil {
 		m.permissions = make(map[int64][]*storage.Permission)
@@ -542,7 +542,7 @@ func TestHandleDeletePermission(t *testing.T) {
 			keyID:  "1",
 			permID: "1",
 			perms: map[int64][]*storage.Permission{
-				1: {{ID: 1, ScopedKeyID: 1}},
+				1: {{ID: 1, TokenID: 1}},
 			},
 			wantStatus: http.StatusSeeOther,
 		},
