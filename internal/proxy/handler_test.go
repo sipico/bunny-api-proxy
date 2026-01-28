@@ -790,8 +790,8 @@ func TestHandleListZones_FiltersToPermittedZones(t *testing.T) {
 		KeyID:   1,
 		KeyName: "test-key",
 		Permissions: []*storage.Permission{
-			{ID: 1, ScopedKeyID: 1, ZoneID: 1},
-			{ID: 2, ScopedKeyID: 1, ZoneID: 2},
+			{ID: 1, TokenID: 1, ZoneID: 1},
+			{ID: 2, TokenID: 1, ZoneID: 2},
 		},
 	}
 
@@ -852,7 +852,7 @@ func TestHandleListZones_AllZonesPermission(t *testing.T) {
 		KeyID:   1,
 		KeyName: "test-key",
 		Permissions: []*storage.Permission{
-			{ID: 1, ScopedKeyID: 1, ZoneID: 0}, // All zones
+			{ID: 1, TokenID: 1, ZoneID: 0}, // All zones
 		},
 	}
 
@@ -901,7 +901,7 @@ func TestHandleListZones_EmptyAfterFilter(t *testing.T) {
 		KeyID:   1,
 		KeyName: "test-key",
 		Permissions: []*storage.Permission{
-			{ID: 1, ScopedKeyID: 1, ZoneID: 999},
+			{ID: 1, TokenID: 1, ZoneID: 999},
 		},
 	}
 
@@ -955,7 +955,7 @@ func TestHandleGetZone_FiltersRecordTypes(t *testing.T) {
 		Permissions: []*storage.Permission{
 			{
 				ID:          1,
-				ScopedKeyID: 1,
+				TokenID:     1,
 				ZoneID:      123,
 				RecordTypes: []string{"A", "AAAA"},
 			},
@@ -1012,7 +1012,7 @@ func TestHandleGetZone_AllRecordTypes(t *testing.T) {
 		Permissions: []*storage.Permission{
 			{
 				ID:          1,
-				ScopedKeyID: 1,
+				TokenID:     1,
 				ZoneID:      123,
 				RecordTypes: []string{}, // All types
 			},
@@ -1063,7 +1063,7 @@ func TestHandleGetZone_EmptyRecordsAfterFilter(t *testing.T) {
 		Permissions: []*storage.Permission{
 			{
 				ID:          1,
-				ScopedKeyID: 1,
+				TokenID:     1,
 				ZoneID:      123,
 				RecordTypes: []string{"TXT"},
 			},
@@ -1115,7 +1115,7 @@ func TestHandleListRecords_FiltersRecordTypes(t *testing.T) {
 		Permissions: []*storage.Permission{
 			{
 				ID:          1,
-				ScopedKeyID: 1,
+				TokenID:     1,
 				ZoneID:      123,
 				RecordTypes: []string{"TXT"},
 			},
@@ -1172,7 +1172,7 @@ func TestHandleListRecords_EmptyAfterFilter(t *testing.T) {
 		Permissions: []*storage.Permission{
 			{
 				ID:          1,
-				ScopedKeyID: 1,
+				TokenID:     1,
 				ZoneID:      123,
 				RecordTypes: []string{"CNAME"},
 			},

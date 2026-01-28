@@ -3,14 +3,12 @@ package storage
 import (
 	"context"
 	"crypto/sha256"
-	"database/sql"
 	"encoding/hex"
 	"errors"
-	"fmt"
 )
 
-// CreateAdminToken creates a new admin token
-// Token is hashed with SHA-256 before storage
+// CreateAdminToken creates a new admin token using the unified tokens table.
+// Token is hashed with SHA-256 before storage.
 // Returns ErrDuplicate if a token with this hash already exists.
 func (s *SQLiteStorage) CreateAdminToken(ctx context.Context, name, token string) (int64, error) {
 	if name == "" {
@@ -22,24 +20,18 @@ func (s *SQLiteStorage) CreateAdminToken(ctx context.Context, name, token string
 
 	hash := hashToken(token)
 
-	result, err := s.db.ExecContext(ctx,
-		"INSERT INTO admin_tokens (name, token_hash) VALUES (?, ?)",
-		name, hash,
-	)
+	// Use the unified tokens table with isAdmin=true
+	t, err := s.CreateToken(ctx, name, true, hash)
 	if err != nil {
-		return 0, fmt.Errorf("failed to create admin token: %w", err)
+		return 0, err
 	}
 
-	id, err := result.LastInsertId()
-	if err != nil {
-		return 0, fmt.Errorf("failed to get insert ID: %w", err)
-	}
-
-	return id, nil
+	return t.ID, nil
 }
 
-// ValidateAdminToken validates a token and returns its info
-// Returns ErrNotFound if token is invalid
+// ValidateAdminToken validates a token and returns its info.
+// Returns ErrNotFound if token is invalid.
+// This wraps GetTokenByHash and converts the result to AdminToken format.
 func (s *SQLiteStorage) ValidateAdminToken(ctx context.Context, token string) (*AdminToken, error) {
 	if token == "" {
 		return nil, ErrNotFound
@@ -47,76 +39,62 @@ func (s *SQLiteStorage) ValidateAdminToken(ctx context.Context, token string) (*
 
 	hash := hashToken(token)
 
-	var at AdminToken
-	err := s.db.QueryRowContext(ctx,
-		"SELECT id, name, token_hash, created_at FROM admin_tokens WHERE token_hash = ?",
-		hash,
-	).Scan(&at.ID, &at.Name, &at.TokenHash, &at.CreatedAt)
-
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, ErrNotFound
-	}
+	// Look up the token in the unified tokens table
+	t, err := s.GetTokenByHash(ctx, hash)
 	if err != nil {
-		return nil, fmt.Errorf("failed to validate admin token: %w", err)
+		if err == ErrNotFound {
+			return nil, ErrNotFound
+		}
+		return nil, err
 	}
 
-	return &at, nil
+	// Convert Token to AdminToken
+	at := &AdminToken{
+		ID:        t.ID,
+		TokenHash: t.KeyHash,
+		Name:      t.Name,
+		CreatedAt: t.CreatedAt,
+	}
+
+	return at, nil
 }
 
-// ListAdminTokens returns all admin tokens
+// ListAdminTokens returns all admin tokens from the unified tokens table.
 // Returns empty slice if no tokens exist.
+// This filters the unified tokens table for records where is_admin=true.
 func (s *SQLiteStorage) ListAdminTokens(ctx context.Context) ([]*AdminToken, error) {
-	rows, err := s.db.QueryContext(ctx,
-		"SELECT id, name, token_hash, created_at FROM admin_tokens ORDER BY created_at DESC",
-	)
+	// Get all tokens from the unified table
+	tokens, err := s.ListTokens(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query admin tokens: %w", err)
+		return nil, err
 	}
-	defer rows.Close() //nolint:errcheck
 
-	var tokens []*AdminToken
-
-	for rows.Next() {
-		var at AdminToken
-		if err := rows.Scan(&at.ID, &at.Name, &at.TokenHash, &at.CreatedAt); err != nil {
-			return nil, fmt.Errorf("failed to scan admin token row: %w", err)
+	// Filter for admin tokens only and convert to AdminToken format
+	var adminTokens []*AdminToken
+	for _, t := range tokens {
+		if t.IsAdmin {
+			at := &AdminToken{
+				ID:        t.ID,
+				TokenHash: t.KeyHash,
+				Name:      t.Name,
+				CreatedAt: t.CreatedAt,
+			}
+			adminTokens = append(adminTokens, at)
 		}
-		tokens = append(tokens, &at)
-	}
-
-	if err = rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating admin tokens: %w", err)
 	}
 
 	// Return empty slice instead of nil
-	if tokens == nil {
-		tokens = make([]*AdminToken, 0)
+	if adminTokens == nil {
+		adminTokens = make([]*AdminToken, 0)
 	}
 
-	return tokens, nil
+	return adminTokens, nil
 }
 
-// DeleteAdminToken deletes an admin token by ID.
+// DeleteAdminToken deletes an admin token by ID using the unified tokens table.
 // Returns ErrNotFound if the token doesn't exist.
 func (s *SQLiteStorage) DeleteAdminToken(ctx context.Context, id int64) error {
-	result, err := s.db.ExecContext(ctx,
-		"DELETE FROM admin_tokens WHERE id = ?",
-		id,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to delete admin token: %w", err)
-	}
-
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("failed to get rows affected: %w", err)
-	}
-
-	if rowsAffected == 0 {
-		return ErrNotFound
-	}
-
-	return nil
+	return s.DeleteToken(ctx, id)
 }
 
 // hashToken returns SHA-256 hash of token

@@ -2,24 +2,22 @@ package storage
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"fmt"
 )
 
 // SQLiteStorage implements the Storage interface using SQLite.
 type SQLiteStorage struct {
-	db            *sql.DB
-	encryptionKey []byte
+	db *sql.DB
 }
 
 // New creates a new SQLiteStorage instance.
 // The dbPath is the file path for the SQLite database (or ":memory:" for tests).
-// The encryptionKey must be exactly 32 bytes for AES-256.
 func New(dbPath string, encryptionKey []byte) (*SQLiteStorage, error) {
-	// Validate encryption key length
-	if len(encryptionKey) != 32 {
-		return nil, ErrInvalidKey
-	}
+	// Note: encryptionKey parameter is deprecated and ignored.
+	// Kept for backward compatibility but no longer used.
 
 	// Open database connection
 	db, err := sql.Open("sqlite", dbPath)
@@ -57,23 +55,20 @@ func New(dbPath string, encryptionKey []byte) (*SQLiteStorage, error) {
 	}
 
 	return &SQLiteStorage{
-		db:            db,
-		encryptionKey: encryptionKey,
+		db: db,
 	}, nil
 }
 
-// SetMasterAPIKey encrypts and stores the master bunny.net API key.
+// SetMasterAPIKey hashes and stores the master bunny.net API key.
 // If a key already exists, it updates it.
 func (s *SQLiteStorage) SetMasterAPIKey(ctx context.Context, apiKey string) error {
-	// Encrypt the API key
-	encrypted, err := EncryptAPIKey(apiKey, s.encryptionKey)
-	if err != nil {
-		return fmt.Errorf("failed to encrypt API key: %w", err)
-	}
+	// Hash the API key using SHA256
+	hash := sha256.Sum256([]byte(apiKey))
+	hashHex := hex.EncodeToString(hash[:])
 
 	// Insert or replace the config row
-	query := "INSERT OR REPLACE INTO config (id, master_api_key_encrypted, updated_at) VALUES (1, ?, CURRENT_TIMESTAMP)"
-	_, err = s.db.ExecContext(ctx, query, encrypted)
+	query := "INSERT OR REPLACE INTO config (id, master_api_key_hash) VALUES (1, ?)"
+	_, err := s.db.ExecContext(ctx, query, hashHex)
 	if err != nil {
 		return fmt.Errorf("failed to set master API key: %w", err)
 	}
@@ -81,27 +76,47 @@ func (s *SQLiteStorage) SetMasterAPIKey(ctx context.Context, apiKey string) erro
 	return nil
 }
 
-// GetMasterAPIKey retrieves and decrypts the master bunny.net API key.
-// Returns ErrNotFound if no key is configured.
+// GetMasterAPIKey is required by the Storage interface.
+// NOTE: The actual implementation only stores the hash, not the plain key.
+// This method returns an empty string as the plain key is not retrievable.
+// Use ValidateMasterAPIKey to verify a key instead.
 func (s *SQLiteStorage) GetMasterAPIKey(ctx context.Context) (string, error) {
-	query := "SELECT master_api_key_encrypted FROM config WHERE id = 1"
-	var encrypted []byte
+	// The plain key is not stored, only the hash. Return empty string.
+	return "", nil
+}
 
-	err := s.db.QueryRowContext(ctx, query).Scan(&encrypted)
+// GetMasterAPIKeyHash retrieves the hash of the master bunny.net API key.
+// Returns ErrNotFound if no key is configured.
+func (s *SQLiteStorage) GetMasterAPIKeyHash(ctx context.Context) (string, error) {
+	query := "SELECT master_api_key_hash FROM config WHERE id = 1"
+	var hash string
+
+	err := s.db.QueryRowContext(ctx, query).Scan(&hash)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return "", ErrNotFound
 		}
-		return "", fmt.Errorf("failed to query master API key: %w", err)
+		return "", fmt.Errorf("failed to query master API key hash: %w", err)
 	}
 
-	// Decrypt the API key
-	apiKey, err := DecryptAPIKey(encrypted, s.encryptionKey)
+	return hash, nil
+}
+
+// ValidateMasterAPIKey checks if the provided API key matches the stored master key hash.
+// Returns true if the key is valid, false if it doesn't match, or an error if the hash can't be retrieved.
+func (s *SQLiteStorage) ValidateMasterAPIKey(ctx context.Context, apiKey string) (bool, error) {
+	// Get the stored hash
+	storedHash, err := s.GetMasterAPIKeyHash(ctx)
 	if err != nil {
-		return "", fmt.Errorf("failed to decrypt API key: %w", err)
+		return false, err
 	}
 
-	return apiKey, nil
+	// Hash the provided key
+	hash := sha256.Sum256([]byte(apiKey))
+	hashHex := hex.EncodeToString(hash[:])
+
+	// Compare
+	return hashHex == storedHash, nil
 }
 
 // Close closes the database connection.

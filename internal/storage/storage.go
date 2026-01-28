@@ -20,6 +20,7 @@ type Storage interface {
 	// Config operations
 	SetMasterAPIKey(ctx context.Context, key string) error
 	GetMasterAPIKey(ctx context.Context) (string, error)
+	ValidateMasterAPIKey(ctx context.Context, apiKey string) (bool, error)
 
 	// Scoped key operations
 	CreateScopedKey(ctx context.Context, name string, key string) (int64, error)

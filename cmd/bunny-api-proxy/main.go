@@ -226,8 +226,9 @@ func readyHandler(store storage.Storage) http.HandlerFunc {
 		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 		defer cancel()
 
-		// Try to get master API key - just tests connectivity, doesn't require a key to exist
-		_, err := store.GetMasterAPIKey(ctx)
+		// Try to validate master API key (with empty string) - tests connectivity without requiring a key to exist
+		// ValidateMasterAPIKey will return ErrNotFound if no key is configured, but will error if database is unavailable
+		_, err := store.ValidateMasterAPIKey(ctx, "")
 		if err != nil && err != storage.ErrNotFound {
 			// Database error
 			w.Header().Set("Content-Type", "application/json")

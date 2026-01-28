@@ -199,6 +199,7 @@ func TestValidateAdminTokenEmpty(t *testing.T) {
 }
 
 // TestListAdminTokens verifies that ListAdminTokens returns tokens in correct order.
+// It also tests that ListAdminTokens filters for admin tokens only.
 func TestListAdminTokens(t *testing.T) {
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
@@ -224,7 +225,7 @@ func TestListAdminTokens(t *testing.T) {
 		t.Errorf("expected 0 tokens, got %d", len(tokens))
 	}
 
-	// Test 2: Create multiple tokens and verify order
+	// Test 2: Create multiple admin tokens and verify order
 	// Wait 1 second between each to ensure different created_at timestamps (SQLite CURRENT_TIMESTAMP has second precision)
 	_, _ = s.CreateAdminToken(ctx, "token-1", "secret-1")
 	time.Sleep(1 * time.Second)

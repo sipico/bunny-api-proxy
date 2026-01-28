@@ -75,8 +75,8 @@ func TestCreateScopedKeyDuplicate(t *testing.T) {
 
 	// Try to manually insert another key with the same hash (simulates duplicate constraint violation)
 	_, err = s.db.ExecContext(ctx,
-		"INSERT INTO scoped_keys (key_hash, name) VALUES (?, ?)",
-		storedHash, "key-2")
+		"INSERT INTO tokens (key_hash, name, is_admin) VALUES (?, ?, ?)",
+		storedHash, "key-2", false)
 
 	if err == nil {
 		t.Fatalf("expected UNIQUE constraint violation, but insert succeeded")

@@ -12,9 +12,9 @@ func TestGetPermittedZoneIDs_SpecificZones(t *testing.T) {
 		KeyID:   1,
 		KeyName: "test-key",
 		Permissions: []*storage.Permission{
-			{ID: 1, ScopedKeyID: 1, ZoneID: 10},
-			{ID: 2, ScopedKeyID: 1, ZoneID: 20},
-			{ID: 3, ScopedKeyID: 1, ZoneID: 30},
+			{ID: 1, TokenID: 1, ZoneID: 10},
+			{ID: 2, TokenID: 1, ZoneID: 20},
+			{ID: 3, TokenID: 1, ZoneID: 30},
 		},
 	}
 
@@ -48,8 +48,8 @@ func TestGetPermittedZoneIDs_AllZones(t *testing.T) {
 		KeyID:   1,
 		KeyName: "test-key",
 		Permissions: []*storage.Permission{
-			{ID: 1, ScopedKeyID: 1, ZoneID: 0}, // All zones
-			{ID: 2, ScopedKeyID: 1, ZoneID: 10},
+			{ID: 1, TokenID: 1, ZoneID: 0}, // All zones
+			{ID: 2, TokenID: 1, ZoneID: 10},
 		},
 	}
 
@@ -102,7 +102,7 @@ func TestHasAllZonesPermission(t *testing.T) {
 				KeyID:   1,
 				KeyName: "test-key",
 				Permissions: []*storage.Permission{
-					{ID: 1, ScopedKeyID: 1, ZoneID: 0},
+					{ID: 1, TokenID: 1, ZoneID: 0},
 				},
 			},
 		},
@@ -113,8 +113,8 @@ func TestHasAllZonesPermission(t *testing.T) {
 				KeyID:   1,
 				KeyName: "test-key",
 				Permissions: []*storage.Permission{
-					{ID: 1, ScopedKeyID: 1, ZoneID: 0},
-					{ID: 2, ScopedKeyID: 1, ZoneID: 10},
+					{ID: 1, TokenID: 1, ZoneID: 0},
+					{ID: 2, TokenID: 1, ZoneID: 10},
 				},
 			},
 		},
@@ -125,8 +125,8 @@ func TestHasAllZonesPermission(t *testing.T) {
 				KeyID:   1,
 				KeyName: "test-key",
 				Permissions: []*storage.Permission{
-					{ID: 1, ScopedKeyID: 1, ZoneID: 10},
-					{ID: 2, ScopedKeyID: 1, ZoneID: 20},
+					{ID: 1, TokenID: 1, ZoneID: 10},
+					{ID: 2, TokenID: 1, ZoneID: 20},
 				},
 			},
 		},
@@ -164,7 +164,7 @@ func TestIsRecordTypePermitted_Allowed(t *testing.T) {
 		Permissions: []*storage.Permission{
 			{
 				ID:             1,
-				ScopedKeyID:    1,
+				TokenID:        1,
 				ZoneID:         10,
 				RecordTypes:    []string{"A", "AAAA", "TXT"},
 				AllowedActions: []string{"list_records"},
@@ -193,7 +193,7 @@ func TestIsRecordTypePermitted_AllTypes(t *testing.T) {
 		Permissions: []*storage.Permission{
 			{
 				ID:             1,
-				ScopedKeyID:    1,
+				TokenID:        1,
 				ZoneID:         10,
 				RecordTypes:    []string{}, // Empty means all types
 				AllowedActions: []string{"list_records"},
@@ -222,7 +222,7 @@ func TestIsRecordTypePermitted_WildcardZone(t *testing.T) {
 		Permissions: []*storage.Permission{
 			{
 				ID:             1,
-				ScopedKeyID:    1,
+				TokenID:        1,
 				ZoneID:         0, // Wildcard zone
 				RecordTypes:    []string{"TXT"},
 				AllowedActions: []string{"list_records"},
@@ -252,7 +252,7 @@ func TestIsRecordTypePermitted_NoPermission(t *testing.T) {
 		Permissions: []*storage.Permission{
 			{
 				ID:             1,
-				ScopedKeyID:    1,
+				TokenID:        1,
 				ZoneID:         10,
 				RecordTypes:    []string{"A"},
 				AllowedActions: []string{"list_records"},
@@ -282,7 +282,7 @@ func TestGetPermittedRecordTypes(t *testing.T) {
 				Permissions: []*storage.Permission{
 					{
 						ID:          1,
-						ScopedKeyID: 1,
+						TokenID:     1,
 						ZoneID:      10,
 						RecordTypes: []string{"A", "AAAA", "TXT"},
 					},
@@ -300,7 +300,7 @@ func TestGetPermittedRecordTypes(t *testing.T) {
 				Permissions: []*storage.Permission{
 					{
 						ID:          1,
-						ScopedKeyID: 1,
+						TokenID:     1,
 						ZoneID:      10,
 						RecordTypes: []string{}, // Empty means all
 					},
@@ -318,7 +318,7 @@ func TestGetPermittedRecordTypes(t *testing.T) {
 				Permissions: []*storage.Permission{
 					{
 						ID:          1,
-						ScopedKeyID: 1,
+						TokenID:     1,
 						ZoneID:      0, // Wildcard
 						RecordTypes: []string{"TXT"},
 					},
@@ -343,7 +343,7 @@ func TestGetPermittedRecordTypes(t *testing.T) {
 				Permissions: []*storage.Permission{
 					{
 						ID:          1,
-						ScopedKeyID: 1,
+						TokenID:     1,
 						ZoneID:      10,
 						RecordTypes: []string{"A"},
 					},

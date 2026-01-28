@@ -2,17 +2,12 @@ package storage
 
 import (
 	"context"
-	"database/sql"
-	"errors"
-	"fmt"
-
-	"modernc.org/sqlite"
-	sqlite3 "modernc.org/sqlite/lib"
 )
 
 // CreateScopedKey creates a new scoped API key with bcrypt hash.
 // Returns the new key ID.
 // Returns ErrDuplicate if a key with this hash already exists.
+// Wraps CreateToken with isAdmin=false.
 func (s *SQLiteStorage) CreateScopedKey(ctx context.Context, name string, key string) (int64, error) {
 	// Hash the key using bcrypt
 	keyHash, err := HashKey(key)
@@ -20,97 +15,86 @@ func (s *SQLiteStorage) CreateScopedKey(ctx context.Context, name string, key st
 		return 0, err
 	}
 
-	// Insert into scoped_keys table
-	result, err := s.db.ExecContext(ctx,
-		"INSERT INTO scoped_keys (key_hash, name) VALUES (?, ?)",
-		keyHash, name)
-
+	// Create token with isAdmin=false
+	token, err := s.CreateToken(ctx, name, false, keyHash)
 	if err != nil {
-		// Check if this is a UNIQUE constraint violation
-		var sqliteErr *sqlite.Error
-		if errors.As(err, &sqliteErr) {
-			if sqliteErr.Code() == sqlite3.SQLITE_CONSTRAINT {
-				return 0, ErrDuplicate
-			}
-		}
-		return 0, fmt.Errorf("failed to create scoped key: %w", err)
+		return 0, err
 	}
 
-	// Return the inserted ID
-	id, err := result.LastInsertId()
-	if err != nil {
-		return 0, fmt.Errorf("failed to get insert ID: %w", err)
-	}
-
-	return id, nil
+	return token.ID, nil
 }
 
 // GetScopedKeyByHash retrieves a scoped key by its hash.
 // This is used during authentication to look up the key.
 // Returns ErrNotFound if the hash doesn't exist.
+// Wraps GetTokenByHash and filters for is_admin=false.
 func (s *SQLiteStorage) GetScopedKeyByHash(ctx context.Context, keyHash string) (*ScopedKey, error) {
-	var sk ScopedKey
-
-	err := s.db.QueryRowContext(ctx,
-		"SELECT id, key_hash, name, created_at, updated_at FROM scoped_keys WHERE key_hash = ?",
-		keyHash).
-		Scan(&sk.ID, &sk.KeyHash, &sk.Name, &sk.CreatedAt, &sk.UpdatedAt)
-
+	token, err := s.GetTokenByHash(ctx, keyHash)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, ErrNotFound
-		}
-		return nil, fmt.Errorf("failed to get scoped key by hash: %w", err)
+		return nil, err
 	}
 
-	return &sk, nil
+	// Only return if it's not an admin token
+	if token.IsAdmin {
+		return nil, ErrNotFound
+	}
+
+	// Convert Token to ScopedKey
+	return &ScopedKey{
+		ID:        token.ID,
+		KeyHash:   token.KeyHash,
+		Name:      token.Name,
+		CreatedAt: token.CreatedAt,
+		UpdatedAt: token.CreatedAt, // Use CreatedAt since Token doesn't track updates
+	}, nil
 }
 
 // GetScopedKey retrieves a scoped key by ID.
 // This is used in the admin UI to view key details.
 // Returns ErrNotFound if the key doesn't exist.
+// Wraps GetTokenByID and filters for is_admin=false.
 func (s *SQLiteStorage) GetScopedKey(ctx context.Context, id int64) (*ScopedKey, error) {
-	var sk ScopedKey
-
-	err := s.db.QueryRowContext(ctx,
-		"SELECT id, key_hash, name, created_at, updated_at FROM scoped_keys WHERE id = ?",
-		id).
-		Scan(&sk.ID, &sk.KeyHash, &sk.Name, &sk.CreatedAt, &sk.UpdatedAt)
-
+	token, err := s.GetTokenByID(ctx, id)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, ErrNotFound
-		}
-		return nil, fmt.Errorf("failed to get scoped key: %w", err)
+		return nil, err
 	}
 
-	return &sk, nil
+	// Only return if it's not an admin token
+	if token.IsAdmin {
+		return nil, ErrNotFound
+	}
+
+	// Convert Token to ScopedKey
+	return &ScopedKey{
+		ID:        token.ID,
+		KeyHash:   token.KeyHash,
+		Name:      token.Name,
+		CreatedAt: token.CreatedAt,
+		UpdatedAt: token.CreatedAt, // Use CreatedAt since Token doesn't track updates
+	}, nil
 }
 
 // ListScopedKeys returns all scoped keys (for admin UI).
 // Returns empty slice if no keys exist.
+// Wraps ListTokens and filters for is_admin=false.
 func (s *SQLiteStorage) ListScopedKeys(ctx context.Context) ([]*ScopedKey, error) {
-	rows, err := s.db.QueryContext(ctx,
-		"SELECT id, key_hash, name, created_at, updated_at FROM scoped_keys ORDER BY created_at DESC")
-
+	tokens, err := s.ListTokens(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query scoped keys: %w", err)
+		return nil, err
 	}
-	defer rows.Close() //nolint:errcheck
 
+	// Filter to only scoped keys (is_admin=false)
 	var keys []*ScopedKey
-
-	for rows.Next() {
-		var sk ScopedKey
-		err := rows.Scan(&sk.ID, &sk.KeyHash, &sk.Name, &sk.CreatedAt, &sk.UpdatedAt)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan scoped key row: %w", err)
+	for _, token := range tokens {
+		if !token.IsAdmin {
+			keys = append(keys, &ScopedKey{
+				ID:        token.ID,
+				KeyHash:   token.KeyHash,
+				Name:      token.Name,
+				CreatedAt: token.CreatedAt,
+				UpdatedAt: token.CreatedAt, // Use CreatedAt since Token doesn't track updates
+			})
 		}
-		keys = append(keys, &sk)
-	}
-
-	if err = rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating scoped keys: %w", err)
 	}
 
 	// Return empty slice instead of nil
@@ -124,24 +108,18 @@ func (s *SQLiteStorage) ListScopedKeys(ctx context.Context) ([]*ScopedKey, error
 // DeleteScopedKey deletes a scoped key by ID.
 // Returns ErrNotFound if the key doesn't exist.
 // Cascades to permissions via foreign key constraint.
+// Wraps DeleteToken.
 func (s *SQLiteStorage) DeleteScopedKey(ctx context.Context, id int64) error {
-	result, err := s.db.ExecContext(ctx,
-		"DELETE FROM scoped_keys WHERE id = ?",
-		id)
-
+	// Verify it's a scoped key before deleting
+	token, err := s.GetTokenByID(ctx, id)
 	if err != nil {
-		return fmt.Errorf("failed to delete scoped key: %w", err)
+		return err
 	}
 
-	// Check rows affected
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("failed to get rows affected: %w", err)
-	}
-
-	if rowsAffected == 0 {
+	// Only allow deletion if it's not an admin token
+	if token.IsAdmin {
 		return ErrNotFound
 	}
 
-	return nil
+	return s.DeleteToken(ctx, id)
 }
