@@ -5,6 +5,10 @@ import (
 	"fmt"
 )
 
+// SchemaVersion is the current version of the database schema.
+// Update this when making schema changes.
+const SchemaVersion = 2
+
 // InitSchema creates all required tables and indexes.
 // This is idempotent - safe to call multiple times.
 func InitSchema(db *sql.DB) error {
@@ -15,50 +19,36 @@ func InitSchema(db *sql.DB) error {
 
 	// Execute all DDL statements
 	ddlStatements := []string{
-		// config table: stores master API key and configuration
+		// config table: stores master API key hash and configuration
 		`CREATE TABLE IF NOT EXISTS config (
 			id INTEGER PRIMARY KEY CHECK (id = 1),
-			master_api_key_encrypted BLOB NOT NULL,
-			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+			master_api_key_hash TEXT NOT NULL
 		)`,
 
-		// scoped_keys table: stores scoped API keys and their metadata
-		`CREATE TABLE IF NOT EXISTS scoped_keys (
+		// tokens table: unified table for both admin tokens and scoped keys
+		`CREATE TABLE IF NOT EXISTS tokens (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			key_hash TEXT NOT NULL UNIQUE,
 			name TEXT NOT NULL,
-			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-		)`,
-
-		// Index on key_hash for fast lookups
-		`CREATE INDEX IF NOT EXISTS idx_scoped_keys_hash ON scoped_keys(key_hash)`,
-
-		// permissions table: stores permissions for each scoped key
-		`CREATE TABLE IF NOT EXISTS permissions (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			scoped_key_id INTEGER NOT NULL,
-			zone_id INTEGER NOT NULL,
-			allowed_actions TEXT NOT NULL,
-			record_types TEXT NOT NULL,
-			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-			FOREIGN KEY (scoped_key_id) REFERENCES scoped_keys(id) ON DELETE CASCADE
-		)`,
-
-		// Index on scoped_key_id for fast lookups
-		`CREATE INDEX IF NOT EXISTS idx_permissions_scoped_key ON permissions(scoped_key_id)`,
-
-		// admin_tokens table: stores admin tokens for authentication
-		`CREATE TABLE IF NOT EXISTS admin_tokens (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			token_hash TEXT NOT NULL UNIQUE,
-			name TEXT NOT NULL,
+			is_admin BOOLEAN NOT NULL DEFAULT FALSE,
 			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		)`,
 
-		// Index on token_hash for fast lookups
-		`CREATE INDEX IF NOT EXISTS idx_admin_tokens_hash ON admin_tokens(token_hash)`,
+		// Index on key_hash for fast lookups
+		`CREATE INDEX IF NOT EXISTS idx_tokens_key_hash ON tokens(key_hash)`,
+
+		// permissions table: stores permissions for each token
+		`CREATE TABLE IF NOT EXISTS permissions (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			token_id INTEGER NOT NULL,
+			zone_id INTEGER NOT NULL,
+			allowed_actions TEXT NOT NULL,
+			record_types TEXT NOT NULL,
+			FOREIGN KEY (token_id) REFERENCES tokens(id) ON DELETE CASCADE
+		)`,
+
+		// Index on token_id for fast lookups
+		`CREATE INDEX IF NOT EXISTS idx_permissions_token_id ON permissions(token_id)`,
 	}
 
 	// Execute each DDL statement
@@ -72,7 +62,7 @@ func InitSchema(db *sql.DB) error {
 }
 
 // MigrateSchema checks current schema version and applies migrations.
-// For MVP, we only have v1. Future versions will add migration logic.
+// For MVP, we only have v2. Future versions will add migration logic.
 func MigrateSchema(db *sql.DB) error {
 	// For MVP, simply initialize the schema
 	// Future versions can add version tracking and incremental migrations here
