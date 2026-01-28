@@ -1,0 +1,20 @@
+# Lefthook configuration for Git hooks
+# Install with: make setup
+# https://github.com/evilmartians/lefthook
+
+pre-commit:
+  parallel: true
+  commands:
+    gofmt:
+      glob: "*.go"
+      run: gofmt -l -d {staged_files} && test -z "$(gofmt -l {staged_files})"
+      fail_text: "gofmt found unformatted files - run 'gofmt -w .' to fix"
+
+    golangci-lint:
+      glob: "*.go"
+      run: golangci-lint run --new-from-rev=HEAD~1 {staged_files}
+      fail_text: "golangci-lint found issues"
+
+    go-mod-tidy:
+      run: go mod tidy && git diff --exit-code go.mod go.sum
+      fail_text: "go.mod/go.sum not tidy - run 'go mod tidy'"

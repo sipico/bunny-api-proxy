@@ -40,6 +40,17 @@ Write tests first, then implementation. Tests are the safety net.
 - Commit messages should be clear and descriptive
 - Never commit secrets or API keys
 - CI validates all changes via GitHub Actions
+- Pre-commit hooks enforce formatting and linting locally
+
+### Development Setup
+
+Run once after cloning to install Git pre-commit hooks:
+
+```bash
+make setup
+```
+
+This installs [lefthook](https://github.com/evilmartians/lefthook) hooks that automatically run `gofmt`, `golangci-lint`, and `go mod tidy` checks before each commit.
 
 ### Local Validation
 
@@ -48,6 +59,8 @@ Run before pushing to catch issues early:
 ```bash
 make lint tidy test
 ```
+
+Pre-commit hooks catch formatting issues automatically, but run full validation before pushing.
 
 ### GitHub CLI
 
@@ -79,6 +92,7 @@ internal/               # Private application code
 - [FUTURE_ENHANCEMENTS.md](dev/FUTURE_ENHANCEMENTS.md) - Deferred features and ideas
 - [SUBAGENT_WORKFLOW.md](dev/SUBAGENT_WORKFLOW.md) - Cost-effective sub-agent patterns
 - `.github/workflows/ci.yml` - CI/CD pipeline
+- `.lefthook.yml` - Git pre-commit hook configuration
 
 ## Sub-Agent Workflow
 
