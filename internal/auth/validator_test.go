@@ -93,7 +93,7 @@ func TestValidateKey_ValidKey(t *testing.T) {
 	perms := []*storage.Permission{
 		{
 			ID:             1,
-			TokenID:    1,
+			TokenID:        1,
 			ZoneID:         100,
 			AllowedActions: []string{"list_records", "add_record"},
 			RecordTypes:    []string{"TXT", "A"},
@@ -132,7 +132,7 @@ func TestValidateKey_MultipleKeys(t *testing.T) {
 	perms2 := []*storage.Permission{
 		{
 			ID:             2,
-			TokenID:    2,
+			TokenID:        2,
 			ZoneID:         200,
 			AllowedActions: []string{"list_records"},
 			RecordTypes:    []string{"CNAME"},
@@ -190,7 +190,7 @@ func TestCheckPermission_GetZoneAllowed(t *testing.T) {
 		Permissions: []*storage.Permission{
 			{
 				ID:             1,
-				TokenID:    1,
+				TokenID:        1,
 				ZoneID:         100,
 				AllowedActions: []string{"list_records"},
 				RecordTypes:    []string{"TXT"},
@@ -236,7 +236,7 @@ func TestCheckPermission_ListRecordsAllowed(t *testing.T) {
 		Permissions: []*storage.Permission{
 			{
 				ID:             1,
-				TokenID:    1,
+				TokenID:        1,
 				ZoneID:         100,
 				AllowedActions: []string{"list_records"},
 				RecordTypes:    []string{"TXT"},
@@ -263,7 +263,7 @@ func TestCheckPermission_ListRecordsDenied(t *testing.T) {
 		Permissions: []*storage.Permission{
 			{
 				ID:             1,
-				TokenID:    1,
+				TokenID:        1,
 				ZoneID:         100,
 				AllowedActions: []string{"add_record"},
 				RecordTypes:    []string{"TXT"},
@@ -290,7 +290,7 @@ func TestCheckPermission_AddRecordAllowed(t *testing.T) {
 		Permissions: []*storage.Permission{
 			{
 				ID:             1,
-				TokenID:    1,
+				TokenID:        1,
 				ZoneID:         100,
 				AllowedActions: []string{"add_record"},
 				RecordTypes:    []string{"TXT", "A"},
@@ -318,7 +318,7 @@ func TestCheckPermission_AddRecordWrongType(t *testing.T) {
 		Permissions: []*storage.Permission{
 			{
 				ID:             1,
-				TokenID:    1,
+				TokenID:        1,
 				ZoneID:         100,
 				AllowedActions: []string{"add_record"},
 				RecordTypes:    []string{"TXT"},
@@ -346,7 +346,7 @@ func TestCheckPermission_AddRecordNoAction(t *testing.T) {
 		Permissions: []*storage.Permission{
 			{
 				ID:             1,
-				TokenID:    1,
+				TokenID:        1,
 				ZoneID:         100,
 				AllowedActions: []string{"list_records"},
 				RecordTypes:    []string{"TXT"},
@@ -374,7 +374,7 @@ func TestCheckPermission_DeleteRecordAllowed(t *testing.T) {
 		Permissions: []*storage.Permission{
 			{
 				ID:             1,
-				TokenID:    1,
+				TokenID:        1,
 				ZoneID:         100,
 				AllowedActions: []string{"delete_record"},
 				RecordTypes:    []string{"TXT"},
@@ -401,7 +401,7 @@ func TestCheckPermission_DeleteRecordDenied(t *testing.T) {
 		Permissions: []*storage.Permission{
 			{
 				ID:             1,
-				TokenID:    1,
+				TokenID:        1,
 				ZoneID:         100,
 				AllowedActions: []string{"list_records"},
 				RecordTypes:    []string{"TXT"},
@@ -428,7 +428,7 @@ func TestCheckPermission_NoZonePermission(t *testing.T) {
 		Permissions: []*storage.Permission{
 			{
 				ID:             1,
-				TokenID:    1,
+				TokenID:        1,
 				ZoneID:         100,
 				AllowedActions: []string{"list_records"},
 				RecordTypes:    []string{"TXT"},
