@@ -22,7 +22,7 @@ func TestInitSchema(t *testing.T) {
 	}
 
 	// Verify all tables exist
-	tables := []string{"config", "scoped_keys", "permissions", "admin_tokens"}
+	tables := []string{"config", "tokens", "permissions"}
 	for _, table := range tables {
 		query := "SELECT name FROM sqlite_master WHERE type='table' AND name=?"
 		var name string
@@ -33,9 +33,8 @@ func TestInitSchema(t *testing.T) {
 
 	// Verify all indexes exist
 	indexes := []string{
-		"idx_scoped_keys_hash",
-		"idx_permissions_scoped_key",
-		"idx_admin_tokens_hash",
+		"idx_tokens_key_hash",
+		"idx_permissions_token_id",
 	}
 	for _, idx := range indexes {
 		query := "SELECT name FROM sqlite_master WHERE type='index' AND name=?"
@@ -62,17 +61,17 @@ func TestInitSchemaIdempotent(t *testing.T) {
 	}
 
 	// Verify tables still exist
-	query := "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('config', 'scoped_keys', 'permissions', 'admin_tokens')"
+	query := "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('config', 'tokens', 'permissions')"
 	var count int
 	if err := db.QueryRow(query).Scan(&count); err != nil {
 		t.Fatalf("failed to query tables: %v", err)
 	}
-	if count != 4 {
-		t.Errorf("expected 4 tables, got %d", count)
+	if count != 3 {
+		t.Errorf("expected 3 tables, got %d", count)
 	}
 }
 
-// TestForeignKeyCascadeDelete verifies that deleting a scoped key cascades to permissions.
+// TestForeignKeyCascadeDelete verifies that deleting a token cascades to permissions.
 func TestForeignKeyCascadeDelete(t *testing.T) {
 	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
@@ -84,40 +83,40 @@ func TestForeignKeyCascadeDelete(t *testing.T) {
 		t.Fatalf("InitSchema failed: %v", err)
 	}
 
-	// Insert a scoped key
-	result, err := db.Exec("INSERT INTO scoped_keys (key_hash, name) VALUES (?, ?)", "test_hash", "test_key")
+	// Insert a token
+	result, err := db.Exec("INSERT INTO tokens (key_hash, name, is_admin) VALUES (?, ?, ?)", "test_hash", "test_token", false)
 	if err != nil {
-		t.Fatalf("failed to insert scoped key: %v", err)
+		t.Fatalf("failed to insert token: %v", err)
 	}
 
-	keyID, err := result.LastInsertId()
+	tokenID, err := result.LastInsertId()
 	if err != nil {
 		t.Fatalf("failed to get last insert ID: %v", err)
 	}
 
-	// Insert a permission for the scoped key
-	_, err = db.Exec("INSERT INTO permissions (scoped_key_id, zone_id, allowed_actions, record_types) VALUES (?, ?, ?, ?)",
-		keyID, 1, "read,write", "A,AAAA")
+	// Insert a permission for the token
+	_, err = db.Exec("INSERT INTO permissions (token_id, zone_id, allowed_actions, record_types) VALUES (?, ?, ?, ?)",
+		tokenID, 1, "read,write", "A,AAAA")
 	if err != nil {
 		t.Fatalf("failed to insert permission: %v", err)
 	}
 
 	// Verify permission exists
 	var permCount int
-	if err := db.QueryRow("SELECT COUNT(*) FROM permissions WHERE scoped_key_id = ?", keyID).Scan(&permCount); err != nil {
+	if err := db.QueryRow("SELECT COUNT(*) FROM permissions WHERE token_id = ?", tokenID).Scan(&permCount); err != nil {
 		t.Fatalf("failed to query permissions: %v", err)
 	}
 	if permCount != 1 {
 		t.Errorf("expected 1 permission, got %d", permCount)
 	}
 
-	// Delete the scoped key
-	if _, err := db.Exec("DELETE FROM scoped_keys WHERE id = ?", keyID); err != nil {
-		t.Fatalf("failed to delete scoped key: %v", err)
+	// Delete the token
+	if _, err := db.Exec("DELETE FROM tokens WHERE id = ?", tokenID); err != nil {
+		t.Fatalf("failed to delete token: %v", err)
 	}
 
 	// Verify permissions are cascaded deleted
-	if err := db.QueryRow("SELECT COUNT(*) FROM permissions WHERE scoped_key_id = ?", keyID).Scan(&permCount); err != nil {
+	if err := db.QueryRow("SELECT COUNT(*) FROM permissions WHERE token_id = ?", tokenID).Scan(&permCount); err != nil {
 		t.Fatalf("failed to query permissions: %v", err)
 	}
 	if permCount != 0 {
@@ -125,7 +124,7 @@ func TestForeignKeyCascadeDelete(t *testing.T) {
 	}
 }
 
-// TestForeignKeyConstraint verifies that inserting a permission with non-existent scoped key fails.
+// TestForeignKeyConstraint verifies that inserting a permission with non-existent token fails.
 func TestForeignKeyConstraint(t *testing.T) {
 	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
@@ -137,9 +136,9 @@ func TestForeignKeyConstraint(t *testing.T) {
 		t.Fatalf("InitSchema failed: %v", err)
 	}
 
-	// Try to insert a permission with non-existent scoped_key_id
+	// Try to insert a permission with non-existent token_id
 	// This should fail due to foreign key constraint
-	_, err = db.Exec("INSERT INTO permissions (scoped_key_id, zone_id, allowed_actions, record_types) VALUES (?, ?, ?, ?)",
+	_, err = db.Exec("INSERT INTO permissions (token_id, zone_id, allowed_actions, record_types) VALUES (?, ?, ?, ?)",
 		999, 1, "read,write", "A,AAAA")
 
 	if err == nil {
@@ -161,13 +160,13 @@ func TestMigrateSchema(t *testing.T) {
 	}
 
 	// Verify tables exist
-	query := "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('config', 'scoped_keys', 'permissions', 'admin_tokens')"
+	query := "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('config', 'tokens', 'permissions')"
 	var count int
 	if err := db.QueryRow(query).Scan(&count); err != nil {
 		t.Fatalf("failed to query tables: %v", err)
 	}
-	if count != 4 {
-		t.Errorf("expected 4 tables, got %d", count)
+	if count != 3 {
+		t.Errorf("expected 3 tables, got %d", count)
 	}
 }
 
@@ -206,7 +205,7 @@ func TestConfigTableStructure(t *testing.T) {
 	}
 
 	// Verify required columns exist
-	requiredColumns := []string{"id", "master_api_key_encrypted", "created_at", "updated_at"}
+	requiredColumns := []string{"id", "master_api_key_hash"}
 	for _, col := range requiredColumns {
 		if !columns[col] {
 			t.Errorf("config table missing column: %s", col)
@@ -214,8 +213,8 @@ func TestConfigTableStructure(t *testing.T) {
 	}
 }
 
-// TestScopedKeysTableStructure verifies the scoped_keys table has correct schema.
-func TestScopedKeysTableStructure(t *testing.T) {
+// TestTokensTableStructure verifies the tokens table has correct schema.
+func TestTokensTableStructure(t *testing.T) {
 	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("failed to open database: %v", err)
@@ -227,9 +226,9 @@ func TestScopedKeysTableStructure(t *testing.T) {
 	}
 
 	// Query table info
-	rows, err := db.Query("PRAGMA table_info(scoped_keys)")
+	rows, err := db.Query("PRAGMA table_info(tokens)")
 	if err != nil {
-		t.Fatalf("failed to query scoped_keys table info: %v", err)
+		t.Fatalf("failed to query tokens table info: %v", err)
 	}
 	defer rows.Close()
 
@@ -249,10 +248,10 @@ func TestScopedKeysTableStructure(t *testing.T) {
 	}
 
 	// Verify required columns exist
-	requiredColumns := []string{"id", "key_hash", "name", "created_at", "updated_at"}
+	requiredColumns := []string{"id", "key_hash", "name", "is_admin", "created_at"}
 	for _, col := range requiredColumns {
 		if !columns[col] {
-			t.Errorf("scoped_keys table missing column: %s", col)
+			t.Errorf("tokens table missing column: %s", col)
 		}
 	}
 }
@@ -292,53 +291,10 @@ func TestPermissionsTableStructure(t *testing.T) {
 	}
 
 	// Verify required columns exist
-	requiredColumns := []string{"id", "scoped_key_id", "zone_id", "allowed_actions", "record_types", "created_at"}
+	requiredColumns := []string{"id", "token_id", "zone_id", "allowed_actions", "record_types", "created_at"}
 	for _, col := range requiredColumns {
 		if !columns[col] {
 			t.Errorf("permissions table missing column: %s", col)
-		}
-	}
-}
-
-// TestAdminTokensTableStructure verifies the admin_tokens table has correct schema.
-func TestAdminTokensTableStructure(t *testing.T) {
-	db, err := sql.Open("sqlite", ":memory:")
-	if err != nil {
-		t.Fatalf("failed to open database: %v", err)
-	}
-	defer db.Close()
-
-	if err := InitSchema(db); err != nil {
-		t.Fatalf("InitSchema failed: %v", err)
-	}
-
-	// Query table info
-	rows, err := db.Query("PRAGMA table_info(admin_tokens)")
-	if err != nil {
-		t.Fatalf("failed to query admin_tokens table info: %v", err)
-	}
-	defer rows.Close()
-
-	columns := make(map[string]bool)
-	for rows.Next() {
-		var cid int
-		var name string
-		var ctype string
-		var notnull int
-		var dfltValue sql.NullString
-		var pk int
-
-		if err := rows.Scan(&cid, &name, &ctype, &notnull, &dfltValue, &pk); err != nil {
-			t.Fatalf("failed to scan column info: %v", err)
-		}
-		columns[name] = true
-	}
-
-	// Verify required columns exist
-	requiredColumns := []string{"id", "token_hash", "name", "created_at"}
-	for _, col := range requiredColumns {
-		if !columns[col] {
-			t.Errorf("admin_tokens table missing column: %s", col)
 		}
 	}
 }
@@ -374,12 +330,12 @@ func TestInitSchemaMultipleCalls(t *testing.T) {
 	}
 
 	// Insert test data
-	result, err := db.Exec("INSERT INTO scoped_keys (key_hash, name) VALUES (?, ?)", "hash1", "key1")
+	result, err := db.Exec("INSERT INTO tokens (key_hash, name, is_admin) VALUES (?, ?, ?)", "hash1", "key1", false)
 	if err != nil {
-		t.Fatalf("failed to insert scoped key: %v", err)
+		t.Fatalf("failed to insert token: %v", err)
 	}
 
-	keyID, _ := result.LastInsertId()
+	tokenID, _ := result.LastInsertId()
 
 	// Call InitSchema again (should be idempotent)
 	if err := InitSchema(db); err != nil {
@@ -388,7 +344,7 @@ func TestInitSchemaMultipleCalls(t *testing.T) {
 
 	// Verify data is still there
 	var name string
-	if err := db.QueryRow("SELECT name FROM scoped_keys WHERE id = ?", keyID).Scan(&name); err != nil {
+	if err := db.QueryRow("SELECT name FROM tokens WHERE id = ?", tokenID).Scan(&name); err != nil {
 		t.Errorf("data lost after second InitSchema: %v", err)
 	}
 	if name != "key1" {
@@ -408,14 +364,14 @@ func TestInitSchemaUniqueConstraints(t *testing.T) {
 		t.Fatalf("InitSchema failed: %v", err)
 	}
 
-	// Insert first scoped key
-	_, err = db.Exec("INSERT INTO scoped_keys (key_hash, name) VALUES (?, ?)", "unique_hash", "key1")
+	// Insert first token
+	_, err = db.Exec("INSERT INTO tokens (key_hash, name, is_admin) VALUES (?, ?, ?)", "unique_hash", "key1", false)
 	if err != nil {
-		t.Fatalf("failed to insert first scoped key: %v", err)
+		t.Fatalf("failed to insert first token: %v", err)
 	}
 
 	// Try to insert duplicate key_hash
-	_, err = db.Exec("INSERT INTO scoped_keys (key_hash, name) VALUES (?, ?)", "unique_hash", "key2")
+	_, err = db.Exec("INSERT INTO tokens (key_hash, name, is_admin) VALUES (?, ?, ?)", "unique_hash", "key2", false)
 	if err == nil {
 		t.Error("expected constraint error for duplicate key_hash, got nil")
 	}
@@ -434,7 +390,7 @@ func TestInitSchemaConfigPrimaryKeyConstraint(t *testing.T) {
 	}
 
 	// Try to insert config with id != 1 (should fail)
-	_, err = db.Exec("INSERT INTO config (id, master_api_key_encrypted) VALUES (?, ?)", 2, []byte("key"))
+	_, err = db.Exec("INSERT INTO config (id, master_api_key_hash) VALUES (?, ?)", 2, "key_hash")
 	if err == nil {
 		t.Error("expected constraint error for config id != 1, got nil")
 	}
@@ -452,24 +408,24 @@ func TestSchemaPermissionsInsert(t *testing.T) {
 		t.Fatalf("InitSchema failed: %v", err)
 	}
 
-	// Insert a scoped key
-	keyResult, err := db.Exec("INSERT INTO scoped_keys (key_hash, name) VALUES (?, ?)", "hash1", "key1")
+	// Insert a token
+	tokenResult, err := db.Exec("INSERT INTO tokens (key_hash, name, is_admin) VALUES (?, ?, ?)", "hash1", "key1", false)
 	if err != nil {
-		t.Fatalf("failed to insert scoped key: %v", err)
+		t.Fatalf("failed to insert token: %v", err)
 	}
 
-	keyID, _ := keyResult.LastInsertId()
+	tokenID, _ := tokenResult.LastInsertId()
 
 	// Insert permission
-	_, err = db.Exec("INSERT INTO permissions (scoped_key_id, zone_id, allowed_actions, record_types) VALUES (?, ?, ?, ?)",
-		keyID, 123, "read", "A,AAAA,TXT")
+	_, err = db.Exec("INSERT INTO permissions (token_id, zone_id, allowed_actions, record_types) VALUES (?, ?, ?, ?)",
+		tokenID, 123, "read", "A,AAAA,TXT")
 	if err != nil {
 		t.Fatalf("failed to insert permission: %v", err)
 	}
 
 	// Verify permission exists
 	var perm string
-	if err := db.QueryRow("SELECT allowed_actions FROM permissions WHERE scoped_key_id = ? AND zone_id = ?", keyID, 123).Scan(&perm); err != nil {
+	if err := db.QueryRow("SELECT allowed_actions FROM permissions WHERE token_id = ? AND zone_id = ?", tokenID, 123).Scan(&perm); err != nil {
 		t.Errorf("permission not found: %v", err)
 	}
 	if perm != "read" {
@@ -477,8 +433,8 @@ func TestSchemaPermissionsInsert(t *testing.T) {
 	}
 }
 
-// TestSchemaAdminTokens verifies admin token table operations.
-func TestSchemaAdminTokens(t *testing.T) {
+// TestSchemaTokensInsert verifies that we can insert and retrieve tokens.
+func TestSchemaTokensInsert(t *testing.T) {
 	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("failed to open database: %v", err)
@@ -489,21 +445,46 @@ func TestSchemaAdminTokens(t *testing.T) {
 		t.Fatalf("InitSchema failed: %v", err)
 	}
 
-	// Insert admin token
-	result, err := db.Exec("INSERT INTO admin_tokens (token_hash, name) VALUES (?, ?)", "admin_hash_1", "admin1")
+	// Insert a regular scoped token
+	result, err := db.Exec("INSERT INTO tokens (key_hash, name, is_admin) VALUES (?, ?, ?)", "hash_1", "token1", false)
 	if err != nil {
-		t.Fatalf("failed to insert admin token: %v", err)
+		t.Fatalf("failed to insert token: %v", err)
 	}
 
 	tokenID, _ := result.LastInsertId()
 
 	// Verify token exists
 	var name string
-	if err := db.QueryRow("SELECT name FROM admin_tokens WHERE id = ?", tokenID).Scan(&name); err != nil {
+	var isAdmin bool
+	if err := db.QueryRow("SELECT name, is_admin FROM tokens WHERE id = ?", tokenID).Scan(&name, &isAdmin); err != nil {
+		t.Errorf("token not found: %v", err)
+	}
+	if name != "token1" {
+		t.Errorf("token name mismatch: expected 'token1', got '%s'", name)
+	}
+	if isAdmin != false {
+		t.Errorf("is_admin mismatch: expected false, got %v", isAdmin)
+	}
+
+	// Insert an admin token
+	adminResult, err := db.Exec("INSERT INTO tokens (key_hash, name, is_admin) VALUES (?, ?, ?)", "admin_hash_1", "admin1", true)
+	if err != nil {
+		t.Fatalf("failed to insert admin token: %v", err)
+	}
+
+	adminID, _ := adminResult.LastInsertId()
+
+	// Verify admin token exists
+	var adminName string
+	var adminFlag bool
+	if err := db.QueryRow("SELECT name, is_admin FROM tokens WHERE id = ?", adminID).Scan(&adminName, &adminFlag); err != nil {
 		t.Errorf("admin token not found: %v", err)
 	}
-	if name != "admin1" {
-		t.Errorf("admin token name mismatch: expected 'admin1', got '%s'", name)
+	if adminName != "admin1" {
+		t.Errorf("admin token name mismatch: expected 'admin1', got '%s'", adminName)
+	}
+	if adminFlag != true {
+		t.Errorf("is_admin mismatch: expected true, got %v", adminFlag)
 	}
 }
 
@@ -520,15 +501,18 @@ func TestSchemaConfigInsert(t *testing.T) {
 	}
 
 	// Insert config
-	_, err = db.Exec("INSERT INTO config (id, master_api_key_encrypted) VALUES (?, ?)", 1, []byte("encrypted_key_data"))
+	_, err = db.Exec("INSERT INTO config (id, master_api_key_hash) VALUES (?, ?)", 1, "key_hash_value")
 	if err != nil {
 		t.Fatalf("failed to insert config: %v", err)
 	}
 
 	// Verify config exists
-	var key []byte
-	if err := db.QueryRow("SELECT master_api_key_encrypted FROM config WHERE id = 1").Scan(&key); err != nil {
+	var keyHash string
+	if err := db.QueryRow("SELECT master_api_key_hash FROM config WHERE id = 1").Scan(&keyHash); err != nil {
 		t.Errorf("config not found: %v", err)
+	}
+	if keyHash != "key_hash_value" {
+		t.Errorf("config mismatch: expected 'key_hash_value', got '%s'", keyHash)
 	}
 }
 
@@ -544,17 +528,17 @@ func TestSchemaIndexUsage(t *testing.T) {
 		t.Fatalf("InitSchema failed: %v", err)
 	}
 
-	// Insert multiple scoped keys
+	// Insert multiple tokens
 	for i := 0; i < 5; i++ {
-		_, err := db.Exec("INSERT INTO scoped_keys (key_hash, name) VALUES (?, ?)", fmt.Sprintf("hash_%d", i), fmt.Sprintf("key_%d", i))
+		_, err := db.Exec("INSERT INTO tokens (key_hash, name, is_admin) VALUES (?, ?, ?)", fmt.Sprintf("hash_%d", i), fmt.Sprintf("key_%d", i), false)
 		if err != nil {
-			t.Fatalf("failed to insert scoped key %d: %v", i, err)
+			t.Fatalf("failed to insert token %d: %v", i, err)
 		}
 	}
 
-	// Query by index (should be fast due to idx_scoped_keys_hash)
+	// Query by index (should be fast due to idx_tokens_key_hash)
 	var name string
-	if err := db.QueryRow("SELECT name FROM scoped_keys WHERE key_hash = ?", "hash_2").Scan(&name); err != nil {
+	if err := db.QueryRow("SELECT name FROM tokens WHERE key_hash = ?", "hash_2").Scan(&name); err != nil {
 		t.Errorf("failed to query by index: %v", err)
 	}
 	if name != "key_2" {
