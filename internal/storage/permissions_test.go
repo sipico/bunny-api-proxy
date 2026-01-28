@@ -376,8 +376,8 @@ func TestCascadeDeleteScopedKey(t *testing.T) {
 		t.Fatalf("AddPermission failed: %v", err)
 	}
 
-	// Delete the scoped key
-	_, err = storage.getDB().ExecContext(ctx, "DELETE FROM scoped_keys WHERE id = ?", keyID)
+	// Delete the scoped key (token)
+	_, err = storage.getDB().ExecContext(ctx, "DELETE FROM tokens WHERE id = ?", keyID)
 	if err != nil {
 		t.Fatalf("failed to delete scoped key: %v", err)
 	}
@@ -561,7 +561,7 @@ func TestGetPermissionsUnmarshalAllowedActionsError(t *testing.T) {
 
 	// Insert a permission with corrupted JSON directly into the database
 	_, err := storage.getDB().ExecContext(ctx,
-		"INSERT INTO permissions (scoped_key_id, zone_id, allowed_actions, record_types) VALUES (?, ?, ?, ?)",
+		"INSERT INTO permissions (token_id, zone_id, allowed_actions, record_types) VALUES (?, ?, ?, ?)",
 		keyID, 12345, "not-valid-json", `["TXT"]`)
 	if err != nil {
 		t.Fatalf("failed to insert corrupted permission: %v", err)
@@ -585,7 +585,7 @@ func TestGetPermissionsUnmarshalRecordTypesError(t *testing.T) {
 
 	// Insert a permission with corrupted JSON directly into the database
 	_, err := storage.getDB().ExecContext(ctx,
-		"INSERT INTO permissions (scoped_key_id, zone_id, allowed_actions, record_types) VALUES (?, ?, ?, ?)",
+		"INSERT INTO permissions (token_id, zone_id, allowed_actions, record_types) VALUES (?, ?, ?, ?)",
 		keyID, 12345, `["list_records"]`, "not-valid-json")
 	if err != nil {
 		t.Fatalf("failed to insert corrupted permission: %v", err)

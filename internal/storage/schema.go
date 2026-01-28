@@ -44,6 +44,7 @@ func InitSchema(db *sql.DB) error {
 			zone_id INTEGER NOT NULL,
 			allowed_actions TEXT NOT NULL,
 			record_types TEXT NOT NULL,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 			FOREIGN KEY (token_id) REFERENCES tokens(id) ON DELETE CASCADE
 		)`,
 
