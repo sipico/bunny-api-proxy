@@ -100,6 +100,41 @@ func (m *mockStorageWithTokenCRUD) DeletePermission(ctx context.Context, id int6
 	return nil
 }
 
+// Unified token operations (Issue 147) - base implementations
+func (m *mockStorageWithTokenCRUD) CreateToken(ctx context.Context, name string, isAdmin bool, keyHash string) (*storage.Token, error) {
+	return &storage.Token{ID: 1, Name: name, IsAdmin: isAdmin, KeyHash: keyHash}, nil
+}
+
+func (m *mockStorageWithTokenCRUD) GetTokenByID(ctx context.Context, id int64) (*storage.Token, error) {
+	return nil, storage.ErrNotFound
+}
+
+func (m *mockStorageWithTokenCRUD) ListTokens(ctx context.Context) ([]*storage.Token, error) {
+	return make([]*storage.Token, 0), nil
+}
+
+func (m *mockStorageWithTokenCRUD) DeleteToken(ctx context.Context, id int64) error {
+	return nil
+}
+
+func (m *mockStorageWithTokenCRUD) CountAdminTokens(ctx context.Context) (int, error) {
+	return 1, nil
+}
+
+func (m *mockStorageWithTokenCRUD) AddPermissionForToken(ctx context.Context, tokenID int64, perm *storage.Permission) (*storage.Permission, error) {
+	perm.ID = 1
+	perm.TokenID = tokenID
+	return perm, nil
+}
+
+func (m *mockStorageWithTokenCRUD) RemovePermission(ctx context.Context, permID int64) error {
+	return nil
+}
+
+func (m *mockStorageWithTokenCRUD) GetPermissionsForToken(ctx context.Context, tokenID int64) ([]*storage.Permission, error) {
+	return make([]*storage.Permission, 0), nil
+}
+
 func TestHandleSetLogLevel(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -709,5 +744,868 @@ func TestGenerateRandomKey(t *testing.T) {
 	// Keys should be different (random)
 	if key1 == key2 {
 		t.Error("expected different keys, got identical")
+	}
+}
+
+// =============================================================================
+// Unified Token API Tests (Issue 147)
+// =============================================================================
+
+// mockUnifiedStorage implements Storage interface for unified token tests
+type mockUnifiedStorage struct {
+	*mockStorageWithTokenCRUD
+
+	// Unified token operations
+	createUnifiedToken     func(ctx context.Context, name string, isAdmin bool, keyHash string) (*storage.Token, error)
+	getTokenByID           func(ctx context.Context, id int64) (*storage.Token, error)
+	listUnifiedTokens      func(ctx context.Context) ([]*storage.Token, error)
+	deleteUnifiedToken     func(ctx context.Context, id int64) error
+	countAdminTokens       func(ctx context.Context) (int, error)
+	addPermissionForToken  func(ctx context.Context, tokenID int64, perm *storage.Permission) (*storage.Permission, error)
+	removePermission       func(ctx context.Context, permID int64) error
+	getPermissionsForToken func(ctx context.Context, tokenID int64) ([]*storage.Permission, error)
+}
+
+func (m *mockUnifiedStorage) CreateToken(ctx context.Context, name string, isAdmin bool, keyHash string) (*storage.Token, error) {
+	if m.createUnifiedToken != nil {
+		return m.createUnifiedToken(ctx, name, isAdmin, keyHash)
+	}
+	return &storage.Token{ID: 1, Name: name, IsAdmin: isAdmin, KeyHash: keyHash}, nil
+}
+
+func (m *mockUnifiedStorage) GetTokenByID(ctx context.Context, id int64) (*storage.Token, error) {
+	if m.getTokenByID != nil {
+		return m.getTokenByID(ctx, id)
+	}
+	return nil, storage.ErrNotFound
+}
+
+func (m *mockUnifiedStorage) ListTokens(ctx context.Context) ([]*storage.Token, error) {
+	if m.listUnifiedTokens != nil {
+		return m.listUnifiedTokens(ctx)
+	}
+	return make([]*storage.Token, 0), nil
+}
+
+func (m *mockUnifiedStorage) DeleteToken(ctx context.Context, id int64) error {
+	if m.deleteUnifiedToken != nil {
+		return m.deleteUnifiedToken(ctx, id)
+	}
+	return nil
+}
+
+func (m *mockUnifiedStorage) CountAdminTokens(ctx context.Context) (int, error) {
+	if m.countAdminTokens != nil {
+		return m.countAdminTokens(ctx)
+	}
+	return 1, nil
+}
+
+func (m *mockUnifiedStorage) AddPermissionForToken(ctx context.Context, tokenID int64, perm *storage.Permission) (*storage.Permission, error) {
+	if m.addPermissionForToken != nil {
+		return m.addPermissionForToken(ctx, tokenID, perm)
+	}
+	perm.ID = 1
+	perm.TokenID = tokenID
+	return perm, nil
+}
+
+func (m *mockUnifiedStorage) RemovePermission(ctx context.Context, permID int64) error {
+	if m.removePermission != nil {
+		return m.removePermission(ctx, permID)
+	}
+	return nil
+}
+
+func (m *mockUnifiedStorage) GetPermissionsForToken(ctx context.Context, tokenID int64) ([]*storage.Permission, error) {
+	if m.getPermissionsForToken != nil {
+		return m.getPermissionsForToken(ctx, tokenID)
+	}
+	return make([]*storage.Permission, 0), nil
+}
+
+func newMockUnifiedStorage() *mockUnifiedStorage {
+	return &mockUnifiedStorage{
+		mockStorageWithTokenCRUD: &mockStorageWithTokenCRUD{
+			mockStorage: &mockStorage{},
+		},
+	}
+}
+
+func TestHandleWhoami(t *testing.T) {
+	tests := []struct {
+		name       string
+		setupCtx   func(context.Context) context.Context
+		wantStatus int
+		checkResp  func(*testing.T, WhoamiResponse)
+	}{
+		{
+			name: "master key auth",
+			setupCtx: func(ctx context.Context) context.Context {
+				// Simulate master key context - we can't use withMasterKey directly as it's unexported
+				// So we test the handler's behavior with a nil token context
+				return ctx
+			},
+			wantStatus: http.StatusOK,
+			checkResp: func(t *testing.T, resp WhoamiResponse) {
+				// Without context setup, defaults apply
+				if resp.TokenID != 0 {
+					t.Errorf("expected no token ID, got %d", resp.TokenID)
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mock := newMockUnifiedStorage()
+			h := NewHandler(mock, NewSessionStore(24*time.Hour), new(slog.LevelVar), slog.Default())
+
+			req := httptest.NewRequest("GET", "/api/whoami", nil)
+			if tt.setupCtx != nil {
+				req = req.WithContext(tt.setupCtx(req.Context()))
+			}
+			w := httptest.NewRecorder()
+
+			h.HandleWhoami(w, req)
+
+			if w.Code != tt.wantStatus {
+				t.Errorf("expected status %d, got %d", tt.wantStatus, w.Code)
+			}
+
+			if tt.wantStatus == http.StatusOK && tt.checkResp != nil {
+				var resp WhoamiResponse
+				if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+					t.Fatalf("failed to decode response: %v", err)
+				}
+				tt.checkResp(t, resp)
+			}
+		})
+	}
+}
+
+func TestHandleListUnifiedTokens(t *testing.T) {
+	tests := []struct {
+		name       string
+		tokens     []*storage.Token
+		setupErr   error
+		wantStatus int
+		wantCount  int
+	}{
+		{
+			name:       "empty list",
+			tokens:     make([]*storage.Token, 0),
+			wantStatus: http.StatusOK,
+			wantCount:  0,
+		},
+		{
+			name: "multiple tokens",
+			tokens: []*storage.Token{
+				{ID: 1, Name: "admin-1", IsAdmin: true, CreatedAt: time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)},
+				{ID: 2, Name: "scoped-1", IsAdmin: false, CreatedAt: time.Date(2025, 1, 2, 0, 0, 0, 0, time.UTC)},
+			},
+			wantStatus: http.StatusOK,
+			wantCount:  2,
+		},
+		{
+			name:       "storage error",
+			setupErr:   storage.ErrNotFound,
+			wantStatus: http.StatusInternalServerError,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mock := newMockUnifiedStorage()
+			mock.listUnifiedTokens = func(ctx context.Context) ([]*storage.Token, error) {
+				if tt.setupErr != nil {
+					return nil, tt.setupErr
+				}
+				return tt.tokens, nil
+			}
+			h := NewHandler(mock, NewSessionStore(24*time.Hour), new(slog.LevelVar), slog.Default())
+
+			req := httptest.NewRequest("GET", "/api/tokens", nil)
+			w := httptest.NewRecorder()
+
+			h.HandleListUnifiedTokens(w, req)
+
+			if w.Code != tt.wantStatus {
+				t.Errorf("expected status %d, got %d", tt.wantStatus, w.Code)
+			}
+
+			if tt.wantStatus == http.StatusOK {
+				var resp []UnifiedTokenResponse
+				if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+					t.Fatalf("failed to decode response: %v", err)
+				}
+				if len(resp) != tt.wantCount {
+					t.Errorf("expected %d tokens, got %d", tt.wantCount, len(resp))
+				}
+			}
+		})
+	}
+}
+
+func TestHandleCreateUnifiedToken(t *testing.T) {
+	tests := []struct {
+		name          string
+		body          interface{}
+		mockToken     *storage.Token
+		mockCreateErr error
+		mockPermErr   error
+		wantStatus    int
+		wantBody      string
+	}{
+		{
+			name: "create admin token",
+			body: CreateUnifiedTokenRequest{
+				Name:    "admin-token",
+				IsAdmin: true,
+			},
+			mockToken:  &storage.Token{ID: 1, Name: "admin-token", IsAdmin: true},
+			wantStatus: http.StatusCreated,
+			wantBody:   `"is_admin":true`,
+		},
+		{
+			name: "create scoped token",
+			body: CreateUnifiedTokenRequest{
+				Name:        "scoped-token",
+				IsAdmin:     false,
+				Zones:       []int64{123},
+				Actions:     []string{"list_records"},
+				RecordTypes: []string{"TXT"},
+			},
+			mockToken:  &storage.Token{ID: 2, Name: "scoped-token", IsAdmin: false},
+			wantStatus: http.StatusCreated,
+			wantBody:   `"is_admin":false`,
+		},
+		{
+			name:       "missing name",
+			body:       CreateUnifiedTokenRequest{IsAdmin: true},
+			wantStatus: http.StatusBadRequest,
+			wantBody:   "missing_name",
+		},
+		{
+			name: "scoped token missing zones",
+			body: CreateUnifiedTokenRequest{
+				Name:        "scoped",
+				IsAdmin:     false,
+				Actions:     []string{"list_records"},
+				RecordTypes: []string{"TXT"},
+			},
+			wantStatus: http.StatusBadRequest,
+			wantBody:   "missing_zones",
+		},
+		{
+			name: "scoped token missing actions",
+			body: CreateUnifiedTokenRequest{
+				Name:        "scoped",
+				IsAdmin:     false,
+				Zones:       []int64{123},
+				RecordTypes: []string{"TXT"},
+			},
+			wantStatus: http.StatusBadRequest,
+			wantBody:   "missing_actions",
+		},
+		{
+			name: "scoped token missing record types",
+			body: CreateUnifiedTokenRequest{
+				Name:    "scoped",
+				IsAdmin: false,
+				Zones:   []int64{123},
+				Actions: []string{"list_records"},
+			},
+			wantStatus: http.StatusBadRequest,
+			wantBody:   "missing_record_types",
+		},
+		{
+			name:       "invalid JSON",
+			body:       "not-json",
+			wantStatus: http.StatusBadRequest,
+			wantBody:   "invalid_json",
+		},
+		{
+			name: "storage error on create",
+			body: CreateUnifiedTokenRequest{
+				Name:    "admin-token",
+				IsAdmin: true,
+			},
+			mockCreateErr: storage.ErrDecryption,
+			wantStatus:    http.StatusInternalServerError,
+		},
+		{
+			name: "duplicate token error",
+			body: CreateUnifiedTokenRequest{
+				Name:    "admin-token",
+				IsAdmin: true,
+			},
+			mockCreateErr: storage.ErrDuplicate,
+			wantStatus:    http.StatusConflict,
+			wantBody:      "duplicate_token",
+		},
+		{
+			name: "permission error on scoped token",
+			body: CreateUnifiedTokenRequest{
+				Name:        "scoped-token",
+				IsAdmin:     false,
+				Zones:       []int64{123},
+				Actions:     []string{"list_records"},
+				RecordTypes: []string{"TXT"},
+			},
+			mockToken:   &storage.Token{ID: 2, Name: "scoped-token", IsAdmin: false},
+			mockPermErr: storage.ErrDecryption,
+			wantStatus:  http.StatusInternalServerError,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mock := newMockUnifiedStorage()
+			mock.createUnifiedToken = func(ctx context.Context, name string, isAdmin bool, keyHash string) (*storage.Token, error) {
+				if tt.mockCreateErr != nil {
+					return nil, tt.mockCreateErr
+				}
+				return tt.mockToken, nil
+			}
+			mock.addPermissionForToken = func(ctx context.Context, tokenID int64, perm *storage.Permission) (*storage.Permission, error) {
+				if tt.mockPermErr != nil {
+					return nil, tt.mockPermErr
+				}
+				perm.ID = 1
+				perm.TokenID = tokenID
+				return perm, nil
+			}
+			mock.deleteUnifiedToken = func(ctx context.Context, id int64) error {
+				return nil // Cleanup always succeeds
+			}
+
+			h := NewHandler(mock, NewSessionStore(24*time.Hour), new(slog.LevelVar), slog.Default())
+
+			var body io.Reader
+			if str, ok := tt.body.(string); ok {
+				body = bytes.NewBufferString(str)
+			} else {
+				bodyBytes, _ := json.Marshal(tt.body)
+				body = bytes.NewBuffer(bodyBytes)
+			}
+
+			req := httptest.NewRequest("POST", "/api/tokens", body)
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+
+			h.HandleCreateUnifiedToken(w, req)
+
+			if w.Code != tt.wantStatus {
+				t.Errorf("expected status %d, got %d: %s", tt.wantStatus, w.Code, w.Body.String())
+			}
+
+			if tt.wantBody != "" && !bytes.Contains(w.Body.Bytes(), []byte(tt.wantBody)) {
+				t.Errorf("expected body to contain %q, got %q", tt.wantBody, w.Body.String())
+			}
+
+			// Verify response structure for success
+			if tt.wantStatus == http.StatusCreated {
+				var resp CreateUnifiedTokenResponse
+				if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+					t.Fatalf("failed to decode response: %v", err)
+				}
+				if resp.Token == "" {
+					t.Error("expected token to be set in response")
+				}
+				if len(resp.Token) != 64 {
+					t.Errorf("expected token length 64, got %d", len(resp.Token))
+				}
+			}
+		})
+	}
+}
+
+func TestHandleGetUnifiedToken(t *testing.T) {
+	tests := []struct {
+		name        string
+		tokenID     string
+		mockToken   *storage.Token
+		mockPerms   []*storage.Permission
+		mockErr     error
+		mockPermErr error
+		wantStatus  int
+	}{
+		{
+			name:       "get admin token",
+			tokenID:    "1",
+			mockToken:  &storage.Token{ID: 1, Name: "admin", IsAdmin: true, CreatedAt: time.Now()},
+			wantStatus: http.StatusOK,
+		},
+		{
+			name:      "get scoped token with permissions",
+			tokenID:   "2",
+			mockToken: &storage.Token{ID: 2, Name: "scoped", IsAdmin: false, CreatedAt: time.Now()},
+			mockPerms: []*storage.Permission{
+				{ID: 1, TokenID: 2, ZoneID: 123, AllowedActions: []string{"list"}, RecordTypes: []string{"TXT"}},
+			},
+			wantStatus: http.StatusOK,
+		},
+		{
+			name:       "invalid token ID",
+			tokenID:    "not-a-number",
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "token not found",
+			tokenID:    "999",
+			mockErr:    storage.ErrNotFound,
+			wantStatus: http.StatusNotFound,
+		},
+		{
+			name:       "storage error",
+			tokenID:    "1",
+			mockErr:    storage.ErrDecryption,
+			wantStatus: http.StatusInternalServerError,
+		},
+		{
+			name:        "permission load error",
+			tokenID:     "2",
+			mockToken:   &storage.Token{ID: 2, Name: "scoped", IsAdmin: false, CreatedAt: time.Now()},
+			mockPermErr: storage.ErrDecryption,
+			wantStatus:  http.StatusInternalServerError,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mock := newMockUnifiedStorage()
+			mock.getTokenByID = func(ctx context.Context, id int64) (*storage.Token, error) {
+				if tt.mockErr != nil {
+					return nil, tt.mockErr
+				}
+				return tt.mockToken, nil
+			}
+			mock.getPermissionsForToken = func(ctx context.Context, tokenID int64) ([]*storage.Permission, error) {
+				if tt.mockPermErr != nil {
+					return nil, tt.mockPermErr
+				}
+				return tt.mockPerms, nil
+			}
+
+			h := NewHandler(mock, NewSessionStore(24*time.Hour), new(slog.LevelVar), slog.Default())
+
+			req := httptest.NewRequest("GET", "/api/tokens/"+tt.tokenID, nil)
+			ctx := chi.NewRouteContext()
+			ctx.URLParams.Add("id", tt.tokenID)
+			req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, ctx))
+
+			w := httptest.NewRecorder()
+			h.HandleGetUnifiedToken(w, req)
+
+			if w.Code != tt.wantStatus {
+				t.Errorf("expected status %d, got %d: %s", tt.wantStatus, w.Code, w.Body.String())
+			}
+		})
+	}
+}
+
+func TestHandleDeleteUnifiedToken(t *testing.T) {
+	tests := []struct {
+		name       string
+		tokenID    string
+		mockToken  *storage.Token
+		mockGetErr error
+		mockDelErr error
+		adminCount int
+		countErr   error
+		wantStatus int
+		wantBody   string
+	}{
+		{
+			name:       "delete scoped token",
+			tokenID:    "2",
+			mockToken:  &storage.Token{ID: 2, Name: "scoped", IsAdmin: false},
+			adminCount: 1,
+			wantStatus: http.StatusNoContent,
+		},
+		{
+			name:       "delete admin token with multiple admins",
+			tokenID:    "1",
+			mockToken:  &storage.Token{ID: 1, Name: "admin", IsAdmin: true},
+			adminCount: 2,
+			wantStatus: http.StatusNoContent,
+		},
+		{
+			name:       "cannot delete last admin",
+			tokenID:    "1",
+			mockToken:  &storage.Token{ID: 1, Name: "admin", IsAdmin: true},
+			adminCount: 1,
+			wantStatus: http.StatusConflict,
+			wantBody:   "cannot_delete_last_admin",
+		},
+		{
+			name:       "invalid token ID",
+			tokenID:    "not-a-number",
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "token not found on get",
+			tokenID:    "999",
+			mockGetErr: storage.ErrNotFound,
+			wantStatus: http.StatusNotFound,
+		},
+		{
+			name:       "token not found on delete",
+			tokenID:    "1",
+			mockToken:  &storage.Token{ID: 1, Name: "scoped", IsAdmin: false},
+			mockDelErr: storage.ErrNotFound,
+			wantStatus: http.StatusNotFound,
+		},
+		{
+			name:       "storage error on get",
+			tokenID:    "1",
+			mockGetErr: storage.ErrDecryption,
+			wantStatus: http.StatusInternalServerError,
+		},
+		{
+			name:       "storage error on delete",
+			tokenID:    "1",
+			mockToken:  &storage.Token{ID: 1, Name: "scoped", IsAdmin: false},
+			mockDelErr: storage.ErrDecryption,
+			wantStatus: http.StatusInternalServerError,
+		},
+		{
+			name:       "count error",
+			tokenID:    "1",
+			mockToken:  &storage.Token{ID: 1, Name: "admin", IsAdmin: true},
+			countErr:   storage.ErrDecryption,
+			wantStatus: http.StatusInternalServerError,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mock := newMockUnifiedStorage()
+			mock.getTokenByID = func(ctx context.Context, id int64) (*storage.Token, error) {
+				if tt.mockGetErr != nil {
+					return nil, tt.mockGetErr
+				}
+				return tt.mockToken, nil
+			}
+			mock.deleteUnifiedToken = func(ctx context.Context, id int64) error {
+				return tt.mockDelErr
+			}
+			mock.countAdminTokens = func(ctx context.Context) (int, error) {
+				if tt.countErr != nil {
+					return 0, tt.countErr
+				}
+				return tt.adminCount, nil
+			}
+
+			h := NewHandler(mock, NewSessionStore(24*time.Hour), new(slog.LevelVar), slog.Default())
+
+			req := httptest.NewRequest("DELETE", "/api/tokens/"+tt.tokenID, nil)
+			ctx := chi.NewRouteContext()
+			ctx.URLParams.Add("id", tt.tokenID)
+			req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, ctx))
+
+			w := httptest.NewRecorder()
+			h.HandleDeleteUnifiedToken(w, req)
+
+			if w.Code != tt.wantStatus {
+				t.Errorf("expected status %d, got %d: %s", tt.wantStatus, w.Code, w.Body.String())
+			}
+
+			if tt.wantBody != "" && !bytes.Contains(w.Body.Bytes(), []byte(tt.wantBody)) {
+				t.Errorf("expected body to contain %q, got %q", tt.wantBody, w.Body.String())
+			}
+		})
+	}
+}
+
+func TestHandleAddTokenPermission(t *testing.T) {
+	tests := []struct {
+		name       string
+		tokenID    string
+		body       interface{}
+		mockToken  *storage.Token
+		mockGetErr error
+		mockAddErr error
+		wantStatus int
+		wantBody   string
+	}{
+		{
+			name:      "add permission successfully",
+			tokenID:   "2",
+			mockToken: &storage.Token{ID: 2, Name: "scoped", IsAdmin: false},
+			body: AddPermissionRequest{
+				ZoneID:         123,
+				AllowedActions: []string{"list_records"},
+				RecordTypes:    []string{"TXT"},
+			},
+			wantStatus: http.StatusCreated,
+		},
+		{
+			name:      "cannot add permission to admin token",
+			tokenID:   "1",
+			mockToken: &storage.Token{ID: 1, Name: "admin", IsAdmin: true},
+			body: AddPermissionRequest{
+				ZoneID:         123,
+				AllowedActions: []string{"list_records"},
+				RecordTypes:    []string{"TXT"},
+			},
+			wantStatus: http.StatusBadRequest,
+			wantBody:   "admin_no_permissions",
+		},
+		{
+			name:       "invalid token ID",
+			tokenID:    "not-a-number",
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "token not found",
+			tokenID:    "999",
+			mockGetErr: storage.ErrNotFound,
+			wantStatus: http.StatusNotFound,
+		},
+		{
+			name:       "invalid JSON",
+			tokenID:    "2",
+			mockToken:  &storage.Token{ID: 2, Name: "scoped", IsAdmin: false},
+			body:       "not-json",
+			wantStatus: http.StatusBadRequest,
+			wantBody:   "invalid_json",
+		},
+		{
+			name:      "invalid zone ID",
+			tokenID:   "2",
+			mockToken: &storage.Token{ID: 2, Name: "scoped", IsAdmin: false},
+			body: AddPermissionRequest{
+				ZoneID:         0,
+				AllowedActions: []string{"list_records"},
+				RecordTypes:    []string{"TXT"},
+			},
+			wantStatus: http.StatusBadRequest,
+			wantBody:   "invalid_zone_id",
+		},
+		{
+			name:      "missing actions",
+			tokenID:   "2",
+			mockToken: &storage.Token{ID: 2, Name: "scoped", IsAdmin: false},
+			body: AddPermissionRequest{
+				ZoneID:      123,
+				RecordTypes: []string{"TXT"},
+			},
+			wantStatus: http.StatusBadRequest,
+			wantBody:   "missing_actions",
+		},
+		{
+			name:      "missing record types",
+			tokenID:   "2",
+			mockToken: &storage.Token{ID: 2, Name: "scoped", IsAdmin: false},
+			body: AddPermissionRequest{
+				ZoneID:         123,
+				AllowedActions: []string{"list_records"},
+			},
+			wantStatus: http.StatusBadRequest,
+			wantBody:   "missing_record_types",
+		},
+		{
+			name:      "storage error on add",
+			tokenID:   "2",
+			mockToken: &storage.Token{ID: 2, Name: "scoped", IsAdmin: false},
+			body: AddPermissionRequest{
+				ZoneID:         123,
+				AllowedActions: []string{"list_records"},
+				RecordTypes:    []string{"TXT"},
+			},
+			mockAddErr: storage.ErrDecryption,
+			wantStatus: http.StatusInternalServerError,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mock := newMockUnifiedStorage()
+			mock.getTokenByID = func(ctx context.Context, id int64) (*storage.Token, error) {
+				if tt.mockGetErr != nil {
+					return nil, tt.mockGetErr
+				}
+				return tt.mockToken, nil
+			}
+			mock.addPermissionForToken = func(ctx context.Context, tokenID int64, perm *storage.Permission) (*storage.Permission, error) {
+				if tt.mockAddErr != nil {
+					return nil, tt.mockAddErr
+				}
+				perm.ID = 1
+				perm.TokenID = tokenID
+				return perm, nil
+			}
+
+			h := NewHandler(mock, NewSessionStore(24*time.Hour), new(slog.LevelVar), slog.Default())
+
+			var body io.Reader
+			if tt.body != nil {
+				if str, ok := tt.body.(string); ok {
+					body = bytes.NewBufferString(str)
+				} else {
+					bodyBytes, _ := json.Marshal(tt.body)
+					body = bytes.NewBuffer(bodyBytes)
+				}
+			}
+
+			req := httptest.NewRequest("POST", "/api/tokens/"+tt.tokenID+"/permissions", body)
+			req.Header.Set("Content-Type", "application/json")
+			ctx := chi.NewRouteContext()
+			ctx.URLParams.Add("id", tt.tokenID)
+			req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, ctx))
+
+			w := httptest.NewRecorder()
+			h.HandleAddTokenPermission(w, req)
+
+			if w.Code != tt.wantStatus {
+				t.Errorf("expected status %d, got %d: %s", tt.wantStatus, w.Code, w.Body.String())
+			}
+
+			if tt.wantBody != "" && !bytes.Contains(w.Body.Bytes(), []byte(tt.wantBody)) {
+				t.Errorf("expected body to contain %q, got %q", tt.wantBody, w.Body.String())
+			}
+		})
+	}
+}
+
+func TestHandleDeleteTokenPermission(t *testing.T) {
+	tests := []struct {
+		name       string
+		tokenID    string
+		permID     string
+		mockToken  *storage.Token
+		mockGetErr error
+		mockDelErr error
+		wantStatus int
+	}{
+		{
+			name:       "delete permission successfully",
+			tokenID:    "2",
+			permID:     "1",
+			mockToken:  &storage.Token{ID: 2, Name: "scoped", IsAdmin: false},
+			wantStatus: http.StatusNoContent,
+		},
+		{
+			name:       "invalid token ID",
+			tokenID:    "not-a-number",
+			permID:     "1",
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "invalid permission ID",
+			tokenID:    "2",
+			permID:     "not-a-number",
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "token not found",
+			tokenID:    "999",
+			permID:     "1",
+			mockGetErr: storage.ErrNotFound,
+			wantStatus: http.StatusNotFound,
+		},
+		{
+			name:       "permission not found",
+			tokenID:    "2",
+			permID:     "999",
+			mockToken:  &storage.Token{ID: 2, Name: "scoped", IsAdmin: false},
+			mockDelErr: storage.ErrNotFound,
+			wantStatus: http.StatusNotFound,
+		},
+		{
+			name:       "storage error on delete",
+			tokenID:    "2",
+			permID:     "1",
+			mockToken:  &storage.Token{ID: 2, Name: "scoped", IsAdmin: false},
+			mockDelErr: storage.ErrDecryption,
+			wantStatus: http.StatusInternalServerError,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mock := newMockUnifiedStorage()
+			mock.getTokenByID = func(ctx context.Context, id int64) (*storage.Token, error) {
+				if tt.mockGetErr != nil {
+					return nil, tt.mockGetErr
+				}
+				return tt.mockToken, nil
+			}
+			mock.removePermission = func(ctx context.Context, permID int64) error {
+				return tt.mockDelErr
+			}
+
+			h := NewHandler(mock, NewSessionStore(24*time.Hour), new(slog.LevelVar), slog.Default())
+
+			req := httptest.NewRequest("DELETE", "/api/tokens/"+tt.tokenID+"/permissions/"+tt.permID, nil)
+			ctx := chi.NewRouteContext()
+			ctx.URLParams.Add("id", tt.tokenID)
+			ctx.URLParams.Add("pid", tt.permID)
+			req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, ctx))
+
+			w := httptest.NewRecorder()
+			h.HandleDeleteTokenPermission(w, req)
+
+			if w.Code != tt.wantStatus {
+				t.Errorf("expected status %d, got %d: %s", tt.wantStatus, w.Code, w.Body.String())
+			}
+		})
+	}
+}
+
+func TestWriteAPIError(t *testing.T) {
+	tests := []struct {
+		name    string
+		status  int
+		code    string
+		message string
+		hint    string
+	}{
+		{
+			name:    "error without hint",
+			status:  http.StatusBadRequest,
+			code:    "test_error",
+			message: "Test error message",
+			hint:    "",
+		},
+		{
+			name:    "error with hint",
+			status:  http.StatusForbidden,
+			code:    "forbidden",
+			message: "Access denied",
+			hint:    "Use an admin token",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			writeAPIError(w, tt.status, tt.code, tt.message, tt.hint)
+
+			if w.Code != tt.status {
+				t.Errorf("expected status %d, got %d", tt.status, w.Code)
+			}
+
+			if w.Header().Get("Content-Type") != "application/json" {
+				t.Errorf("expected Content-Type application/json, got %s", w.Header().Get("Content-Type"))
+			}
+
+			var resp APIError
+			if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+				t.Fatalf("failed to decode response: %v", err)
+			}
+
+			if resp.Error != tt.code {
+				t.Errorf("expected error code %q, got %q", tt.code, resp.Error)
+			}
+			if resp.Message != tt.message {
+				t.Errorf("expected message %q, got %q", tt.message, resp.Message)
+			}
+			if resp.Hint != tt.hint {
+				t.Errorf("expected hint %q, got %q", tt.hint, resp.Hint)
+			}
+		})
 	}
 }

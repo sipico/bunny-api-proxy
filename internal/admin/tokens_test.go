@@ -106,6 +106,41 @@ func (m *mockStorageForTokens) DeletePermission(ctx context.Context, id int64) e
 	return storage.ErrNotFound
 }
 
+// Unified token operations (Issue 147)
+func (m *mockStorageForTokens) CreateToken(ctx context.Context, name string, isAdmin bool, keyHash string) (*storage.Token, error) {
+	return &storage.Token{ID: 1, Name: name, IsAdmin: isAdmin, KeyHash: keyHash}, nil
+}
+
+func (m *mockStorageForTokens) GetTokenByID(ctx context.Context, id int64) (*storage.Token, error) {
+	return nil, storage.ErrNotFound
+}
+
+func (m *mockStorageForTokens) ListTokens(ctx context.Context) ([]*storage.Token, error) {
+	return make([]*storage.Token, 0), nil
+}
+
+func (m *mockStorageForTokens) DeleteToken(ctx context.Context, id int64) error {
+	return nil
+}
+
+func (m *mockStorageForTokens) CountAdminTokens(ctx context.Context) (int, error) {
+	return 1, nil
+}
+
+func (m *mockStorageForTokens) AddPermissionForToken(ctx context.Context, tokenID int64, perm *storage.Permission) (*storage.Permission, error) {
+	perm.ID = 1
+	perm.TokenID = tokenID
+	return perm, nil
+}
+
+func (m *mockStorageForTokens) RemovePermission(ctx context.Context, permID int64) error {
+	return nil
+}
+
+func (m *mockStorageForTokens) GetPermissionsForToken(ctx context.Context, tokenID int64) ([]*storage.Permission, error) {
+	return make([]*storage.Permission, 0), nil
+}
+
 func TestHandleListAdminTokensPage(t *testing.T) {
 	tests := []struct {
 		name       string

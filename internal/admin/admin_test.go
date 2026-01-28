@@ -156,6 +156,41 @@ func (m *mockStorageForAdminTest) DeletePermission(ctx context.Context, id int64
 	return nil
 }
 
+// Unified token operations (Issue 147)
+func (m *mockStorageForAdminTest) CreateToken(ctx context.Context, name string, isAdmin bool, keyHash string) (*storage.Token, error) {
+	return &storage.Token{ID: 1, Name: name, IsAdmin: isAdmin, KeyHash: keyHash}, nil
+}
+
+func (m *mockStorageForAdminTest) GetTokenByID(ctx context.Context, id int64) (*storage.Token, error) {
+	return nil, storage.ErrNotFound
+}
+
+func (m *mockStorageForAdminTest) ListTokens(ctx context.Context) ([]*storage.Token, error) {
+	return make([]*storage.Token, 0), nil
+}
+
+func (m *mockStorageForAdminTest) DeleteToken(ctx context.Context, id int64) error {
+	return nil
+}
+
+func (m *mockStorageForAdminTest) CountAdminTokens(ctx context.Context) (int, error) {
+	return 1, nil
+}
+
+func (m *mockStorageForAdminTest) AddPermissionForToken(ctx context.Context, tokenID int64, perm *storage.Permission) (*storage.Permission, error) {
+	perm.ID = 1
+	perm.TokenID = tokenID
+	return perm, nil
+}
+
+func (m *mockStorageForAdminTest) RemovePermission(ctx context.Context, permID int64) error {
+	return nil
+}
+
+func (m *mockStorageForAdminTest) GetPermissionsForToken(ctx context.Context, tokenID int64) ([]*storage.Permission, error) {
+	return make([]*storage.Permission, 0), nil
+}
+
 // contains is a helper function to check if a string contains a substring
 func contains(s, substr string) bool {
 	// Simple string contains check

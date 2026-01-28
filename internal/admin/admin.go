@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/sipico/bunny-api-proxy/internal/auth"
 	"github.com/sipico/bunny-api-proxy/internal/storage"
 )
 
@@ -28,6 +29,7 @@ type Handler struct {
 	logger       *slog.Logger
 	logLevel     *slog.LevelVar
 	templates    *template.Template
+	bootstrap    *auth.BootstrapService
 }
 
 // Storage interface for admin operations
@@ -58,6 +60,16 @@ type Storage interface {
 	GetPermissions(ctx context.Context, keyID int64) ([]*storage.Permission, error)
 	AddPermission(ctx context.Context, scopedKeyID int64, perm *storage.Permission) (int64, error)
 	DeletePermission(ctx context.Context, id int64) error
+
+	// Unified token operations (Issue 147)
+	CreateToken(ctx context.Context, name string, isAdmin bool, keyHash string) (*storage.Token, error)
+	GetTokenByID(ctx context.Context, id int64) (*storage.Token, error)
+	ListTokens(ctx context.Context) ([]*storage.Token, error)
+	DeleteToken(ctx context.Context, id int64) error
+	CountAdminTokens(ctx context.Context) (int, error)
+	AddPermissionForToken(ctx context.Context, tokenID int64, perm *storage.Permission) (*storage.Permission, error)
+	RemovePermission(ctx context.Context, permID int64) error
+	GetPermissionsForToken(ctx context.Context, tokenID int64) ([]*storage.Permission, error)
 }
 
 // NewHandler creates an admin handler
@@ -100,6 +112,12 @@ func NewHandler(storage Storage, sessionStore *SessionStore, logLevel *slog.Leve
 		logger:       logger,
 		templates:    tmpl,
 	}
+}
+
+// SetBootstrapService sets the bootstrap service for handling token creation during bootstrap.
+// This must be called before using the unified token API endpoints.
+func (h *Handler) SetBootstrapService(bs *auth.BootstrapService) {
+	h.bootstrap = bs
 }
 
 // Context helpers (used by later issues)

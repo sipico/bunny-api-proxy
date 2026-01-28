@@ -76,6 +76,41 @@ func (m *mockStorageForSession) DeletePermission(ctx context.Context, id int64) 
 	return nil
 }
 
+// Unified token operations (Issue 147)
+func (m *mockStorageForSession) CreateToken(ctx context.Context, name string, isAdmin bool, keyHash string) (*storage.Token, error) {
+	return &storage.Token{ID: 1, Name: name, IsAdmin: isAdmin, KeyHash: keyHash}, nil
+}
+
+func (m *mockStorageForSession) GetTokenByID(ctx context.Context, id int64) (*storage.Token, error) {
+	return nil, storage.ErrNotFound
+}
+
+func (m *mockStorageForSession) ListTokens(ctx context.Context) ([]*storage.Token, error) {
+	return make([]*storage.Token, 0), nil
+}
+
+func (m *mockStorageForSession) DeleteToken(ctx context.Context, id int64) error {
+	return nil
+}
+
+func (m *mockStorageForSession) CountAdminTokens(ctx context.Context) (int, error) {
+	return 1, nil
+}
+
+func (m *mockStorageForSession) AddPermissionForToken(ctx context.Context, tokenID int64, perm *storage.Permission) (*storage.Permission, error) {
+	perm.ID = 1
+	perm.TokenID = tokenID
+	return perm, nil
+}
+
+func (m *mockStorageForSession) RemovePermission(ctx context.Context, permID int64) error {
+	return nil
+}
+
+func (m *mockStorageForSession) GetPermissionsForToken(ctx context.Context, tokenID int64) ([]*storage.Permission, error) {
+	return make([]*storage.Permission, 0), nil
+}
+
 // TestSessionStoreCreateSession tests session creation
 func TestSessionStoreCreateSession(t *testing.T) {
 	t.Run("generates unique session IDs", func(t *testing.T) {

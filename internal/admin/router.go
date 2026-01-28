@@ -22,10 +22,22 @@ func (h *Handler) NewRouter() chi.Router {
 	// Admin API (token auth)
 	r.Route("/api", func(r chi.Router) {
 		r.Use(h.TokenAuthMiddleware)
+
+		// Whoami endpoint - available to any authenticated token
+		r.Get("/whoami", h.HandleWhoami)
+
+		// Log level management
 		r.Post("/loglevel", h.HandleSetLogLevel)
-		r.Get("/tokens", h.HandleListTokens)
-		r.Post("/tokens", h.HandleCreateToken)
-		r.Delete("/tokens/{id}", h.HandleDeleteToken)
+
+		// Unified token management (Issue 147)
+		r.Get("/tokens", h.HandleListUnifiedTokens)
+		r.Post("/tokens", h.HandleCreateUnifiedToken)
+		r.Get("/tokens/{id}", h.HandleGetUnifiedToken)
+		r.Delete("/tokens/{id}", h.HandleDeleteUnifiedToken)
+		r.Post("/tokens/{id}/permissions", h.HandleAddTokenPermission)
+		r.Delete("/tokens/{id}/permissions/{pid}", h.HandleDeleteTokenPermission)
+
+		// Legacy endpoints (for backward compatibility)
 		r.Put("/master-key", h.HandleSetMasterKeyAPI)
 		r.Post("/keys", h.HandleCreateKeyAPI)
 	})
