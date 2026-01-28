@@ -28,4 +28,4 @@ setup: install-hooks
 # Install git hooks via lefthook
 install-hooks:
 	@echo "Installing git hooks..."
-	@go run github.com/evilmartians/lefthook@latest install
+	@go tool lefthook install
