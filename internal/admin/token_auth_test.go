@@ -112,6 +112,14 @@ func (m *mockStorageWithToken) GetPermissionsForToken(ctx context.Context, token
 	return make([]*storage.Permission, 0), nil
 }
 
+func (m *mockStorageWithToken) HasAnyAdminToken(ctx context.Context) (bool, error) {
+	return false, nil
+}
+
+func (m *mockStorageWithToken) GetTokenByHash(ctx context.Context, keyHash string) (*storage.Token, error) {
+	return nil, storage.ErrNotFound
+}
+
 func TestTokenAuthMiddleware(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -285,15 +293,17 @@ func TestGetTokenInfoFromContext(t *testing.T) {
 
 func TestTokenAuthMiddlewareMasterKey(t *testing.T) {
 	t.Run("master key authentication", func(t *testing.T) {
-		// Setup mock storage with master key
+		// Setup mock storage
 		mock := &mockStorageWithToken{
 			mockStorage: &mockStorage{},
-			getMasterKey: func(ctx context.Context) (string, error) {
-				return "master-key-12345", nil
-			},
 		}
 
 		h := NewHandler(mock, new(slog.LevelVar), slog.Default())
+
+		// Set up bootstrap service with the master key
+		masterKey := "master-key-12345"
+		bootstrap := auth.NewBootstrapService(mock, masterKey)
+		h.SetBootstrapService(bootstrap)
 
 		// Create test handler that checks context for master key flag
 		var isMasterKey, isAdmin bool
@@ -308,7 +318,7 @@ func TestTokenAuthMiddlewareMasterKey(t *testing.T) {
 
 		// Create request with master key
 		req := httptest.NewRequest("GET", "/api/test", nil)
-		req.Header.Set("AccessKey", "master-key-12345")
+		req.Header.Set("AccessKey", masterKey)
 		w := httptest.NewRecorder()
 
 		// Execute
