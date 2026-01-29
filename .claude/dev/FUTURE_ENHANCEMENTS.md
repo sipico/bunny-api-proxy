@@ -328,6 +328,15 @@ The admin web UI currently has only handler-level unit tests. There are no tests
 
 - [ ] **Add t.Parallel() to tests** - Faster test execution (currently 0 parallel tests)
 
+### Go Version Modernization
+
+- [ ] **Review code for Go 1.25 improvements** - Audit codebase for newer Go idioms
+  - Upgraded from Go 1.24 to 1.25 for lefthook compatibility (Jan 2026)
+  - Review stdlib for new functions that simplify existing code
+  - Check for iterator pattern opportunities
+  - Look for performance improvements in newer stdlib versions
+  - Low priority - current code works fine, purely opportunistic
+
 ### Documentation
 
 - [ ] **CHANGELOG.md maintenance** - Version history and breaking changes
