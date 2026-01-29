@@ -44,19 +44,19 @@ For initial setup, use your bunny.net master API key with the bootstrap endpoint
 
 ### Bootstrap (First Setup)
 
-#### POST /admin/api/bootstrap
+#### POST /admin/api/tokens (Bootstrap)
 
-Create the first admin token using your bunny.net master API key. This endpoint only works when no admin tokens exist yet.
+Create the first admin token using your bunny.net master API key. During bootstrap (when no admin tokens exist), use your master key and set `is_admin: true`.
 
 **Authentication:** bunny.net master API key in AccessKey header
-**Response:** 201 Created or 409 Conflict (if admin tokens already exist)
+**Response:** 201 Created or 403 Forbidden (if master key locked out after admin exists)
 
 **Example Request:**
 ```bash
-curl -X POST http://localhost:8080/admin/api/bootstrap \
+curl -X POST http://localhost:8080/admin/api/tokens \
   -H "AccessKey: your-bunny-net-master-api-key" \
   -H "Content-Type: application/json" \
-  -d '{"name": "initial-admin-token"}'
+  -d '{"name": "initial-admin-token", "is_admin": true}'
 ```
 
 **Example Response:**
@@ -64,7 +64,8 @@ curl -X POST http://localhost:8080/admin/api/bootstrap \
 {
   "id": 1,
   "name": "initial-admin-token",
-  "token": "generated-admin-token-value"
+  "token": "generated-admin-token-value",
+  "is_admin": true
 }
 ```
 
@@ -510,16 +511,17 @@ Example configuration for an ACME client using the Bunny API Proxy:
 
 ```bash
 # 1. Bootstrap: Create first admin token using bunny.net master key
-curl -X POST http://localhost:8080/admin/api/bootstrap \
+curl -X POST http://localhost:8080/admin/api/tokens \
   -H "AccessKey: your-bunny-net-master-api-key" \
   -H "Content-Type: application/json" \
-  -d '{"name": "initial-admin"}'
+  -d '{"name": "initial-admin", "is_admin": true}'
 
 # Response:
 # {
 #   "id": 1,
 #   "name": "initial-admin",
-#   "token": "admin-token-value"
+#   "token": "admin-token-value",
+#   "is_admin": true
 # }
 
 # 2. Create a scoped key restricted to TXT record management for DNS-01
