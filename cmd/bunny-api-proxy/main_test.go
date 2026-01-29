@@ -91,29 +91,15 @@ func TestReadyHandlerWithClosedStorage(t *testing.T) {
 }
 
 func TestInitializeComponentsWithValidConfig(t *testing.T) {
-	encryptionKey := strings.Repeat("a", 32)
-	adminPassword := "test-admin-password"
 
-	oldEncKey := os.Getenv("ENCRYPTION_KEY")
-	oldAdminPw := os.Getenv("ADMIN_PASSWORD")
-	oldDataPath := os.Getenv("DATA_PATH")
+	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
 
 	defer func() {
-		if oldEncKey != "" {
-			os.Setenv("ENCRYPTION_KEY", oldEncKey)
+		if oldDatabasePath != "" {
+			os.Setenv("DATABASE_PATH", oldDatabasePath)
 		} else {
-			os.Unsetenv("ENCRYPTION_KEY")
-		}
-		if oldAdminPw != "" {
-			os.Setenv("ADMIN_PASSWORD", oldAdminPw)
-		} else {
-			os.Unsetenv("ADMIN_PASSWORD")
-		}
-		if oldDataPath != "" {
-			os.Setenv("DATA_PATH", oldDataPath)
-		} else {
-			os.Unsetenv("DATA_PATH")
+			os.Unsetenv("DATABASE_PATH")
 		}
 		if oldLogLevel != "" {
 			os.Setenv("LOG_LEVEL", oldLogLevel)
@@ -122,9 +108,7 @@ func TestInitializeComponentsWithValidConfig(t *testing.T) {
 		}
 	}()
 
-	os.Setenv("ENCRYPTION_KEY", encryptionKey)
-	os.Setenv("ADMIN_PASSWORD", adminPassword)
-	os.Setenv("DATA_PATH", ":memory:")
+	os.Setenv("DATABASE_PATH", ":memory:")
 	os.Setenv("LOG_LEVEL", "info")
 
 	// Load config
@@ -168,29 +152,15 @@ func TestInitializeComponentsWithValidConfig(t *testing.T) {
 }
 
 func TestInitializeComponentsWithDebugLogLevel(t *testing.T) {
-	encryptionKey := strings.Repeat("a", 32)
-	adminPassword := "test-admin-password"
 
-	oldEncKey := os.Getenv("ENCRYPTION_KEY")
-	oldAdminPw := os.Getenv("ADMIN_PASSWORD")
-	oldDataPath := os.Getenv("DATA_PATH")
+	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
 
 	defer func() {
-		if oldEncKey != "" {
-			os.Setenv("ENCRYPTION_KEY", oldEncKey)
+		if oldDatabasePath != "" {
+			os.Setenv("DATABASE_PATH", oldDatabasePath)
 		} else {
-			os.Unsetenv("ENCRYPTION_KEY")
-		}
-		if oldAdminPw != "" {
-			os.Setenv("ADMIN_PASSWORD", oldAdminPw)
-		} else {
-			os.Unsetenv("ADMIN_PASSWORD")
-		}
-		if oldDataPath != "" {
-			os.Setenv("DATA_PATH", oldDataPath)
-		} else {
-			os.Unsetenv("DATA_PATH")
+			os.Unsetenv("DATABASE_PATH")
 		}
 		if oldLogLevel != "" {
 			os.Setenv("LOG_LEVEL", oldLogLevel)
@@ -199,9 +169,7 @@ func TestInitializeComponentsWithDebugLogLevel(t *testing.T) {
 		}
 	}()
 
-	os.Setenv("ENCRYPTION_KEY", encryptionKey)
-	os.Setenv("ADMIN_PASSWORD", adminPassword)
-	os.Setenv("DATA_PATH", ":memory:")
+	os.Setenv("DATABASE_PATH", ":memory:")
 	os.Setenv("LOG_LEVEL", "debug")
 
 	cfg, err := config.Load()
@@ -221,29 +189,15 @@ func TestInitializeComponentsWithDebugLogLevel(t *testing.T) {
 }
 
 func TestInitializeComponentsWithInvalidLogLevel(t *testing.T) {
-	encryptionKey := strings.Repeat("a", 32)
-	adminPassword := "test-admin-password"
 
-	oldEncKey := os.Getenv("ENCRYPTION_KEY")
-	oldAdminPw := os.Getenv("ADMIN_PASSWORD")
-	oldDataPath := os.Getenv("DATA_PATH")
+	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
 
 	defer func() {
-		if oldEncKey != "" {
-			os.Setenv("ENCRYPTION_KEY", oldEncKey)
+		if oldDatabasePath != "" {
+			os.Setenv("DATABASE_PATH", oldDatabasePath)
 		} else {
-			os.Unsetenv("ENCRYPTION_KEY")
-		}
-		if oldAdminPw != "" {
-			os.Setenv("ADMIN_PASSWORD", oldAdminPw)
-		} else {
-			os.Unsetenv("ADMIN_PASSWORD")
-		}
-		if oldDataPath != "" {
-			os.Setenv("DATA_PATH", oldDataPath)
-		} else {
-			os.Unsetenv("DATA_PATH")
+			os.Unsetenv("DATABASE_PATH")
 		}
 		if oldLogLevel != "" {
 			os.Setenv("LOG_LEVEL", oldLogLevel)
@@ -252,9 +206,7 @@ func TestInitializeComponentsWithInvalidLogLevel(t *testing.T) {
 		}
 	}()
 
-	os.Setenv("ENCRYPTION_KEY", encryptionKey)
-	os.Setenv("ADMIN_PASSWORD", adminPassword)
-	os.Setenv("DATA_PATH", ":memory:")
+	os.Setenv("DATABASE_PATH", ":memory:")
 	os.Setenv("LOG_LEVEL", "invalid-level")
 
 	cfg, err := config.Load()
@@ -273,29 +225,15 @@ func TestInitializeComponentsWithInvalidLogLevel(t *testing.T) {
 }
 
 func TestInitializeComponentsWithInvalidDataPath(t *testing.T) {
-	encryptionKey := strings.Repeat("a", 32)
-	adminPassword := "test-admin-password"
 
-	oldEncKey := os.Getenv("ENCRYPTION_KEY")
-	oldAdminPw := os.Getenv("ADMIN_PASSWORD")
-	oldDataPath := os.Getenv("DATA_PATH")
+	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
 
 	defer func() {
-		if oldEncKey != "" {
-			os.Setenv("ENCRYPTION_KEY", oldEncKey)
+		if oldDatabasePath != "" {
+			os.Setenv("DATABASE_PATH", oldDatabasePath)
 		} else {
-			os.Unsetenv("ENCRYPTION_KEY")
-		}
-		if oldAdminPw != "" {
-			os.Setenv("ADMIN_PASSWORD", oldAdminPw)
-		} else {
-			os.Unsetenv("ADMIN_PASSWORD")
-		}
-		if oldDataPath != "" {
-			os.Setenv("DATA_PATH", oldDataPath)
-		} else {
-			os.Unsetenv("DATA_PATH")
+			os.Unsetenv("DATABASE_PATH")
 		}
 		if oldLogLevel != "" {
 			os.Setenv("LOG_LEVEL", oldLogLevel)
@@ -304,9 +242,7 @@ func TestInitializeComponentsWithInvalidDataPath(t *testing.T) {
 		}
 	}()
 
-	os.Setenv("ENCRYPTION_KEY", encryptionKey)
-	os.Setenv("ADMIN_PASSWORD", adminPassword)
-	os.Setenv("DATA_PATH", "/nonexistent/path/does/not/exist/proxy.db")
+	os.Setenv("DATABASE_PATH", "/nonexistent/path/does/not/exist/proxy.db")
 	os.Setenv("LOG_LEVEL", "info")
 
 	cfg, err := config.Load()
@@ -324,33 +260,33 @@ func TestInitializeComponentsWithInvalidDataPath(t *testing.T) {
 	}
 }
 
-func TestRunWithMissingConfig(t *testing.T) {
-	oldEncKey := os.Getenv("ENCRYPTION_KEY")
-	oldAdminPw := os.Getenv("ADMIN_PASSWORD")
+func TestRunWithInvalidLogLevel(t *testing.T) {
+	oldDatabasePath := os.Getenv("DATABASE_PATH")
+	oldLogLevel := os.Getenv("LOG_LEVEL")
 
 	defer func() {
-		if oldEncKey != "" {
-			os.Setenv("ENCRYPTION_KEY", oldEncKey)
+		if oldDatabasePath != "" {
+			os.Setenv("DATABASE_PATH", oldDatabasePath)
 		} else {
-			os.Unsetenv("ENCRYPTION_KEY")
+			os.Unsetenv("DATABASE_PATH")
 		}
-		if oldAdminPw != "" {
-			os.Setenv("ADMIN_PASSWORD", oldAdminPw)
+		if oldLogLevel != "" {
+			os.Setenv("LOG_LEVEL", oldLogLevel)
 		} else {
-			os.Unsetenv("ADMIN_PASSWORD")
+			os.Unsetenv("LOG_LEVEL")
 		}
 	}()
 
-	os.Unsetenv("ENCRYPTION_KEY")
-	os.Unsetenv("ADMIN_PASSWORD")
+	os.Setenv("DATABASE_PATH", ":memory:")
+	os.Setenv("LOG_LEVEL", "invalid_level") // Invalid log level
 
 	err := run()
 	if err == nil {
-		t.Error("expected run() to fail with missing config")
+		t.Error("expected run() to fail with invalid log level")
 	}
 
-	if !strings.Contains(err.Error(), "ENCRYPTION_KEY is required") && !strings.Contains(err.Error(), "ADMIN_PASSWORD is required") {
-		t.Errorf("expected config-related error, got: %v", err)
+	if !strings.Contains(err.Error(), "invalid log level") {
+		t.Errorf("expected 'invalid log level' error, got: %v", err)
 	}
 }
 
@@ -550,29 +486,15 @@ func TestReadyHandlerStatusOKResponse(t *testing.T) {
 
 // TestInitializeComponentsWithWarnLogLevel tests debug log level
 func TestInitializeComponentsWithWarnLogLevel(t *testing.T) {
-	encryptionKey := strings.Repeat("a", 32)
-	adminPassword := "test-admin-password"
 
-	oldEncKey := os.Getenv("ENCRYPTION_KEY")
-	oldAdminPw := os.Getenv("ADMIN_PASSWORD")
-	oldDataPath := os.Getenv("DATA_PATH")
+	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
 
 	defer func() {
-		if oldEncKey != "" {
-			os.Setenv("ENCRYPTION_KEY", oldEncKey)
+		if oldDatabasePath != "" {
+			os.Setenv("DATABASE_PATH", oldDatabasePath)
 		} else {
-			os.Unsetenv("ENCRYPTION_KEY")
-		}
-		if oldAdminPw != "" {
-			os.Setenv("ADMIN_PASSWORD", oldAdminPw)
-		} else {
-			os.Unsetenv("ADMIN_PASSWORD")
-		}
-		if oldDataPath != "" {
-			os.Setenv("DATA_PATH", oldDataPath)
-		} else {
-			os.Unsetenv("DATA_PATH")
+			os.Unsetenv("DATABASE_PATH")
 		}
 		if oldLogLevel != "" {
 			os.Setenv("LOG_LEVEL", oldLogLevel)
@@ -581,9 +503,7 @@ func TestInitializeComponentsWithWarnLogLevel(t *testing.T) {
 		}
 	}()
 
-	os.Setenv("ENCRYPTION_KEY", encryptionKey)
-	os.Setenv("ADMIN_PASSWORD", adminPassword)
-	os.Setenv("DATA_PATH", ":memory:")
+	os.Setenv("DATABASE_PATH", ":memory:")
 	os.Setenv("LOG_LEVEL", "warn")
 
 	cfg, err := config.Load()
@@ -604,29 +524,15 @@ func TestInitializeComponentsWithWarnLogLevel(t *testing.T) {
 
 // TestInitializeComponentsWithErrorLogLevel tests error log level
 func TestInitializeComponentsWithErrorLogLevel(t *testing.T) {
-	encryptionKey := strings.Repeat("a", 32)
-	adminPassword := "test-admin-password"
 
-	oldEncKey := os.Getenv("ENCRYPTION_KEY")
-	oldAdminPw := os.Getenv("ADMIN_PASSWORD")
-	oldDataPath := os.Getenv("DATA_PATH")
+	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
 
 	defer func() {
-		if oldEncKey != "" {
-			os.Setenv("ENCRYPTION_KEY", oldEncKey)
+		if oldDatabasePath != "" {
+			os.Setenv("DATABASE_PATH", oldDatabasePath)
 		} else {
-			os.Unsetenv("ENCRYPTION_KEY")
-		}
-		if oldAdminPw != "" {
-			os.Setenv("ADMIN_PASSWORD", oldAdminPw)
-		} else {
-			os.Unsetenv("ADMIN_PASSWORD")
-		}
-		if oldDataPath != "" {
-			os.Setenv("DATA_PATH", oldDataPath)
-		} else {
-			os.Unsetenv("DATA_PATH")
+			os.Unsetenv("DATABASE_PATH")
 		}
 		if oldLogLevel != "" {
 			os.Setenv("LOG_LEVEL", oldLogLevel)
@@ -635,9 +541,7 @@ func TestInitializeComponentsWithErrorLogLevel(t *testing.T) {
 		}
 	}()
 
-	os.Setenv("ENCRYPTION_KEY", encryptionKey)
-	os.Setenv("ADMIN_PASSWORD", adminPassword)
-	os.Setenv("DATA_PATH", ":memory:")
+	os.Setenv("DATABASE_PATH", ":memory:")
 	os.Setenv("LOG_LEVEL", "error")
 
 	cfg, err := config.Load()
@@ -658,29 +562,15 @@ func TestInitializeComponentsWithErrorLogLevel(t *testing.T) {
 
 // TestInitializeComponentsRouterSetup validates that the main router is properly configured
 func TestInitializeComponentsRouterSetup(t *testing.T) {
-	encryptionKey := strings.Repeat("a", 32)
-	adminPassword := "test-admin-password"
 
-	oldEncKey := os.Getenv("ENCRYPTION_KEY")
-	oldAdminPw := os.Getenv("ADMIN_PASSWORD")
-	oldDataPath := os.Getenv("DATA_PATH")
+	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
 
 	defer func() {
-		if oldEncKey != "" {
-			os.Setenv("ENCRYPTION_KEY", oldEncKey)
+		if oldDatabasePath != "" {
+			os.Setenv("DATABASE_PATH", oldDatabasePath)
 		} else {
-			os.Unsetenv("ENCRYPTION_KEY")
-		}
-		if oldAdminPw != "" {
-			os.Setenv("ADMIN_PASSWORD", oldAdminPw)
-		} else {
-			os.Unsetenv("ADMIN_PASSWORD")
-		}
-		if oldDataPath != "" {
-			os.Setenv("DATA_PATH", oldDataPath)
-		} else {
-			os.Unsetenv("DATA_PATH")
+			os.Unsetenv("DATABASE_PATH")
 		}
 		if oldLogLevel != "" {
 			os.Setenv("LOG_LEVEL", oldLogLevel)
@@ -689,9 +579,7 @@ func TestInitializeComponentsRouterSetup(t *testing.T) {
 		}
 	}()
 
-	os.Setenv("ENCRYPTION_KEY", encryptionKey)
-	os.Setenv("ADMIN_PASSWORD", adminPassword)
-	os.Setenv("DATA_PATH", ":memory:")
+	os.Setenv("DATABASE_PATH", ":memory:")
 	os.Setenv("LOG_LEVEL", "info")
 
 	cfg, err := config.Load()
@@ -717,29 +605,15 @@ func TestInitializeComponentsRouterSetup(t *testing.T) {
 
 // TestInitializeComponentsReadyEndpoint validates that ready endpoint works
 func TestInitializeComponentsReadyEndpoint(t *testing.T) {
-	encryptionKey := strings.Repeat("a", 32)
-	adminPassword := "test-admin-password"
 
-	oldEncKey := os.Getenv("ENCRYPTION_KEY")
-	oldAdminPw := os.Getenv("ADMIN_PASSWORD")
-	oldDataPath := os.Getenv("DATA_PATH")
+	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
 
 	defer func() {
-		if oldEncKey != "" {
-			os.Setenv("ENCRYPTION_KEY", oldEncKey)
+		if oldDatabasePath != "" {
+			os.Setenv("DATABASE_PATH", oldDatabasePath)
 		} else {
-			os.Unsetenv("ENCRYPTION_KEY")
-		}
-		if oldAdminPw != "" {
-			os.Setenv("ADMIN_PASSWORD", oldAdminPw)
-		} else {
-			os.Unsetenv("ADMIN_PASSWORD")
-		}
-		if oldDataPath != "" {
-			os.Setenv("DATA_PATH", oldDataPath)
-		} else {
-			os.Unsetenv("DATA_PATH")
+			os.Unsetenv("DATABASE_PATH")
 		}
 		if oldLogLevel != "" {
 			os.Setenv("LOG_LEVEL", oldLogLevel)
@@ -748,9 +622,7 @@ func TestInitializeComponentsReadyEndpoint(t *testing.T) {
 		}
 	}()
 
-	os.Setenv("ENCRYPTION_KEY", encryptionKey)
-	os.Setenv("ADMIN_PASSWORD", adminPassword)
-	os.Setenv("DATA_PATH", ":memory:")
+	os.Setenv("DATABASE_PATH", ":memory:")
 	os.Setenv("LOG_LEVEL", "info")
 
 	cfg, err := config.Load()
@@ -776,29 +648,15 @@ func TestInitializeComponentsReadyEndpoint(t *testing.T) {
 
 // TestInitializeComponentsValidatorCreated validates validator is created
 func TestInitializeComponentsValidatorCreated(t *testing.T) {
-	encryptionKey := strings.Repeat("a", 32)
-	adminPassword := "test-admin-password"
 
-	oldEncKey := os.Getenv("ENCRYPTION_KEY")
-	oldAdminPw := os.Getenv("ADMIN_PASSWORD")
-	oldDataPath := os.Getenv("DATA_PATH")
+	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
 
 	defer func() {
-		if oldEncKey != "" {
-			os.Setenv("ENCRYPTION_KEY", oldEncKey)
+		if oldDatabasePath != "" {
+			os.Setenv("DATABASE_PATH", oldDatabasePath)
 		} else {
-			os.Unsetenv("ENCRYPTION_KEY")
-		}
-		if oldAdminPw != "" {
-			os.Setenv("ADMIN_PASSWORD", oldAdminPw)
-		} else {
-			os.Unsetenv("ADMIN_PASSWORD")
-		}
-		if oldDataPath != "" {
-			os.Setenv("DATA_PATH", oldDataPath)
-		} else {
-			os.Unsetenv("DATA_PATH")
+			os.Unsetenv("DATABASE_PATH")
 		}
 		if oldLogLevel != "" {
 			os.Setenv("LOG_LEVEL", oldLogLevel)
@@ -807,9 +665,7 @@ func TestInitializeComponentsValidatorCreated(t *testing.T) {
 		}
 	}()
 
-	os.Setenv("ENCRYPTION_KEY", encryptionKey)
-	os.Setenv("ADMIN_PASSWORD", adminPassword)
-	os.Setenv("DATA_PATH", ":memory:")
+	os.Setenv("DATABASE_PATH", ":memory:")
 	os.Setenv("LOG_LEVEL", "info")
 
 	cfg, err := config.Load()
@@ -831,29 +687,15 @@ func TestInitializeComponentsValidatorCreated(t *testing.T) {
 
 // TestInitializeComponentsStorageCreated validates storage is created and working
 func TestInitializeComponentsStorageCreated(t *testing.T) {
-	encryptionKey := strings.Repeat("a", 32)
-	adminPassword := "test-admin-password"
 
-	oldEncKey := os.Getenv("ENCRYPTION_KEY")
-	oldAdminPw := os.Getenv("ADMIN_PASSWORD")
-	oldDataPath := os.Getenv("DATA_PATH")
+	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
 
 	defer func() {
-		if oldEncKey != "" {
-			os.Setenv("ENCRYPTION_KEY", oldEncKey)
+		if oldDatabasePath != "" {
+			os.Setenv("DATABASE_PATH", oldDatabasePath)
 		} else {
-			os.Unsetenv("ENCRYPTION_KEY")
-		}
-		if oldAdminPw != "" {
-			os.Setenv("ADMIN_PASSWORD", oldAdminPw)
-		} else {
-			os.Unsetenv("ADMIN_PASSWORD")
-		}
-		if oldDataPath != "" {
-			os.Setenv("DATA_PATH", oldDataPath)
-		} else {
-			os.Unsetenv("DATA_PATH")
+			os.Unsetenv("DATABASE_PATH")
 		}
 		if oldLogLevel != "" {
 			os.Setenv("LOG_LEVEL", oldLogLevel)
@@ -862,9 +704,7 @@ func TestInitializeComponentsStorageCreated(t *testing.T) {
 		}
 	}()
 
-	os.Setenv("ENCRYPTION_KEY", encryptionKey)
-	os.Setenv("ADMIN_PASSWORD", adminPassword)
-	os.Setenv("DATA_PATH", ":memory:")
+	os.Setenv("DATABASE_PATH", ":memory:")
 	os.Setenv("LOG_LEVEL", "info")
 
 	cfg, err := config.Load()
@@ -890,29 +730,15 @@ func TestInitializeComponentsStorageCreated(t *testing.T) {
 
 // TestInitializeComponentsBunnyClientCreated validates bunny client is created
 func TestInitializeComponentsBunnyClientCreated(t *testing.T) {
-	encryptionKey := strings.Repeat("a", 32)
-	adminPassword := "test-admin-password"
 
-	oldEncKey := os.Getenv("ENCRYPTION_KEY")
-	oldAdminPw := os.Getenv("ADMIN_PASSWORD")
-	oldDataPath := os.Getenv("DATA_PATH")
+	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
 
 	defer func() {
-		if oldEncKey != "" {
-			os.Setenv("ENCRYPTION_KEY", oldEncKey)
+		if oldDatabasePath != "" {
+			os.Setenv("DATABASE_PATH", oldDatabasePath)
 		} else {
-			os.Unsetenv("ENCRYPTION_KEY")
-		}
-		if oldAdminPw != "" {
-			os.Setenv("ADMIN_PASSWORD", oldAdminPw)
-		} else {
-			os.Unsetenv("ADMIN_PASSWORD")
-		}
-		if oldDataPath != "" {
-			os.Setenv("DATA_PATH", oldDataPath)
-		} else {
-			os.Unsetenv("DATA_PATH")
+			os.Unsetenv("DATABASE_PATH")
 		}
 		if oldLogLevel != "" {
 			os.Setenv("LOG_LEVEL", oldLogLevel)
@@ -921,9 +747,7 @@ func TestInitializeComponentsBunnyClientCreated(t *testing.T) {
 		}
 	}()
 
-	os.Setenv("ENCRYPTION_KEY", encryptionKey)
-	os.Setenv("ADMIN_PASSWORD", adminPassword)
-	os.Setenv("DATA_PATH", ":memory:")
+	os.Setenv("DATABASE_PATH", ":memory:")
 	os.Setenv("LOG_LEVEL", "info")
 
 	cfg, err := config.Load()
@@ -948,48 +772,31 @@ func TestMainServerStartAndHealthCheck(t *testing.T) {
 		t.Skip("Skipping integration test in short mode")
 	}
 
-	encryptionKey := strings.Repeat("a", 32)
-	adminPassword := "test-admin-password"
-
-	oldEncKey := os.Getenv("ENCRYPTION_KEY")
-	oldAdminPw := os.Getenv("ADMIN_PASSWORD")
-	oldDataPath := os.Getenv("DATA_PATH")
+	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
-	oldHTTPPort := os.Getenv("HTTP_PORT")
+	oldListenAddr := os.Getenv("LISTEN_ADDR")
 
 	defer func() {
-		if oldEncKey != "" {
-			os.Setenv("ENCRYPTION_KEY", oldEncKey)
+		if oldDatabasePath != "" {
+			os.Setenv("DATABASE_PATH", oldDatabasePath)
 		} else {
-			os.Unsetenv("ENCRYPTION_KEY")
-		}
-		if oldAdminPw != "" {
-			os.Setenv("ADMIN_PASSWORD", oldAdminPw)
-		} else {
-			os.Unsetenv("ADMIN_PASSWORD")
-		}
-		if oldDataPath != "" {
-			os.Setenv("DATA_PATH", oldDataPath)
-		} else {
-			os.Unsetenv("DATA_PATH")
+			os.Unsetenv("DATABASE_PATH")
 		}
 		if oldLogLevel != "" {
 			os.Setenv("LOG_LEVEL", oldLogLevel)
 		} else {
 			os.Unsetenv("LOG_LEVEL")
 		}
-		if oldHTTPPort != "" {
-			os.Setenv("HTTP_PORT", oldHTTPPort)
+		if oldListenAddr != "" {
+			os.Setenv("LISTEN_ADDR", oldListenAddr)
 		} else {
-			os.Unsetenv("HTTP_PORT")
+			os.Unsetenv("LISTEN_ADDR")
 		}
 	}()
 
-	os.Setenv("ENCRYPTION_KEY", encryptionKey)
-	os.Setenv("ADMIN_PASSWORD", adminPassword)
-	os.Setenv("DATA_PATH", ":memory:")
+	os.Setenv("DATABASE_PATH", ":memory:")
 	os.Setenv("LOG_LEVEL", "info")
-	os.Setenv("HTTP_PORT", "9876") // Use a fixed port for testing
+	os.Setenv("LISTEN_ADDR", "9876") // Use a fixed port for testing
 
 	// Start server in a goroutine with a timeout
 	serverDone := make(chan error, 1)
@@ -1017,29 +824,15 @@ func TestMainServerStartAndHealthCheck(t *testing.T) {
 
 // TestInitializeComponentsAllComponentsNotNil verifies no component is nil
 func TestInitializeComponentsAllComponentsNotNil(t *testing.T) {
-	encryptionKey := strings.Repeat("a", 32)
-	adminPassword := "test-admin-password"
 
-	oldEncKey := os.Getenv("ENCRYPTION_KEY")
-	oldAdminPw := os.Getenv("ADMIN_PASSWORD")
-	oldDataPath := os.Getenv("DATA_PATH")
+	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
 
 	defer func() {
-		if oldEncKey != "" {
-			os.Setenv("ENCRYPTION_KEY", oldEncKey)
+		if oldDatabasePath != "" {
+			os.Setenv("DATABASE_PATH", oldDatabasePath)
 		} else {
-			os.Unsetenv("ENCRYPTION_KEY")
-		}
-		if oldAdminPw != "" {
-			os.Setenv("ADMIN_PASSWORD", oldAdminPw)
-		} else {
-			os.Unsetenv("ADMIN_PASSWORD")
-		}
-		if oldDataPath != "" {
-			os.Setenv("DATA_PATH", oldDataPath)
-		} else {
-			os.Unsetenv("DATA_PATH")
+			os.Unsetenv("DATABASE_PATH")
 		}
 		if oldLogLevel != "" {
 			os.Setenv("LOG_LEVEL", oldLogLevel)
@@ -1048,9 +841,7 @@ func TestInitializeComponentsAllComponentsNotNil(t *testing.T) {
 		}
 	}()
 
-	os.Setenv("ENCRYPTION_KEY", encryptionKey)
-	os.Setenv("ADMIN_PASSWORD", adminPassword)
-	os.Setenv("DATA_PATH", ":memory:")
+	os.Setenv("DATABASE_PATH", ":memory:")
 	os.Setenv("LOG_LEVEL", "info")
 
 	cfg, err := config.Load()
@@ -1096,29 +887,15 @@ func TestInitializeComponentsAllComponentsNotNil(t *testing.T) {
 
 // TestInitializeComponentsLogLevelVariantWorks validates the log level can be changed
 func TestInitializeComponentsLogLevelVariantWorks(t *testing.T) {
-	encryptionKey := strings.Repeat("a", 32)
-	adminPassword := "test-admin-password"
 
-	oldEncKey := os.Getenv("ENCRYPTION_KEY")
-	oldAdminPw := os.Getenv("ADMIN_PASSWORD")
-	oldDataPath := os.Getenv("DATA_PATH")
+	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
 
 	defer func() {
-		if oldEncKey != "" {
-			os.Setenv("ENCRYPTION_KEY", oldEncKey)
+		if oldDatabasePath != "" {
+			os.Setenv("DATABASE_PATH", oldDatabasePath)
 		} else {
-			os.Unsetenv("ENCRYPTION_KEY")
-		}
-		if oldAdminPw != "" {
-			os.Setenv("ADMIN_PASSWORD", oldAdminPw)
-		} else {
-			os.Unsetenv("ADMIN_PASSWORD")
-		}
-		if oldDataPath != "" {
-			os.Setenv("DATA_PATH", oldDataPath)
-		} else {
-			os.Unsetenv("DATA_PATH")
+			os.Unsetenv("DATABASE_PATH")
 		}
 		if oldLogLevel != "" {
 			os.Setenv("LOG_LEVEL", oldLogLevel)
@@ -1127,9 +904,7 @@ func TestInitializeComponentsLogLevelVariantWorks(t *testing.T) {
 		}
 	}()
 
-	os.Setenv("ENCRYPTION_KEY", encryptionKey)
-	os.Setenv("ADMIN_PASSWORD", adminPassword)
-	os.Setenv("DATA_PATH", ":memory:")
+	os.Setenv("DATABASE_PATH", ":memory:")
 	os.Setenv("LOG_LEVEL", "info")
 
 	cfg, err := config.Load()
@@ -1150,60 +925,15 @@ func TestInitializeComponentsLogLevelVariantWorks(t *testing.T) {
 }
 
 // TestRunConfigLoadErrorHandling tests that run() handles config load errors
-func TestRunConfigLoadErrorHandling(t *testing.T) {
-	oldEncKey := os.Getenv("ENCRYPTION_KEY")
-	oldAdminPw := os.Getenv("ADMIN_PASSWORD")
-
-	defer func() {
-		if oldEncKey != "" {
-			os.Setenv("ENCRYPTION_KEY", oldEncKey)
-		} else {
-			os.Unsetenv("ENCRYPTION_KEY")
-		}
-		if oldAdminPw != "" {
-			os.Setenv("ADMIN_PASSWORD", oldAdminPw)
-		} else {
-			os.Unsetenv("ADMIN_PASSWORD")
-		}
-	}()
-
-	os.Unsetenv("ENCRYPTION_KEY")
-	os.Unsetenv("ADMIN_PASSWORD")
-
-	err := run()
-	if err == nil {
-		t.Error("run() should return error with missing config")
-	}
-	if !strings.Contains(err.Error(), "config load failed") {
-		t.Errorf("error should mention config load failure, got: %v", err)
-	}
-}
-
-// TestInitializeComponentsWithAllLogLevels tests initialization with multiple log levels
-func TestInitializeComponentsWithInfoLogLevel(t *testing.T) {
-	encryptionKey := strings.Repeat("a", 32)
-	adminPassword := "test-admin-password"
-
-	oldEncKey := os.Getenv("ENCRYPTION_KEY")
-	oldAdminPw := os.Getenv("ADMIN_PASSWORD")
-	oldDataPath := os.Getenv("DATA_PATH")
+func TestRunWithInvalidDatabasePath(t *testing.T) {
+	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
 
 	defer func() {
-		if oldEncKey != "" {
-			os.Setenv("ENCRYPTION_KEY", oldEncKey)
+		if oldDatabasePath != "" {
+			os.Setenv("DATABASE_PATH", oldDatabasePath)
 		} else {
-			os.Unsetenv("ENCRYPTION_KEY")
-		}
-		if oldAdminPw != "" {
-			os.Setenv("ADMIN_PASSWORD", oldAdminPw)
-		} else {
-			os.Unsetenv("ADMIN_PASSWORD")
-		}
-		if oldDataPath != "" {
-			os.Setenv("DATA_PATH", oldDataPath)
-		} else {
-			os.Unsetenv("DATA_PATH")
+			os.Unsetenv("DATABASE_PATH")
 		}
 		if oldLogLevel != "" {
 			os.Setenv("LOG_LEVEL", oldLogLevel)
@@ -1212,9 +942,38 @@ func TestInitializeComponentsWithInfoLogLevel(t *testing.T) {
 		}
 	}()
 
-	os.Setenv("ENCRYPTION_KEY", encryptionKey)
-	os.Setenv("ADMIN_PASSWORD", adminPassword)
-	os.Setenv("DATA_PATH", ":memory:")
+	os.Setenv("DATABASE_PATH", "/nonexistent/path/that/does/not/exist/db.sqlite")
+	os.Setenv("LOG_LEVEL", "info")
+
+	err := run()
+	if err == nil {
+		t.Error("run() should return error with invalid database path")
+	}
+	if !strings.Contains(err.Error(), "storage initialization failed") {
+		t.Errorf("error should mention storage initialization failure, got: %v", err)
+	}
+}
+
+// TestInitializeComponentsWithAllLogLevels tests initialization with multiple log levels
+func TestInitializeComponentsWithInfoLogLevel(t *testing.T) {
+
+	oldDatabasePath := os.Getenv("DATABASE_PATH")
+	oldLogLevel := os.Getenv("LOG_LEVEL")
+
+	defer func() {
+		if oldDatabasePath != "" {
+			os.Setenv("DATABASE_PATH", oldDatabasePath)
+		} else {
+			os.Unsetenv("DATABASE_PATH")
+		}
+		if oldLogLevel != "" {
+			os.Setenv("LOG_LEVEL", oldLogLevel)
+		} else {
+			os.Unsetenv("LOG_LEVEL")
+		}
+	}()
+
+	os.Setenv("DATABASE_PATH", ":memory:")
 	os.Setenv("LOG_LEVEL", "info")
 
 	cfg, err := config.Load()
@@ -1239,29 +998,15 @@ func TestInitializeComponentsWithInfoLogLevel(t *testing.T) {
 
 // TestInitializeComponentsErrorDoesNotLeakResources tests that failed initialization cleans up
 func TestInitializeComponentsErrorHandling(t *testing.T) {
-	encryptionKey := strings.Repeat("a", 32)
-	adminPassword := "test-admin-password"
 
-	oldEncKey := os.Getenv("ENCRYPTION_KEY")
-	oldAdminPw := os.Getenv("ADMIN_PASSWORD")
-	oldDataPath := os.Getenv("DATA_PATH")
+	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
 
 	defer func() {
-		if oldEncKey != "" {
-			os.Setenv("ENCRYPTION_KEY", oldEncKey)
+		if oldDatabasePath != "" {
+			os.Setenv("DATABASE_PATH", oldDatabasePath)
 		} else {
-			os.Unsetenv("ENCRYPTION_KEY")
-		}
-		if oldAdminPw != "" {
-			os.Setenv("ADMIN_PASSWORD", oldAdminPw)
-		} else {
-			os.Unsetenv("ADMIN_PASSWORD")
-		}
-		if oldDataPath != "" {
-			os.Setenv("DATA_PATH", oldDataPath)
-		} else {
-			os.Unsetenv("DATA_PATH")
+			os.Unsetenv("DATABASE_PATH")
 		}
 		if oldLogLevel != "" {
 			os.Setenv("LOG_LEVEL", oldLogLevel)
@@ -1270,9 +1015,7 @@ func TestInitializeComponentsErrorHandling(t *testing.T) {
 		}
 	}()
 
-	os.Setenv("ENCRYPTION_KEY", encryptionKey)
-	os.Setenv("ADMIN_PASSWORD", adminPassword)
-	os.Setenv("DATA_PATH", "/invalid/path/proxy.db")
+	os.Setenv("DATABASE_PATH", "/invalid/path/proxy.db")
 	os.Setenv("LOG_LEVEL", "info")
 
 	cfg, err := config.Load()
@@ -1354,48 +1097,31 @@ func TestReadyHandlerMultipleCalls(t *testing.T) {
 
 // TestCreateServer tests that the server is created with correct configuration
 func TestCreateServer(t *testing.T) {
-	encryptionKey := strings.Repeat("a", 32)
-	adminPassword := "test-admin-password"
-
-	oldEncKey := os.Getenv("ENCRYPTION_KEY")
-	oldAdminPw := os.Getenv("ADMIN_PASSWORD")
-	oldDataPath := os.Getenv("DATA_PATH")
+	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
-	oldHTTPPort := os.Getenv("HTTP_PORT")
+	oldListenAddr := os.Getenv("LISTEN_ADDR")
 
 	defer func() {
-		if oldEncKey != "" {
-			os.Setenv("ENCRYPTION_KEY", oldEncKey)
+		if oldDatabasePath != "" {
+			os.Setenv("DATABASE_PATH", oldDatabasePath)
 		} else {
-			os.Unsetenv("ENCRYPTION_KEY")
-		}
-		if oldAdminPw != "" {
-			os.Setenv("ADMIN_PASSWORD", oldAdminPw)
-		} else {
-			os.Unsetenv("ADMIN_PASSWORD")
-		}
-		if oldDataPath != "" {
-			os.Setenv("DATA_PATH", oldDataPath)
-		} else {
-			os.Unsetenv("DATA_PATH")
+			os.Unsetenv("DATABASE_PATH")
 		}
 		if oldLogLevel != "" {
 			os.Setenv("LOG_LEVEL", oldLogLevel)
 		} else {
 			os.Unsetenv("LOG_LEVEL")
 		}
-		if oldHTTPPort != "" {
-			os.Setenv("HTTP_PORT", oldHTTPPort)
+		if oldListenAddr != "" {
+			os.Setenv("LISTEN_ADDR", oldListenAddr)
 		} else {
-			os.Unsetenv("HTTP_PORT")
+			os.Unsetenv("LISTEN_ADDR")
 		}
 	}()
 
-	os.Setenv("ENCRYPTION_KEY", encryptionKey)
-	os.Setenv("ADMIN_PASSWORD", adminPassword)
-	os.Setenv("DATA_PATH", ":memory:")
+	os.Setenv("DATABASE_PATH", ":memory:")
 	os.Setenv("LOG_LEVEL", "info")
-	os.Setenv("HTTP_PORT", "8080")
+	os.Setenv("LISTEN_ADDR", ":8080")
 
 	cfg, err := config.Load()
 	if err != nil {
@@ -1435,48 +1161,31 @@ func TestCreateServer(t *testing.T) {
 
 // TestCreateServerWithDifferentPorts tests server creation with different ports
 func TestCreateServerWithDifferentPorts(t *testing.T) {
-	encryptionKey := strings.Repeat("a", 32)
-	adminPassword := "test-admin-password"
-
-	oldEncKey := os.Getenv("ENCRYPTION_KEY")
-	oldAdminPw := os.Getenv("ADMIN_PASSWORD")
-	oldDataPath := os.Getenv("DATA_PATH")
+	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
-	oldHTTPPort := os.Getenv("HTTP_PORT")
+	oldListenAddr := os.Getenv("LISTEN_ADDR")
 
 	defer func() {
-		if oldEncKey != "" {
-			os.Setenv("ENCRYPTION_KEY", oldEncKey)
+		if oldDatabasePath != "" {
+			os.Setenv("DATABASE_PATH", oldDatabasePath)
 		} else {
-			os.Unsetenv("ENCRYPTION_KEY")
-		}
-		if oldAdminPw != "" {
-			os.Setenv("ADMIN_PASSWORD", oldAdminPw)
-		} else {
-			os.Unsetenv("ADMIN_PASSWORD")
-		}
-		if oldDataPath != "" {
-			os.Setenv("DATA_PATH", oldDataPath)
-		} else {
-			os.Unsetenv("DATA_PATH")
+			os.Unsetenv("DATABASE_PATH")
 		}
 		if oldLogLevel != "" {
 			os.Setenv("LOG_LEVEL", oldLogLevel)
 		} else {
 			os.Unsetenv("LOG_LEVEL")
 		}
-		if oldHTTPPort != "" {
-			os.Setenv("HTTP_PORT", oldHTTPPort)
+		if oldListenAddr != "" {
+			os.Setenv("LISTEN_ADDR", oldListenAddr)
 		} else {
-			os.Unsetenv("HTTP_PORT")
+			os.Unsetenv("LISTEN_ADDR")
 		}
 	}()
 
-	os.Setenv("ENCRYPTION_KEY", encryptionKey)
-	os.Setenv("ADMIN_PASSWORD", adminPassword)
-	os.Setenv("DATA_PATH", ":memory:")
+	os.Setenv("DATABASE_PATH", ":memory:")
 	os.Setenv("LOG_LEVEL", "info")
-	os.Setenv("HTTP_PORT", "9000")
+	os.Setenv("LISTEN_ADDR", ":9000")
 
 	cfg, err := config.Load()
 	if err != nil {
@@ -1514,29 +1223,15 @@ func TestVersionConstant(t *testing.T) {
 
 // TestServerWithReadyAndHealthEndpoints tests that both endpoints are properly mounted
 func TestServerWithReadyAndHealthEndpoints(t *testing.T) {
-	encryptionKey := strings.Repeat("a", 32)
-	adminPassword := "test-admin-password"
 
-	oldEncKey := os.Getenv("ENCRYPTION_KEY")
-	oldAdminPw := os.Getenv("ADMIN_PASSWORD")
-	oldDataPath := os.Getenv("DATA_PATH")
+	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
 
 	defer func() {
-		if oldEncKey != "" {
-			os.Setenv("ENCRYPTION_KEY", oldEncKey)
+		if oldDatabasePath != "" {
+			os.Setenv("DATABASE_PATH", oldDatabasePath)
 		} else {
-			os.Unsetenv("ENCRYPTION_KEY")
-		}
-		if oldAdminPw != "" {
-			os.Setenv("ADMIN_PASSWORD", oldAdminPw)
-		} else {
-			os.Unsetenv("ADMIN_PASSWORD")
-		}
-		if oldDataPath != "" {
-			os.Setenv("DATA_PATH", oldDataPath)
-		} else {
-			os.Unsetenv("DATA_PATH")
+			os.Unsetenv("DATABASE_PATH")
 		}
 		if oldLogLevel != "" {
 			os.Setenv("LOG_LEVEL", oldLogLevel)
@@ -1545,9 +1240,7 @@ func TestServerWithReadyAndHealthEndpoints(t *testing.T) {
 		}
 	}()
 
-	os.Setenv("ENCRYPTION_KEY", encryptionKey)
-	os.Setenv("ADMIN_PASSWORD", adminPassword)
-	os.Setenv("DATA_PATH", ":memory:")
+	os.Setenv("DATABASE_PATH", ":memory:")
 	os.Setenv("LOG_LEVEL", "info")
 
 	cfg, err := config.Load()
@@ -1620,48 +1313,32 @@ func TestReadyHandlerResponseHeaders(t *testing.T) {
 
 // TestCreateServerHandlerIsSet tests that server handler is properly assigned
 func TestCreateServerHandlerIsSet(t *testing.T) {
-	encryptionKey := strings.Repeat("a", 32)
-	adminPassword := "test-admin-password"
 
-	oldEncKey := os.Getenv("ENCRYPTION_KEY")
-	oldAdminPw := os.Getenv("ADMIN_PASSWORD")
-	oldDataPath := os.Getenv("DATA_PATH")
+	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
-	oldHTTPPort := os.Getenv("HTTP_PORT")
+	oldListenAddr := os.Getenv("LISTEN_ADDR")
 
 	defer func() {
-		if oldEncKey != "" {
-			os.Setenv("ENCRYPTION_KEY", oldEncKey)
+		if oldDatabasePath != "" {
+			os.Setenv("DATABASE_PATH", oldDatabasePath)
 		} else {
-			os.Unsetenv("ENCRYPTION_KEY")
-		}
-		if oldAdminPw != "" {
-			os.Setenv("ADMIN_PASSWORD", oldAdminPw)
-		} else {
-			os.Unsetenv("ADMIN_PASSWORD")
-		}
-		if oldDataPath != "" {
-			os.Setenv("DATA_PATH", oldDataPath)
-		} else {
-			os.Unsetenv("DATA_PATH")
+			os.Unsetenv("DATABASE_PATH")
 		}
 		if oldLogLevel != "" {
 			os.Setenv("LOG_LEVEL", oldLogLevel)
 		} else {
 			os.Unsetenv("LOG_LEVEL")
 		}
-		if oldHTTPPort != "" {
-			os.Setenv("HTTP_PORT", oldHTTPPort)
+		if oldListenAddr != "" {
+			os.Setenv("LISTEN_ADDR", oldListenAddr)
 		} else {
-			os.Unsetenv("HTTP_PORT")
+			os.Unsetenv("LISTEN_ADDR")
 		}
 	}()
 
-	os.Setenv("ENCRYPTION_KEY", encryptionKey)
-	os.Setenv("ADMIN_PASSWORD", adminPassword)
-	os.Setenv("DATA_PATH", ":memory:")
+	os.Setenv("DATABASE_PATH", ":memory:")
 	os.Setenv("LOG_LEVEL", "info")
-	os.Setenv("HTTP_PORT", "8080")
+	os.Setenv("LISTEN_ADDR", "8080")
 
 	cfg, err := config.Load()
 	if err != nil {
@@ -1683,29 +1360,15 @@ func TestCreateServerHandlerIsSet(t *testing.T) {
 
 // TestRunComponentInitializationPath tests the full run() component initialization path
 func TestRunComponentInitializationPath(t *testing.T) {
-	encryptionKey := strings.Repeat("a", 32)
-	adminPassword := "test-admin-password"
 
-	oldEncKey := os.Getenv("ENCRYPTION_KEY")
-	oldAdminPw := os.Getenv("ADMIN_PASSWORD")
-	oldDataPath := os.Getenv("DATA_PATH")
+	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
 
 	defer func() {
-		if oldEncKey != "" {
-			os.Setenv("ENCRYPTION_KEY", oldEncKey)
+		if oldDatabasePath != "" {
+			os.Setenv("DATABASE_PATH", oldDatabasePath)
 		} else {
-			os.Unsetenv("ENCRYPTION_KEY")
-		}
-		if oldAdminPw != "" {
-			os.Setenv("ADMIN_PASSWORD", oldAdminPw)
-		} else {
-			os.Unsetenv("ADMIN_PASSWORD")
-		}
-		if oldDataPath != "" {
-			os.Setenv("DATA_PATH", oldDataPath)
-		} else {
-			os.Unsetenv("DATA_PATH")
+			os.Unsetenv("DATABASE_PATH")
 		}
 		if oldLogLevel != "" {
 			os.Setenv("LOG_LEVEL", oldLogLevel)
@@ -1714,9 +1377,7 @@ func TestRunComponentInitializationPath(t *testing.T) {
 		}
 	}()
 
-	os.Setenv("ENCRYPTION_KEY", encryptionKey)
-	os.Setenv("ADMIN_PASSWORD", adminPassword)
-	os.Setenv("DATA_PATH", ":memory:")
+	os.Setenv("DATABASE_PATH", ":memory:")
 	os.Setenv("LOG_LEVEL", "info")
 
 	// Test configuration loading and component initialization in run()
@@ -1754,29 +1415,15 @@ func TestRunComponentInitializationPath(t *testing.T) {
 
 // TestInitializeComponentsLoggerDefaultLevel tests that logger is set as default
 func TestInitializeComponentsLoggerDefaultLevel(t *testing.T) {
-	encryptionKey := strings.Repeat("a", 32)
-	adminPassword := "test-admin-password"
 
-	oldEncKey := os.Getenv("ENCRYPTION_KEY")
-	oldAdminPw := os.Getenv("ADMIN_PASSWORD")
-	oldDataPath := os.Getenv("DATA_PATH")
+	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
 
 	defer func() {
-		if oldEncKey != "" {
-			os.Setenv("ENCRYPTION_KEY", oldEncKey)
+		if oldDatabasePath != "" {
+			os.Setenv("DATABASE_PATH", oldDatabasePath)
 		} else {
-			os.Unsetenv("ENCRYPTION_KEY")
-		}
-		if oldAdminPw != "" {
-			os.Setenv("ADMIN_PASSWORD", oldAdminPw)
-		} else {
-			os.Unsetenv("ADMIN_PASSWORD")
-		}
-		if oldDataPath != "" {
-			os.Setenv("DATA_PATH", oldDataPath)
-		} else {
-			os.Unsetenv("DATA_PATH")
+			os.Unsetenv("DATABASE_PATH")
 		}
 		if oldLogLevel != "" {
 			os.Setenv("LOG_LEVEL", oldLogLevel)
@@ -1785,9 +1432,7 @@ func TestInitializeComponentsLoggerDefaultLevel(t *testing.T) {
 		}
 	}()
 
-	os.Setenv("ENCRYPTION_KEY", encryptionKey)
-	os.Setenv("ADMIN_PASSWORD", adminPassword)
-	os.Setenv("DATA_PATH", ":memory:")
+	os.Setenv("DATABASE_PATH", ":memory:")
 	os.Setenv("LOG_LEVEL", "info")
 
 	cfg, err := config.Load()
@@ -1810,48 +1455,32 @@ func TestInitializeComponentsLoggerDefaultLevel(t *testing.T) {
 
 // TestCreateServerTimeouts verifies timeout values are correctly set
 func TestCreateServerTimeouts(t *testing.T) {
-	encryptionKey := strings.Repeat("a", 32)
-	adminPassword := "test-admin-password"
 
-	oldEncKey := os.Getenv("ENCRYPTION_KEY")
-	oldAdminPw := os.Getenv("ADMIN_PASSWORD")
-	oldDataPath := os.Getenv("DATA_PATH")
+	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
-	oldHTTPPort := os.Getenv("HTTP_PORT")
+	oldListenAddr := os.Getenv("LISTEN_ADDR")
 
 	defer func() {
-		if oldEncKey != "" {
-			os.Setenv("ENCRYPTION_KEY", oldEncKey)
+		if oldDatabasePath != "" {
+			os.Setenv("DATABASE_PATH", oldDatabasePath)
 		} else {
-			os.Unsetenv("ENCRYPTION_KEY")
-		}
-		if oldAdminPw != "" {
-			os.Setenv("ADMIN_PASSWORD", oldAdminPw)
-		} else {
-			os.Unsetenv("ADMIN_PASSWORD")
-		}
-		if oldDataPath != "" {
-			os.Setenv("DATA_PATH", oldDataPath)
-		} else {
-			os.Unsetenv("DATA_PATH")
+			os.Unsetenv("DATABASE_PATH")
 		}
 		if oldLogLevel != "" {
 			os.Setenv("LOG_LEVEL", oldLogLevel)
 		} else {
 			os.Unsetenv("LOG_LEVEL")
 		}
-		if oldHTTPPort != "" {
-			os.Setenv("HTTP_PORT", oldHTTPPort)
+		if oldListenAddr != "" {
+			os.Setenv("LISTEN_ADDR", oldListenAddr)
 		} else {
-			os.Unsetenv("HTTP_PORT")
+			os.Unsetenv("LISTEN_ADDR")
 		}
 	}()
 
-	os.Setenv("ENCRYPTION_KEY", encryptionKey)
-	os.Setenv("ADMIN_PASSWORD", adminPassword)
-	os.Setenv("DATA_PATH", ":memory:")
+	os.Setenv("DATABASE_PATH", ":memory:")
 	os.Setenv("LOG_LEVEL", "info")
-	os.Setenv("HTTP_PORT", "8080")
+	os.Setenv("LISTEN_ADDR", "8080")
 
 	cfg, err := config.Load()
 	if err != nil {
@@ -1881,29 +1510,15 @@ func TestCreateServerTimeouts(t *testing.T) {
 
 // TestStartServerAndWaitForShutdownWithServerError tests server shutdown when ListenAndServe returns error
 func TestStartServerAndWaitForShutdownWithServerError(t *testing.T) {
-	encryptionKey := strings.Repeat("a", 32)
-	adminPassword := "test-admin-password"
 
-	oldEncKey := os.Getenv("ENCRYPTION_KEY")
-	oldAdminPw := os.Getenv("ADMIN_PASSWORD")
-	oldDataPath := os.Getenv("DATA_PATH")
+	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
 
 	defer func() {
-		if oldEncKey != "" {
-			os.Setenv("ENCRYPTION_KEY", oldEncKey)
+		if oldDatabasePath != "" {
+			os.Setenv("DATABASE_PATH", oldDatabasePath)
 		} else {
-			os.Unsetenv("ENCRYPTION_KEY")
-		}
-		if oldAdminPw != "" {
-			os.Setenv("ADMIN_PASSWORD", oldAdminPw)
-		} else {
-			os.Unsetenv("ADMIN_PASSWORD")
-		}
-		if oldDataPath != "" {
-			os.Setenv("DATA_PATH", oldDataPath)
-		} else {
-			os.Unsetenv("DATA_PATH")
+			os.Unsetenv("DATABASE_PATH")
 		}
 		if oldLogLevel != "" {
 			os.Setenv("LOG_LEVEL", oldLogLevel)
@@ -1912,9 +1527,7 @@ func TestStartServerAndWaitForShutdownWithServerError(t *testing.T) {
 		}
 	}()
 
-	os.Setenv("ENCRYPTION_KEY", encryptionKey)
-	os.Setenv("ADMIN_PASSWORD", adminPassword)
-	os.Setenv("DATA_PATH", ":memory:")
+	os.Setenv("DATABASE_PATH", ":memory:")
 	os.Setenv("LOG_LEVEL", "info")
 
 	// Create a mock server that fails immediately
@@ -1946,29 +1559,15 @@ func TestStartServerAndWaitForShutdownWithServerError(t *testing.T) {
 
 // TestStorageCloseError tests that storage close errors are logged
 func TestStorageCloseError(t *testing.T) {
-	encryptionKey := strings.Repeat("a", 32)
-	adminPassword := "test-admin-password"
 
-	oldEncKey := os.Getenv("ENCRYPTION_KEY")
-	oldAdminPw := os.Getenv("ADMIN_PASSWORD")
-	oldDataPath := os.Getenv("DATA_PATH")
+	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
 
 	defer func() {
-		if oldEncKey != "" {
-			os.Setenv("ENCRYPTION_KEY", oldEncKey)
+		if oldDatabasePath != "" {
+			os.Setenv("DATABASE_PATH", oldDatabasePath)
 		} else {
-			os.Unsetenv("ENCRYPTION_KEY")
-		}
-		if oldAdminPw != "" {
-			os.Setenv("ADMIN_PASSWORD", oldAdminPw)
-		} else {
-			os.Unsetenv("ADMIN_PASSWORD")
-		}
-		if oldDataPath != "" {
-			os.Setenv("DATA_PATH", oldDataPath)
-		} else {
-			os.Unsetenv("DATA_PATH")
+			os.Unsetenv("DATABASE_PATH")
 		}
 		if oldLogLevel != "" {
 			os.Setenv("LOG_LEVEL", oldLogLevel)
@@ -1977,9 +1576,7 @@ func TestStorageCloseError(t *testing.T) {
 		}
 	}()
 
-	os.Setenv("ENCRYPTION_KEY", encryptionKey)
-	os.Setenv("ADMIN_PASSWORD", adminPassword)
-	os.Setenv("DATA_PATH", ":memory:")
+	os.Setenv("DATABASE_PATH", ":memory:")
 	os.Setenv("LOG_LEVEL", "info")
 
 	cfg, err := config.Load()
@@ -2001,29 +1598,15 @@ func TestStorageCloseError(t *testing.T) {
 
 // TestInitializeComponentsLoggingLevel tests that log level parsing works correctly
 func TestInitializeComponentsLoggingLevelDebug(t *testing.T) {
-	encryptionKey := strings.Repeat("a", 32)
-	adminPassword := "test-admin-password"
 
-	oldEncKey := os.Getenv("ENCRYPTION_KEY")
-	oldAdminPw := os.Getenv("ADMIN_PASSWORD")
-	oldDataPath := os.Getenv("DATA_PATH")
+	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
 
 	defer func() {
-		if oldEncKey != "" {
-			os.Setenv("ENCRYPTION_KEY", oldEncKey)
+		if oldDatabasePath != "" {
+			os.Setenv("DATABASE_PATH", oldDatabasePath)
 		} else {
-			os.Unsetenv("ENCRYPTION_KEY")
-		}
-		if oldAdminPw != "" {
-			os.Setenv("ADMIN_PASSWORD", oldAdminPw)
-		} else {
-			os.Unsetenv("ADMIN_PASSWORD")
-		}
-		if oldDataPath != "" {
-			os.Setenv("DATA_PATH", oldDataPath)
-		} else {
-			os.Unsetenv("DATA_PATH")
+			os.Unsetenv("DATABASE_PATH")
 		}
 		if oldLogLevel != "" {
 			os.Setenv("LOG_LEVEL", oldLogLevel)
@@ -2032,9 +1615,7 @@ func TestInitializeComponentsLoggingLevelDebug(t *testing.T) {
 		}
 	}()
 
-	os.Setenv("ENCRYPTION_KEY", encryptionKey)
-	os.Setenv("ADMIN_PASSWORD", adminPassword)
-	os.Setenv("DATA_PATH", ":memory:")
+	os.Setenv("DATABASE_PATH", ":memory:")
 	os.Setenv("LOG_LEVEL", "debug")
 
 	cfg, err := config.Load()
@@ -2056,48 +1637,32 @@ func TestInitializeComponentsLoggingLevelDebug(t *testing.T) {
 
 // TestCreateServerIsServerInitialized tests that createServer initializes all fields
 func TestCreateServerIsServerInitialized(t *testing.T) {
-	encryptionKey := strings.Repeat("a", 32)
-	adminPassword := "test-admin-password"
 
-	oldEncKey := os.Getenv("ENCRYPTION_KEY")
-	oldAdminPw := os.Getenv("ADMIN_PASSWORD")
-	oldDataPath := os.Getenv("DATA_PATH")
+	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
-	oldHTTPPort := os.Getenv("HTTP_PORT")
+	oldListenAddr := os.Getenv("LISTEN_ADDR")
 
 	defer func() {
-		if oldEncKey != "" {
-			os.Setenv("ENCRYPTION_KEY", oldEncKey)
+		if oldDatabasePath != "" {
+			os.Setenv("DATABASE_PATH", oldDatabasePath)
 		} else {
-			os.Unsetenv("ENCRYPTION_KEY")
-		}
-		if oldAdminPw != "" {
-			os.Setenv("ADMIN_PASSWORD", oldAdminPw)
-		} else {
-			os.Unsetenv("ADMIN_PASSWORD")
-		}
-		if oldDataPath != "" {
-			os.Setenv("DATA_PATH", oldDataPath)
-		} else {
-			os.Unsetenv("DATA_PATH")
+			os.Unsetenv("DATABASE_PATH")
 		}
 		if oldLogLevel != "" {
 			os.Setenv("LOG_LEVEL", oldLogLevel)
 		} else {
 			os.Unsetenv("LOG_LEVEL")
 		}
-		if oldHTTPPort != "" {
-			os.Setenv("HTTP_PORT", oldHTTPPort)
+		if oldListenAddr != "" {
+			os.Setenv("LISTEN_ADDR", oldListenAddr)
 		} else {
-			os.Unsetenv("HTTP_PORT")
+			os.Unsetenv("LISTEN_ADDR")
 		}
 	}()
 
-	os.Setenv("ENCRYPTION_KEY", encryptionKey)
-	os.Setenv("ADMIN_PASSWORD", adminPassword)
-	os.Setenv("DATA_PATH", ":memory:")
+	os.Setenv("DATABASE_PATH", ":memory:")
 	os.Setenv("LOG_LEVEL", "info")
-	os.Setenv("HTTP_PORT", "8080")
+	os.Setenv("LISTEN_ADDR", "8080")
 
 	cfg, err := config.Load()
 	if err != nil {
@@ -2130,48 +1695,32 @@ func TestCreateServerIsServerInitialized(t *testing.T) {
 
 // TestRunCompleteFlow tests the full run() function with all components
 func TestRunCompleteFlow(t *testing.T) {
-	encryptionKey := strings.Repeat("a", 32)
-	adminPassword := "test-admin-password"
 
-	oldEncKey := os.Getenv("ENCRYPTION_KEY")
-	oldAdminPw := os.Getenv("ADMIN_PASSWORD")
-	oldDataPath := os.Getenv("DATA_PATH")
+	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
-	oldHTTPPort := os.Getenv("HTTP_PORT")
+	oldListenAddr := os.Getenv("LISTEN_ADDR")
 
 	defer func() {
-		if oldEncKey != "" {
-			os.Setenv("ENCRYPTION_KEY", oldEncKey)
+		if oldDatabasePath != "" {
+			os.Setenv("DATABASE_PATH", oldDatabasePath)
 		} else {
-			os.Unsetenv("ENCRYPTION_KEY")
-		}
-		if oldAdminPw != "" {
-			os.Setenv("ADMIN_PASSWORD", oldAdminPw)
-		} else {
-			os.Unsetenv("ADMIN_PASSWORD")
-		}
-		if oldDataPath != "" {
-			os.Setenv("DATA_PATH", oldDataPath)
-		} else {
-			os.Unsetenv("DATA_PATH")
+			os.Unsetenv("DATABASE_PATH")
 		}
 		if oldLogLevel != "" {
 			os.Setenv("LOG_LEVEL", oldLogLevel)
 		} else {
 			os.Unsetenv("LOG_LEVEL")
 		}
-		if oldHTTPPort != "" {
-			os.Setenv("HTTP_PORT", oldHTTPPort)
+		if oldListenAddr != "" {
+			os.Setenv("LISTEN_ADDR", oldListenAddr)
 		} else {
-			os.Unsetenv("HTTP_PORT")
+			os.Unsetenv("LISTEN_ADDR")
 		}
 	}()
 
-	os.Setenv("ENCRYPTION_KEY", encryptionKey)
-	os.Setenv("ADMIN_PASSWORD", adminPassword)
-	os.Setenv("DATA_PATH", ":memory:")
+	os.Setenv("DATABASE_PATH", ":memory:")
 	os.Setenv("LOG_LEVEL", "info")
-	os.Setenv("HTTP_PORT", "0") // Use port 0 for random assignment
+	os.Setenv("LISTEN_ADDR", "0") // Use port 0 for random assignment
 
 	// Load configuration
 	cfg, err := config.Load()
@@ -2210,49 +1759,49 @@ func TestRunCompleteFlow(t *testing.T) {
 	}
 }
 
-// TestInitializeComponentsInsufficientEnvVar tests initialization error handling
-func TestInitializeComponentsWithNoAdminPassword(t *testing.T) {
-	encryptionKey := strings.Repeat("a", 32)
-
-	oldEncKey := os.Getenv("ENCRYPTION_KEY")
-	oldDataPath := os.Getenv("DATA_PATH")
+// TestConfigLoadsWithDefaults tests that config loads successfully with all defaults
+func TestConfigLoadsWithDefaults(t *testing.T) {
+	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
-	oldAdminPw := os.Getenv("ADMIN_PASSWORD")
+	oldListenAddr := os.Getenv("LISTEN_ADDR")
 
 	defer func() {
-		if oldEncKey != "" {
-			os.Setenv("ENCRYPTION_KEY", oldEncKey)
+		if oldDatabasePath != "" {
+			os.Setenv("DATABASE_PATH", oldDatabasePath)
 		} else {
-			os.Unsetenv("ENCRYPTION_KEY")
-		}
-		if oldDataPath != "" {
-			os.Setenv("DATA_PATH", oldDataPath)
-		} else {
-			os.Unsetenv("DATA_PATH")
+			os.Unsetenv("DATABASE_PATH")
 		}
 		if oldLogLevel != "" {
 			os.Setenv("LOG_LEVEL", oldLogLevel)
 		} else {
 			os.Unsetenv("LOG_LEVEL")
 		}
-		if oldAdminPw != "" {
-			os.Setenv("ADMIN_PASSWORD", oldAdminPw)
+		if oldListenAddr != "" {
+			os.Setenv("LISTEN_ADDR", oldListenAddr)
 		} else {
-			os.Unsetenv("ADMIN_PASSWORD")
+			os.Unsetenv("LISTEN_ADDR")
 		}
 	}()
 
-	os.Setenv("ENCRYPTION_KEY", encryptionKey)
-	os.Setenv("DATA_PATH", ":memory:")
-	os.Setenv("LOG_LEVEL", "info")
-	os.Unsetenv("ADMIN_PASSWORD")
+	// Clear all config env vars to test defaults
+	os.Unsetenv("DATABASE_PATH")
+	os.Unsetenv("LOG_LEVEL")
+	os.Unsetenv("LISTEN_ADDR")
 
-	_, err := config.Load()
-	if err == nil {
-		t.Error("expected config load to fail with missing ADMIN_PASSWORD")
-	} else if !strings.Contains(err.Error(), "ADMIN_PASSWORD") {
-		// Should fail during config load
-		t.Logf("got expected error: %v", err)
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("expected config load to succeed with defaults, got error: %v", err)
+	}
+
+	// Verify defaults are applied
+	if cfg.LogLevel != "info" {
+		t.Errorf("expected default LOG_LEVEL 'info', got %q", cfg.LogLevel)
+	}
+	if cfg.ListenAddr != ":8080" {
+		t.Errorf("expected default LISTEN_ADDR ':8080', got %q", cfg.ListenAddr)
+	}
+	if cfg.DatabasePath != "/data/proxy.db" {
+		t.Errorf("expected default DATABASE_PATH '/data/proxy.db', got %q", cfg.DatabasePath)
 	}
 }
 
@@ -2294,48 +1843,31 @@ func TestReadyHandlerMultipleRequestsConsistency(t *testing.T) {
 
 // TestRunWithHealthEndpoint tests that the server correctly exposes the health endpoint
 func TestRunWithHealthEndpoint(t *testing.T) {
-	encryptionKey := strings.Repeat("a", 32)
-	adminPassword := "test-admin-password"
-
-	oldEncKey := os.Getenv("ENCRYPTION_KEY")
-	oldAdminPw := os.Getenv("ADMIN_PASSWORD")
-	oldDataPath := os.Getenv("DATA_PATH")
+	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
-	oldHTTPPort := os.Getenv("HTTP_PORT")
+	oldListenAddr := os.Getenv("LISTEN_ADDR")
 
 	defer func() {
-		if oldEncKey != "" {
-			os.Setenv("ENCRYPTION_KEY", oldEncKey)
+		if oldDatabasePath != "" {
+			os.Setenv("DATABASE_PATH", oldDatabasePath)
 		} else {
-			os.Unsetenv("ENCRYPTION_KEY")
-		}
-		if oldAdminPw != "" {
-			os.Setenv("ADMIN_PASSWORD", oldAdminPw)
-		} else {
-			os.Unsetenv("ADMIN_PASSWORD")
-		}
-		if oldDataPath != "" {
-			os.Setenv("DATA_PATH", oldDataPath)
-		} else {
-			os.Unsetenv("DATA_PATH")
+			os.Unsetenv("DATABASE_PATH")
 		}
 		if oldLogLevel != "" {
 			os.Setenv("LOG_LEVEL", oldLogLevel)
 		} else {
 			os.Unsetenv("LOG_LEVEL")
 		}
-		if oldHTTPPort != "" {
-			os.Setenv("HTTP_PORT", oldHTTPPort)
+		if oldListenAddr != "" {
+			os.Setenv("LISTEN_ADDR", oldListenAddr)
 		} else {
-			os.Unsetenv("HTTP_PORT")
+			os.Unsetenv("LISTEN_ADDR")
 		}
 	}()
 
-	os.Setenv("ENCRYPTION_KEY", encryptionKey)
-	os.Setenv("ADMIN_PASSWORD", adminPassword)
-	os.Setenv("DATA_PATH", ":memory:")
+	os.Setenv("DATABASE_PATH", ":memory:")
 	os.Setenv("LOG_LEVEL", "info")
-	os.Setenv("HTTP_PORT", "0") // Use random port
+	os.Setenv("LISTEN_ADDR", ":0") // Use random port
 
 	cfg, err := config.Load()
 	if err != nil {
@@ -2389,29 +1921,15 @@ func TestRunWithHealthEndpoint(t *testing.T) {
 
 // TestInitializeComponentsCreateAllRouters tests that all routers are created
 func TestInitializeComponentsCreateAllRouters(t *testing.T) {
-	encryptionKey := strings.Repeat("a", 32)
-	adminPassword := "test-admin-password"
 
-	oldEncKey := os.Getenv("ENCRYPTION_KEY")
-	oldAdminPw := os.Getenv("ADMIN_PASSWORD")
-	oldDataPath := os.Getenv("DATA_PATH")
+	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
 
 	defer func() {
-		if oldEncKey != "" {
-			os.Setenv("ENCRYPTION_KEY", oldEncKey)
+		if oldDatabasePath != "" {
+			os.Setenv("DATABASE_PATH", oldDatabasePath)
 		} else {
-			os.Unsetenv("ENCRYPTION_KEY")
-		}
-		if oldAdminPw != "" {
-			os.Setenv("ADMIN_PASSWORD", oldAdminPw)
-		} else {
-			os.Unsetenv("ADMIN_PASSWORD")
-		}
-		if oldDataPath != "" {
-			os.Setenv("DATA_PATH", oldDataPath)
-		} else {
-			os.Unsetenv("DATA_PATH")
+			os.Unsetenv("DATABASE_PATH")
 		}
 		if oldLogLevel != "" {
 			os.Setenv("LOG_LEVEL", oldLogLevel)
@@ -2420,9 +1938,7 @@ func TestInitializeComponentsCreateAllRouters(t *testing.T) {
 		}
 	}()
 
-	os.Setenv("ENCRYPTION_KEY", encryptionKey)
-	os.Setenv("ADMIN_PASSWORD", adminPassword)
-	os.Setenv("DATA_PATH", ":memory:")
+	os.Setenv("DATABASE_PATH", ":memory:")
 	os.Setenv("LOG_LEVEL", "info")
 
 	cfg, err := config.Load()
@@ -2470,31 +1986,16 @@ func TestInitializeComponentsCreateAllRouters(t *testing.T) {
 	}
 }
 
-// TestRunInitializeComponentsError tests run() when initializeComponents fails
-func TestRunInitializeComponentsError(t *testing.T) {
-	encryptionKey := strings.Repeat("a", 31) // Invalid - too short
-	adminPassword := "test-admin-password"
-
-	oldEncKey := os.Getenv("ENCRYPTION_KEY")
-	oldAdminPw := os.Getenv("ADMIN_PASSWORD")
-	oldDataPath := os.Getenv("DATA_PATH")
+// TestRunInitializeComponentsWithInvalidLogLevel tests that initializeComponents fails with invalid log level
+func TestRunInitializeComponentsWithInvalidLogLevel(t *testing.T) {
+	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
 
 	defer func() {
-		if oldEncKey != "" {
-			os.Setenv("ENCRYPTION_KEY", oldEncKey)
+		if oldDatabasePath != "" {
+			os.Setenv("DATABASE_PATH", oldDatabasePath)
 		} else {
-			os.Unsetenv("ENCRYPTION_KEY")
-		}
-		if oldAdminPw != "" {
-			os.Setenv("ADMIN_PASSWORD", oldAdminPw)
-		} else {
-			os.Unsetenv("ADMIN_PASSWORD")
-		}
-		if oldDataPath != "" {
-			os.Setenv("DATA_PATH", oldDataPath)
-		} else {
-			os.Unsetenv("DATA_PATH")
+			os.Unsetenv("DATABASE_PATH")
 		}
 		if oldLogLevel != "" {
 			os.Setenv("LOG_LEVEL", oldLogLevel)
@@ -2503,42 +2004,34 @@ func TestRunInitializeComponentsError(t *testing.T) {
 		}
 	}()
 
-	os.Setenv("ENCRYPTION_KEY", encryptionKey)
-	os.Setenv("ADMIN_PASSWORD", adminPassword)
-	os.Setenv("DATA_PATH", ":memory:")
-	os.Setenv("LOG_LEVEL", "info")
+	os.Setenv("DATABASE_PATH", ":memory:")
+	os.Setenv("LOG_LEVEL", "invalid_level") // Invalid log level
 
-	_, err := config.Load()
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("config load should succeed: %v", err)
+	}
+
+	_, err = initializeComponents(cfg)
 	if err == nil {
-		t.Error("expected config load to fail with invalid encryption key")
+		t.Error("expected initializeComponents to fail with invalid log level")
+	}
+	if !strings.Contains(err.Error(), "invalid log level") {
+		t.Errorf("expected 'invalid log level' error, got: %v", err)
 	}
 }
 
 // TestInitializeComponentsWithErrorPath tests error handling in initialization
 func TestInitializeComponentsValidation(t *testing.T) {
-	encryptionKey := strings.Repeat("a", 32)
-	adminPassword := "test-admin-password"
 
-	oldEncKey := os.Getenv("ENCRYPTION_KEY")
-	oldAdminPw := os.Getenv("ADMIN_PASSWORD")
-	oldDataPath := os.Getenv("DATA_PATH")
+	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
 
 	defer func() {
-		if oldEncKey != "" {
-			os.Setenv("ENCRYPTION_KEY", oldEncKey)
+		if oldDatabasePath != "" {
+			os.Setenv("DATABASE_PATH", oldDatabasePath)
 		} else {
-			os.Unsetenv("ENCRYPTION_KEY")
-		}
-		if oldAdminPw != "" {
-			os.Setenv("ADMIN_PASSWORD", oldAdminPw)
-		} else {
-			os.Unsetenv("ADMIN_PASSWORD")
-		}
-		if oldDataPath != "" {
-			os.Setenv("DATA_PATH", oldDataPath)
-		} else {
-			os.Unsetenv("DATA_PATH")
+			os.Unsetenv("DATABASE_PATH")
 		}
 		if oldLogLevel != "" {
 			os.Setenv("LOG_LEVEL", oldLogLevel)
@@ -2547,9 +2040,7 @@ func TestInitializeComponentsValidation(t *testing.T) {
 		}
 	}()
 
-	os.Setenv("ENCRYPTION_KEY", encryptionKey)
-	os.Setenv("ADMIN_PASSWORD", adminPassword)
-	os.Setenv("DATA_PATH", ":memory:")
+	os.Setenv("DATABASE_PATH", ":memory:")
 	os.Setenv("LOG_LEVEL", "info")
 
 	cfg, err := config.Load()
@@ -2570,61 +2061,44 @@ func TestInitializeComponentsValidation(t *testing.T) {
 	}
 }
 
-// TestCreateServerAddrFormatting tests correct port formatting
+// TestCreateServerAddrFormatting tests correct address formatting
 func TestCreateServerAddrFormatting(t *testing.T) {
 	tests := []struct {
-		port     string
+		addr     string
 		expected string
 	}{
-		{"8080", ":8080"},
-		{"3000", ":3000"},
-		{"9090", ":9090"},
+		{":8080", ":8080"},
+		{":3000", ":3000"},
+		{"0.0.0.0:9090", "0.0.0.0:9090"},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.port, func(t *testing.T) {
-			encryptionKey := strings.Repeat("a", 32)
-			adminPassword := "test-admin-password"
-
-			oldEncKey := os.Getenv("ENCRYPTION_KEY")
-			oldAdminPw := os.Getenv("ADMIN_PASSWORD")
-			oldDataPath := os.Getenv("DATA_PATH")
+		t.Run(tt.addr, func(t *testing.T) {
+			oldDatabasePath := os.Getenv("DATABASE_PATH")
 			oldLogLevel := os.Getenv("LOG_LEVEL")
-			oldHTTPPort := os.Getenv("HTTP_PORT")
+			oldListenAddr := os.Getenv("LISTEN_ADDR")
 
 			defer func() {
-				if oldEncKey != "" {
-					os.Setenv("ENCRYPTION_KEY", oldEncKey)
+				if oldDatabasePath != "" {
+					os.Setenv("DATABASE_PATH", oldDatabasePath)
 				} else {
-					os.Unsetenv("ENCRYPTION_KEY")
-				}
-				if oldAdminPw != "" {
-					os.Setenv("ADMIN_PASSWORD", oldAdminPw)
-				} else {
-					os.Unsetenv("ADMIN_PASSWORD")
-				}
-				if oldDataPath != "" {
-					os.Setenv("DATA_PATH", oldDataPath)
-				} else {
-					os.Unsetenv("DATA_PATH")
+					os.Unsetenv("DATABASE_PATH")
 				}
 				if oldLogLevel != "" {
 					os.Setenv("LOG_LEVEL", oldLogLevel)
 				} else {
 					os.Unsetenv("LOG_LEVEL")
 				}
-				if oldHTTPPort != "" {
-					os.Setenv("HTTP_PORT", oldHTTPPort)
+				if oldListenAddr != "" {
+					os.Setenv("LISTEN_ADDR", oldListenAddr)
 				} else {
-					os.Unsetenv("HTTP_PORT")
+					os.Unsetenv("LISTEN_ADDR")
 				}
 			}()
 
-			os.Setenv("ENCRYPTION_KEY", encryptionKey)
-			os.Setenv("ADMIN_PASSWORD", adminPassword)
-			os.Setenv("DATA_PATH", ":memory:")
+			os.Setenv("DATABASE_PATH", ":memory:")
 			os.Setenv("LOG_LEVEL", "info")
-			os.Setenv("HTTP_PORT", tt.port)
+			os.Setenv("LISTEN_ADDR", tt.addr)
 
 			cfg, err := config.Load()
 			if err != nil {
@@ -2643,48 +2117,31 @@ func TestCreateServerAddrFormatting(t *testing.T) {
 
 // TestServerStartAndHealthCheck starts an actual HTTP server and verifies health endpoints
 func TestStartActualServer(t *testing.T) {
-	encryptionKey := strings.Repeat("a", 32)
-	adminPassword := "test-admin-password"
-
-	oldEncKey := os.Getenv("ENCRYPTION_KEY")
-	oldAdminPw := os.Getenv("ADMIN_PASSWORD")
-	oldDataPath := os.Getenv("DATA_PATH")
+	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
-	oldHTTPPort := os.Getenv("HTTP_PORT")
+	oldListenAddr := os.Getenv("LISTEN_ADDR")
 
 	defer func() {
-		if oldEncKey != "" {
-			os.Setenv("ENCRYPTION_KEY", oldEncKey)
+		if oldDatabasePath != "" {
+			os.Setenv("DATABASE_PATH", oldDatabasePath)
 		} else {
-			os.Unsetenv("ENCRYPTION_KEY")
-		}
-		if oldAdminPw != "" {
-			os.Setenv("ADMIN_PASSWORD", oldAdminPw)
-		} else {
-			os.Unsetenv("ADMIN_PASSWORD")
-		}
-		if oldDataPath != "" {
-			os.Setenv("DATA_PATH", oldDataPath)
-		} else {
-			os.Unsetenv("DATA_PATH")
+			os.Unsetenv("DATABASE_PATH")
 		}
 		if oldLogLevel != "" {
 			os.Setenv("LOG_LEVEL", oldLogLevel)
 		} else {
 			os.Unsetenv("LOG_LEVEL")
 		}
-		if oldHTTPPort != "" {
-			os.Setenv("HTTP_PORT", oldHTTPPort)
+		if oldListenAddr != "" {
+			os.Setenv("LISTEN_ADDR", oldListenAddr)
 		} else {
-			os.Unsetenv("HTTP_PORT")
+			os.Unsetenv("LISTEN_ADDR")
 		}
 	}()
 
-	os.Setenv("ENCRYPTION_KEY", encryptionKey)
-	os.Setenv("ADMIN_PASSWORD", adminPassword)
-	os.Setenv("DATA_PATH", ":memory:")
+	os.Setenv("DATABASE_PATH", ":memory:")
 	os.Setenv("LOG_LEVEL", "info")
-	os.Setenv("HTTP_PORT", "0") // Use random port
+	os.Setenv("LISTEN_ADDR", ":0") // Use random port
 
 	cfg, err := config.Load()
 	if err != nil {
@@ -2729,29 +2186,15 @@ func TestStartActualServer(t *testing.T) {
 }
 
 func TestRunInitializeComponentsInvalidLogLevel(t *testing.T) {
-	encryptionKey := strings.Repeat("a", 32)
-	adminPassword := "test-admin-password"
 
-	oldEncKey := os.Getenv("ENCRYPTION_KEY")
-	oldAdminPw := os.Getenv("ADMIN_PASSWORD")
-	oldDataPath := os.Getenv("DATA_PATH")
+	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
 
 	defer func() {
-		if oldEncKey != "" {
-			os.Setenv("ENCRYPTION_KEY", oldEncKey)
+		if oldDatabasePath != "" {
+			os.Setenv("DATABASE_PATH", oldDatabasePath)
 		} else {
-			os.Unsetenv("ENCRYPTION_KEY")
-		}
-		if oldAdminPw != "" {
-			os.Setenv("ADMIN_PASSWORD", oldAdminPw)
-		} else {
-			os.Unsetenv("ADMIN_PASSWORD")
-		}
-		if oldDataPath != "" {
-			os.Setenv("DATA_PATH", oldDataPath)
-		} else {
-			os.Unsetenv("DATA_PATH")
+			os.Unsetenv("DATABASE_PATH")
 		}
 		if oldLogLevel != "" {
 			os.Setenv("LOG_LEVEL", oldLogLevel)
@@ -2760,8 +2203,6 @@ func TestRunInitializeComponentsInvalidLogLevel(t *testing.T) {
 		}
 	}()
 
-	os.Setenv("ENCRYPTION_KEY", encryptionKey)
-	os.Setenv("ADMIN_PASSWORD", adminPassword)
 	os.Setenv("LOG_LEVEL", "INVALID_LEVEL")
 
 	// Call run() with invalid log level

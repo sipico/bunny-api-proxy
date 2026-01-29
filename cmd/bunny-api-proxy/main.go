@@ -85,11 +85,11 @@ func initializeComponents(cfg *config.Config) (*serverComponents, error) {
 	logger.Info("Server starting",
 		"version", version,
 		"logLevel", cfg.LogLevel,
-		"httpPort", cfg.HTTPPort,
+		"listenAddr", cfg.ListenAddr,
 	)
 
 	// 3. Initialize storage
-	store, err := storage.New(cfg.DataPath, cfg.EncryptionKey)
+	store, err := storage.New(cfg.DatabasePath, nil)
 	if err != nil {
 		return nil, fmt.Errorf("storage initialization failed: %w", err)
 	}
@@ -136,9 +136,8 @@ func initializeComponents(cfg *config.Config) (*serverComponents, error) {
 
 // createServer creates and returns an HTTP server with the given configuration
 func createServer(cfg *config.Config, handler http.Handler) *http.Server {
-	addr := fmt.Sprintf(":%s", cfg.HTTPPort)
 	return &http.Server{
-		Addr:         addr,
+		Addr:         cfg.ListenAddr,
 		Handler:      handler,
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
