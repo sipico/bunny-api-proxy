@@ -26,10 +26,11 @@ docker-compose up -d
 # 4. Verify it's running
 curl http://localhost:8080/health
 
-# 5. Access admin panel
-# Browser: http://localhost:8080/
-# Username: admin
-# Password: (value from ADMIN_PASSWORD in .env)
+# 5. Bootstrap with your bunny.net master API key
+curl -X POST http://localhost:8080/admin/api/bootstrap \
+  -H "AccessKey: your-bunny-net-master-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "initial-admin"}'
 
 # View logs
 docker-compose logs -f bunny-api-proxy
@@ -41,20 +42,13 @@ docker-compose down
 docker-compose down -v
 ```
 
-### Quick Start - Generate Secrets
+### Quick Start - Required Credentials
 
-Before starting, generate secure credentials:
+Before starting, have your bunny.net master API key ready:
 
-```bash
-# Generate ADMIN_PASSWORD (save this securely)
-openssl rand -base64 32
-
-# Generate ENCRYPTION_KEY (save this securely)
-openssl rand -base64 32
-
-# Add them to .env file
-nano .env
-```
+1. Log in to your bunny.net account
+2. Go to Account Settings > API
+3. Copy your API key (you'll need this for bootstrap)
 
 ## Docker Compose with Traefik
 
@@ -307,20 +301,14 @@ kubectl create namespace bunny-api-proxy
 **2. Create Secret with credentials:**
 
 ```bash
-# Generate values
-ADMIN_PASSWORD=$(openssl rand -base64 32)
-ENCRYPTION_KEY=$(openssl rand -base64 32)
-
-echo "ADMIN_PASSWORD: $ADMIN_PASSWORD"
-echo "ENCRYPTION_KEY: $ENCRYPTION_KEY"
-
-# Create Secret
-kubectl create secret generic bunny-api-proxy-secret \
-  --from-literal=admin-password="$ADMIN_PASSWORD" \
-  --from-literal=encryption-key="$ENCRYPTION_KEY"
+# Create ConfigMap for non-secret configuration
+kubectl create configmap bunny-api-proxy-config \
+  --from-literal=LOG_LEVEL=info \
+  --from-literal=LISTEN_ADDR=:8080 \
+  --from-literal=DATABASE_PATH=/data/proxy.db
 
 # Verify
-kubectl get secret bunny-api-proxy-secret
+kubectl get configmap bunny-api-proxy-config
 ```
 
 **3. Create PersistentVolumeClaim:**
@@ -480,15 +468,15 @@ az aks get-credentials --resource-group my-rg --name bunny-proxy
 
 ### Secrets Management
 
-1. **Never commit secrets to Git**
-   - Use `.env` (add to `.gitignore`)
-   - Use environment variables
-   - Use external secret managers
+1. **Protect your bunny.net master API key**
+   - Only use during bootstrap
+   - Store in password manager
+   - Never commit to Git
 
-2. **Rotate secrets regularly**
-   - Change ADMIN_PASSWORD quarterly
-   - Rotate ENCRYPTION_KEY if compromised
-   - Kubernetes: update Secret and restart pods
+2. **Protect admin tokens**
+   - Store securely after creation (shown only once)
+   - Create separate tokens for different services
+   - Rotate tokens periodically
 
 3. **External secret managers** (production)
    - HashiCorp Vault
@@ -516,9 +504,9 @@ az aks get-credentials --resource-group my-rg --name bunny-proxy
 ### Access Control
 
 1. **Authentication**
-   - Strong ADMIN_PASSWORD (32+ chars)
-   - Consider 2FA for admin panel
+   - Protect admin tokens securely
    - API key rotation
+   - Use separate tokens per service
 
 2. **Authorization**
    - Scoped API keys (only needed permissions)
@@ -749,12 +737,10 @@ kubectl top pods
 
 See `../.env.example` for complete configuration options:
 
-- `ADMIN_PASSWORD` - Admin panel password (required, change in production)
-- `ENCRYPTION_KEY` - Key for encrypting sensitive data (required, change in production)
 - `LOG_LEVEL` - Logging level: debug, info, warn, error (default: info)
-- `HTTP_PORT` - Port to listen on (default: 8080)
-- `DATA_PATH` - SQLite database file path (default: /data/proxy.db)
-- `DATABASE_AUTO_INIT` - Auto-initialize database (default: true)
+- `LISTEN_ADDR` - Address to listen on (default: :8080)
+- `DATABASE_PATH` - SQLite database file path (default: /data/proxy.db)
+- `BUNNY_API_URL` - bunny.net API URL (default: https://api.bunny.net)
 
 ### Version Information
 

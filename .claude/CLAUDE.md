@@ -68,10 +68,9 @@ internal/               # Private application code
   proxy/                # Core proxy logic
   auth/                 # Key validation, permissions
   storage/              # SQLite operations
-  admin/                # Admin UI handlers
+  admin/                # Admin API handlers
   bunny/                # bunny.net API client
   testutil/mockbunny/   # Mock server for testing
-web/templates/          # HTML templates
 ```
 
 ## Key Files

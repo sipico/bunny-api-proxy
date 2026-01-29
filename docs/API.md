@@ -6,14 +6,13 @@ Complete API documentation for the Bunny API Proxy, which provides a secure, sco
 
 The Bunny API Proxy enables controlled access to bunny.net's DNS management APIs through scoped API keys. It sits between clients (like ACME clients, automation tools, etc.) and the bunny.net API, enforcing permission boundaries.
 
-All APIs listen on port 8080 (configurable via `HTTP_PORT` environment variable).
+All APIs listen on port 8080 (configurable via `LISTEN_ADDR` environment variable).
 
 ### API Categories
 
-1. **Admin REST API** - Master key, admin tokens, and scoped API key management
-2. **Admin Web UI** - HTML interface for administrative tasks (session-based)
-3. **DNS Proxy API** - Scoped access to bunny.net DNS endpoints (AccessKey required)
-4. **Health Endpoints** - Service health and readiness checks (no auth)
+1. **Admin REST API** - Bootstrap, master key, admin tokens, and scoped API key management
+2. **DNS Proxy API** - Scoped access to bunny.net DNS endpoints (AccessKey required)
+3. **Health Endpoints** - Service health and readiness checks (no auth)
 
 ## Base URL
 
@@ -31,17 +30,47 @@ Endpoints for managing the proxy's master key, admin tokens, and scoped API keys
 
 ### Authentication Methods
 
-**AccessKey Token (Recommended):**
+**AccessKey Token:**
 ```
 AccessKey: <admin-token>
 ```
 
-**Basic Auth (Bootstrap Only):**
+**Bootstrap (First Setup Only):**
 ```
-Authorization: Basic base64(admin:<ADMIN_PASSWORD>)
+AccessKey: <bunny.net-master-api-key>
 ```
 
-Basic auth is only available if `ADMIN_PASSWORD` environment variable is set. Use it for initial setup before creating tokens.
+For initial setup, use your bunny.net master API key with the bootstrap endpoint to create your first admin token. After that, use admin tokens for all admin API operations.
+
+### Bootstrap (First Setup)
+
+#### POST /admin/api/bootstrap
+
+Create the first admin token using your bunny.net master API key. This endpoint only works when no admin tokens exist yet.
+
+**Authentication:** bunny.net master API key in AccessKey header
+**Response:** 201 Created or 409 Conflict (if admin tokens already exist)
+
+**Example Request:**
+```bash
+curl -X POST http://localhost:8080/admin/api/bootstrap \
+  -H "AccessKey: your-bunny-net-master-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "initial-admin-token"}'
+```
+
+**Example Response:**
+```json
+{
+  "id": 1,
+  "name": "initial-admin-token",
+  "token": "generated-admin-token-value"
+}
+```
+
+**Note:** The token is shown only once. Store it securely immediately - it cannot be retrieved later.
+
+---
 
 ### Managing Admin Tokens
 
@@ -49,7 +78,7 @@ Basic auth is only available if `ADMIN_PASSWORD` environment variable is set. Us
 
 List all admin tokens (names and creation dates only - full tokens are never returned).
 
-**Authentication:** AccessKey or Basic auth required
+**Authentication:** AccessKey required
 **Response:** 200 OK
 
 **Example Request:**
@@ -80,7 +109,7 @@ curl -X GET http://localhost:8080/admin/api/tokens \
 
 Create a new admin token.
 
-**Authentication:** AccessKey or Basic auth required
+**Authentication:** AccessKey required
 **Response:** 201 Created
 
 **Request Body:**
@@ -119,7 +148,7 @@ curl -X POST http://localhost:8080/admin/api/tokens \
 
 Delete an admin token.
 
-**Authentication:** AccessKey or Basic auth required
+**Authentication:** AccessKey required
 **Path Parameters:** `id` - The token ID
 **Response:** 204 No Content
 
@@ -137,7 +166,7 @@ curl -X DELETE http://localhost:8080/admin/api/tokens/1 \
 
 Set the master bunny.net API key (can only be set once).
 
-**Authentication:** AccessKey or Basic auth required
+**Authentication:** AccessKey required
 **Response:** 201 Created or 409 Conflict (if already set)
 
 **Request Body:**
@@ -170,7 +199,7 @@ curl -X PUT http://localhost:8080/admin/api/master-key \
 
 Create a new scoped API key with specific zone and action permissions.
 
-**Authentication:** AccessKey or Basic auth required
+**Authentication:** AccessKey required
 **Response:** 201 Created
 
 **Request Body:**
@@ -220,7 +249,7 @@ curl -X POST http://localhost:8080/admin/api/keys \
 
 Change the runtime log level.
 
-**Authentication:** AccessKey or Basic auth required
+**Authentication:** AccessKey required
 **Response:** 200 OK
 
 **Request Body:**
@@ -244,182 +273,6 @@ curl -X POST http://localhost:8080/admin/api/loglevel \
   "level": "debug"
 }
 ```
-
----
-
-## Admin Web UI
-
-HTML interface for administrative management. All endpoints require session authentication via the `admin_session` cookie.
-
-### Session Management
-
-#### POST /admin/login
-
-Authenticate and create an admin session.
-
-**Authentication:** None
-**Request Format:** HTML form data
-**Form Parameters:** `password` - The admin password
-**Response:** 303 See Other (redirects to /admin with session cookie)
-
----
-
-#### POST /admin/logout
-
-Invalidate the current admin session.
-
-**Authentication:** Session cookie required
-**Response:** 200 OK
-
----
-
-### Dashboard
-
-#### GET /admin
-
-Admin dashboard home page.
-
-**Authentication:** Session cookie required
-**Response:** 200 OK (HTML)
-
----
-
-### Master Key Management
-
-#### GET /admin/master-key
-
-Display the master API key management form.
-
-**Authentication:** Session cookie required
-**Response:** 200 OK (HTML)
-
----
-
-#### POST /admin/master-key
-
-Update the master bunny.net API key via form.
-
-**Authentication:** Session cookie required
-**Response:** 303 See Other (redirects to /admin/master-key)
-
----
-
-### Admin Token Management (Web UI)
-
-#### GET /admin/tokens
-
-Display list of all admin tokens.
-
-**Authentication:** Session cookie required
-**Response:** 200 OK (HTML)
-
----
-
-#### GET /admin/tokens/new
-
-Display form to create a new admin token.
-
-**Authentication:** Session cookie required
-**Response:** 200 OK (HTML)
-
----
-
-#### POST /admin/tokens
-
-Create a new admin token via form. The system automatically generates the token.
-
-**Authentication:** Session cookie required
-**Response:** 200 OK (HTML with generated token displayed once)
-
----
-
-#### POST /admin/tokens/{id}/delete
-
-Delete an admin token.
-
-**Authentication:** Session cookie required
-**Response:** 303 See Other (redirects to /admin/tokens)
-
----
-
-### Scoped Key Management (Web UI)
-
-#### GET /admin/keys
-
-Display list of all scoped API keys.
-
-**Authentication:** Session cookie required
-**Response:** 200 OK (HTML)
-
----
-
-#### GET /admin/keys/new
-
-Display form to create a new scoped API key.
-
-**Authentication:** Session cookie required
-**Response:** 200 OK (HTML)
-
----
-
-#### POST /admin/keys
-
-Create a new scoped API key via form.
-
-**Authentication:** Session cookie required
-**Response:** 303 See Other (redirects to /admin/keys)
-
----
-
-#### GET /admin/keys/{id}
-
-Display detailed view of a scoped key including all permissions.
-
-**Authentication:** Session cookie required
-**Response:** 200 OK (HTML)
-
----
-
-#### POST /admin/keys/{id}/delete
-
-Delete a scoped API key and all its permissions.
-
-**Authentication:** Session cookie required
-**Response:** 303 See Other (redirects to /admin/keys)
-
----
-
-### Permission Management (Web UI)
-
-#### GET /admin/keys/{id}/permissions/new
-
-Display form to add a new permission to a scoped key.
-
-**Authentication:** Session cookie required
-**Response:** 200 OK (HTML)
-
----
-
-#### POST /admin/keys/{id}/permissions
-
-Add a permission to a scoped key.
-
-**Authentication:** Session cookie required
-**Form Parameters:**
-- `zone_id` - The zone ID
-- `allowed_actions` - Comma-separated list of actions
-- `record_types` - Comma-separated list of DNS record types
-
-**Response:** 303 See Other (redirects to /admin/keys/{id})
-
----
-
-#### POST /admin/keys/{id}/permissions/{pid}/delete
-
-Delete a permission from a scoped key.
-
-**Authentication:** Session cookie required
-**Response:** 303 See Other (redirects to /admin/keys/{id})
 
 ---
 
@@ -656,9 +509,22 @@ When the proxy receives an error from the bunny.net API:
 Example configuration for an ACME client using the Bunny API Proxy:
 
 ```bash
-# 1. Create a scoped key restricted to TXT record management for DNS-01
+# 1. Bootstrap: Create first admin token using bunny.net master key
+curl -X POST http://localhost:8080/admin/api/bootstrap \
+  -H "AccessKey: your-bunny-net-master-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "initial-admin"}'
+
+# Response:
+# {
+#   "id": 1,
+#   "name": "initial-admin",
+#   "token": "admin-token-value"
+# }
+
+# 2. Create a scoped key restricted to TXT record management for DNS-01
 curl -X POST http://localhost:8080/admin/api/keys \
-  -H "Authorization: Basic admin:$ADMIN_PASSWORD" \
+  -H "AccessKey: admin-token-value" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "acme-dns-client",
@@ -673,7 +539,7 @@ curl -X POST http://localhost:8080/admin/api/keys \
 #   "key": "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6"
 # }
 
-# 2. Configure ACME client to use this key
+# 3. Configure ACME client to use this key
 # Example for Certbot with a DNS hook script:
 
 #!/bin/bash
@@ -702,10 +568,8 @@ fi
 
 | Variable | Description | Default |
 |---|---|---|
-| `HTTP_PORT` | Port to listen on | 8080 |
-| `ADMIN_PASSWORD` | Password for admin access | (required) |
-| `DATA_PATH` | SQLite database file path | /data/proxy.db |
-| `ENCRYPTION_KEY` | Encryption key for sensitive data | (required) |
+| `LISTEN_ADDR` | Address and port to listen on | :8080 |
+| `DATABASE_PATH` | SQLite database file path | /data/proxy.db |
 | `LOG_LEVEL` | Default log level | info |
 | `BUNNY_API_URL` | bunny.net API URL (for testing/mocking) | https://api.bunny.net |
 

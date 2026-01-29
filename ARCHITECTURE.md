@@ -14,7 +14,7 @@ An API proxy for bunny.net that allows creating scoped/limited API keys. Sits be
 └─────────────┘     └─────────────────┘     └─────────────┘
                            │
                     ┌──────┴──────┐
-                    │ Admin UI    │
+                    │ Admin API   │
                     │ (key mgmt)  │
                     └─────────────┘
 ```
@@ -27,7 +27,6 @@ An API proxy for bunny.net that allows creating scoped/limited API keys. Sits be
 | Web Framework | Chi | Lightweight, idiomatic Go, 100% net/http compatible |
 | Database | SQLite | Zero config, single file, perfect for single-container deployment |
 | SQLite Driver | modernc.org/sqlite | Pure Go, no CGO required, enables simpler builds and cross-compilation |
-| Admin UI | Go templates + HTMX | Single binary, interactive without full SPA complexity |
 | Container Base | Alpine | Small (~5 MB), has shell for debugging, includes CA certs |
 
 ## Project Policies
@@ -68,13 +67,10 @@ bunny-api-proxy/
 │   ├── proxy/                   # Core proxy logic
 │   ├── auth/                    # Key validation, permissions
 │   ├── storage/                 # SQLite operations
-│   ├── admin/                   # Admin UI handlers
+│   ├── admin/                   # Admin API handlers
 │   ├── bunny/                   # bunny.net API client
 │   └── testutil/
 │       └── mockbunny/           # Stateful mock server for testing
-├── web/
-│   ├── templates/               # HTML templates
-│   └── static/                  # CSS, JS (HTMX)
 ├── .github/
 │   └── workflows/               # CI/CD
 ├── go.mod
@@ -161,27 +157,24 @@ Every push runs:
 
 ## Configuration
 
-### Hybrid Approach
+### Environment Variables
 
-**Environment variables** (set at deployment):
 | Variable | Purpose | Default |
 |----------|---------|---------|
-| `ADMIN_PASSWORD` | Web UI login | (required) |
-| `ENCRYPTION_KEY` | Encrypt stored API keys | (required) |
 | `LOG_LEVEL` | Logging verbosity | `info` |
-| `HTTP_PORT` | Listen port | `8080` |
-| `DATA_PATH` | Database location | `/data/proxy.db` |
+| `LISTEN_ADDR` | Listen address | `:8080` |
+| `DATABASE_PATH` | Database location | `/data/proxy.db` |
+| `BUNNY_API_URL` | bunny.net API URL (for testing) | `https://api.bunny.net` |
 
-**Admin UI** (configured after deployment):
-- bunny.net master API key
+**Admin API** (configured after deployment via bootstrap):
+- bunny.net master API key (used to create first admin token)
+- Admin tokens for API access
 - Scoped keys and permissions
 
 ### Example Deployment
 
 ```bash
 docker run -d \
-  -e ADMIN_PASSWORD=secretpassword \
-  -e ENCRYPTION_KEY=32-character-random-string \
   -p 8080:8080 \
   -v bunny-api-proxy-data:/data \
   bunny-api-proxy
@@ -189,16 +182,17 @@ docker run -d \
 
 ## Authentication
 
-### Two Separate Auth Mechanisms
+### API-Only Authentication
 
 | Access Type | Auth Method | Purpose |
 |-------------|-------------|---------|
-| Web UI | Password → session cookie | Human admin interaction |
-| Admin API | AccessKey token | Scripts, automation |
+| Bootstrap | bunny.net master API key | Create first admin token |
+| Admin API | AccessKey header | Scripts, automation, key management |
+| Proxy API | AccessKey header | Scoped DNS operations |
 
-- Admin password: Only entered in web login form
-- Admin API token: Generated via Web UI, stored hashed in DB
-- MVP: Single admin API token
+- Bootstrap: Use bunny.net master API key to create first admin token
+- Admin tokens: Generated via Admin API, stored hashed in DB
+- Scoped keys: For limited DNS API access, stored hashed in DB
 
 ## Security
 
@@ -206,16 +200,11 @@ docker run -d \
 
 | Secret | Storage |
 |--------|---------|
-| bunny.net master API key | Encrypted in SQLite (AES-256) |
-| Scoped proxy keys | Hashed in SQLite |
-| Admin API token | Hashed in SQLite |
+| bunny.net master API key | Hashed in SQLite (SHA-256) |
+| Scoped proxy keys | Hashed in SQLite (bcrypt) |
+| Admin API tokens | Hashed in SQLite (SHA-256) |
 
-### Encryption Key Recovery
-
-If `ENCRYPTION_KEY` is lost:
-- Re-enter bunny.net master key via Admin UI
-- Scoped keys, permissions, and config survive
-- Only encrypted master key becomes unreadable
+All secrets are stored as one-way hashes. The master API key hash is used only for validation during bootstrap - the actual key is never stored and must be provided via the bunny.net account.
 
 ## Logging
 
@@ -243,7 +232,12 @@ Mirror bunny.net DNS API structure (MVP endpoints listed above).
 
 | Endpoint | Purpose |
 |----------|---------|
-| `GET /admin` | Web UI |
+| `POST /admin/api/bootstrap` | Create first admin token (requires master API key) |
+| `GET /admin/api/tokens` | List admin tokens |
+| `POST /admin/api/tokens` | Create admin token |
+| `DELETE /admin/api/tokens/{id}` | Delete admin token |
+| `PUT /admin/api/master-key` | Set master API key |
+| `POST /admin/api/keys` | Create scoped key |
 | `POST /admin/api/loglevel` | Change log level dynamically |
 | `GET /health` | Liveness check |
 | `GET /ready` | Readiness check (DB connected) |
