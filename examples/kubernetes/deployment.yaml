@@ -80,23 +80,18 @@ spec:
         # Environment variables from Secret
         # See: secret.yaml.example for Secret definition
         env:
-        - name: ADMIN_PASSWORD
+        - name: BUNNY_API_KEY
           valueFrom:
             secretKeyRef:
               name: bunny-api-proxy-secret
-              key: admin-password
-        - name: ENCRYPTION_KEY
-          valueFrom:
-            secretKeyRef:
-              name: bunny-api-proxy-secret
-              key: encryption-key
+              key: bunny-api-key
 
         # Other environment variables
         - name: LOG_LEVEL
           value: "info"  # Change to 'debug' for troubleshooting
-        - name: HTTP_PORT
-          value: "8080"
-        - name: DATA_PATH
+        - name: LISTEN_ADDR
+          value: ":8080"
+        - name: DATABASE_PATH
           value: "/data/proxy.db"
         - name: DATABASE_AUTO_INIT
           value: "true"

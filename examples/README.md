@@ -17,7 +17,7 @@ The fastest way to get Bunny API Proxy running:
 # 1. Copy environment template
 cp .env.example .env
 
-# 2. Edit configuration (important: change ADMIN_PASSWORD and ENCRYPTION_KEY)
+# 2. Edit configuration (important: set BUNNY_API_KEY)
 nano .env
 
 # 3. Start services
@@ -159,8 +159,8 @@ sudo chmod 640 /etc/bunny-api-proxy/.env
 
 ```bash
 sudo nano /etc/bunny-api-proxy/.env
-# Update: DATA_PATH=/var/lib/bunny-api-proxy/proxy.db
-# Change: ADMIN_PASSWORD and ENCRYPTION_KEY
+# Update: DATABASE_PATH=/var/lib/bunny-api-proxy/proxy.db
+# Set: BUNNY_API_KEY=your-bunny-net-master-api-key
 ```
 
 **6. Download binary:**
@@ -751,7 +751,7 @@ All examples reference version `2026.01.2`:
 ## Next Steps
 
 1. **Choose deployment method** based on your infrastructure
-2. **Generate secure credentials** (ADMIN_PASSWORD, ENCRYPTION_KEY)
+2. **Obtain your bunny.net API key** from your bunny.net account settings
 3. **Configure networking** (firewall, reverse proxy, TLS)
 4. **Set up monitoring** (health checks, logs, alerting)
 5. **Plan backup strategy** (automated backups, testing restores)

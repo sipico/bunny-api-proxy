@@ -232,12 +232,12 @@ Mirror bunny.net DNS API structure (MVP endpoints listed above).
 
 | Endpoint | Purpose |
 |----------|---------|
-| `POST /admin/api/bootstrap` | Create first admin token (requires master API key) |
-| `GET /admin/api/tokens` | List admin tokens |
-| `POST /admin/api/tokens` | Create admin token |
-| `DELETE /admin/api/tokens/{id}` | Delete admin token |
-| `PUT /admin/api/master-key` | Set master API key |
-| `POST /admin/api/keys` | Create scoped key |
+| `GET /admin/api/tokens` | List all tokens (admin and scoped) |
+| `POST /admin/api/tokens` | Create token (admin or scoped) - bootstrap uses `BUNNY_API_KEY` |
+| `GET /admin/api/tokens/{id}` | Get token details |
+| `DELETE /admin/api/tokens/{id}` | Delete token |
+| `POST /admin/api/tokens/{id}/permissions` | Add permission to token |
+| `DELETE /admin/api/tokens/{id}/permissions/{pid}` | Remove permission |
 | `POST /admin/api/loglevel` | Change log level dynamically |
 | `GET /health` | Liveness check |
 | `GET /ready` | Readiness check (DB connected) |

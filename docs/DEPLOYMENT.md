@@ -51,6 +51,7 @@ The simplest way to deploy Bunny API Proxy is using Docker.
 ```bash
 docker run -d \
   --name bunny-api-proxy \
+  -e BUNNY_API_KEY="your-bunny-net-master-api-key" \
   -e LOG_LEVEL="info" \
   -p 8080:8080 \
   -v bunny-proxy-data:/data \
@@ -63,6 +64,7 @@ docker run -d \
 |------|---------|
 | `-d` | Run in background (detached mode) |
 | `--name bunny-api-proxy` | Assign a container name for easier management |
+| `-e BUNNY_API_KEY` | **Required**: Your bunny.net master API key |
 | `-e LOG_LEVEL` | Optional: info (default), debug, warn, or error |
 | `-p 8080:8080` | Map container port 8080 to host port 8080 |
 | `-v bunny-proxy-data:/data` | Mount Docker volume for persistent database storage |
@@ -103,6 +105,7 @@ services:
     restart: unless-stopped
 
     environment:
+      BUNNY_API_KEY: ${BUNNY_API_KEY}  # Required
       LOG_LEVEL: ${LOG_LEVEL:-info}
       LISTEN_ADDR: ":8080"
       DATABASE_PATH: /data/proxy.db
@@ -130,6 +133,7 @@ volumes:
 Create a `.env` file in the same directory:
 
 ```bash
+BUNNY_API_KEY=your-bunny-net-master-api-key  # Required
 LOG_LEVEL=info
 ```
 
@@ -167,6 +171,7 @@ services:
     restart: unless-stopped
 
     environment:
+      BUNNY_API_KEY: ${BUNNY_API_KEY}  # Required
       LOG_LEVEL: ${LOG_LEVEL:-info}
       LISTEN_ADDR: ":8080"
       DATABASE_PATH: /data/proxy.db
@@ -231,6 +236,7 @@ networks:
 For this setup, update your `.env` file:
 
 ```bash
+BUNNY_API_KEY=your-bunny-net-master-api-key  # Required
 LOG_LEVEL=info
 PROXY_HOSTNAME=api-proxy.example.com
 ACME_EMAIL=admin@example.com
@@ -242,7 +248,7 @@ After successful deployment, follow these steps to configure the proxy:
 
 ### Step 1: Bootstrap - Create First Admin Token
 
-Use your bunny.net master API key to create the first admin token:
+Use your bunny.net master API key (the same one from `BUNNY_API_KEY` environment variable) to create the first admin token:
 
 ```bash
 # Bootstrap with your bunny.net master API key
@@ -260,27 +266,20 @@ curl -X POST http://localhost:8080/admin/api/tokens \
 # }
 ```
 
-**Important**: Save the returned token securely - it cannot be retrieved later.
+**Important**:
+- Save the returned token securely - it cannot be retrieved later
+- After creating the first admin token, the master key is locked out of admin endpoints
+- Use the new admin token for all subsequent management operations
 
-### Step 2: Set the Master API Key
-
-Store the master API key hash in the proxy:
-
-```bash
-curl -X PUT http://localhost:8080/admin/api/master-key \
-  -H "AccessKey: generated-admin-token" \
-  -H "Content-Type: application/json" \
-  -d '{"api_key": "your-bunny-net-master-api-key"}'
-```
-
-### Step 3: Create Your First Scoped Key
+### Step 2: Create Your First Scoped Token
 
 ```bash
-curl -X POST http://localhost:8080/admin/api/keys \
+curl -X POST http://localhost:8080/admin/api/tokens \
   -H "AccessKey: generated-admin-token" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "acme-dns-validation",
+    "is_admin": false,
     "zones": [123456],
     "actions": ["list_zones", "list_records", "add_record", "delete_record"],
     "record_types": ["TXT"]
@@ -288,30 +287,32 @@ curl -X POST http://localhost:8080/admin/api/keys \
 
 # Response:
 # {
-#   "id": 1,
-#   "key": "scoped-key-value"
+#   "id": 2,
+#   "name": "acme-dns-validation",
+#   "token": "scoped-token-value",
+#   "is_admin": false
 # }
 ```
 
-**Important**: Save the returned key securely - it cannot be retrieved later.
+**Important**: Save the returned token securely - it cannot be retrieved later.
 
-### Step 4: Test the Scoped Key
+### Step 3: Test the Scoped Token
 
 ```bash
-# List zones (should work if key has permission)
-curl -H "AccessKey: scoped-key-value" \
+# List zones (should work if token has permission)
+curl -H "AccessKey: scoped-token-value" \
   http://localhost:8080/dnszone
 
 # Create a TXT record for ACME validation
 curl -X POST \
-  -H "AccessKey: scoped-key-value" \
+  -H "AccessKey: scoped-token-value" \
   -H "Content-Type: application/json" \
   -d '{"Type":"TXT","Name":"_acme-challenge","Value":"validation-token","Ttl":300}' \
   http://localhost:8080/dnszone/123456/records
 
 # Delete the test record when done
 curl -X DELETE \
-  -H "AccessKey: scoped-key-value" \
+  -H "AccessKey: scoped-token-value" \
   http://localhost:8080/dnszone/123456/records/record-id
 ```
 
@@ -321,17 +322,19 @@ All configuration is done via environment variables. They must be set before the
 
 ### Environment Variables
 
-| Variable | Type | Default | Values | Description |
-|----------|------|---------|--------|-------------|
-| `LOG_LEVEL` | String | `info` | `debug`, `info`, `warn`, `error` | Logging verbosity. Use `debug` for troubleshooting. Can be changed dynamically via Admin API without restart. |
-| `LISTEN_ADDR` | Address | `:8080` | `:8080`, `0.0.0.0:8080` | HTTP server listen address. Must match container port mapping if using Docker. |
-| `DATABASE_PATH` | File path | `/data/proxy.db` | `/data/proxy.db` (recommended) | SQLite database file location. Should be on a mounted volume for persistence. |
-| `BUNNY_API_URL` | URL | `https://api.bunny.net` | `https://api.bunny.net` | Override bunny.net API endpoint. Mainly for testing against mock servers. |
+| Variable | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `BUNNY_API_KEY` | String | **Yes** | - | Your bunny.net master API key. Used for proxying requests to bunny.net and for bootstrap authentication. |
+| `LOG_LEVEL` | String | No | `info` | Logging verbosity: `debug`, `info`, `warn`, `error`. Can be changed dynamically via Admin API without restart. |
+| `LISTEN_ADDR` | Address | No | `:8080` | HTTP server listen address. Must match container port mapping if using Docker. |
+| `DATABASE_PATH` | File path | No | `/data/proxy.db` | SQLite database file location. Should be on a mounted volume for persistence. |
+| `BUNNY_API_URL` | URL | No | `https://api.bunny.net` | Override bunny.net API endpoint. Mainly for testing against mock servers. |
 
 ### Configuration Examples
 
 **Development (verbose logging):**
 ```bash
+BUNNY_API_KEY=your-bunny-net-master-api-key
 LOG_LEVEL=debug
 LISTEN_ADDR=:8080
 DATABASE_PATH=/data/proxy.db
@@ -339,6 +342,7 @@ DATABASE_PATH=/data/proxy.db
 
 **Production (minimal logging):**
 ```bash
+BUNNY_API_KEY=your-bunny-net-master-api-key
 LOG_LEVEL=warn
 LISTEN_ADDR=:8080
 DATABASE_PATH=/data/proxy.db
@@ -346,6 +350,7 @@ DATABASE_PATH=/data/proxy.db
 
 **Testing (custom bunny.net endpoint):**
 ```bash
+BUNNY_API_KEY=test-api-key
 BUNNY_API_URL=http://mock-bunny:9999
 LOG_LEVEL=debug
 ```
@@ -355,10 +360,10 @@ LOG_LEVEL=debug
 ### Essential Security Practices
 
 1. **Protect Your bunny.net Master API Key**
-   - Only use during bootstrap to create admin tokens
-   - Store securely in a password manager
+   - Set via `BUNNY_API_KEY` environment variable (never in config files)
+   - Store securely in a password manager or secrets manager
    - Never commit to version control
-   - The proxy stores only a hash - the original key is needed for bunny.net API calls
+   - The key is used both for proxying to bunny.net and bootstrap authentication
 
 2. **Protect Admin Tokens**
    - Store admin tokens securely after creation
@@ -425,6 +430,15 @@ For Kubernetes environments, use a Deployment with persistent storage:
 
 ```yaml
 apiVersion: v1
+kind: Secret
+metadata:
+  name: bunny-api-proxy-secret
+type: Opaque
+stringData:
+  BUNNY_API_KEY: "your-bunny-net-master-api-key"  # Replace with actual key
+
+---
+apiVersion: v1
 kind: ConfigMap
 metadata:
   name: bunny-api-proxy-config
@@ -470,6 +484,8 @@ spec:
           name: http
 
         envFrom:
+        - secretRef:
+            name: bunny-api-proxy-secret
         - configMapRef:
             name: bunny-api-proxy-config
 
@@ -551,6 +567,7 @@ Group=bunny
 WorkingDirectory=/var/lib/bunny-api-proxy
 
 # Environment variables
+EnvironmentFile=/etc/bunny-api-proxy/env  # Contains BUNNY_API_KEY
 Environment="LOG_LEVEL=info"
 Environment="LISTEN_ADDR=:8080"
 Environment="DATABASE_PATH=/var/lib/bunny-api-proxy/proxy.db"
@@ -583,6 +600,12 @@ sudo useradd -r -s /bin/false bunny
 sudo mkdir -p /var/lib/bunny-api-proxy
 sudo chown -R bunny:bunny /var/lib/bunny-api-proxy
 sudo chmod 700 /var/lib/bunny-api-proxy
+
+# Create environment file with API key (secure permissions)
+sudo mkdir -p /etc/bunny-api-proxy
+echo 'BUNNY_API_KEY=your-bunny-net-master-api-key' | sudo tee /etc/bunny-api-proxy/env
+sudo chmod 600 /etc/bunny-api-proxy/env
+sudo chown root:bunny /etc/bunny-api-proxy/env
 
 # Enable and start the service
 sudo systemctl daemon-reload
@@ -666,10 +689,11 @@ sudo systemctl reload nginx
 ### What to Backup
 
 The SQLite database contains:
-- Scoped API keys and their permissions
+- Token hashes (admin and scoped tokens)
+- Permissions for each token
 - Configuration (log level, etc.)
-- Encrypted master API key
-- Admin tokens and sessions
+
+**Note**: The master bunny.net API key is NOT stored in the database - it comes from the `BUNNY_API_KEY` environment variable.
 
 **Location**: `/data/proxy.db` (inside container or mounted volume)
 
@@ -775,8 +799,7 @@ docker rm bunny-api-proxy
 # Start with the new image (same command as initial deployment)
 docker run -d \
   --name bunny-api-proxy \
-  -e ADMIN_PASSWORD="..." \
-  -e ENCRYPTION_KEY="..." \
+  -e BUNNY_API_KEY="your-bunny-net-master-api-key" \
   -p 8080:8080 \
   -v bunny-proxy-data:/data \
   ghcr.io/sipico/bunny-api-proxy:latest
@@ -806,9 +829,9 @@ curl http://localhost:8080/ready
 - [ ] Pull latest image
 - [ ] Restart container/service
 - [ ] Verify `/ready` endpoint returns OK
-- [ ] Test scoped key functionality
+- [ ] Test scoped token functionality
 - [ ] Check logs for errors: `docker logs bunny-api-proxy`
-- [ ] Confirm admin UI is accessible
+- [ ] Confirm admin API is accessible (e.g., `/admin/api/tokens`)
 
 ## Monitoring and Health Checks
 
@@ -978,9 +1001,7 @@ docker logs bunny-api-proxy
 
 | Error | Solution |
 |-------|----------|
-| `ADMIN_PASSWORD is required` | Add `-e ADMIN_PASSWORD=...` to docker run |
-| `ENCRYPTION_KEY is required` | Add `-e ENCRYPTION_KEY=...` (32 chars) |
-| `ENCRYPTION_KEY must be exactly 32 characters` | Verify key length is exactly 32 |
+| `BUNNY_API_KEY environment variable is required` | Add `-e BUNNY_API_KEY=...` to docker run with your bunny.net API key |
 | `address already in use` | Change port or stop existing container |
 | `permission denied` | Run with `--user 1000:1000` or ensure volume permissions |
 

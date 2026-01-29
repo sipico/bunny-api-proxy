@@ -399,24 +399,18 @@ providedHash := sha256.Sum256([]byte(providedToken))
    metadata:
      name: bunny-proxy-secrets
    type: Opaque
-   data:
-     admin-password: <base64-encoded>
-     encryption-key: <base64-encoded>
+   stringData:
+     bunny-api-key: your-bunny-net-master-api-key
    ```
 
 2. **Environment Variables**
    ```yaml
    env:
-   - name: ADMIN_PASSWORD
+   - name: BUNNY_API_KEY
      valueFrom:
        secretKeyRef:
          name: bunny-proxy-secrets
-         key: admin-password
-   - name: ENCRYPTION_KEY
-     valueFrom:
-       secretKeyRef:
-         name: bunny-proxy-secrets
-         key: encryption-key
+         key: bunny-api-key
    ```
 
 3. **Network Policy**
@@ -447,9 +441,9 @@ providedHash := sha256.Sum256([]byte(providedToken))
 
 **Mitigation**:
 - Master key never given to clients
-- Only scoped keys with minimal permissions are distributed
-- Scoped keys can be revoked without affecting other clients
-- Master key encrypted in database (cannot be read without `ENCRYPTION_KEY`)
+- Only scoped tokens with minimal permissions are distributed
+- Scoped tokens can be revoked without affecting other clients
+- Master key is provided via `BUNNY_API_KEY` environment variable (not stored in database)
 
 #### Accidental Overprivileged Keys
 
