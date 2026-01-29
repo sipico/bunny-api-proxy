@@ -1,10 +1,7 @@
 package storage
 
 import (
-	"context"
-	"crypto/sha256"
 	"database/sql"
-	"encoding/hex"
 	"fmt"
 )
 
@@ -57,66 +54,6 @@ func New(dbPath string, encryptionKey []byte) (*SQLiteStorage, error) {
 	return &SQLiteStorage{
 		db: db,
 	}, nil
-}
-
-// SetMasterAPIKey hashes and stores the master bunny.net API key.
-// If a key already exists, it updates it.
-func (s *SQLiteStorage) SetMasterAPIKey(ctx context.Context, apiKey string) error {
-	// Hash the API key using SHA256
-	hash := sha256.Sum256([]byte(apiKey))
-	hashHex := hex.EncodeToString(hash[:])
-
-	// Insert or replace the config row
-	query := "INSERT OR REPLACE INTO config (id, master_api_key_hash) VALUES (1, ?)"
-	_, err := s.db.ExecContext(ctx, query, hashHex)
-	if err != nil {
-		return fmt.Errorf("failed to set master API key: %w", err)
-	}
-
-	return nil
-}
-
-// GetMasterAPIKey is required by the Storage interface.
-// NOTE: The actual implementation only stores the hash, not the plain key.
-// This method returns an empty string as the plain key is not retrievable.
-// Use ValidateMasterAPIKey to verify a key instead.
-func (s *SQLiteStorage) GetMasterAPIKey(ctx context.Context) (string, error) {
-	// The plain key is not stored, only the hash. Return empty string.
-	return "", nil
-}
-
-// GetMasterAPIKeyHash retrieves the hash of the master bunny.net API key.
-// Returns ErrNotFound if no key is configured.
-func (s *SQLiteStorage) GetMasterAPIKeyHash(ctx context.Context) (string, error) {
-	query := "SELECT master_api_key_hash FROM config WHERE id = 1"
-	var hash string
-
-	err := s.db.QueryRowContext(ctx, query).Scan(&hash)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return "", ErrNotFound
-		}
-		return "", fmt.Errorf("failed to query master API key hash: %w", err)
-	}
-
-	return hash, nil
-}
-
-// ValidateMasterAPIKey checks if the provided API key matches the stored master key hash.
-// Returns true if the key is valid, false if it doesn't match, or an error if the hash can't be retrieved.
-func (s *SQLiteStorage) ValidateMasterAPIKey(ctx context.Context, apiKey string) (bool, error) {
-	// Get the stored hash
-	storedHash, err := s.GetMasterAPIKeyHash(ctx)
-	if err != nil {
-		return false, err
-	}
-
-	// Hash the provided key
-	hash := sha256.Sum256([]byte(apiKey))
-	hashHex := hex.EncodeToString(hash[:])
-
-	// Compare
-	return hashHex == storedHash, nil
 }
 
 // Close closes the database connection.

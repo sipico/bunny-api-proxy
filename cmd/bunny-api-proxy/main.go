@@ -61,14 +61,15 @@ func doHealthCheck(url string) int {
 
 // serverComponents holds all initialized server components for testing
 type serverComponents struct {
-	logger      *slog.Logger
-	logLevel    *slog.LevelVar
-	store       storage.Storage
-	validator   *auth.Validator
-	bunnyClient *bunny.StorageClient
-	proxyRouter http.Handler
-	adminRouter http.Handler
-	mainRouter  *chi.Mux
+	logger           *slog.Logger
+	logLevel         *slog.LevelVar
+	store            storage.Storage
+	validator        *auth.Validator
+	bunnyClient      *bunny.Client
+	bootstrapService *auth.BootstrapService
+	proxyRouter      http.Handler
+	adminRouter      http.Handler
+	mainRouter       *chi.Mux
 }
 
 // initializeComponents sets up all server components with proper error handling
@@ -97,22 +98,26 @@ func initializeComponents(cfg *config.Config) (*serverComponents, error) {
 	// 4. Create auth validator
 	validator := auth.NewValidator(store)
 
-	// 5. Create bunny client (storage-backed)
-	var bunnyOpts []interface{}
+	// 5. Create bunny client with real API key
+	var bunnyOpts []bunny.Option
 	if cfg.BunnyAPIURL != "" {
-		bunnyOpts = append(bunnyOpts, bunny.WithStorageClientBaseURL(cfg.BunnyAPIURL))
+		bunnyOpts = append(bunnyOpts, bunny.WithBaseURL(cfg.BunnyAPIURL))
 	}
-	bunnyClient := bunny.NewStorageClient(store, bunnyOpts...)
+	bunnyClient := bunny.NewClient(cfg.BunnyAPIKey, bunnyOpts...)
 
-	// 6. Create proxy handler and router
+	// 6. Create bootstrap service for managing master key and bootstrap state
+	bootstrapService := auth.NewBootstrapService(store, cfg.BunnyAPIKey)
+
+	// 7. Create proxy handler and router
 	proxyHandler := proxy.NewHandler(bunnyClient, logger)
 	proxyRouter := proxy.NewRouter(proxyHandler, auth.Middleware(validator))
 
-	// 7. Create admin handler and router
+	// 8. Create admin handler and router
 	adminHandler := admin.NewHandler(store, logLevel, logger)
+	adminHandler.SetBootstrapService(bootstrapService)
 	adminRouter := adminHandler.NewRouter()
 
-	// 8. Assemble main router
+	// 9. Assemble main router
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
@@ -123,14 +128,15 @@ func initializeComponents(cfg *config.Config) (*serverComponents, error) {
 	r.Mount("/", proxyRouter)
 
 	return &serverComponents{
-		logger:      logger,
-		logLevel:    logLevel,
-		store:       store,
-		validator:   validator,
-		bunnyClient: bunnyClient,
-		proxyRouter: proxyRouter,
-		adminRouter: adminRouter,
-		mainRouter:  r,
+		logger:           logger,
+		logLevel:         logLevel,
+		store:            store,
+		validator:        validator,
+		bunnyClient:      bunnyClient,
+		bootstrapService: bootstrapService,
+		proxyRouter:      proxyRouter,
+		adminRouter:      adminRouter,
+		mainRouter:       r,
 	}, nil
 }
 
@@ -191,6 +197,10 @@ func run() error {
 		return fmt.Errorf("config load failed: %w", err)
 	}
 
+	if err := cfg.Validate(); err != nil {
+		return fmt.Errorf("config validation failed: %w", err)
+	}
+
 	// Initialize all components
 	components, err := initializeComponents(cfg)
 	if err != nil {
@@ -224,10 +234,9 @@ func readyHandler(store storage.Storage) http.HandlerFunc {
 		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 		defer cancel()
 
-		// Try to validate master API key (with empty string) - tests connectivity without requiring a key to exist
-		// ValidateMasterAPIKey will return ErrNotFound if no key is configured, but will error if database is unavailable
-		_, err := store.ValidateMasterAPIKey(ctx, "")
-		if err != nil && err != storage.ErrNotFound {
+		// Test database connectivity by listing tokens
+		_, err := store.ListTokens(ctx)
+		if err != nil {
 			// Database error
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusServiceUnavailable)

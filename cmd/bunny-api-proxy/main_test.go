@@ -263,6 +263,7 @@ func TestInitializeComponentsWithInvalidDataPath(t *testing.T) {
 func TestRunWithInvalidLogLevel(t *testing.T) {
 	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
+	oldBunnyAPIKey := os.Getenv("BUNNY_API_KEY")
 
 	defer func() {
 		if oldDatabasePath != "" {
@@ -275,10 +276,16 @@ func TestRunWithInvalidLogLevel(t *testing.T) {
 		} else {
 			os.Unsetenv("LOG_LEVEL")
 		}
+		if oldBunnyAPIKey != "" {
+			os.Setenv("BUNNY_API_KEY", oldBunnyAPIKey)
+		} else {
+			os.Unsetenv("BUNNY_API_KEY")
+		}
 	}()
 
 	os.Setenv("DATABASE_PATH", ":memory:")
 	os.Setenv("LOG_LEVEL", "invalid_level") // Invalid log level
+	os.Setenv("BUNNY_API_KEY", "test-key")
 
 	err := run()
 	if err == nil {
@@ -721,9 +728,9 @@ func TestInitializeComponentsStorageCreated(t *testing.T) {
 	// Verify storage works
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	_, storageErr := components.store.GetMasterAPIKey(ctx)
-	// It's OK if the key doesn't exist, we're just testing connectivity
-	if storageErr != nil && storageErr != storage.ErrNotFound {
+	_, storageErr := components.store.ListTokens(ctx)
+	// ListTokens should succeed even if no tokens exist
+	if storageErr != nil {
 		t.Errorf("storage should be accessible, got error: %v", storageErr)
 	}
 }
@@ -928,6 +935,7 @@ func TestInitializeComponentsLogLevelVariantWorks(t *testing.T) {
 func TestRunWithInvalidDatabasePath(t *testing.T) {
 	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
+	oldBunnyAPIKey := os.Getenv("BUNNY_API_KEY")
 
 	defer func() {
 		if oldDatabasePath != "" {
@@ -940,10 +948,16 @@ func TestRunWithInvalidDatabasePath(t *testing.T) {
 		} else {
 			os.Unsetenv("LOG_LEVEL")
 		}
+		if oldBunnyAPIKey != "" {
+			os.Setenv("BUNNY_API_KEY", oldBunnyAPIKey)
+		} else {
+			os.Unsetenv("BUNNY_API_KEY")
+		}
 	}()
 
 	os.Setenv("DATABASE_PATH", "/nonexistent/path/that/does/not/exist/db.sqlite")
 	os.Setenv("LOG_LEVEL", "info")
+	os.Setenv("BUNNY_API_KEY", "test-key")
 
 	err := run()
 	if err == nil {
@@ -2189,6 +2203,7 @@ func TestRunInitializeComponentsInvalidLogLevel(t *testing.T) {
 
 	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
+	oldBunnyAPIKey := os.Getenv("BUNNY_API_KEY")
 
 	defer func() {
 		if oldDatabasePath != "" {
@@ -2201,9 +2216,15 @@ func TestRunInitializeComponentsInvalidLogLevel(t *testing.T) {
 		} else {
 			os.Unsetenv("LOG_LEVEL")
 		}
+		if oldBunnyAPIKey != "" {
+			os.Setenv("BUNNY_API_KEY", oldBunnyAPIKey)
+		} else {
+			os.Unsetenv("BUNNY_API_KEY")
+		}
 	}()
 
 	os.Setenv("LOG_LEVEL", "INVALID_LEVEL")
+	os.Setenv("BUNNY_API_KEY", "test-key")
 
 	// Call run() with invalid log level
 	err := run()

@@ -161,89 +161,6 @@ curl -X DELETE http://localhost:8080/admin/api/tokens/1 \
 
 ---
 
-### Master API Key Management
-
-#### PUT /admin/api/master-key
-
-Set the master bunny.net API key (can only be set once).
-
-**Authentication:** AccessKey required
-**Response:** 201 Created or 409 Conflict (if already set)
-
-**Request Body:**
-```json
-{
-  "api_key": "bunny.net-api-key"
-}
-```
-
-**Example Request:**
-```bash
-curl -X PUT http://localhost:8080/admin/api/master-key \
-  -H "AccessKey: <admin-token>" \
-  -H "Content-Type: application/json" \
-  -d '{"api_key": "12345abcde-bunny-api-key"}'
-```
-
-**Example Response:**
-```json
-{
-  "status": "ok"
-}
-```
-
----
-
-### Scoped API Key Management
-
-#### POST /admin/api/keys
-
-Create a new scoped API key with specific zone and action permissions.
-
-**Authentication:** AccessKey required
-**Response:** 201 Created
-
-**Request Body:**
-```json
-{
-  "name": "key-name",
-  "zones": [123456, 789012],
-  "actions": ["list_zones", "add_record", "delete_record"],
-  "record_types": ["A", "CNAME", "TXT", "MX"]
-}
-```
-
-**Parameters:**
-- `name` - Descriptive name for the key
-- `zones` - Zone IDs this key can access
-- `actions` - Allowed actions: `list_zones`, `get_zone`, `list_records`, `add_record`, `delete_record`
-- `record_types` - DNS record types the key can modify
-
-**Example Request (ACME DNS-01 Client):**
-```bash
-curl -X POST http://localhost:8080/admin/api/keys \
-  -H "AccessKey: <admin-token>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "acme-client",
-    "zones": [123456],
-    "actions": ["list_zones", "add_record", "delete_record", "list_records"],
-    "record_types": ["TXT"]
-  }'
-```
-
-**Example Response:**
-```json
-{
-  "id": 5,
-  "key": "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b"
-}
-```
-
-**Note:** The key is shown only once. Store it securely immediately.
-
----
-
 ### Log Level Management
 
 #### POST /admin/api/loglevel
@@ -524,12 +441,13 @@ curl -X POST http://localhost:8080/admin/api/tokens \
 #   "is_admin": true
 # }
 
-# 2. Create a scoped key restricted to TXT record management for DNS-01
-curl -X POST http://localhost:8080/admin/api/keys \
+# 2. Create a scoped token restricted to TXT record management for DNS-01
+curl -X POST http://localhost:8080/admin/api/tokens \
   -H "AccessKey: admin-token-value" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "acme-dns-client",
+    "is_admin": false,
     "zones": [123456],
     "actions": ["list_zones", "list_records", "add_record", "delete_record"],
     "record_types": ["TXT"]
@@ -537,23 +455,25 @@ curl -X POST http://localhost:8080/admin/api/keys \
 
 # Response:
 # {
-#   "id": 1,
-#   "key": "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6"
+#   "id": 2,
+#   "name": "acme-dns-client",
+#   "token": "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6",
+#   "is_admin": false
 # }
 
-# 3. Configure ACME client to use this key
+# 3. Configure ACME client to use this token
 # Example for Certbot with a DNS hook script:
 
 #!/bin/bash
 # dns-hook.sh
-ACME_KEY="a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6"
+ACME_TOKEN="a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6"
 ZONE_ID="123456"
 PROXY_URL="http://localhost:8080"
 
 if [ "$CERTBOT_AUTH_OUTPUT" ]; then
   # Add validation record
   curl -X POST "$PROXY_URL/dnszone/$ZONE_ID/records" \
-    -H "AccessKey: $ACME_KEY" \
+    -H "AccessKey: $ACME_TOKEN" \
     -H "Content-Type: application/json" \
     -d "{
       \"Type\": \"TXT\",

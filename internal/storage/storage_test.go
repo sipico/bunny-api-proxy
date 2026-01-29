@@ -34,22 +34,7 @@ func TestCompleteWorkflow(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	ctx := context.Background()
 
-	// Step 1: Set master API key
-	masterKey := "bunny-api-key-abc123xyz"
-	if err := s.SetMasterAPIKey(ctx, masterKey); err != nil {
-		t.Fatalf("SetMasterAPIKey failed: %v", err)
-	}
-
-	// Step 2: Verify master key validation
-	valid, err := s.ValidateMasterAPIKey(ctx, masterKey)
-	if err != nil {
-		t.Fatalf("ValidateMasterAPIKey failed: %v", err)
-	}
-	if !valid {
-		t.Errorf("master key validation failed")
-	}
-
-	// Step 3: Create multiple scoped keys
+	// Step 1: Create multiple scoped keys
 	acmeKeyID, err := s.CreateScopedKey(ctx, "ACME DNS Validation", "proxy_acme_key_12345")
 	if err != nil {
 		t.Fatalf("failed to create ACME scoped key: %v", err)
@@ -60,7 +45,7 @@ func TestCompleteWorkflow(t *testing.T) {
 		t.Fatalf("failed to create admin scoped key: %v", err)
 	}
 
-	// Step 4: Add permissions to ACME key
+	// Step 2: Add permissions to ACME key
 	acmePerm := &Permission{
 		ZoneID:         12345,
 		AllowedActions: []string{"list_records", "add_record", "delete_record"},
@@ -74,7 +59,7 @@ func TestCompleteWorkflow(t *testing.T) {
 		t.Errorf("expected positive permission ID, got %d", acmePermID)
 	}
 
-	// Step 5: Add multiple permissions to admin key
+	// Step 3: Add multiple permissions to admin key
 	adminPerm1 := &Permission{
 		ZoneID:         12345,
 		AllowedActions: []string{"list_records", "add_record", "delete_record"},
@@ -126,27 +111,12 @@ func TestCompleteWorkflow(t *testing.T) {
 		t.Fatalf("expected 2 admin permissions, got %d", len(adminPerms))
 	}
 
-	// Step 9: Update master API key
-	newMasterKey := "bunny-api-key-updated-xyz789"
-	if err := s.SetMasterAPIKey(ctx, newMasterKey); err != nil {
-		t.Fatalf("failed to update master API key: %v", err)
-	}
-
-	// Step 10: Verify updated master key
-	valid, err = s.ValidateMasterAPIKey(ctx, newMasterKey)
-	if err != nil {
-		t.Fatalf("ValidateMasterAPIKey failed after update: %v", err)
-	}
-	if !valid {
-		t.Errorf("updated master key validation failed")
-	}
-
-	// Step 11: Delete a permission
+	// Step 9: Delete a permission
 	if err := s.DeletePermission(ctx, acmePermID); err != nil {
 		t.Fatalf("failed to delete permission: %v", err)
 	}
 
-	// Step 12: Verify permission is deleted
+	// Step 10: Verify permission is deleted
 	acmePerms, err = s.GetPermissions(ctx, acmeKeyID)
 	if err != nil {
 		t.Fatalf("failed to get ACME permissions after delete: %v", err)
@@ -155,12 +125,12 @@ func TestCompleteWorkflow(t *testing.T) {
 		t.Errorf("expected 0 ACME permissions after delete, got %d", len(acmePerms))
 	}
 
-	// Step 13: Delete ACME scoped key (should cascade delete remaining permissions)
+	// Step 11: Delete ACME scoped key (should cascade delete remaining permissions)
 	if err := s.DeleteScopedKey(ctx, acmeKeyID); err != nil {
 		t.Fatalf("failed to delete ACME scoped key: %v", err)
 	}
 
-	// Step 14: Verify only admin key remains
+	// Step 12: Verify only admin key remains
 	allKeys, err = s.ListScopedKeys(ctx)
 	if err != nil {
 		t.Fatalf("failed to list scoped keys after delete: %v", err)
@@ -335,11 +305,6 @@ func TestConcurrentAccess(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	ctx := context.Background()
 
-	// Set master key once
-	if err := s.SetMasterAPIKey(ctx, "master-key-123"); err != nil {
-		t.Fatalf("SetMasterAPIKey failed: %v", err)
-	}
-
 	const numGoroutines = 10
 	var wg sync.WaitGroup
 	var errorCount int32
@@ -498,25 +463,6 @@ func TestErrorCases(t *testing.T) {
 		}
 	})
 
-	t.Run("GetMasterKeyNotSet", func(t *testing.T) {
-		// Create a fresh storage without setting master key
-		freshKey := make([]byte, 32)
-		_, _ = rand.Read(freshKey)
-		freshS, err := New(":memory:", freshKey)
-		if err != nil {
-			t.Fatalf("New failed: %v", err)
-		}
-		defer func() { _ = freshS.Close() }()
-
-		_, err = freshS.GetMasterAPIKeyHash(ctx)
-		if err == nil {
-			t.Error("expected error for unset master key, got nil")
-		}
-		if !errors.Is(err, ErrNotFound) {
-			t.Errorf("expected ErrNotFound, got %v", err)
-		}
-	})
-
 	t.Run("ContextCancellation", func(t *testing.T) {
 		cancelCtx, cancel := context.WithCancel(ctx)
 		cancel() // Cancel immediately
@@ -548,12 +494,6 @@ func TestDataPersistence(t *testing.T) {
 	s, err := New(dbPath, encryptionKey)
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
-	}
-
-	// Write master key
-	masterKey := "master-key-persistence-test"
-	if err := s.SetMasterAPIKey(ctx, masterKey); err != nil {
-		t.Fatalf("SetMasterAPIKey failed: %v", err)
 	}
 
 	// Create scoped keys with permissions
@@ -597,16 +537,7 @@ func TestDataPersistence(t *testing.T) {
 	}
 	defer func() { _ = s2.Close() }()
 
-	// Phase 4: Verify master key persisted
-	valid, err := s2.ValidateMasterAPIKey(ctx, masterKey)
-	if err != nil {
-		t.Fatalf("ValidateMasterAPIKey failed: %v", err)
-	}
-	if !valid {
-		t.Errorf("master key persistence validation failed")
-	}
-
-	// Phase 5: Verify scoped keys persisted
+	// Phase 4: Verify scoped keys persisted
 	reopenedKeys, err := s2.ListScopedKeys(ctx)
 	if err != nil {
 		t.Fatalf("ListScopedKeys failed after reopen: %v", err)
@@ -615,7 +546,7 @@ func TestDataPersistence(t *testing.T) {
 		t.Fatalf("expected 3 keys after reopen, got %d", len(reopenedKeys))
 	}
 
-	// Phase 6: Verify key details match
+	// Phase 5: Verify key details match
 	for i, initialKey := range initialKeys {
 		reopenedKey := reopenedKeys[i]
 		if reopenedKey.ID != initialKey.ID {
@@ -629,7 +560,7 @@ func TestDataPersistence(t *testing.T) {
 		}
 	}
 
-	// Phase 7: Verify permissions persisted
+	// Phase 6: Verify permissions persisted
 	for i, keyID := range keyIDs {
 		perms, err := s2.GetPermissions(ctx, keyID)
 		if err != nil {

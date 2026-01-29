@@ -2,7 +2,6 @@ package admin
 
 import (
 	"bytes"
-	"context"
 	"crypto/rand"
 	"encoding/json"
 	"io"
@@ -39,12 +38,8 @@ func newTestServer(t *testing.T) *testServer {
 		t.Fatalf("failed to create storage: %v", err)
 	}
 
-	// Create master key and set it
-	masterKey := "test-master-api-key-12345"
-	ctx := context.Background()
-	if err := store.SetMasterAPIKey(ctx, masterKey); err != nil {
-		t.Fatalf("failed to set master key: %v", err)
-	}
+	// Test master key (from environment in production)
+	masterKey := "test-bunny-api-key-12345"
 
 	// Create handler
 	logLevel := new(slog.LevelVar)

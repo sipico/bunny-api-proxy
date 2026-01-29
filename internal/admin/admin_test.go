@@ -65,14 +65,6 @@ func (m *mockStorageForAdminTest) Close() error {
 	return nil
 }
 
-func (m *mockStorageForAdminTest) GetMasterAPIKey(ctx context.Context) (string, error) {
-	return "", nil
-}
-
-func (m *mockStorageForAdminTest) SetMasterAPIKey(ctx context.Context, key string) error {
-	return nil
-}
-
 func (m *mockStorageForAdminTest) ValidateAdminToken(ctx context.Context, token string) (*storage.AdminToken, error) {
 	return nil, nil
 }

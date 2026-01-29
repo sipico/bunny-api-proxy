@@ -34,10 +34,6 @@ func (h *Handler) NewRouter() chi.Router {
 		r.Delete("/tokens/{id}", h.HandleDeleteUnifiedToken)
 		r.Post("/tokens/{id}/permissions", h.HandleAddTokenPermission)
 		r.Delete("/tokens/{id}/permissions/{pid}", h.HandleDeleteTokenPermission)
-
-		// Legacy endpoints (for backward compatibility)
-		r.Put("/master-key", h.HandleSetMasterKeyAPI)
-		r.Post("/keys", h.HandleCreateKeyAPI)
 	})
 
 	return r
