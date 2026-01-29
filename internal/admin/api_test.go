@@ -464,7 +464,6 @@ func TestHandleDeleteToken(t *testing.T) {
 	}
 }
 
-
 func TestGenerateRandomKey(t *testing.T) {
 	// Test that generateRandomKey produces keys of correct length
 	key1 := generateRandomKey(32)

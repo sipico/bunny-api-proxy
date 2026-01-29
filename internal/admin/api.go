@@ -170,7 +170,6 @@ func (h *Handler) HandleDeleteToken(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-
 // generateRandomKey generates a random hex string of the given length
 func generateRandomKey(length int) string {
 	b := make([]byte, length/2)

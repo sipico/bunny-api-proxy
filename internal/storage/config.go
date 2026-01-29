@@ -56,7 +56,6 @@ func New(dbPath string, encryptionKey []byte) (*SQLiteStorage, error) {
 	}, nil
 }
 
-
 // Close closes the database connection.
 func (s *SQLiteStorage) Close() error {
 	if s.db != nil {
