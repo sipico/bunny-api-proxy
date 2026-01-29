@@ -5,129 +5,341 @@
 [![codecov](https://codecov.io/gh/sipico/bunny-api-proxy/branch/main/graph/badge.svg)](https://codecov.io/gh/sipico/bunny-api-proxy)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 
-A production-ready API proxy for bunny.net that enables scoped and limited API keys. Perfect for ACME DNS-01 validation and other use cases where you want to restrict access to specific DNS zones or operations.
+An API proxy for bunny.net that enables scoped and limited API keys. Perfect for ACME DNS-01 validation and other use cases where you want to restrict access to specific DNS zones or operations.
 
 ## Features
 
-- **Scoped API Keys** - Create API keys with granular permissions for specific operations
-- **DNS API Support** - Full support for bunny.net DNS operations
-  - List zones
-  - Get zone details
-  - List, add, and delete DNS records
-- **Admin Web UI** - HTMX-based web interface for managing API keys, tokens, and permissions
-- **Admin REST API** - Programmatic access to admin functions
+- **API-Only Architecture** - Pure REST API with no web UI; ideal for automation
+- **Scoped Tokens** - Create tokens with granular permissions for specific zones and operations
+- **Admin Tokens** - Full-access tokens for management operations
+- **Bootstrap Security** - Master key can only create the first admin token, then is locked out
+- **DNS API Support** - Proxies bunny.net DNS operations (list zones, records, add/delete)
 - **SQLite Storage** - Lightweight, embedded database with persistent storage
-- **Data Encryption** - AES-256 encryption for sensitive data at rest
-- **Authentication** - Session-based and bearer token authentication
-- **Structured Logging** - JSON-formatted logs for production environments
-- **Health Endpoints** - Liveness and readiness probes for Kubernetes/container orchestration
-- **Comprehensive Test Coverage** - >85% test coverage with security scanning
-- **Docker Ready** - Production-grade Docker image included
+- **Structured Logging** - JSON-formatted logs with runtime log level control
+- **Health Endpoints** - Liveness and readiness probes for container orchestration
+- **Comprehensive Tests** - >85% test coverage with security scanning
 
 ## Quick Start
 
-### Using Docker (Recommended)
+### Using Docker
 
 ```bash
-docker run -it \
+docker run -d \
   -p 8080:8080 \
-  -e ADMIN_PASSWORD=change-me-in-production \
-  -e ENCRYPTION_KEY=32-character-key-for-aes-256enc \
   -v bunny-proxy-data:/data \
   ghcr.io/sipico/bunny-api-proxy:latest
 ```
 
-Then access the admin UI at `http://localhost:8080` with username `admin` and your chosen password.
+### Configuration
 
-### Using Docker Compose
+All configuration is via environment variables:
 
-```yaml
-version: '3.8'
-services:
-  bunny-proxy:
-    image: ghcr.io/sipico/bunny-api-proxy:latest
-    ports:
-      - "8080:8080"
-    environment:
-      ADMIN_PASSWORD: change-me-in-production
-      ENCRYPTION_KEY: 32-character-key-for-aes-256enc
-      LOG_LEVEL: info
-    volumes:
-      - bunny-proxy-data:/data
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `LOG_LEVEL` | `info` | Log level (debug, info, warn, error) |
+| `LISTEN_ADDR` | `:8080` | Server listen address |
+| `DATABASE_PATH` | `/data/proxy.db` | SQLite database path |
+| `BUNNY_API_URL` | `https://api.bunny.net` | bunny.net API endpoint |
 
-volumes:
-  bunny-proxy-data:
-```
+### Bootstrap: Creating the First Admin Token
 
-## Configuration
-
-All configuration is handled via environment variables:
-
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `ADMIN_PASSWORD` | Yes | - | Password for admin UI authentication |
-| `ENCRYPTION_KEY` | Yes | - | 32-character key for AES-256 encryption of sensitive data |
-| `HTTP_PORT` | No | `8080` | HTTP server port |
-| `LOG_LEVEL` | No | `info` | Log level (debug, info, warn, error) |
-| `DATA_PATH` | No | `/data/proxy.db` | Path to SQLite database file |
-| `BUNNY_API_URL` | No | `https://api.bunny.net` | bunny.net API endpoint (for testing/proxying) |
-
-### Generating an Encryption Key
-
-Generate a secure 32-character encryption key:
+On first run, use your bunny.net master API key to create an admin token:
 
 ```bash
-# Linux/macOS
-openssl rand -base64 24
-
-# Or using Go
-go run -c 'import "crypto/rand"; import "encoding/base64"; b := make([]byte, 24); rand.Read(b); println(base64.StdEncoding.EncodeToString(b))'
+# Create the first admin token using master key
+curl -X POST http://localhost:8080/admin/api/tokens \
+  -H "AccessKey: YOUR_BUNNY_NET_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "primary-admin", "is_admin": true}'
 ```
 
-## Documentation
+Response:
+```json
+{
+  "id": 1,
+  "name": "primary-admin",
+  "token": "abc123...",
+  "is_admin": true
+}
+```
 
-- [Deployment Guide](DEPLOYMENT.md) - Comprehensive deployment instructions for various environments
-- [API Reference](API.md) - Detailed API documentation and examples
-- [Security Guide](SECURITY.md) - Security best practices and threat model
-- [Architecture](ARCHITECTURE.md) - Technical decisions and system design
+**Important:** Save the returned `token` value - it is shown only once. After the first admin token is created, the master key is locked out and all further management must use admin tokens.
+
+## Authentication
+
+All API requests require the `AccessKey` header:
+
+```bash
+curl -H "AccessKey: YOUR_TOKEN" http://localhost:8080/admin/api/whoami
+```
+
+## API Reference
+
+### Health Endpoints (No Auth Required)
+
+#### GET /health
+Liveness check - returns OK if the process is running.
+
+```bash
+curl http://localhost:8080/health
+```
+```json
+{"status":"ok"}
+```
+
+#### GET /ready
+Readiness check - returns OK if the database is accessible.
+
+```bash
+curl http://localhost:8080/ready
+```
+```json
+{"status":"ok"}
+```
+
+### Admin API
+
+All admin endpoints are under `/admin/api` and require authentication via the `AccessKey` header.
+
+#### GET /admin/api/whoami
+Returns information about the current token.
+
+```bash
+curl -H "AccessKey: YOUR_TOKEN" http://localhost:8080/admin/api/whoami
+```
+
+Response for admin token:
+```json
+{
+  "token_id": 1,
+  "name": "primary-admin",
+  "is_admin": true,
+  "is_master_key": false
+}
+```
+
+Response for scoped token:
+```json
+{
+  "token_id": 2,
+  "name": "acme-client",
+  "is_admin": false,
+  "is_master_key": false,
+  "permissions": [
+    {
+      "id": 1,
+      "zone_id": 12345,
+      "allowed_actions": ["list_records", "add_record", "delete_record"],
+      "record_types": ["TXT"]
+    }
+  ]
+}
+```
+
+#### GET /admin/api/tokens
+List all tokens (admin only).
+
+```bash
+curl -H "AccessKey: YOUR_ADMIN_TOKEN" http://localhost:8080/admin/api/tokens
+```
+```json
+[
+  {"id": 1, "name": "primary-admin", "is_admin": true, "created_at": "2024-01-15T10:30:00Z"},
+  {"id": 2, "name": "acme-client", "is_admin": false, "created_at": "2024-01-15T11:00:00Z"}
+]
+```
+
+#### POST /admin/api/tokens
+Create a new token (admin only, or master key during bootstrap).
+
+**Create an admin token:**
+```bash
+curl -X POST http://localhost:8080/admin/api/tokens \
+  -H "AccessKey: YOUR_ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "backup-admin", "is_admin": true}'
+```
+
+**Create a scoped token:**
+```bash
+curl -X POST http://localhost:8080/admin/api/tokens \
+  -H "AccessKey: YOUR_ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "acme-client",
+    "is_admin": false,
+    "zones": [12345],
+    "actions": ["list_records", "add_record", "delete_record"],
+    "record_types": ["TXT"]
+  }'
+```
+
+Response:
+```json
+{
+  "id": 2,
+  "name": "acme-client",
+  "token": "def456...",
+  "is_admin": false
+}
+```
+
+**Note:** The `token` is shown only once. Store it securely.
+
+#### GET /admin/api/tokens/{id}
+Get token details (admin only).
+
+```bash
+curl -H "AccessKey: YOUR_ADMIN_TOKEN" http://localhost:8080/admin/api/tokens/2
+```
+```json
+{
+  "id": 2,
+  "name": "acme-client",
+  "is_admin": false,
+  "created_at": "2024-01-15T11:00:00Z",
+  "permissions": [
+    {
+      "id": 1,
+      "zone_id": 12345,
+      "allowed_actions": ["list_records", "add_record", "delete_record"],
+      "record_types": ["TXT"]
+    }
+  ]
+}
+```
+
+#### DELETE /admin/api/tokens/{id}
+Delete a token (admin only).
+
+```bash
+curl -X DELETE -H "AccessKey: YOUR_ADMIN_TOKEN" http://localhost:8080/admin/api/tokens/2
+```
+
+Returns `204 No Content` on success. You cannot delete the last admin token.
+
+#### POST /admin/api/tokens/{id}/permissions
+Add a permission to a scoped token (admin only).
+
+```bash
+curl -X POST http://localhost:8080/admin/api/tokens/2/permissions \
+  -H "AccessKey: YOUR_ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "zone_id": 67890,
+    "allowed_actions": ["list_records"],
+    "record_types": ["A", "AAAA"]
+  }'
+```
+```json
+{
+  "id": 2,
+  "zone_id": 67890,
+  "allowed_actions": ["list_records"],
+  "record_types": ["A", "AAAA"]
+}
+```
+
+#### DELETE /admin/api/tokens/{id}/permissions/{pid}
+Remove a permission from a token (admin only).
+
+```bash
+curl -X DELETE -H "AccessKey: YOUR_ADMIN_TOKEN" \
+  http://localhost:8080/admin/api/tokens/2/permissions/1
+```
+
+Returns `204 No Content` on success.
+
+#### POST /admin/api/loglevel
+Change the runtime log level (admin only).
+
+```bash
+curl -X POST http://localhost:8080/admin/api/loglevel \
+  -H "AccessKey: YOUR_ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"level": "debug"}'
+```
+```json
+{"level": "debug"}
+```
+
+### DNS Proxy API
+
+These endpoints proxy requests to bunny.net. Use a scoped token with appropriate permissions.
+
+#### GET /dnszone
+List all DNS zones.
+
+```bash
+curl -H "AccessKey: YOUR_TOKEN" http://localhost:8080/dnszone
+```
+
+#### GET /dnszone/{zoneID}
+Get zone details.
+
+```bash
+curl -H "AccessKey: YOUR_TOKEN" http://localhost:8080/dnszone/12345
+```
+
+#### GET /dnszone/{zoneID}/records
+List records in a zone.
+
+```bash
+curl -H "AccessKey: YOUR_TOKEN" http://localhost:8080/dnszone/12345/records
+```
+
+#### POST /dnszone/{zoneID}/records
+Add a record to a zone.
+
+```bash
+curl -X POST http://localhost:8080/dnszone/12345/records \
+  -H "AccessKey: YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"Type": 3, "Name": "_acme-challenge", "Value": "validation-token", "Ttl": 300}'
+```
+
+#### DELETE /dnszone/{zoneID}/records/{recordID}
+Delete a record from a zone.
+
+```bash
+curl -X DELETE -H "AccessKey: YOUR_TOKEN" \
+  http://localhost:8080/dnszone/12345/records/67890
+```
+
+## Error Responses
+
+All errors return JSON with a consistent structure:
+
+```json
+{
+  "error": "error_code",
+  "message": "Human-readable description",
+  "hint": "Optional suggestion for resolution"
+}
+```
+
+Common error codes:
+- `invalid_request` - Malformed request body or invalid parameters
+- `invalid_credentials` - Missing or invalid API key
+- `admin_required` - Endpoint requires an admin token
+- `master_key_locked` - Master key cannot be used after bootstrap
+- `not_found` - Resource not found
+- `cannot_delete_last_admin` - Cannot delete the only admin token
+- `no_admin_token_exists` - Must create admin token first during bootstrap
+- `internal_error` - Server error
 
 ## Building from Source
 
 ```bash
-# Clone the repository
 git clone https://github.com/sipico/bunny-api-proxy.git
 cd bunny-api-proxy
-
-# Build
 go build -o bunny-api-proxy ./cmd/bunny-api-proxy
-
-# Run with required environment variables
-export ADMIN_PASSWORD=your-secure-password
-export ENCRYPTION_KEY=your-32-character-encryption-key
 ./bunny-api-proxy
 ```
 
-## Development
-
-See [CLAUDE.md](CLAUDE.md) for development conventions and [ARCHITECTURE.md](ARCHITECTURE.md) for technical details.
-
-### Requirements
-
-- Go 1.24+
-- golangci-lint
-- Docker (optional)
-
-### Building and Testing
+### Development
 
 ```bash
-# Format code
-gofmt -w .
-
 # Run tests with coverage
 go test -race -cover ./...
 
@@ -136,26 +348,16 @@ golangci-lint run
 
 # Security scan
 govulncheck ./...
-
-# Build binary
-go build -o bunny-api-proxy ./cmd/bunny-api-proxy
-
-# Build Docker image
-docker build -t bunny-api-proxy .
-
-# Check test coverage
-make coverage
 ```
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for technical details.
 
 ## License
 
 AGPL v3 - see [LICENSE](LICENSE) for details.
 
-Commercial licenses are available for organizations that want to use this software without the AGPL v3 copyleft requirements. For inquiries, please open an issue or contact the maintainer.
+Commercial licenses available for organizations that want to use this software without AGPL v3 copyleft requirements.
 
 ## Contributing
 
-This project is not accepting external code contributions (pull requests) at this time.
-
-Bug reports and feature requests are welcome as GitHub Issues. See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
-# Test docs-only change
+Bug reports and feature requests welcome as GitHub Issues. See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
