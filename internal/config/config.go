@@ -2,81 +2,50 @@
 package config
 
 import (
-	"errors"
 	"os"
 )
 
-// Config holds all application configuration
+// Config holds all application configuration for API-only mode.
 type Config struct {
-	AdminPassword string
-	EncryptionKey []byte // Must be 32 bytes
-	LogLevel      string // debug, info, warn, error
-	HTTPPort      string
-	DataPath      string
-	BunnyAPIURL   string // Optional: Base URL for bunny.net API (empty = use default)
+	LogLevel     string // debug, info, warn, error
+	ListenAddr   string // Server listen address (e.g., ":8080")
+	DatabasePath string // SQLite database path
+	BunnyAPIURL  string // Optional: Base URL for bunny.net API (empty = use default)
 }
 
-// ErrMissingAdminPassword indicates the ADMIN_PASSWORD environment variable is required.
-var ErrMissingAdminPassword = errors.New("ADMIN_PASSWORD is required")
-
-// ErrMissingEncryptionKey indicates the ENCRYPTION_KEY environment variable is required.
-var ErrMissingEncryptionKey = errors.New("ENCRYPTION_KEY is required")
-
-// ErrInvalidEncryptionKey indicates the ENCRYPTION_KEY must be exactly 32 characters.
-var ErrInvalidEncryptionKey = errors.New("ENCRYPTION_KEY must be exactly 32 characters")
-
 // Load parses configuration from environment variables.
-// Returns error if required variables are missing or invalid.
+// All configuration options have sensible defaults for ease of deployment.
 func Load() (*Config, error) {
-	adminPassword := os.Getenv("ADMIN_PASSWORD")
-	encryptionKeyStr := os.Getenv("ENCRYPTION_KEY")
 	logLevel := os.Getenv("LOG_LEVEL")
-	httpPort := os.Getenv("HTTP_PORT")
-	dataPath := os.Getenv("DATA_PATH")
+	listenAddr := os.Getenv("LISTEN_ADDR")
+	databasePath := os.Getenv("DATABASE_PATH")
 	bunnyAPIURL := os.Getenv("BUNNY_API_URL")
-
-	// Validate required fields
-	if adminPassword == "" {
-		return nil, ErrMissingAdminPassword
-	}
-
-	if encryptionKeyStr == "" {
-		return nil, ErrMissingEncryptionKey
-	}
 
 	// Set defaults for optional fields
 	if logLevel == "" {
 		logLevel = "info"
 	}
 
-	if httpPort == "" {
-		httpPort = "8080"
+	if listenAddr == "" {
+		listenAddr = ":8080"
 	}
 
-	if dataPath == "" {
-		dataPath = "/data/proxy.db"
+	if databasePath == "" {
+		databasePath = "/data/proxy.db"
 	}
 
 	cfg := &Config{
-		AdminPassword: adminPassword,
-		EncryptionKey: []byte(encryptionKeyStr),
-		LogLevel:      logLevel,
-		HTTPPort:      httpPort,
-		DataPath:      dataPath,
-		BunnyAPIURL:   bunnyAPIURL,
-	}
-
-	if err := cfg.Validate(); err != nil {
-		return nil, err
+		LogLevel:     logLevel,
+		ListenAddr:   listenAddr,
+		DatabasePath: databasePath,
+		BunnyAPIURL:  bunnyAPIURL,
 	}
 
 	return cfg, nil
 }
 
-// Validate checks all configuration constraints
+// Validate checks all configuration constraints.
+// Currently no required fields; all have defaults.
 func (c *Config) Validate() error {
-	if len(c.EncryptionKey) != 32 {
-		return ErrInvalidEncryptionKey
-	}
 	return nil
 }
