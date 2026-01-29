@@ -2,6 +2,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 )
 
@@ -11,6 +12,7 @@ type Config struct {
 	ListenAddr   string // Server listen address (e.g., ":8080")
 	DatabasePath string // SQLite database path
 	BunnyAPIURL  string // Optional: Base URL for bunny.net API (empty = use default)
+	BunnyAPIKey  string // Required: bunny.net API key for master authentication
 }
 
 // Load parses configuration from environment variables.
@@ -20,6 +22,7 @@ func Load() (*Config, error) {
 	listenAddr := os.Getenv("LISTEN_ADDR")
 	databasePath := os.Getenv("DATABASE_PATH")
 	bunnyAPIURL := os.Getenv("BUNNY_API_URL")
+	bunnyAPIKey := os.Getenv("BUNNY_API_KEY")
 
 	// Set defaults for optional fields
 	if logLevel == "" {
@@ -39,13 +42,16 @@ func Load() (*Config, error) {
 		ListenAddr:   listenAddr,
 		DatabasePath: databasePath,
 		BunnyAPIURL:  bunnyAPIURL,
+		BunnyAPIKey:  bunnyAPIKey,
 	}
 
 	return cfg, nil
 }
 
 // Validate checks all configuration constraints.
-// Currently no required fields; all have defaults.
 func (c *Config) Validate() error {
+	if c.BunnyAPIKey == "" {
+		return fmt.Errorf("BUNNY_API_KEY environment variable is required")
+	}
 	return nil
 }

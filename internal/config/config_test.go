@@ -12,6 +12,7 @@ func TestLoad_DefaultValues(t *testing.T) {
 		os.Unsetenv("LISTEN_ADDR")
 		os.Unsetenv("DATABASE_PATH")
 		os.Unsetenv("BUNNY_API_URL")
+		os.Unsetenv("BUNNY_API_KEY")
 
 		cfg, err := Load()
 		if err != nil {
@@ -30,6 +31,9 @@ func TestLoad_DefaultValues(t *testing.T) {
 		if cfg.BunnyAPIURL != "" {
 			t.Errorf("BunnyAPIURL = %q, want empty string (default)", cfg.BunnyAPIURL)
 		}
+		if cfg.BunnyAPIKey != "" {
+			t.Errorf("BunnyAPIKey = %q, want empty string (not set)", cfg.BunnyAPIKey)
+		}
 	})
 }
 
@@ -39,6 +43,7 @@ func TestLoad_CustomValues(t *testing.T) {
 		t.Setenv("LISTEN_ADDR", ":9000")
 		t.Setenv("DATABASE_PATH", "/custom/path.db")
 		t.Setenv("BUNNY_API_URL", "http://mockbunny:8081")
+		t.Setenv("BUNNY_API_KEY", "test-api-key-123")
 
 		cfg, err := Load()
 		if err != nil {
@@ -56,6 +61,9 @@ func TestLoad_CustomValues(t *testing.T) {
 		}
 		if cfg.BunnyAPIURL != "http://mockbunny:8081" {
 			t.Errorf("BunnyAPIURL = %q, want %q", cfg.BunnyAPIURL, "http://mockbunny:8081")
+		}
+		if cfg.BunnyAPIKey != "test-api-key-123" {
+			t.Errorf("BunnyAPIKey = %q, want %q", cfg.BunnyAPIKey, "test-api-key-123")
 		}
 	})
 }
@@ -184,11 +192,29 @@ func TestLoad_BunnyAPIURL(t *testing.T) {
 }
 
 func TestValidate(t *testing.T) {
-	t.Run("always returns nil for valid config", func(t *testing.T) {
+	t.Run("returns error when BunnyAPIKey is empty", func(t *testing.T) {
 		cfg := &Config{
 			LogLevel:     "info",
 			ListenAddr:   ":8080",
 			DatabasePath: "/data/proxy.db",
+			BunnyAPIKey:  "", // Missing required key
+		}
+
+		err := cfg.Validate()
+		if err == nil {
+			t.Error("Validate() should return error when BunnyAPIKey is empty")
+		}
+		if err != nil && err.Error() != "BUNNY_API_KEY environment variable is required" {
+			t.Errorf("Validate() error message = %v, want 'BUNNY_API_KEY environment variable is required'", err)
+		}
+	})
+
+	t.Run("returns nil when BunnyAPIKey is set", func(t *testing.T) {
+		cfg := &Config{
+			LogLevel:     "info",
+			ListenAddr:   ":8080",
+			DatabasePath: "/data/proxy.db",
+			BunnyAPIKey:  "valid-api-key",
 		}
 
 		err := cfg.Validate()
