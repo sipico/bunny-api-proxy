@@ -35,9 +35,8 @@ func (h *Handler) TokenAuthMiddleware(next http.Handler) http.Handler {
 
 		ctx := r.Context()
 
-		// First, check if this is the master API key
-		masterKey, err := h.storage.GetMasterAPIKey(ctx)
-		if err == nil && masterKey != "" && token == masterKey {
+		// First, check if this is the master API key using the bootstrap service
+		if h.bootstrap != nil && h.bootstrap.IsMasterKey(token) {
 			// Master key authenticated - set context flags
 			ctx = auth.WithMasterKey(ctx, true)
 			ctx = auth.WithAdmin(ctx, true)

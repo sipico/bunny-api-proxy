@@ -463,6 +463,11 @@ func (h *Handler) HandleCreateUnifiedToken(w http.ResponseWriter, r *http.Reques
 					"Create requests using an admin token instead of the master API key.")
 				return
 			}
+			// Only admin tokens can manage tokens
+			if !auth.IsAdminFromContext(ctx) {
+				WriteError(w, http.StatusForbidden, ErrCodeAdminRequired, "Admin token required to manage tokens")
+				return
+			}
 		}
 	}
 
