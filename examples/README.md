@@ -27,10 +27,10 @@ docker-compose up -d
 curl http://localhost:8080/health
 
 # 5. Bootstrap with your bunny.net master API key
-curl -X POST http://localhost:8080/admin/api/bootstrap \
+curl -X POST http://localhost:8080/admin/api/tokens \
   -H "AccessKey: your-bunny-net-master-api-key" \
   -H "Content-Type: application/json" \
-  -d '{"name": "initial-admin"}'
+  -d '{"name": "initial-admin", "is_admin": true}'
 
 # View logs
 docker-compose logs -f bunny-api-proxy

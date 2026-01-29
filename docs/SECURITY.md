@@ -44,26 +44,26 @@ Example permission model:
 
 ### 2.1 Bootstrap Authentication
 
-**Flow**: bunny.net Master API Key → Validate with bunny.net → Create First Admin Token
+**Flow**: bunny.net Master API Key → Create First Admin Token
 
 #### Bootstrap Mechanism
-- **Endpoint**: `POST /admin/api/bootstrap`
+- **Endpoint**: `POST /admin/api/tokens` with `is_admin: true`
 - **Input**: bunny.net master API key in `AccessKey` header
-- **Validation**: The proxy validates the key by making a test request to bunny.net
-- **Availability**: Only works when no admin tokens exist in the database
-- **Prevention**: Once an admin token exists, bootstrap is disabled
+- **Validation**: The proxy checks if the key matches the stored master key hash
+- **Availability**: Master key authentication only works when no admin tokens exist
+- **Prevention**: Once an admin token exists, master key is locked out
 
 **Security notes**:
-- Bootstrap requires a valid bunny.net master API key
-- The master key is validated against bunny.net's API
-- Once bootstrap completes, this endpoint returns 409 Conflict
+- Bootstrap requires the bunny.net master API key
+- The master key hash is stored when setting up the proxy
+- Once an admin token exists, master key returns 403 Forbidden
 
 ### 2.2 Admin API Authentication
 
 **Flow**: AccessKey Token → Hash Validation → Request Processing
 
 #### AccessKey Token Authentication
-- **Endpoint**: Any `/admin/api/*` endpoint (except bootstrap)
+- **Endpoint**: Any `/admin/api/*` endpoint
 - **Header format**: `AccessKey: <token>`
 - **Token validation**:
   1. Token is hashed with SHA-256
