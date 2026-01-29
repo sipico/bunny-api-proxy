@@ -246,16 +246,17 @@ Use your bunny.net master API key to create the first admin token:
 
 ```bash
 # Bootstrap with your bunny.net master API key
-curl -X POST http://localhost:8080/admin/api/bootstrap \
+curl -X POST http://localhost:8080/admin/api/tokens \
   -H "AccessKey: your-bunny-net-master-api-key" \
   -H "Content-Type: application/json" \
-  -d '{"name": "initial-admin"}'
+  -d '{"name": "initial-admin", "is_admin": true}'
 
 # Response:
 # {
 #   "id": 1,
 #   "name": "initial-admin",
-#   "token": "generated-admin-token"
+#   "token": "generated-admin-token",
+#   "is_admin": true
 # }
 ```
 
@@ -746,12 +747,12 @@ All admin tokens are stored as hashes and cannot be recovered.
 **Recovery steps**:
 
 1. If other admin tokens exist, use one to create a new token
-2. If no admin tokens exist, the bootstrap endpoint becomes available again:
+2. If no admin tokens exist, the master key can create a new admin:
    ```bash
-   curl -X POST http://localhost:8080/admin/api/bootstrap \
+   curl -X POST http://localhost:8080/admin/api/tokens \
      -H "AccessKey: your-bunny-net-master-api-key" \
      -H "Content-Type: application/json" \
-     -d '{"name": "recovery-admin"}'
+     -d '{"name": "recovery-admin", "is_admin": true}'
    ```
 3. All scoped keys and permissions remain intact
 
