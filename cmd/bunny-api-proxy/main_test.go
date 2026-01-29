@@ -728,9 +728,9 @@ func TestInitializeComponentsStorageCreated(t *testing.T) {
 	// Verify storage works
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	_, storageErr := components.store.GetMasterAPIKey(ctx)
-	// It's OK if the key doesn't exist, we're just testing connectivity
-	if storageErr != nil && storageErr != storage.ErrNotFound {
+	_, storageErr := components.store.ListTokens(ctx)
+	// ListTokens should succeed even if no tokens exist
+	if storageErr != nil {
 		t.Errorf("storage should be accessible, got error: %v", storageErr)
 	}
 }

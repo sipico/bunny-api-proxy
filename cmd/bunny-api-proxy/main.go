@@ -234,10 +234,9 @@ func readyHandler(store storage.Storage) http.HandlerFunc {
 		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 		defer cancel()
 
-		// Try to validate master API key (with empty string) - tests connectivity without requiring a key to exist
-		// ValidateMasterAPIKey will return ErrNotFound if no key is configured, but will error if database is unavailable
-		_, err := store.ValidateMasterAPIKey(ctx, "")
-		if err != nil && err != storage.ErrNotFound {
+		// Test database connectivity by listing tokens
+		_, err := store.ListTokens(ctx)
+		if err != nil {
 			// Database error
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusServiceUnavailable)

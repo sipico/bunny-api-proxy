@@ -16,7 +16,6 @@ import (
 type mockStorageWithToken struct {
 	*mockStorage
 	validateToken func(ctx context.Context, token string) (*storage.AdminToken, error)
-	getMasterKey  func(ctx context.Context) (string, error)
 	listTokens    func(ctx context.Context) ([]*storage.Token, error)
 }
 
@@ -25,13 +24,6 @@ func (m *mockStorageWithToken) ValidateAdminToken(ctx context.Context, token str
 		return m.validateToken(ctx, token)
 	}
 	return nil, storage.ErrNotFound
-}
-
-func (m *mockStorageWithToken) GetMasterAPIKey(ctx context.Context) (string, error) {
-	if m.getMasterKey != nil {
-		return m.getMasterKey(ctx)
-	}
-	return "", storage.ErrNotFound
 }
 
 func (m *mockStorageWithToken) CreateAdminToken(ctx context.Context, name, token string) (int64, error) {

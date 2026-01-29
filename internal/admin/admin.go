@@ -29,10 +29,6 @@ type Handler struct {
 // Storage interface for admin operations
 // Extended by later issues with additional methods
 type Storage interface {
-	// Config operations (Issue 5)
-	GetMasterAPIKey(ctx context.Context) (string, error)
-	SetMasterAPIKey(ctx context.Context, key string) error
-
 	// Health check
 	Close() error
 
