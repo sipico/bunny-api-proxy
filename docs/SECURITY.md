@@ -10,7 +10,7 @@ The Bunny API Proxy implements a **two-tier authentication architecture** design
 
 | Tier | Users | Purpose | Auth Method |
 |------|-------|---------|-------------|
-| **Admin** | Humans, automation | Manage proxy configuration | Password + session cookies or bearer tokens |
+| **Admin** | Humans, automation | Manage proxy configuration | AccessKey tokens (admin tokens) |
 | **Scoped Proxy Keys** | API clients (ACME, etc.) | Limited access to bunny.net API | AccessKey tokens with explicit permissions |
 
 ### Principle of Least Privilege
@@ -42,60 +42,38 @@ Example permission model:
 
 ## 2. Authentication Methods
 
-### 2.1 Admin Web UI
+### 2.1 Bootstrap Authentication
 
-**Flow**: Password → Session Token → Restricted Access
+**Flow**: bunny.net Master API Key → Validate with bunny.net → Create First Admin Token
 
-#### Login Mechanism
-- **Endpoint**: `POST /admin/login`
-- **Input**: Form data with `password` field
-- **Validation**: Constant-time comparison against `ADMIN_PASSWORD` environment variable
-- **Prevention**: Timing attack resistant (uses `crypto/subtle.ConstantTimeCompare`)
-
-#### Session Management
-- **Generation**: 32 random bytes → 64 hex character session ID
-- **Storage**: In-memory map (lost on restart)
-- **Expiration**: 24 hours (configurable via `NewSessionStore` timeout)
-- **Cookie Settings**:
-  - `HttpOnly: true` - Prevents JavaScript access
-  - `Secure: true` - Only sent over HTTPS (auto-detected from TLS context)
-  - `SameSite: Lax` - CSRF protection
-  - `Path: /admin` - Restricted to admin paths
-
-#### Logout
-- **Endpoint**: `POST /admin/logout`
-- **Action**: Deletes session from store and invalidates cookie
-- **Cookie deletion**: Sets `MaxAge: -1` to expire immediately
+#### Bootstrap Mechanism
+- **Endpoint**: `POST /admin/api/bootstrap`
+- **Input**: bunny.net master API key in `AccessKey` header
+- **Validation**: The proxy validates the key by making a test request to bunny.net
+- **Availability**: Only works when no admin tokens exist in the database
+- **Prevention**: Once an admin token exists, bootstrap is disabled
 
 **Security notes**:
-- Sessions are ephemeral (not persisted to database)
-- No session replay tokens or nonces (standard OAuth/SAML pattern not needed for single admin)
-- In production, run behind reverse proxy with TLS termination
+- Bootstrap requires a valid bunny.net master API key
+- The master key is validated against bunny.net's API
+- Once bootstrap completes, this endpoint returns 409 Conflict
 
 ### 2.2 Admin API Authentication
 
-**Flow**: AccessKey Token or Basic Auth → Validated → Request Processing
+**Flow**: AccessKey Token → Hash Validation → Request Processing
 
 #### AccessKey Token Authentication
-- **Endpoint**: Any `POST /admin/api/*` endpoint
+- **Endpoint**: Any `/admin/api/*` endpoint (except bootstrap)
 - **Header format**: `AccessKey: <token>`
 - **Token validation**:
   1. Token is hashed with SHA-256
   2. Hash is compared against stored admin token hashes in database
   3. If match found, token info is attached to request context
 
-#### Bootstrap: Basic Auth
-- **Purpose**: Initial setup when no bearer tokens exist
-- **Format**: `Authorization: Basic admin:<ADMIN_PASSWORD>`
-- **Credentials**:
-  - Username: Hard-coded as `admin`
-  - Password: Same as `ADMIN_PASSWORD` environment variable
-- **Validation**: Same constant-time comparison as web login
-
 #### Token Management
-- **Creation**: Via web UI (admin generates new token, receives once)
+- **Creation**: Via Admin API (admin generates new token, receives once)
 - **Storage**: SHA-256 hash in database (plaintext never stored)
-- **No rotation**: Tokens have no expiration; revocation requires deletion via UI
+- **No rotation**: Tokens have no expiration; revocation requires deletion via API
 - **Audit trail**: Token name stored for logging
 
 **Security notes**:
@@ -145,50 +123,36 @@ For each request:
 
 ### 3.1 Stored Secrets
 
-The proxy stores three types of secrets, each with different protection:
+The proxy stores secrets with one-way hashing for security:
 
 | Secret | Storage | Protection | Recovery |
 |--------|---------|-----------|----------|
-| **Master bunny.net API key** | SQLite config table | AES-256-GCM encrypted | Requires ENCRYPTION_KEY; master key must be re-entered if lost |
-| **Scoped proxy keys** | SQLite scoped_keys table | Bcrypt hashed (cost 12) | Cannot be recovered; key must be rotated via UI |
-| **Admin API tokens** | SQLite admin_tokens table | SHA-256 hashed | Cannot be recovered; token must be recreated via UI |
-| **Admin password** | Environment variable only | Not stored; ephemeral in memory | N/A |
+| **Master bunny.net API key** | SQLite config table | SHA-256 hashed | Cannot be recovered; used only for bootstrap validation |
+| **Scoped proxy keys** | SQLite scoped_keys table | Bcrypt hashed (cost 12) | Cannot be recovered; key must be rotated via API |
+| **Admin API tokens** | SQLite admin_tokens table | SHA-256 hashed | Cannot be recovered; token must be recreated via API |
 
-### 3.2 Master API Key Encryption
+### 3.2 Master API Key Storage
 
-The master bunny.net API key is the most sensitive secret, as it grants unscoped access to the bunny.net API.
+The master bunny.net API key hash is used only for validating bootstrap requests. The actual key is never stored - it must be provided from your bunny.net account when making API calls.
 
-#### Encryption Algorithm: AES-256-GCM
+#### Hash-Based Storage
 
-- **Algorithm**: AES (Advanced Encryption Standard) with 256-bit key
-- **Mode**: GCM (Galois/Counter Mode)
-- **Nonce**: 12 random bytes per encryption (cryptographically unique)
-- **Storage format**: Hex-encoded `nonce + ciphertext`
-- **Authenticity**: GCM provides built-in authentication (detects tampering)
-
-#### Encryption Key Requirements
-
-- **Length**: Exactly 32 bytes
-- **Randomness**: Must be cryptographically random
-- **Source**: Generated outside the application and set via `ENCRYPTION_KEY` environment variable
-- **Generation example**:
-  ```bash
-  openssl rand -base64 32
-  ```
+- **Algorithm**: SHA-256 (one-way hash)
+- **Purpose**: Validate the master key during bootstrap
+- **Security**: The original key cannot be recovered from the hash
+- **Note**: The proxy does not store the actual master key - it only stores a hash for validation
 
 #### Key Recovery
 
-If the `ENCRYPTION_KEY` is lost or compromised:
+Since the master key is stored as a hash:
 
-1. **Lost Key**: Master API key becomes unreadable but not deleted
-   - Re-enter master key via Admin UI → `/admin/master-key`
-   - All scoped keys, permissions, and tokens remain functional
-   - Only encrypted data needs re-entry
+1. **Lost bunny.net Master Key**: Get a new one from bunny.net dashboard
+   - All scoped keys and admin tokens remain functional
+   - Bootstrap endpoint becomes available if no admin tokens exist
 
-2. **Compromised Key**: Assume attacker can read the encrypted master key
-   - **Action**: Revoke all compromised API keys at bunny.net
-   - **Mitigation**: Rotate scoped keys immediately
-   - **Prevention**: Use secrets management system (Vault, AWS Secrets Manager, etc.)
+2. **Compromised Database**: Attacker cannot recover the master key from hash
+   - SHA-256 hashes are one-way
+   - Scoped keys are also hashed (bcrypt) and cannot be recovered
 
 ### 3.3 Hashing Strategies
 
@@ -217,7 +181,7 @@ for _, key := range storedKeys {
 // No match = invalid key
 ```
 
-#### SHA-256 for Admin Tokens
+#### SHA-256 for Admin Tokens and Master Key
 
 **Why SHA-256?**
 - Simple one-way hash (no salt needed for tokens; tokens themselves are random)
@@ -235,15 +199,6 @@ hash := sha256.Sum256([]byte(token))
 providedHash := sha256.Sum256([]byte(providedToken))
 // Compare: if storedHash == computedHash { valid }
 ```
-
-### 3.4 No Stored Passwords
-
-The admin password is **never stored** in the database or files:
-
-- **Runtime use only**: Compared directly against `ADMIN_PASSWORD` environment variable
-- **Logging**: Never logged (even at debug level)
-- **Transmission**: Only sent in form data (POST) or Basic Auth (base64 encoded)
-- **Recovery**: Cannot be reset if forgotten; re-deploy with new `ADMIN_PASSWORD`
 
 ---
 
@@ -275,27 +230,17 @@ The admin password is **never stored** in the database or files:
    - Implement rate limiting at reverse proxy level
    - Monitor for suspicious auth attempts
 
-#### Environment Configuration (Mandatory)
+#### Environment Configuration
 
-1. **ADMIN_PASSWORD**
-   - **Strength**: Minimum 32 characters recommended
-   - **Source**: Generate with password manager
-   - **Storage**: Never commit to git; use secrets management
-   - **Example generation**:
-     ```bash
-     openssl rand -base64 24  # Produces ~32 char random string
-     ```
+1. **bunny.net Master API Key**
+   - **Use**: Only during bootstrap to create first admin token
+   - **Storage**: Keep in password manager, never commit to git
+   - **Note**: The proxy stores only a hash - the original key is needed for bunny.net API calls
 
-2. **ENCRYPTION_KEY**
-   - **Strength**: 32 bytes cryptographically random
-   - **Format**: Base64 or hex encoded (decoded to 32 bytes)
-   - **Source**: Generated outside application
-   - **Example generation**:
-     ```bash
-     openssl rand -base64 32
-     ```
-   - **Backup**: Store securely in Vault/Secrets Manager
-   - **Rotation**: Requires decrypting all master keys, re-encrypting with new key
+2. **Admin Tokens**
+   - **Creation**: Via bootstrap or Admin API
+   - **Storage**: Store securely after creation (shown only once)
+   - **Rotation**: Create new tokens periodically and delete old ones
 
 3. **Log Level**
    - **Default**: `info` (recommended for production)
@@ -336,7 +281,7 @@ The admin password is **never stored** in the database or files:
    - Document last rotation date in key name
 
 4. **Key Revocation**
-   - Delete via Admin UI immediately if leaked
+   - Delete via Admin API immediately if leaked
    - Check logs for usage from leaked key
    - Regenerate in consuming application
 
@@ -351,7 +296,7 @@ The admin password is **never stored** in the database or files:
    - Helps identify which service's token was compromised
 
 3. **Regular Audit**
-   - Review active tokens monthly
+   - Review active tokens monthly via Admin API
    - Delete unused tokens
    - Check logs for suspicious token usage
 
@@ -374,25 +319,23 @@ The admin password is **never stored** in the database or files:
    - Use separate credentials/IAM roles
    - Monitor backup access logs
 
-#### Encryption Key Management
+#### bunny.net Master API Key Management
 
 1. **Storage**
-   - Use secrets management system (HashiCorp Vault, AWS Secrets Manager, Kubernetes Secrets)
+   - Store in password manager or secrets management system
    - Never hardcode in configuration files or Docker images
    - Never commit to version control
 
-2. **Rotation**
-   - Master key rotation requires:
-     1. Get current master API key (decrypt with old key)
-     2. Create new 32-byte encryption key
-     3. Delete current config row
-     4. Re-enter master key (encrypts with new key)
-   - Consider every 1-2 years for security hygiene
+2. **Usage**
+   - Only needed during bootstrap to create first admin token
+   - The proxy stores only a hash for validation
+   - Keep the original key for bunny.net API access
 
-3. **Access Logging**
-   - Enable secrets management audit trails
-   - Alert if ENCRYPTION_KEY is accessed unexpectedly
-   - Investigate access patterns
+3. **Rotation**
+   - If the bunny.net key needs rotation:
+     1. Generate new key at bunny.net dashboard
+     2. Bootstrap endpoint becomes available when no admin tokens exist
+     3. Or use existing admin token to update master key via API
 
 #### Monitoring & Logging
 
@@ -547,16 +490,15 @@ The admin password is **never stored** in the database or files:
 - SQLite driver enforces parameter binding
 - Foreign key constraints enabled (protects referential integrity)
 
-#### Session Fixation/Hijacking
+#### Admin Token Theft
 
-**Threat**: Attacker steals or guesses admin session cookie
+**Threat**: Attacker steals admin token
 
 **Mitigation**:
-- Session IDs are 32 random bytes (256 bits)
-- Cryptographically unforgeable
-- HttpOnly flag prevents JavaScript access
-- SameSite=Lax prevents CSRF
-- Secure flag ensures HTTPS-only transmission
+- Tokens are shown only once during creation
+- Store tokens securely (password manager, secrets management)
+- Use separate tokens per service for surgical revocation
+- Regular token rotation
 
 #### Unauthorized Zone Access via Missing Auth
 
@@ -599,15 +541,15 @@ The admin password is **never stored** in the database or files:
 - Encrypt drives at rest
 - Limit physical access
 
-#### Weak ADMIN_PASSWORD or ENCRYPTION_KEY
+#### Compromised bunny.net Master API Key
 
-**Threat**: Weak passwords/keys could be guessed via brute force
+**Threat**: Attacker obtains the bunny.net master API key
 
 **Mitigation** (user's responsibility):
-- Generate both with cryptographically secure sources
-- Use minimum 32 characters for password
-- Never reuse keys across deployments
-- Store keys in secrets management system
+- Store the master key securely in a password manager
+- Only use during bootstrap (not stored in proxy)
+- Rotate the key at bunny.net if compromise suspected
+- The proxy only stores a hash - cannot be used to recover the key
 
 #### Compromised Reverse Proxy
 
@@ -624,16 +566,6 @@ The admin password is **never stored** in the database or files:
 ## 6. Security Headers
 
 The Bunny API Proxy sets security-focused HTTP headers on responses:
-
-### Session Cookies (Web UI)
-```http
-Set-Cookie: admin_session=<id>;
-  Path=/admin;
-  MaxAge=86400;
-  HttpOnly;
-  Secure;
-  SameSite=Lax
-```
 
 ### JSON Responses (API)
 ```http
@@ -757,20 +689,17 @@ Use this checklist when deploying Bunny API Proxy to production:
 
 ### Pre-Deployment
 
-- [ ] Generate cryptographically random `ADMIN_PASSWORD` (32+ chars)
-- [ ] Generate cryptographically random `ENCRYPTION_KEY` (32 bytes)
-- [ ] Store both in secrets management system (Vault, AWS Secrets Manager, etc.)
-- [ ] Plan encryption key backup strategy
+- [ ] Have your bunny.net master API key ready (from bunny.net dashboard)
 - [ ] Plan database backup strategy
 - [ ] Set up reverse proxy with TLS termination
 - [ ] Configure firewall rules (block direct port 8080 access)
-- [ ] Review ADMIN_PASSWORD strength (min 32 chars, no patterns)
 
 ### Deployment
 
 - [ ] Deploy with reverse proxy in front
 - [ ] Verify HTTPS/TLS is working
-- [ ] Test login with admin password
+- [ ] Bootstrap: Create first admin token using bunny.net master key
+- [ ] Store admin token securely (password manager, secrets management)
 - [ ] Create first scoped key with minimal permissions
 - [ ] Test API access with scoped key
 - [ ] Configure log aggregation
@@ -785,19 +714,16 @@ Use this checklist when deploying Bunny API Proxy to production:
 - [ ] Schedule quarterly key rotation review
 - [ ] Monitor database size/growth
 - [ ] Test database backup restore
-- [ ] Review scoped keys monthly (remove unused)
+- [ ] Review scoped keys monthly via API (remove unused)
 - [ ] Update reverse proxy (security patches)
 - [ ] Update Bunny API Proxy (security patches)
-- [ ] Review ENCRYPTION_KEY access logs (if available)
-- [ ] Plan and test encryption key rotation
 
 ### Incident Response
 
 - [ ] Verify leaked key: Check logs for unauthorized access
-- [ ] Revoke leaked key immediately via Admin UI
+- [ ] Revoke leaked key immediately via Admin API
 - [ ] Check bunny.net audit logs for suspicious API calls
-- [ ] Rotate admin password if admin account was compromised
-- [ ] Rotate encryption key if database was accessed
+- [ ] Rotate admin tokens if admin access was compromised
 - [ ] Review all scoped keys; rotate if in doubt
 - [ ] Post-incident review: How did key leak? How to prevent?
 
