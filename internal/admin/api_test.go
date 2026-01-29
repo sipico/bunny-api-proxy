@@ -175,13 +175,13 @@ func TestHandleSetLogLevel(t *testing.T) {
 			name:       "invalid level",
 			body:       SetLogLevelRequest{Level: "invalid"},
 			wantStatus: http.StatusBadRequest,
-			wantBody:   "Invalid level",
+			wantBody:   "Invalid log level",
 		},
 		{
 			name:       "invalid JSON",
 			body:       "not-json",
 			wantStatus: http.StatusBadRequest,
-			wantBody:   "Invalid JSON",
+			wantBody:   "invalid_request",
 		},
 	}
 
@@ -361,7 +361,7 @@ func TestHandleCreateToken(t *testing.T) {
 			},
 			mockErr:    storage.ErrNotFound,
 			wantStatus: http.StatusInternalServerError,
-			wantBody:   "Internal error",
+			wantBody:   "internal_error",
 		},
 	}
 
@@ -500,7 +500,7 @@ func TestHandleSetMasterKeyAPI(t *testing.T) {
 			body:        SetMasterKeyRequest{APIKey: "new-master-key"},
 			existingKey: "existing-key",
 			wantStatus:  http.StatusConflict,
-			wantBody:    "master key already set",
+			wantBody:    "master_key_already_set",
 		},
 		{
 			name:       "missing api_key",
@@ -984,7 +984,7 @@ func TestHandleCreateUnifiedToken(t *testing.T) {
 			name:       "missing name",
 			body:       CreateUnifiedTokenRequest{IsAdmin: true},
 			wantStatus: http.StatusBadRequest,
-			wantBody:   "missing_name",
+			wantBody:   "invalid_request",
 		},
 		{
 			name: "scoped token missing zones",
@@ -995,7 +995,7 @@ func TestHandleCreateUnifiedToken(t *testing.T) {
 				RecordTypes: []string{"TXT"},
 			},
 			wantStatus: http.StatusBadRequest,
-			wantBody:   "missing_zones",
+			wantBody:   "invalid_request",
 		},
 		{
 			name: "scoped token missing actions",
@@ -1006,7 +1006,7 @@ func TestHandleCreateUnifiedToken(t *testing.T) {
 				RecordTypes: []string{"TXT"},
 			},
 			wantStatus: http.StatusBadRequest,
-			wantBody:   "missing_actions",
+			wantBody:   "invalid_request",
 		},
 		{
 			name: "scoped token missing record types",
@@ -1017,13 +1017,13 @@ func TestHandleCreateUnifiedToken(t *testing.T) {
 				Actions: []string{"list_records"},
 			},
 			wantStatus: http.StatusBadRequest,
-			wantBody:   "missing_record_types",
+			wantBody:   "invalid_request",
 		},
 		{
 			name:       "invalid JSON",
 			body:       "not-json",
 			wantStatus: http.StatusBadRequest,
-			wantBody:   "invalid_json",
+			wantBody:   "invalid_request",
 		},
 		{
 			name: "storage error on create",
@@ -1351,7 +1351,7 @@ func TestHandleAddTokenPermission(t *testing.T) {
 				RecordTypes:    []string{"TXT"},
 			},
 			wantStatus: http.StatusBadRequest,
-			wantBody:   "admin_no_permissions",
+			wantBody:   "invalid_request",
 		},
 		{
 			name:       "invalid token ID",
@@ -1370,7 +1370,7 @@ func TestHandleAddTokenPermission(t *testing.T) {
 			mockToken:  &storage.Token{ID: 2, Name: "scoped", IsAdmin: false},
 			body:       "not-json",
 			wantStatus: http.StatusBadRequest,
-			wantBody:   "invalid_json",
+			wantBody:   "invalid_request",
 		},
 		{
 			name:      "invalid zone ID",
@@ -1382,7 +1382,7 @@ func TestHandleAddTokenPermission(t *testing.T) {
 				RecordTypes:    []string{"TXT"},
 			},
 			wantStatus: http.StatusBadRequest,
-			wantBody:   "invalid_zone_id",
+			wantBody:   "invalid_request",
 		},
 		{
 			name:      "missing actions",
@@ -1393,7 +1393,7 @@ func TestHandleAddTokenPermission(t *testing.T) {
 				RecordTypes: []string{"TXT"},
 			},
 			wantStatus: http.StatusBadRequest,
-			wantBody:   "missing_actions",
+			wantBody:   "invalid_request",
 		},
 		{
 			name:      "missing record types",
@@ -1404,7 +1404,7 @@ func TestHandleAddTokenPermission(t *testing.T) {
 				AllowedActions: []string{"list_records"},
 			},
 			wantStatus: http.StatusBadRequest,
-			wantBody:   "missing_record_types",
+			wantBody:   "invalid_request",
 		},
 		{
 			name:      "storage error on add",
@@ -1555,57 +1555,4 @@ func TestHandleDeleteTokenPermission(t *testing.T) {
 	}
 }
 
-func TestWriteAPIError(t *testing.T) {
-	tests := []struct {
-		name    string
-		status  int
-		code    string
-		message string
-		hint    string
-	}{
-		{
-			name:    "error without hint",
-			status:  http.StatusBadRequest,
-			code:    "test_error",
-			message: "Test error message",
-			hint:    "",
-		},
-		{
-			name:    "error with hint",
-			status:  http.StatusForbidden,
-			code:    "forbidden",
-			message: "Access denied",
-			hint:    "Use an admin token",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			w := httptest.NewRecorder()
-			writeAPIError(w, tt.status, tt.code, tt.message, tt.hint)
-
-			if w.Code != tt.status {
-				t.Errorf("expected status %d, got %d", tt.status, w.Code)
-			}
-
-			if w.Header().Get("Content-Type") != "application/json" {
-				t.Errorf("expected Content-Type application/json, got %s", w.Header().Get("Content-Type"))
-			}
-
-			var resp APIError
-			if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
-				t.Fatalf("failed to decode response: %v", err)
-			}
-
-			if resp.Error != tt.code {
-				t.Errorf("expected error code %q, got %q", tt.code, resp.Error)
-			}
-			if resp.Message != tt.message {
-				t.Errorf("expected message %q, got %q", tt.message, resp.Message)
-			}
-			if resp.Hint != tt.hint {
-				t.Errorf("expected hint %q, got %q", tt.hint, resp.Hint)
-			}
-		})
-	}
-}
+// TestWriteAPIError was moved to errors_test.go as TestWriteError and TestWriteErrorWithHint
