@@ -26,7 +26,7 @@ type SetLogLevelRequest struct {
 func (h *Handler) HandleSetLogLevel(w http.ResponseWriter, r *http.Request) {
 	var req SetLogLevelRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		WriteError(w, http.StatusBadRequest, ErrCodeInvalidRequest, "Invalid JSON")
 		return
 	}
 
@@ -41,7 +41,8 @@ func (h *Handler) HandleSetLogLevel(w http.ResponseWriter, r *http.Request) {
 	case "error":
 		level = slog.LevelError
 	default:
-		http.Error(w, "Invalid level (must be: debug, info, warn, error)", http.StatusBadRequest)
+		WriteErrorWithHint(w, http.StatusBadRequest, ErrCodeInvalidRequest,
+			"Invalid log level", "Must be one of: debug, info, warn, error")
 		return
 	}
 
@@ -72,7 +73,7 @@ func (h *Handler) HandleListTokens(w http.ResponseWriter, r *http.Request) {
 	tokens, err := h.storage.ListAdminTokens(r.Context())
 	if err != nil {
 		h.logger.Error("failed to list tokens", "error", err)
-		http.Error(w, "Internal error", http.StatusInternalServerError)
+		WriteError(w, http.StatusInternalServerError, ErrCodeInternalError, "Failed to list tokens")
 		return
 	}
 
@@ -112,19 +113,19 @@ type CreateTokenResponse struct {
 func (h *Handler) HandleCreateToken(w http.ResponseWriter, r *http.Request) {
 	var req CreateTokenRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		WriteError(w, http.StatusBadRequest, ErrCodeInvalidRequest, "Invalid JSON")
 		return
 	}
 
 	if req.Name == "" || req.Token == "" {
-		http.Error(w, "Name and token required", http.StatusBadRequest)
+		WriteError(w, http.StatusBadRequest, ErrCodeInvalidRequest, "Name and token required")
 		return
 	}
 
 	id, err := h.storage.CreateAdminToken(r.Context(), req.Name, req.Token)
 	if err != nil {
 		h.logger.Error("failed to create token", "error", err)
-		http.Error(w, "Internal error", http.StatusInternalServerError)
+		WriteError(w, http.StatusInternalServerError, ErrCodeInternalError, "Failed to create token")
 		return
 	}
 
@@ -149,18 +150,19 @@ func (h *Handler) HandleDeleteToken(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		http.Error(w, "Invalid token ID", http.StatusBadRequest)
+		WriteErrorWithHint(w, http.StatusBadRequest, ErrCodeInvalidRequest,
+			"Invalid token ID", "Token ID must be a number")
 		return
 	}
 
 	err = h.storage.DeleteAdminToken(r.Context(), id)
 	if err != nil {
 		if err == storage.ErrNotFound {
-			http.Error(w, "Token not found", http.StatusNotFound)
+			WriteError(w, http.StatusNotFound, ErrCodeNotFound, "Token not found")
 			return
 		}
 		h.logger.Error("failed to delete token", "error", err)
-		http.Error(w, "Internal error", http.StatusInternalServerError)
+		WriteError(w, http.StatusInternalServerError, ErrCodeInternalError, "Failed to delete token")
 		return
 	}
 
@@ -179,32 +181,27 @@ type SetMasterKeyRequest struct {
 func (h *Handler) HandleSetMasterKeyAPI(w http.ResponseWriter, r *http.Request) {
 	var req SetMasterKeyRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		WriteError(w, http.StatusBadRequest, ErrCodeInvalidRequest, "Invalid JSON")
 		return
 	}
 
 	if req.APIKey == "" {
-		http.Error(w, "API key required", http.StatusBadRequest)
+		WriteError(w, http.StatusBadRequest, ErrCodeInvalidRequest, "API key required")
 		return
 	}
 
 	// Check if master key is already set
 	existingKey, err := h.storage.GetMasterAPIKey(r.Context())
 	if err == nil && existingKey != "" {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusConflict)
-		encErr := json.NewEncoder(w).Encode(map[string]string{
-			"error": "master key already set",
-		})
-		if encErr != nil {
-			_ = encErr
-		}
+		WriteErrorWithHint(w, http.StatusConflict, "master_key_already_set",
+			"Master key is already configured",
+			"The master key can only be set once. Delete and recreate the database to reset.")
 		return
 	}
 
 	if err := h.storage.SetMasterAPIKey(r.Context(), req.APIKey); err != nil {
 		h.logger.Error("failed to set master key", "error", err)
-		http.Error(w, "Internal error", http.StatusInternalServerError)
+		WriteError(w, http.StatusInternalServerError, ErrCodeInternalError, "Failed to set master key")
 		return
 	}
 
@@ -240,27 +237,27 @@ type CreateKeyResponse struct {
 func (h *Handler) HandleCreateKeyAPI(w http.ResponseWriter, r *http.Request) {
 	var req CreateKeyRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		WriteError(w, http.StatusBadRequest, ErrCodeInvalidRequest, "Invalid JSON")
 		return
 	}
 
 	if req.Name == "" {
-		http.Error(w, "Name required", http.StatusBadRequest)
+		WriteError(w, http.StatusBadRequest, ErrCodeInvalidRequest, "Name required")
 		return
 	}
 
 	if len(req.Zones) == 0 {
-		http.Error(w, "At least one zone required", http.StatusBadRequest)
+		WriteError(w, http.StatusBadRequest, ErrCodeInvalidRequest, "At least one zone required")
 		return
 	}
 
 	if len(req.Actions) == 0 {
-		http.Error(w, "At least one action required", http.StatusBadRequest)
+		WriteError(w, http.StatusBadRequest, ErrCodeInvalidRequest, "At least one action required")
 		return
 	}
 
 	if len(req.RecordTypes) == 0 {
-		http.Error(w, "At least one record type required", http.StatusBadRequest)
+		WriteError(w, http.StatusBadRequest, ErrCodeInvalidRequest, "At least one record type required")
 		return
 	}
 
@@ -271,7 +268,7 @@ func (h *Handler) HandleCreateKeyAPI(w http.ResponseWriter, r *http.Request) {
 	keyID, err := h.storage.CreateScopedKey(r.Context(), req.Name, apiKey)
 	if err != nil {
 		h.logger.Error("failed to create scoped key", "error", err)
-		http.Error(w, "Internal error", http.StatusInternalServerError)
+		WriteError(w, http.StatusInternalServerError, ErrCodeInternalError, "Failed to create scoped key")
 		return
 	}
 
@@ -288,7 +285,7 @@ func (h *Handler) HandleCreateKeyAPI(w http.ResponseWriter, r *http.Request) {
 			if delErr := h.storage.DeleteScopedKey(r.Context(), keyID); delErr != nil {
 				h.logger.Error("failed to clean up key after permission error", "error", delErr)
 			}
-			http.Error(w, "Internal error", http.StatusInternalServerError)
+			WriteError(w, http.StatusInternalServerError, ErrCodeInternalError, "Failed to add permissions")
 			return
 		}
 	}
@@ -319,28 +316,6 @@ func generateRandomKey(length int) string {
 // =============================================================================
 // Unified Token API Handlers (Issue 147)
 // =============================================================================
-
-// APIError is the standard error response format for JSON APIs.
-type APIError struct {
-	Error   string `json:"error"`
-	Message string `json:"message"`
-	Hint    string `json:"hint,omitempty"`
-}
-
-// writeAPIError writes a JSON error response with error code, message, and optional hint.
-func writeAPIError(w http.ResponseWriter, status int, code, message, hint string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	resp := APIError{
-		Error:   code,
-		Message: message,
-		Hint:    hint,
-	}
-	encErr := json.NewEncoder(w).Encode(resp)
-	if encErr != nil {
-		_ = encErr
-	}
-}
 
 // WhoamiResponse represents the current token's identity.
 type WhoamiResponse struct {
@@ -373,7 +348,7 @@ func (h *Handler) HandleWhoami(w http.ResponseWriter, r *http.Request) {
 			perms, err := h.storage.GetPermissionsForToken(ctx, token.ID)
 			if err != nil {
 				h.logger.Error("failed to get permissions", "error", err)
-				writeAPIError(w, http.StatusInternalServerError, "internal_error", "Failed to get permissions", "")
+				WriteError(w, http.StatusInternalServerError, ErrCodeInternalError, "Failed to get permissions")
 				return
 			}
 			resp.Permissions = perms
@@ -401,7 +376,7 @@ func (h *Handler) HandleListUnifiedTokens(w http.ResponseWriter, r *http.Request
 	tokens, err := h.storage.ListTokens(r.Context())
 	if err != nil {
 		h.logger.Error("failed to list tokens", "error", err)
-		writeAPIError(w, http.StatusInternalServerError, "internal_error", "Failed to list tokens", "")
+		WriteError(w, http.StatusInternalServerError, ErrCodeInternalError, "Failed to list tokens")
 		return
 	}
 
@@ -452,12 +427,12 @@ func (h *Handler) HandleCreateUnifiedToken(w http.ResponseWriter, r *http.Reques
 
 	var req CreateUnifiedTokenRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeAPIError(w, http.StatusBadRequest, "invalid_json", "Invalid JSON in request body", "")
+		WriteError(w, http.StatusBadRequest, ErrCodeInvalidRequest, "Invalid JSON in request body")
 		return
 	}
 
 	if req.Name == "" {
-		writeAPIError(w, http.StatusBadRequest, "missing_name", "Token name is required", "")
+		WriteError(w, http.StatusBadRequest, ErrCodeInvalidRequest, "Token name is required")
 		return
 	}
 
@@ -467,7 +442,7 @@ func (h *Handler) HandleCreateUnifiedToken(w http.ResponseWriter, r *http.Reques
 		state, err := h.bootstrap.GetState(ctx)
 		if err != nil {
 			h.logger.Error("failed to get bootstrap state", "error", err)
-			writeAPIError(w, http.StatusInternalServerError, "internal_error", "Failed to check bootstrap state", "")
+			WriteError(w, http.StatusInternalServerError, ErrCodeInternalError, "Failed to check bootstrap state")
 			return
 		}
 
@@ -475,7 +450,7 @@ func (h *Handler) HandleCreateUnifiedToken(w http.ResponseWriter, r *http.Reques
 		if state == auth.StateUnconfigured {
 			// Only admin tokens can be created during bootstrap
 			if !req.IsAdmin {
-				writeAPIError(w, http.StatusUnprocessableEntity, "no_admin_token_exists",
+				WriteErrorWithHint(w, http.StatusUnprocessableEntity, ErrCodeNoAdminTokenExists,
 					"No admin token exists. Create an admin token first.",
 					"During bootstrap, you must create an admin token (is_admin: true) first.")
 				return
@@ -483,7 +458,7 @@ func (h *Handler) HandleCreateUnifiedToken(w http.ResponseWriter, r *http.Reques
 		} else {
 			// System is CONFIGURED - master key is locked out
 			if isMasterKey {
-				writeAPIError(w, http.StatusForbidden, "master_key_locked",
+				WriteErrorWithHint(w, http.StatusForbidden, ErrCodeMasterKeyLocked,
 					"Master API key cannot access admin endpoints. Use an admin token.",
 					"Create requests using an admin token instead of the master API key.")
 				return
@@ -494,18 +469,15 @@ func (h *Handler) HandleCreateUnifiedToken(w http.ResponseWriter, r *http.Reques
 	// Validate permissions for scoped tokens
 	if !req.IsAdmin {
 		if len(req.Zones) == 0 {
-			writeAPIError(w, http.StatusBadRequest, "missing_zones",
-				"Scoped tokens require at least one zone", "")
+			WriteError(w, http.StatusBadRequest, ErrCodeInvalidRequest, "Scoped tokens require at least one zone")
 			return
 		}
 		if len(req.Actions) == 0 {
-			writeAPIError(w, http.StatusBadRequest, "missing_actions",
-				"Scoped tokens require at least one action", "")
+			WriteError(w, http.StatusBadRequest, ErrCodeInvalidRequest, "Scoped tokens require at least one action")
 			return
 		}
 		if len(req.RecordTypes) == 0 {
-			writeAPIError(w, http.StatusBadRequest, "missing_record_types",
-				"Scoped tokens require at least one record type", "")
+			WriteError(w, http.StatusBadRequest, ErrCodeInvalidRequest, "Scoped tokens require at least one record type")
 			return
 		}
 	}
@@ -521,12 +493,12 @@ func (h *Handler) HandleCreateUnifiedToken(w http.ResponseWriter, r *http.Reques
 	token, err := h.storage.CreateToken(ctx, req.Name, req.IsAdmin, keyHash)
 	if err != nil {
 		if err == storage.ErrDuplicate {
-			writeAPIError(w, http.StatusConflict, "duplicate_token",
+			WriteErrorWithHint(w, http.StatusConflict, "duplicate_token",
 				"A token with this hash already exists", "Try creating the token again.")
 			return
 		}
 		h.logger.Error("failed to create token", "error", err)
-		writeAPIError(w, http.StatusInternalServerError, "internal_error", "Failed to create token", "")
+		WriteError(w, http.StatusInternalServerError, ErrCodeInternalError, "Failed to create token")
 		return
 	}
 
@@ -544,7 +516,7 @@ func (h *Handler) HandleCreateUnifiedToken(w http.ResponseWriter, r *http.Reques
 				if delErr := h.storage.DeleteToken(ctx, token.ID); delErr != nil {
 					h.logger.Error("failed to clean up token after permission error", "error", delErr)
 				}
-				writeAPIError(w, http.StatusInternalServerError, "internal_error", "Failed to add permissions", "")
+				WriteError(w, http.StatusInternalServerError, ErrCodeInternalError, "Failed to add permissions")
 				return
 			}
 		}
@@ -580,7 +552,7 @@ func (h *Handler) HandleGetUnifiedToken(w http.ResponseWriter, r *http.Request) 
 	idStr := chi.URLParam(r, "id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		writeAPIError(w, http.StatusBadRequest, "invalid_id", "Invalid token ID", "Token ID must be a number.")
+		WriteErrorWithHint(w, http.StatusBadRequest, ErrCodeInvalidRequest, "Invalid token ID", "Token ID must be a number.")
 		return
 	}
 
@@ -589,11 +561,11 @@ func (h *Handler) HandleGetUnifiedToken(w http.ResponseWriter, r *http.Request) 
 	token, err := h.storage.GetTokenByID(ctx, id)
 	if err != nil {
 		if err == storage.ErrNotFound {
-			writeAPIError(w, http.StatusNotFound, "not_found", "Token not found", "")
+			WriteError(w, http.StatusNotFound, ErrCodeNotFound, "Token not found")
 			return
 		}
 		h.logger.Error("failed to get token", "error", err, "id", id)
-		writeAPIError(w, http.StatusInternalServerError, "internal_error", "Failed to get token", "")
+		WriteError(w, http.StatusInternalServerError, ErrCodeInternalError, "Failed to get token")
 		return
 	}
 
@@ -609,7 +581,7 @@ func (h *Handler) HandleGetUnifiedToken(w http.ResponseWriter, r *http.Request) 
 		perms, err := h.storage.GetPermissionsForToken(ctx, token.ID)
 		if err != nil {
 			h.logger.Error("failed to get permissions", "error", err, "token_id", id)
-			writeAPIError(w, http.StatusInternalServerError, "internal_error", "Failed to get permissions", "")
+			WriteError(w, http.StatusInternalServerError, ErrCodeInternalError, "Failed to get permissions")
 			return
 		}
 		resp.Permissions = perms
@@ -628,7 +600,7 @@ func (h *Handler) HandleDeleteUnifiedToken(w http.ResponseWriter, r *http.Reques
 	idStr := chi.URLParam(r, "id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		writeAPIError(w, http.StatusBadRequest, "invalid_id", "Invalid token ID", "Token ID must be a number.")
+		WriteErrorWithHint(w, http.StatusBadRequest, ErrCodeInvalidRequest, "Invalid token ID", "Token ID must be a number.")
 		return
 	}
 
@@ -638,11 +610,11 @@ func (h *Handler) HandleDeleteUnifiedToken(w http.ResponseWriter, r *http.Reques
 	token, err := h.storage.GetTokenByID(ctx, id)
 	if err != nil {
 		if err == storage.ErrNotFound {
-			writeAPIError(w, http.StatusNotFound, "not_found", "Token not found", "")
+			WriteError(w, http.StatusNotFound, ErrCodeNotFound, "Token not found")
 			return
 		}
 		h.logger.Error("failed to get token", "error", err, "id", id)
-		writeAPIError(w, http.StatusInternalServerError, "internal_error", "Failed to get token", "")
+		WriteError(w, http.StatusInternalServerError, ErrCodeInternalError, "Failed to get token")
 		return
 	}
 
@@ -651,11 +623,11 @@ func (h *Handler) HandleDeleteUnifiedToken(w http.ResponseWriter, r *http.Reques
 		count, err := h.storage.CountAdminTokens(ctx)
 		if err != nil {
 			h.logger.Error("failed to count admin tokens", "error", err)
-			writeAPIError(w, http.StatusInternalServerError, "internal_error", "Failed to check admin count", "")
+			WriteError(w, http.StatusInternalServerError, ErrCodeInternalError, "Failed to check admin count")
 			return
 		}
 		if count <= 1 {
-			writeAPIError(w, http.StatusConflict, "cannot_delete_last_admin",
+			WriteErrorWithHint(w, http.StatusConflict, ErrCodeCannotDeleteLastAdmin,
 				"Cannot delete the last admin token. Create another admin first.",
 				"Create a new admin token before deleting this one.")
 			return
@@ -665,11 +637,11 @@ func (h *Handler) HandleDeleteUnifiedToken(w http.ResponseWriter, r *http.Reques
 	err = h.storage.DeleteToken(ctx, id)
 	if err != nil {
 		if err == storage.ErrNotFound {
-			writeAPIError(w, http.StatusNotFound, "not_found", "Token not found", "")
+			WriteError(w, http.StatusNotFound, ErrCodeNotFound, "Token not found")
 			return
 		}
 		h.logger.Error("failed to delete token", "error", err, "id", id)
-		writeAPIError(w, http.StatusInternalServerError, "internal_error", "Failed to delete token", "")
+		WriteError(w, http.StatusInternalServerError, ErrCodeInternalError, "Failed to delete token")
 		return
 	}
 
@@ -699,7 +671,7 @@ func (h *Handler) HandleAddTokenPermission(w http.ResponseWriter, r *http.Reques
 	idStr := chi.URLParam(r, "id")
 	tokenID, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		writeAPIError(w, http.StatusBadRequest, "invalid_id", "Invalid token ID", "Token ID must be a number.")
+		WriteErrorWithHint(w, http.StatusBadRequest, ErrCodeInvalidRequest, "Invalid token ID", "Token ID must be a number.")
 		return
 	}
 
@@ -709,17 +681,17 @@ func (h *Handler) HandleAddTokenPermission(w http.ResponseWriter, r *http.Reques
 	token, err := h.storage.GetTokenByID(ctx, tokenID)
 	if err != nil {
 		if err == storage.ErrNotFound {
-			writeAPIError(w, http.StatusNotFound, "not_found", "Token not found", "")
+			WriteError(w, http.StatusNotFound, ErrCodeNotFound, "Token not found")
 			return
 		}
 		h.logger.Error("failed to get token", "error", err, "id", tokenID)
-		writeAPIError(w, http.StatusInternalServerError, "internal_error", "Failed to get token", "")
+		WriteError(w, http.StatusInternalServerError, ErrCodeInternalError, "Failed to get token")
 		return
 	}
 
 	// Admin tokens don't use permissions
 	if token.IsAdmin {
-		writeAPIError(w, http.StatusBadRequest, "admin_no_permissions",
+		WriteErrorWithHint(w, http.StatusBadRequest, ErrCodeInvalidRequest,
 			"Admin tokens do not use zone permissions",
 			"Admin tokens have full access. Permissions are only for scoped tokens.")
 		return
@@ -727,24 +699,21 @@ func (h *Handler) HandleAddTokenPermission(w http.ResponseWriter, r *http.Reques
 
 	var req AddPermissionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeAPIError(w, http.StatusBadRequest, "invalid_json", "Invalid JSON in request body", "")
+		WriteError(w, http.StatusBadRequest, ErrCodeInvalidRequest, "Invalid JSON in request body")
 		return
 	}
 
 	// Validate required fields
 	if req.ZoneID <= 0 {
-		writeAPIError(w, http.StatusBadRequest, "invalid_zone_id",
-			"Zone ID must be greater than 0", "")
+		WriteError(w, http.StatusBadRequest, ErrCodeInvalidRequest, "Zone ID must be greater than 0")
 		return
 	}
 	if len(req.AllowedActions) == 0 {
-		writeAPIError(w, http.StatusBadRequest, "missing_actions",
-			"At least one action is required", "")
+		WriteError(w, http.StatusBadRequest, ErrCodeInvalidRequest, "At least one action is required")
 		return
 	}
 	if len(req.RecordTypes) == 0 {
-		writeAPIError(w, http.StatusBadRequest, "missing_record_types",
-			"At least one record type is required", "")
+		WriteError(w, http.StatusBadRequest, ErrCodeInvalidRequest, "At least one record type is required")
 		return
 	}
 
@@ -757,7 +726,7 @@ func (h *Handler) HandleAddTokenPermission(w http.ResponseWriter, r *http.Reques
 	createdPerm, err := h.storage.AddPermissionForToken(ctx, tokenID, perm)
 	if err != nil {
 		h.logger.Error("failed to add permission", "error", err, "token_id", tokenID)
-		writeAPIError(w, http.StatusInternalServerError, "internal_error", "Failed to add permission", "")
+		WriteError(w, http.StatusInternalServerError, ErrCodeInternalError, "Failed to add permission")
 		return
 	}
 
@@ -782,14 +751,14 @@ func (h *Handler) HandleDeleteTokenPermission(w http.ResponseWriter, r *http.Req
 	idStr := chi.URLParam(r, "id")
 	tokenID, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		writeAPIError(w, http.StatusBadRequest, "invalid_id", "Invalid token ID", "Token ID must be a number.")
+		WriteErrorWithHint(w, http.StatusBadRequest, ErrCodeInvalidRequest, "Invalid token ID", "Token ID must be a number.")
 		return
 	}
 
 	pidStr := chi.URLParam(r, "pid")
 	permID, err := strconv.ParseInt(pidStr, 10, 64)
 	if err != nil {
-		writeAPIError(w, http.StatusBadRequest, "invalid_permission_id",
+		WriteErrorWithHint(w, http.StatusBadRequest, ErrCodeInvalidRequest,
 			"Invalid permission ID", "Permission ID must be a number.")
 		return
 	}
@@ -800,11 +769,11 @@ func (h *Handler) HandleDeleteTokenPermission(w http.ResponseWriter, r *http.Req
 	_, err = h.storage.GetTokenByID(ctx, tokenID)
 	if err != nil {
 		if err == storage.ErrNotFound {
-			writeAPIError(w, http.StatusNotFound, "not_found", "Token not found", "")
+			WriteError(w, http.StatusNotFound, ErrCodeNotFound, "Token not found")
 			return
 		}
 		h.logger.Error("failed to get token", "error", err, "id", tokenID)
-		writeAPIError(w, http.StatusInternalServerError, "internal_error", "Failed to get token", "")
+		WriteError(w, http.StatusInternalServerError, ErrCodeInternalError, "Failed to get token")
 		return
 	}
 
@@ -812,11 +781,11 @@ func (h *Handler) HandleDeleteTokenPermission(w http.ResponseWriter, r *http.Req
 	err = h.storage.RemovePermission(ctx, permID)
 	if err != nil {
 		if err == storage.ErrNotFound {
-			writeAPIError(w, http.StatusNotFound, "not_found", "Permission not found", "")
+			WriteError(w, http.StatusNotFound, ErrCodeNotFound, "Permission not found")
 			return
 		}
 		h.logger.Error("failed to delete permission", "error", err, "permission_id", permID)
-		writeAPIError(w, http.StatusInternalServerError, "internal_error", "Failed to delete permission", "")
+		WriteError(w, http.StatusInternalServerError, ErrCodeInternalError, "Failed to delete permission")
 		return
 	}
 
