@@ -3017,3 +3017,227 @@ func TestVerifyCleanupComplete_AllZonesDeleted(t *testing.T) {
 	// Should succeed without errors
 	env.verifyCleanupComplete(t)
 }
+
+// ============================================================================
+// COVERAGE IMPROVEMENT TESTS - Focus on uncovered error paths
+// ============================================================================
+
+
+// TestProxyHelpers_HappyPath tests successful happy path execution.
+func TestProxyHelpers_HappyPath(t *testing.T) {
+	mockProxy := NewMockProxyServer(t)
+	defer mockProxy.Close()
+
+	env := &TestEnv{
+		ProxyURL:   mockProxy.URL,
+		CommitHash: "test-hash",
+		AdminToken: "",
+	}
+
+	// Bootstrap token
+	env.ensureAdminToken(t)
+	if env.AdminToken == "" {
+		t.Fatal("Failed to bootstrap token")
+	}
+
+	// Create zones
+	zone1 := env.createZoneViaProxy(t, "zone1.example.com")
+	zone2 := env.createZoneViaProxy(t, "zone2.example.com")
+
+	if zone1 == nil || zone2 == nil {
+		t.Fatal("Failed to create zones")
+	}
+
+	// List zones
+	zones := env.listZonesViaProxy(t)
+	if len(zones) < 2 {
+		t.Errorf("Expected at least 2 zones, got %d", len(zones))
+	}
+
+	// Delete zones
+	err1 := env.deleteZoneViaProxy(t, zone1.ID)
+	err2 := env.deleteZoneViaProxy(t, zone2.ID)
+
+	if err1 != nil || err2 != nil {
+		t.Errorf("Failed to delete zones: err1=%v, err2=%v", err1, err2)
+	}
+
+	// Verify deletion
+	zones = env.listZonesViaProxy(t)
+	for _, z := range zones {
+		if z.ID == zone1.ID || z.ID == zone2.ID {
+			t.Errorf("Zone %d should have been deleted", z.ID)
+		}
+	}
+}
+
+// TestProxyHelpers_CreateAndListMultiple tests creating and listing multiple zones.
+func TestProxyHelpers_CreateAndListMultiple(t *testing.T) {
+	mockProxy := NewMockProxyServer(t)
+	defer mockProxy.Close()
+
+	env := &TestEnv{
+		ProxyURL:   mockProxy.URL,
+		AdminToken: "test-token",
+		CommitHash: "test",
+	}
+
+	mockProxy.tokens["test-token"] = true
+
+	// Create multiple zones
+	const numZones = 10
+	createdZones := make([]*bunny.Zone, numZones)
+
+	for i := 0; i < numZones; i++ {
+		domain := fmt.Sprintf("zone%d.example.com", i)
+		zone := env.createZoneViaProxy(t, domain)
+		if zone == nil {
+			t.Fatalf("Failed to create zone %d", i)
+		}
+		createdZones[i] = zone
+	}
+
+	// List all zones
+	listedZones := env.listZonesViaProxy(t)
+
+	// Verify all created zones are in the list
+	if len(listedZones) < numZones {
+		t.Errorf("Expected at least %d zones, got %d", numZones, len(listedZones))
+	}
+
+	// Verify each created zone is present
+	for _, created := range createdZones {
+		found := false
+		for _, listed := range listedZones {
+			if listed.ID == created.ID && listed.Domain == created.Domain {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("Created zone %d (%s) not found in list", created.ID, created.Domain)
+		}
+	}
+}
+
+// TestVerifyEmptyState_WithProxyMode tests VerifyEmptyState with proxy.
+func TestVerifyEmptyState_WithProxyMode(t *testing.T) {
+	mockProxy := NewMockProxyServer(t)
+	defer mockProxy.Close()
+
+	mockServer := mockbunny.New()
+	defer mockServer.Close()
+
+	env := &TestEnv{
+		Mode:       ModeMock,
+		ProxyURL:   mockProxy.URL,
+		AdminToken: "test-token",
+		CommitHash: "test",
+		ctx:        context.Background(),
+		Client: bunny.NewClient("test-key",
+			bunny.WithBaseURL(mockServer.URL()),
+		),
+	}
+
+	mockProxy.tokens["test-token"] = true
+
+	// No zones - should verify empty state successfully
+	env.VerifyEmptyState(t)
+}
+
+// TestVerifyEmptyState_DirectClientMode tests VerifyEmptyState using direct client.
+func TestVerifyEmptyState_DirectClientMode(t *testing.T) {
+	mockServer := mockbunny.New()
+	defer mockServer.Close()
+
+	env := &TestEnv{
+		Mode:       ModeMock,
+		ProxyURL:   "",  // No proxy - use direct client
+		CommitHash: "test",
+		ctx:        context.Background(),
+		Client: bunny.NewClient("test-key",
+			bunny.WithBaseURL(mockServer.URL()),
+		),
+	}
+
+	// No zones - should verify empty state successfully
+	env.VerifyEmptyState(t)
+}
+
+// TestVerifyEmptyState_RealModeWithBothChecks tests VerifyEmptyState in real mode with proxy.
+func TestVerifyEmptyState_RealModeWithBothChecks(t *testing.T) {
+	mockProxy := NewMockProxyServer(t)
+	defer mockProxy.Close()
+
+	mockServer := mockbunny.New()
+	defer mockServer.Close()
+
+	env := &TestEnv{
+		Mode:       ModeReal,  // Real mode triggers both checks
+		ProxyURL:   mockProxy.URL,
+		AdminToken: "test-token",
+		CommitHash: "test",
+		ctx:        context.Background(),
+		Client: bunny.NewClient("test-key",
+			bunny.WithBaseURL(mockServer.URL()),
+		),
+	}
+
+	mockProxy.tokens["test-token"] = true
+
+	// No zones - should verify empty state successfully via both paths
+	env.VerifyEmptyState(t)
+}
+
+// TestDeleteZoneViaProxy_ServerError_Recoverable tests deletezone error handling.
+func TestDeleteZoneViaProxy_ServerError_Recoverable(t *testing.T) {
+	mockProxy := NewMockProxyServer(t)
+	defer mockProxy.Close()
+
+	mockProxy.deleteFail = true
+
+	// Add zone
+	mockProxy.zones[1] = &bunny.Zone{ID: 1, Domain: "test.example.com"}
+
+	env := &TestEnv{
+		ProxyURL:   mockProxy.URL,
+		AdminToken: "test-token",
+		CommitHash: "test",
+	}
+
+	mockProxy.tokens["test-token"] = true
+
+	// deleteZoneViaProxy returns error (not t.Fatalf)
+	err := env.deleteZoneViaProxy(t, 1)
+
+	if err == nil {
+		t.Error("Expected error from deleteZoneViaProxy when server returns error")
+	}
+
+	if !strings.Contains(err.Error(), "status") && !strings.Contains(err.Error(), "failed") {
+		t.Logf("Got error message: %v", err)
+	}
+}
+
+// TestDeleteZoneViaProxy_NotFound_Error tests delete of non-existent zone.
+func TestDeleteZoneViaProxy_NotFound_Error(t *testing.T) {
+	mockProxy := NewMockProxyServer(t)
+	defer mockProxy.Close()
+
+	env := &TestEnv{
+		ProxyURL:   mockProxy.URL,
+		AdminToken: "test-token",
+		CommitHash: "test",
+	}
+
+	mockProxy.tokens["test-token"] = true
+
+	// deleteZoneViaProxy should return error for non-existent zone
+	err := env.deleteZoneViaProxy(t, 9999)
+
+	if err == nil {
+		t.Error("Expected error when deleting non-existent zone")
+	}
+}
+
+
