@@ -97,7 +97,7 @@ func createScopedKeyInternal(t *testing.T, zoneID int64, actions []string, recor
 var adminTokenCache string
 
 // ensureAdminToken ensures an admin token exists, creating one via bootstrap if needed.
-// This uses the new unified token API with bootstrap support.
+// Uses the bunny.net master API key (from BUNNY_API_KEY env) for bootstrap authentication.
 func ensureAdminToken(t *testing.T) string {
 	t.Helper()
 
@@ -106,7 +106,10 @@ func ensureAdminToken(t *testing.T) string {
 		return adminTokenCache
 	}
 
-	// Try to create admin token using master key (bootstrap mode)
+	// Bootstrap: create first admin token using master API key from environment
+	// The proxy's BUNNY_API_KEY is available as the bootstrap AccessKey
+	masterAPIKey := getEnv("BUNNY_MASTER_API_KEY", "test-api-key-for-mockbunny")
+
 	tokenBody := map[string]interface{}{
 		"name":     "e2e-admin-token",
 		"is_admin": true,
@@ -115,7 +118,7 @@ func ensureAdminToken(t *testing.T) string {
 
 	req, _ := http.NewRequest("POST", proxyURL+"/admin/api/tokens", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	req.SetBasicAuth("admin", adminPassword)
+	req.Header.Set("AccessKey", masterAPIKey) // Bootstrap uses AccessKey, not Basic Auth
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {

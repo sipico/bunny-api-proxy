@@ -46,6 +46,7 @@ services:
       - PROXY_URL=http://proxy:8080
       - MOCKBUNNY_URL=http://mockbunny:8081
       - ADMIN_PASSWORD=testpassword123
+      - BUNNY_MASTER_API_KEY=test-api-key-for-mockbunny
     depends_on:
       proxy:
         condition: service_healthy
