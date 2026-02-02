@@ -637,9 +637,9 @@ func TestLoggingTransport_LogsAllRequestHeaders(t *testing.T) {
 		if _, ok := headersMap["Content-Type"]; !ok {
 			t.Error("Expected Content-Type header in log")
 		}
-		// AccessKey should be present but redacted
-		if _, ok := headersMap["AccessKey"]; !ok {
-			t.Error("Expected AccessKey header in log (redacted)")
+		// AccessKey should be present but redacted (HTTP canonicalizes to "Accesskey")
+		if _, ok := headersMap["Accesskey"]; !ok {
+			t.Errorf("Expected Accesskey header in log (redacted), got headers: %+v", headersMap)
 		}
 	} else {
 		t.Error("Expected headers in request log")
