@@ -135,11 +135,22 @@ func (e *TestEnv) CleanupStaleZones(t *testing.T) {
 // Private helpers
 
 // setupMock initializes the test environment with a mock bunny.net server.
+// If MOCKBUNNY_URL is set, uses external mockbunny server (for E2E tests).
+// Otherwise creates in-process mockbunny server (for unit tests).
 func (e *TestEnv) setupMock() {
-	e.mockServer = mockbunny.New()
-	e.Client = bunny.NewClient("test-key",
-		bunny.WithBaseURL(e.mockServer.URL()),
-	)
+	externalMockURL := os.Getenv("MOCKBUNNY_URL")
+	if externalMockURL != "" {
+		// Use external mockbunny (E2E Docker tests)
+		e.Client = bunny.NewClient("test-key",
+			bunny.WithBaseURL(externalMockURL),
+		)
+	} else {
+		// Create in-process mockbunny (unit tests)
+		e.mockServer = mockbunny.New()
+		e.Client = bunny.NewClient("test-key",
+			bunny.WithBaseURL(e.mockServer.URL()),
+		)
+	}
 }
 
 // setupReal initializes the test environment with the real bunny.net API.
