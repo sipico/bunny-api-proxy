@@ -4,6 +4,8 @@ services:
     build:
       context: ../..
       dockerfile: .claude/docker/Dockerfile.mockbunny
+    environment:
+      - DEBUG=${DEBUG:-false}  # Enable via DEBUG=true
     networks:
       - test-network
     healthcheck:

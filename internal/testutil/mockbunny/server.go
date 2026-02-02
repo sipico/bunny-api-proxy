@@ -1,7 +1,9 @@
 package mockbunny
 
 import (
+	"log/slog"
 	"net/http/httptest"
+	"os"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -13,15 +15,25 @@ type Server struct {
 	*httptest.Server
 	state  *State
 	router chi.Router
+	logger *slog.Logger
 }
 
 // New creates a new mock bunny.net server for testing.
 // It initializes the server with placeholder routes that return 501 Not Implemented.
 // The state is initialized with empty zones and auto-incrementing IDs.
+// If DEBUG environment variable is set to "true", HTTP request/response logging is enabled.
 func New() *Server {
 	state := NewState()
 
 	r := chi.NewRouter()
+
+	// Create logger if DEBUG=true
+	var logger *slog.Logger
+	if os.Getenv("DEBUG") == "true" {
+		logger = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+			Level: slog.LevelDebug,
+		}))
+	}
 
 	ts := httptest.NewServer(r)
 
@@ -29,6 +41,12 @@ func New() *Server {
 		Server: ts,
 		state:  state,
 		router: r,
+		logger: logger,
+	}
+
+	// Apply logging middleware if logger present
+	if logger != nil {
+		r.Use(LoggingMiddleware(logger))
 	}
 
 	// Wire up handlers
