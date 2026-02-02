@@ -1,5 +1,6 @@
 services:
   mockbunny:
+    profiles: ["mock"]  # Only start in mock mode
     build:
       context: ../..
       dockerfile: .claude/docker/Dockerfile.mockbunny
@@ -22,11 +23,12 @@ services:
       - LOG_LEVEL=debug
       - HTTP_PORT=8080
       - DATA_PATH=/data/proxy.db
-      - BUNNY_API_URL=http://mockbunny:8081
-      - BUNNY_API_KEY=test-api-key-for-mockbunny
+      - BUNNY_API_URL=${BUNNY_API_URL:-http://mockbunny:8081}
+      - BUNNY_API_KEY=${BUNNY_API_KEY:-test-api-key-for-mockbunny}
     depends_on:
       mockbunny:
         condition: service_healthy
+        required: false  # Optional dependency - not needed for real API mode
     networks:
       - test-network
     healthcheck:
@@ -44,9 +46,9 @@ services:
       dockerfile: .claude/docker/Dockerfile.testrunner
     environment:
       - PROXY_URL=http://proxy:8080
-      - MOCKBUNNY_URL=http://mockbunny:8081
+      - MOCKBUNNY_URL=${MOCKBUNNY_URL:-http://mockbunny:8081}
       - ADMIN_PASSWORD=testpassword123
-      - BUNNY_MASTER_API_KEY=test-api-key-for-mockbunny
+      - BUNNY_MASTER_API_KEY=${BUNNY_API_KEY:-test-api-key-for-mockbunny}
     depends_on:
       proxy:
         condition: service_healthy
