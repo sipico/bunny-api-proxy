@@ -61,3 +61,8 @@ type ListZonesOptions struct {
 	PerPage int
 	Search  string
 }
+
+// CreateZoneRequest represents the request body for creating a new DNS zone.
+type CreateZoneRequest struct {
+	Domain string `json:"Domain"`
+}
