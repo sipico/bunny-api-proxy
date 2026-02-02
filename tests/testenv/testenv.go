@@ -391,9 +391,15 @@ func (e *TestEnv) ensureAdminToken(t *testing.T) {
 		"name":     fmt.Sprintf("testenv-admin-%s", e.CommitHash),
 		"is_admin": true,
 	}
-	body, _ := json.Marshal(tokenBody)
+	body, err := json.Marshal(tokenBody)
+	if err != nil {
+		t.Fatalf("Failed to marshal token body: %v", err)
+	}
 
-	req, _ := http.NewRequest("POST", e.ProxyURL+"/admin/api/tokens", bytes.NewReader(body))
+	req, err := http.NewRequest("POST", e.ProxyURL+"/admin/api/tokens", bytes.NewReader(body))
+	if err != nil {
+		t.Fatalf("Failed to create request: %v", err)
+	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("AccessKey", masterAPIKey)
 
@@ -401,10 +407,17 @@ func (e *TestEnv) ensureAdminToken(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to bootstrap admin token: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			t.Logf("Warning: failed to close response body: %v", closeErr)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusCreated {
-		bodyContent, _ := io.ReadAll(resp.Body)
+		bodyContent, err := io.ReadAll(resp.Body)
+		if err != nil {
+			t.Fatalf("Failed to bootstrap admin token, got status %d (could not read body: %v)", resp.StatusCode, err)
+		}
 		t.Fatalf("Failed to bootstrap admin token, got status %d: %s", resp.StatusCode, string(bodyContent))
 	}
 
@@ -423,17 +436,27 @@ func (e *TestEnv) ensureAdminToken(t *testing.T) {
 func (e *TestEnv) listZonesViaProxy(t *testing.T) []bunny.Zone {
 	t.Helper()
 
-	req, _ := http.NewRequest("GET", e.ProxyURL+"/dnszone", nil)
+	req, err := http.NewRequest("GET", e.ProxyURL+"/dnszone", nil)
+	if err != nil {
+		t.Fatalf("Failed to create request: %v", err)
+	}
 	req.Header.Set("AccessKey", e.AdminToken)
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("Failed to list zones via proxy: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			t.Logf("Warning: failed to close response body: %v", closeErr)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
-		bodyContent, _ := io.ReadAll(resp.Body)
+		bodyContent, err := io.ReadAll(resp.Body)
+		if err != nil {
+			t.Fatalf("Failed to list zones, got status %d (could not read body: %v)", resp.StatusCode, err)
+		}
 		t.Fatalf("Failed to list zones, got status %d: %s", resp.StatusCode, string(bodyContent))
 	}
 
@@ -454,9 +477,15 @@ func (e *TestEnv) createZoneViaProxy(t *testing.T, domain string) *bunny.Zone {
 	reqBody := map[string]interface{}{
 		"Domain": domain,
 	}
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatalf("Failed to marshal request body: %v", err)
+	}
 
-	req, _ := http.NewRequest("POST", e.ProxyURL+"/dnszone", bytes.NewReader(body))
+	req, err := http.NewRequest("POST", e.ProxyURL+"/dnszone", bytes.NewReader(body))
+	if err != nil {
+		t.Fatalf("Failed to create request: %v", err)
+	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("AccessKey", e.AdminToken)
 
@@ -464,10 +493,17 @@ func (e *TestEnv) createZoneViaProxy(t *testing.T, domain string) *bunny.Zone {
 	if err != nil {
 		t.Fatalf("Failed to create zone %s via proxy: %v", domain, err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			t.Logf("Warning: failed to close response body: %v", closeErr)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusCreated {
-		bodyContent, _ := io.ReadAll(resp.Body)
+		bodyContent, err := io.ReadAll(resp.Body)
+		if err != nil {
+			t.Fatalf("Failed to create zone, got status %d (could not read body: %v)", resp.StatusCode, err)
+		}
 		t.Fatalf("Failed to create zone, got status %d: %s", resp.StatusCode, string(bodyContent))
 	}
 
@@ -483,17 +519,27 @@ func (e *TestEnv) createZoneViaProxy(t *testing.T, domain string) *bunny.Zone {
 func (e *TestEnv) deleteZoneViaProxy(t *testing.T, id int64) error {
 	t.Helper()
 
-	req, _ := http.NewRequest("DELETE", fmt.Sprintf("%s/dnszone/%d", e.ProxyURL, id), nil)
+	req, err := http.NewRequest("DELETE", fmt.Sprintf("%s/dnszone/%d", e.ProxyURL, id), nil)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
 	req.Header.Set("AccessKey", e.AdminToken)
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to delete zone %d via proxy: %w", id, err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			t.Logf("Warning: failed to close response body: %v", closeErr)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
-		bodyContent, _ := io.ReadAll(resp.Body)
+		bodyContent, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return fmt.Errorf("failed to delete zone, got status %d (could not read body: %w)", resp.StatusCode, err)
+		}
 		return fmt.Errorf("failed to delete zone, got status %d: %s", resp.StatusCode, string(bodyContent))
 	}
 
