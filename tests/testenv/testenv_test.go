@@ -1227,7 +1227,7 @@ func TestE2EFullWorkflow_TokenBootstrap(t *testing.T) {
 				ProxyURL:   mockProxy.URL,
 				AdminToken: "",
 			}
-	_ = env
+			_ = env
 
 			os.Setenv("BUNNY_MASTER_API_KEY", tt.masterKey)
 			defer os.Unsetenv("BUNNY_MASTER_API_KEY")
@@ -1336,6 +1336,7 @@ func TestE2EErrorHandling_CleanupDeleteFails(t *testing.T) {
 
 	t.Log("Cleanup delete error path verified")
 }
+
 // ============================================================================
 // Additional E2E Coverage Tests
 // ============================================================================
@@ -1394,9 +1395,9 @@ func TestVerifyCleanupComplete_MixedZones(t *testing.T) {
 	defer mockServer.Close()
 
 	env := &TestEnv{
-		Mode:   ModeMock,
+		Mode:     ModeMock,
 		ProxyURL: "",
-		ctx:    context.Background(),
+		ctx:      context.Background(),
 		Client: bunny.NewClient("test-key",
 			bunny.WithBaseURL(mockServer.URL()),
 		),
@@ -1506,8 +1507,8 @@ func TestCleanupStaleZones_AllStale(t *testing.T) {
 	defer mockServer.Close()
 
 	env := &TestEnv{
-		Mode:   ModeMock,
-		ctx:    context.Background(),
+		Mode: ModeMock,
+		ctx:  context.Background(),
 		Client: bunny.NewClient("test-key",
 			bunny.WithBaseURL(mockServer.URL()),
 		),
@@ -1619,7 +1620,6 @@ func TestSetupMock_InProcess(t *testing.T) {
 		t.Error("Expected zone to be created successfully")
 	}
 }
-
 
 // ============================================================================
 // Final Coverage Improvement Tests
@@ -1857,8 +1857,8 @@ func TestCleanupStaleZones_MixedZones(t *testing.T) {
 	defer mockServer.Close()
 
 	env := &TestEnv{
-		Mode:   ModeMock,
-		ctx:    context.Background(),
+		Mode: ModeMock,
+		ctx:  context.Background(),
 		Client: bunny.NewClient("test-key",
 			bunny.WithBaseURL(mockServer.URL()),
 		),
@@ -1890,7 +1890,6 @@ func TestCleanupStaleZones_MixedZones(t *testing.T) {
 		}
 	}
 }
-
 
 // ============================================================================
 // Coverage Boost Tests - Final Push to 85%
@@ -2174,7 +2173,6 @@ func TestSetupReal_WithApiKey(t *testing.T) {
 	}
 }
 
-
 // ============================================================================
 // Real Mode Verification Tests - Target Remaining Code Paths
 // ============================================================================
@@ -2197,7 +2195,7 @@ func TestVerifyEmptyState_RealModeDirectVerification(t *testing.T) {
 		ProxyURL:   mockProxy.URL,
 		AdminToken: "test-token",
 		ctx:        context.Background(),
-		Client: bunny.NewClient(realAPIKey),
+		Client:     bunny.NewClient(realAPIKey),
 	}
 	_ = env
 
@@ -2224,7 +2222,7 @@ func TestVerifyCleanupComplete_RealModeWithProxy(t *testing.T) {
 		ProxyURL:   mockProxy.URL,
 		AdminToken: "test-token",
 		ctx:        context.Background(),
-		Client: bunny.NewClient(realAPIKey),
+		Client:     bunny.NewClient(realAPIKey),
 		Zones:      make([]*bunny.Zone, 0),
 	}
 	_ = env
@@ -2324,7 +2322,7 @@ func TestVerifyCleanupComplete_RealModeFailure(t *testing.T) {
 		ProxyURL:   mockProxy.URL,
 		AdminToken: "test-token",
 		ctx:        context.Background(),
-		Client: bunny.NewClient(realAPIKey),
+		Client:     bunny.NewClient(realAPIKey),
 		Zones: []*bunny.Zone{
 			{ID: 9999, Domain: "nonexistent.com"},
 		},
@@ -2367,8 +2365,8 @@ func TestCleanupStaleZones_Performance(t *testing.T) {
 	defer mockServer.Close()
 
 	env := &TestEnv{
-		Mode:   ModeMock,
-		ctx:    context.Background(),
+		Mode: ModeMock,
+		ctx:  context.Background(),
 		Client: bunny.NewClient("test-key",
 			bunny.WithBaseURL(mockServer.URL()),
 		),
@@ -2396,7 +2394,6 @@ func TestCleanupStaleZones_Performance(t *testing.T) {
 	}
 }
 
-
 // ============================================================================
 // Final Targeted Tests for 85% Coverage Goal
 // ============================================================================
@@ -2421,7 +2418,7 @@ func TestVerifyEmptyState_ProxyMode_Empty(t *testing.T) {
 
 	// This directly tests the if e.ProxyURL != "" branch
 	env.VerifyEmptyState(t)
-	
+
 	t.Log("Verified E2E proxy empty path works correctly")
 }
 
@@ -2495,9 +2492,9 @@ func TestVerifyCleanupComplete_AllPaths(t *testing.T) {
 	defer mockServer.Close()
 
 	env := &TestEnv{
-		Mode:       ModeMock,
-		ProxyURL:   "",
-		ctx:        context.Background(),
+		Mode:     ModeMock,
+		ProxyURL: "",
+		ctx:      context.Background(),
 		Client: bunny.NewClient("test-key",
 			bunny.WithBaseURL(mockServer.URL()),
 		),
@@ -2649,7 +2646,6 @@ func TestCleanupWithE2EMode(t *testing.T) {
 	}
 }
 
-
 // ============================================================================
 // Additional Coverage Tests for Low-Coverage Functions
 // ============================================================================
@@ -2786,8 +2782,8 @@ func TestVerifyEmptyState_UnitTestWithZones(t *testing.T) {
 	mockServer.AddZone("test.zone")
 
 	env := &TestEnv{
-		Mode:       ModeMock,
-		ProxyURL:   "", // Unit test mode
+		Mode:     ModeMock,
+		ProxyURL: "", // Unit test mode
 		Client: bunny.NewClient("test-key",
 			bunny.WithBaseURL(mockServer.URL()),
 		),
@@ -3021,4 +3017,3 @@ func TestVerifyCleanupComplete_AllZonesDeleted(t *testing.T) {
 	// Should succeed without errors
 	env.verifyCleanupComplete(t)
 }
-
