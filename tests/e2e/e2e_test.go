@@ -3,33 +3,31 @@
 package e2e
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/sipico/bunny-api-proxy/internal/bunny"
+	"github.com/sipico/bunny-api-proxy/tests/testenv"
+	"github.com/stretchr/testify/require"
 )
 
 var (
 	proxyURL      string
-	mockbunnyURL  string
 	adminPassword string
 )
 
 func TestMain(m *testing.M) {
 	proxyURL = getEnv("PROXY_URL", "http://localhost:8080")
-	mockbunnyURL = getEnv("MOCKBUNNY_URL", "http://localhost:8081")
 	adminPassword = getEnv("ADMIN_PASSWORD", "testpassword123")
 
-	// Wait for services to be ready
+	// Wait for proxy to be ready
 	if err := waitForService(proxyURL+"/health", 30*time.Second); err != nil {
 		fmt.Fprintf(os.Stderr, "Proxy not ready: %v\n", err)
-		os.Exit(1)
-	}
-	if err := waitForService(mockbunnyURL+"/admin/state", 30*time.Second); err != nil {
-		fmt.Fprintf(os.Stderr, "Mockbunny not ready: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -39,36 +37,30 @@ func TestMain(m *testing.M) {
 // TestE2E_HealthCheck verifies that the proxy is responding to health checks.
 func TestE2E_HealthCheck(t *testing.T) {
 	resp, err := http.Get(proxyURL + "/health")
-	if err != nil {
-		t.Fatalf("Failed to reach health endpoint: %v", err)
-	}
+	require.NoError(t, err)
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		t.Errorf("Expected 200, got %d", resp.StatusCode)
-	}
+	require.Equal(t, http.StatusOK, resp.StatusCode)
 }
 
 // TestE2E_ProxyToMockbunny verifies the complete flow from proxy to mockbunny.
 // It tests listing zones with a scoped API key.
 func TestE2E_ProxyToMockbunny(t *testing.T) {
-	// 1. Reset mockbunny state
-	resetMockbunny(t)
+	// 1. Setup test environment with mock backend
+	env := testenv.Setup(t)
 
-	// 2. Seed a zone in mockbunny
-	zoneID := seedZone(t, "e2e-test.com")
+	// 2. Create a test zone in backend
+	zones := env.CreateTestZones(t, 1)
+	zone := zones[0]
 
-	// 3. Create a scoped API key via admin API
-	apiKey := createScopedKey(t, zoneID)
+	// 3. Create a scoped API key via proxy admin API
+	apiKey := createScopedKey(t, zone.ID)
 
 	// 4. Use the scoped key to list zones via proxy
 	resp := proxyRequest(t, "GET", "/dnszone", apiKey, nil)
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		t.Errorf("Expected 200, got %d. Body: %s", resp.StatusCode, string(body))
-	}
+	require.Equal(t, http.StatusOK, resp.StatusCode)
 
 	// 5. Verify the zone is in the response
 	var result struct {
@@ -77,60 +69,57 @@ func TestE2E_ProxyToMockbunny(t *testing.T) {
 			Domain string `json:"Domain"`
 		} `json:"Items"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		t.Fatalf("Failed to decode response: %v", err)
-	}
+	err := json.NewDecoder(resp.Body).Decode(&result)
+	require.NoError(t, err)
 
+	// Verify the zone we created is in the response
 	found := false
 	for _, item := range result.Items {
-		if item.Domain == "e2e-test.com" {
+		if item.ID == zone.ID && item.Domain == zone.Domain {
 			found = true
 			break
 		}
 	}
-	if !found {
-		t.Error("Zone e2e-test.com not found in response")
-	}
+	require.True(t, found, "Zone %s (ID: %d) not found in proxy response", zone.Domain, zone.ID)
 }
 
 // TestE2E_GetZone verifies retrieving a specific zone.
 func TestE2E_GetZone(t *testing.T) {
-	resetMockbunny(t)
-	zoneID := seedZone(t, "getzone-test.com")
-	apiKey := createScopedKey(t, zoneID)
+	env := testenv.Setup(t)
 
-	resp := proxyRequest(t, "GET", fmt.Sprintf("/dnszone/%d", zoneID), apiKey, nil)
+	// Create a test zone
+	zones := env.CreateTestZones(t, 1)
+	zone := zones[0]
+
+	apiKey := createScopedKey(t, zone.ID)
+
+	resp := proxyRequest(t, "GET", fmt.Sprintf("/dnszone/%d", zone.ID), apiKey, nil)
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		t.Errorf("Expected 200, got %d. Body: %s", resp.StatusCode, string(body))
-	}
+	require.Equal(t, http.StatusOK, resp.StatusCode)
 
-	var zone struct {
+	var retrievedZone struct {
 		ID     int64  `json:"Id"`
 		Domain string `json:"Domain"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&zone); err != nil {
-		t.Fatalf("Failed to decode response: %v", err)
-	}
+	err := json.NewDecoder(resp.Body).Decode(&retrievedZone)
+	require.NoError(t, err)
 
-	if zone.ID != zoneID {
-		t.Errorf("Expected zone ID %d, got %d", zoneID, zone.ID)
-	}
-	if zone.Domain != "getzone-test.com" {
-		t.Errorf("Expected domain 'getzone-test.com', got %q", zone.Domain)
-	}
+	require.Equal(t, zone.ID, retrievedZone.ID)
+	require.Equal(t, zone.Domain, retrievedZone.Domain)
 }
 
 // TestE2E_AddAndDeleteRecord verifies adding and deleting DNS records.
 func TestE2E_AddAndDeleteRecord(t *testing.T) {
-	// 1. Reset and seed
-	resetMockbunny(t)
-	zoneID := seedZone(t, "record-test.com")
-	apiKey := createScopedKey(t, zoneID)
+	env := testenv.Setup(t)
 
-	// 2. Add a TXT record via proxy
+	// Create a test zone
+	zones := env.CreateTestZones(t, 1)
+	zone := zones[0]
+
+	apiKey := createScopedKey(t, zone.ID)
+
+	// Add a TXT record via proxy
 	addRecordBody := map[string]interface{}{
 		"Type":  "TXT",
 		"Name":  "_acme-challenge",
@@ -138,52 +127,57 @@ func TestE2E_AddAndDeleteRecord(t *testing.T) {
 	}
 	body, _ := json.Marshal(addRecordBody)
 
-	resp := proxyRequest(t, "POST", fmt.Sprintf("/dnszone/%d/records", zoneID), apiKey, body)
+	resp := proxyRequest(t, "POST", fmt.Sprintf("/dnszone/%d/records", zone.ID), apiKey, body)
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusCreated {
-		respBody, _ := io.ReadAll(resp.Body)
-		t.Fatalf("Expected 201, got %d. Body: %s", resp.StatusCode, string(respBody))
-	}
+	require.Equal(t, http.StatusCreated, resp.StatusCode)
 
 	var record struct {
 		ID int64 `json:"Id"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&record); err != nil {
-		t.Fatalf("Failed to decode record response: %v", err)
-	}
+	err := json.NewDecoder(resp.Body).Decode(&record)
+	require.NoError(t, err)
+	require.NotZero(t, record.ID)
 
-	if record.ID == 0 {
-		t.Fatal("Expected valid record ID, got 0")
-	}
-
-	// 3. Delete the record
-	resp2 := proxyRequest(t, "DELETE", fmt.Sprintf("/dnszone/%d/records/%d", zoneID, record.ID), apiKey, nil)
+	// Delete the record
+	resp2 := proxyRequest(t, "DELETE", fmt.Sprintf("/dnszone/%d/records/%d", zone.ID, record.ID), apiKey, nil)
 	defer resp2.Body.Close()
 
-	if resp2.StatusCode != http.StatusNoContent {
-		t.Errorf("Expected 204, got %d", resp2.StatusCode)
-	}
+	require.Equal(t, http.StatusNoContent, resp2.StatusCode)
 }
 
 // TestE2E_ListRecords verifies listing DNS records in a zone.
 func TestE2E_ListRecords(t *testing.T) {
-	resetMockbunny(t)
-	zoneID := seedZone(t, "list-records-test.com")
+	env := testenv.Setup(t)
 
-	// Seed some records via mockbunny admin API
-	seedRecord(t, zoneID, "TXT", "_acme", "acme-value-1")
-	seedRecord(t, zoneID, "TXT", "_verify", "acme-value-2")
+	// Create a test zone
+	zones := env.CreateTestZones(t, 1)
+	zone := zones[0]
 
-	apiKey := createScopedKey(t, zoneID)
+	// Add test records directly via the API client
+	ctx := context.Background()
+	_, err := env.Client.AddRecord(ctx, zone.ID, &bunny.AddRecordRequest{
+		Type:  "TXT",
+		Name:  "_acme",
+		Value: "acme-value-1",
+		TTL:   300,
+	})
+	require.NoError(t, err)
 
-	resp := proxyRequest(t, "GET", fmt.Sprintf("/dnszone/%d/records", zoneID), apiKey, nil)
+	_, err = env.Client.AddRecord(ctx, zone.ID, &bunny.AddRecordRequest{
+		Type:  "TXT",
+		Name:  "_verify",
+		Value: "acme-value-2",
+		TTL:   300,
+	})
+	require.NoError(t, err)
+
+	apiKey := createScopedKey(t, zone.ID)
+
+	resp := proxyRequest(t, "GET", fmt.Sprintf("/dnszone/%d/records", zone.ID), apiKey, nil)
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		t.Errorf("Expected 200, got %d. Body: %s", resp.StatusCode, string(body))
-	}
+	require.Equal(t, http.StatusOK, resp.StatusCode)
 
 	var records []struct {
 		ID    int64  `json:"Id"`
@@ -191,90 +185,73 @@ func TestE2E_ListRecords(t *testing.T) {
 		Name  string `json:"Name"`
 		Value string `json:"Value"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&records); err != nil {
-		t.Fatalf("Failed to decode records: %v", err)
-	}
-
-	if len(records) < 2 {
-		t.Errorf("Expected at least 2 records, got %d", len(records))
-	}
+	err = json.NewDecoder(resp.Body).Decode(&records)
+	require.NoError(t, err)
+	require.GreaterOrEqual(t, len(records), 2)
 }
 
 // TestE2E_UnauthorizedWithoutKey verifies that requests without an API key are rejected.
 func TestE2E_UnauthorizedWithoutKey(t *testing.T) {
 	resp, err := http.Get(proxyURL + "/dnszone")
-	if err != nil {
-		t.Fatalf("Request failed: %v", err)
-	}
+	require.NoError(t, err)
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusUnauthorized {
-		t.Errorf("Expected 401, got %d", resp.StatusCode)
-	}
+	require.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 
 	var result map[string]string
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		t.Fatalf("Failed to decode error response: %v", err)
-	}
-	if result["error"] != "missing API key" {
-		t.Errorf("Expected error 'missing API key', got %q", result["error"])
-	}
+	err = json.NewDecoder(resp.Body).Decode(&result)
+	require.NoError(t, err)
+	require.Equal(t, "missing API key", result["error"])
 }
 
 // TestE2E_UnauthorizedWithInvalidKey verifies that invalid API keys are rejected.
 func TestE2E_UnauthorizedWithInvalidKey(t *testing.T) {
 	resp, err := http.Get(proxyURL + "/dnszone")
-	if err != nil {
-		t.Fatalf("Request failed: %v", err)
-	}
+	require.NoError(t, err)
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusUnauthorized {
-		t.Errorf("Expected 401, got %d", resp.StatusCode)
-	}
+	require.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 
 	var result map[string]string
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		t.Fatalf("Failed to decode error response: %v", err)
-	}
-	if result["error"] != "missing API key" {
-		t.Errorf("Expected error 'missing API key', got %q", result["error"])
-	}
+	err = json.NewDecoder(resp.Body).Decode(&result)
+	require.NoError(t, err)
+	require.Equal(t, "missing API key", result["error"])
 }
 
 // TestE2E_ForbiddenWrongZone verifies that a key can only access its authorized zones.
 func TestE2E_ForbiddenWrongZone(t *testing.T) {
-	resetMockbunny(t)
-	zone1ID := seedZone(t, "allowed.com")
-	zone2ID := seedZone(t, "forbidden.com")
+	env := testenv.Setup(t)
+
+	// Create two test zones
+	zones := env.CreateTestZones(t, 2)
+	zone1 := zones[0]
+	zone2 := zones[1]
 
 	// Create key only for zone1
-	apiKey := createScopedKey(t, zone1ID)
+	apiKey := createScopedKey(t, zone1.ID)
 
-	// Try to access zone2 with zone1's key
-	resp := proxyRequest(t, "GET", fmt.Sprintf("/dnszone/%d", zone2ID), apiKey, nil)
+	// Try to access zone2 with zone1's key - should fail
+	resp := proxyRequest(t, "GET", fmt.Sprintf("/dnszone/%d", zone2.ID), apiKey, nil)
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusForbidden {
-		t.Errorf("Expected 403, got %d", resp.StatusCode)
-	}
+	require.Equal(t, http.StatusForbidden, resp.StatusCode)
 
 	var result map[string]string
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		t.Fatalf("Failed to decode error response: %v", err)
-	}
-	if result["error"] != "permission denied" {
-		t.Errorf("Expected error 'permission denied', got %q", result["error"])
-	}
+	err := json.NewDecoder(resp.Body).Decode(&result)
+	require.NoError(t, err)
+	require.Equal(t, "permission denied", result["error"])
 }
 
 // TestE2E_ForbiddenWrongRecordType verifies that keys can only use their allowed record types.
 func TestE2E_ForbiddenWrongRecordType(t *testing.T) {
-	resetMockbunny(t)
-	zoneID := seedZone(t, "record-type-test.com")
+	env := testenv.Setup(t)
+
+	// Create a test zone
+	zones := env.CreateTestZones(t, 1)
+	zone := zones[0]
 
 	// Create key with permission only for TXT records
-	apiKey := createScopedKeyWithRecordTypes(t, zoneID, []string{"TXT"})
+	apiKey := createScopedKeyWithRecordTypes(t, zone.ID, []string{"TXT"})
 
 	// Try to add an A record (not allowed)
 	addRecordBody := map[string]interface{}{
@@ -284,19 +261,13 @@ func TestE2E_ForbiddenWrongRecordType(t *testing.T) {
 	}
 	body, _ := json.Marshal(addRecordBody)
 
-	resp := proxyRequest(t, "POST", fmt.Sprintf("/dnszone/%d/records", zoneID), apiKey, body)
+	resp := proxyRequest(t, "POST", fmt.Sprintf("/dnszone/%d/records", zone.ID), apiKey, body)
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusForbidden {
-		respBody, _ := io.ReadAll(resp.Body)
-		t.Errorf("Expected 403, got %d. Body: %s", resp.StatusCode, string(respBody))
-	}
+	require.Equal(t, http.StatusForbidden, resp.StatusCode)
 
 	var result map[string]string
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		t.Fatalf("Failed to decode error response: %v", err)
-	}
-	if result["error"] != "permission denied" {
-		t.Errorf("Expected error 'permission denied', got %q", result["error"])
-	}
+	err := json.NewDecoder(resp.Body).Decode(&result)
+	require.NoError(t, err)
+	require.Equal(t, "permission denied", result["error"])
 }
