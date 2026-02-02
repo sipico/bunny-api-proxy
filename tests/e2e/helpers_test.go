@@ -56,62 +56,87 @@ func createScopedKeyWithRecordTypes(t *testing.T, zoneID int64, recordTypes []st
 func createScopedKeyInternal(t *testing.T, zoneID int64, actions []string, recordTypes []string) string {
 	t.Helper()
 
-	// First, set master API key via admin API
-	setMasterKey(t)
+	// First, ensure we have an admin token (bootstrap if needed)
+	adminToken := ensureAdminToken(t)
 
-	// Create a scoped key with permission for this zone
-	keyBody := map[string]interface{}{
+	// Create a scoped token with permission for this zone
+	tokenBody := map[string]interface{}{
 		"name":         fmt.Sprintf("e2e-test-key-%d", time.Now().UnixNano()),
+		"is_admin":     false,
 		"zones":        []int64{zoneID},
 		"actions":      actions,
 		"record_types": recordTypes,
 	}
-	body, _ := json.Marshal(keyBody)
+	body, _ := json.Marshal(tokenBody)
 
-	req, _ := http.NewRequest("POST", proxyURL+"/admin/api/keys", bytes.NewReader(body))
+	req, _ := http.NewRequest("POST", proxyURL+"/admin/api/tokens", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	req.SetBasicAuth("admin", adminPassword)
+	req.Header.Set("AccessKey", adminToken)
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		t.Fatalf("Failed to create scoped key: %v", err)
+		t.Fatalf("Failed to create scoped token: %v", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusCreated {
 		bodyContent, _ := io.ReadAll(resp.Body)
-		t.Fatalf("Failed to create key, got status %d: %s", resp.StatusCode, string(bodyContent))
+		t.Fatalf("Failed to create token, got status %d: %s", resp.StatusCode, string(bodyContent))
 	}
 
 	var result struct {
-		Key string `json:"key"`
+		Token string `json:"token"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		t.Fatalf("Failed to decode key response: %v", err)
+		t.Fatalf("Failed to decode token response: %v", err)
 	}
-	return result.Key
+	return result.Token
 }
 
-// setMasterKey sets the master API key for the proxy.
-// This is required before creating scoped keys.
-func setMasterKey(t *testing.T) {
+// adminTokenCache caches the admin token across test runs to avoid recreating it.
+var adminTokenCache string
+
+// ensureAdminToken ensures an admin token exists, creating one via bootstrap if needed.
+// This uses the new unified token API with bootstrap support.
+func ensureAdminToken(t *testing.T) string {
 	t.Helper()
 
-	body, _ := json.Marshal(map[string]string{"api_key": "test-master-key"})
-	req, _ := http.NewRequest("PUT", proxyURL+"/admin/api/master-key", bytes.NewReader(body))
+	// Return cached token if we already have one
+	if adminTokenCache != "" {
+		return adminTokenCache
+	}
+
+	// Try to create admin token using master key (bootstrap mode)
+	tokenBody := map[string]interface{}{
+		"name":     "e2e-admin-token",
+		"is_admin": true,
+	}
+	body, _ := json.Marshal(tokenBody)
+
+	req, _ := http.NewRequest("POST", proxyURL+"/admin/api/tokens", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.SetBasicAuth("admin", adminPassword)
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		t.Fatalf("Failed to set master key: %v", err)
+		t.Fatalf("Failed to create admin token: %v", err)
 	}
-	resp.Body.Close()
+	defer resp.Body.Close()
 
-	// Don't fail if this returns 409 (key already set)
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusConflict {
-		t.Logf("Warning: set master key returned status %d", resp.StatusCode)
+	if resp.StatusCode != http.StatusCreated {
+		bodyContent, _ := io.ReadAll(resp.Body)
+		t.Fatalf("Failed to create admin token, got status %d: %s", resp.StatusCode, string(bodyContent))
 	}
+
+	var result struct {
+		Token string `json:"token"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("Failed to decode admin token response: %v", err)
+	}
+
+	adminTokenCache = result.Token
+	return adminTokenCache
 }
 
 // proxyRequest makes an authenticated HTTP request to the proxy with the given API key.
