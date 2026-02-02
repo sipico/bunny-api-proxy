@@ -4,8 +4,12 @@
 package testenv
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"strings"
@@ -29,8 +33,13 @@ const (
 // TestEnv provides a test environment that works with both mock and real APIs.
 // It handles setup, teardown, zone creation with commit-hash naming, and cleanup
 // of stale zones from previous failed test runs.
+//
+// Two modes of operation:
+// 1. Unit test mode (ProxyURL empty): Uses Client directly to talk to backend
+// 2. E2E test mode (ProxyURL set): Makes HTTP requests through proxy
 type TestEnv struct {
-	// Client is the bunny.net API client configured for the test mode.
+	// Client is the bunny.net API client for direct backend access (unit tests)
+	// or direct verification (E2E real mode only).
 	Client *bunny.Client
 	// Mode indicates whether we're running in mock or real mode.
 	Mode TestMode
@@ -38,6 +47,10 @@ type TestEnv struct {
 	CommitHash string
 	// Zones stores created zones for cleanup.
 	Zones []*bunny.Zone
+	// ProxyURL is the proxy base URL for E2E tests. If empty, uses direct Client.
+	ProxyURL string
+	// AdminToken is the cached admin token for E2E tests (bootstrap once).
+	AdminToken string
 
 	// Internal state
 	mockServer *mockbunny.Server
@@ -46,7 +59,9 @@ type TestEnv struct {
 
 // Setup creates a new test environment based on BUNNY_TEST_MODE env var.
 // Default mode is mock. For real mode, BUNNY_API_KEY must be set or the test will skip.
-// Automatic cleanup of stale zones is performed, and cleanup is registered via t.Cleanup().
+// Verifies account is empty before proceeding, and registers comprehensive cleanup.
+//
+// For E2E tests, set PROXY_URL environment variable to enable proxy-based operations.
 func Setup(t *testing.T) *TestEnv {
 	mode := getTestMode()
 
@@ -55,6 +70,7 @@ func Setup(t *testing.T) *TestEnv {
 		CommitHash: getCommitHash(),
 		Zones:      make([]*bunny.Zone, 0),
 		ctx:        context.Background(),
+		ProxyURL:   os.Getenv("PROXY_URL"),
 	}
 
 	switch mode {
@@ -66,8 +82,15 @@ func Setup(t *testing.T) *TestEnv {
 		t.Fatalf("Invalid test mode: %s", mode)
 	}
 
-	// Clean up stale zones from previous failed runs
-	env.CleanupStaleZones(t)
+	// Verify account is completely empty before starting
+	// This ensures tests start with clean state and don't leave garbage
+	if env.ProxyURL != "" {
+		// E2E tests: Always verify empty state
+		env.VerifyEmptyState(t)
+	} else {
+		// Unit tests: Clean up stale zones if any exist
+		env.CleanupStaleZones(t)
+	}
 
 	// Register cleanup to run when test completes
 	t.Cleanup(func() {
@@ -80,7 +103,23 @@ func Setup(t *testing.T) *TestEnv {
 // CreateTestZones creates N zones with commit-hash naming.
 // Domain format: {index+1}-{commit-hash}-bap.xyz
 // Example: 1-a42cdbc-bap.xyz, 2-a42cdbc-bap.xyz
+//
+// In E2E mode (ProxyURL set): Creates zones via proxy using admin token.
+// In unit test mode: Creates zones directly via Client.
 func (e *TestEnv) CreateTestZones(t *testing.T, count int) []*bunny.Zone {
+	// E2E mode: Ensure we have admin token and create via proxy
+	if e.ProxyURL != "" {
+		e.ensureAdminToken(t)
+		for i := 0; i < count; i++ {
+			domain := e.getZoneDomain(i)
+			zone := e.createZoneViaProxy(t, domain)
+			e.Zones = append(e.Zones, zone)
+			t.Logf("Created zone via proxy: %s (ID: %d)", zone.Domain, zone.ID)
+		}
+		return e.Zones
+	}
+
+	// Unit test mode: Create directly via client
 	for i := 0; i < count; i++ {
 		domain := e.getZoneDomain(i)
 		zone, err := e.Client.CreateZone(e.ctx, domain)
@@ -88,24 +127,123 @@ func (e *TestEnv) CreateTestZones(t *testing.T, count int) []*bunny.Zone {
 			t.Fatalf("Failed to create zone %s: %v", domain, err)
 		}
 		e.Zones = append(e.Zones, zone)
+		t.Logf("Created zone directly: %s (ID: %d)", zone.Domain, zone.ID)
 	}
 	return e.Zones
 }
 
-// Cleanup deletes all created zones and closes the mock server if active.
+// Cleanup deletes all created zones and verifies account is empty.
 // This is registered automatically via t.Cleanup() in Setup().
+//
+// In E2E mode: Deletes via proxy and verifies via proxy + direct API (real mode).
+// In unit test mode: Deletes and verifies via direct client.
 func (e *TestEnv) Cleanup(t *testing.T) {
-	for _, zone := range e.Zones {
-		if zone != nil {
-			if err := e.Client.DeleteZone(e.ctx, zone.ID); err != nil {
-				// Log but don't fail - zone might have been deleted already
-				t.Logf("Warning: Failed to delete zone %d: %v", zone.ID, err)
+	t.Helper()
+
+	// Delete all tracked zones
+	if e.ProxyURL != "" {
+		// E2E mode: Delete via proxy
+		for _, zone := range e.Zones {
+			if zone != nil {
+				if err := e.deleteZoneViaProxy(t, zone.ID); err != nil {
+					t.Logf("Warning: Failed to delete zone %d via proxy: %v", zone.ID, err)
+				} else {
+					t.Logf("Deleted zone via proxy: %s (ID: %d)", zone.Domain, zone.ID)
+				}
+			}
+		}
+	} else {
+		// Unit test mode: Delete via direct client
+		for _, zone := range e.Zones {
+			if zone != nil {
+				if err := e.Client.DeleteZone(e.ctx, zone.ID); err != nil {
+					t.Logf("Warning: Failed to delete zone %d: %v", zone.ID, err)
+				} else {
+					t.Logf("Deleted zone directly: %s (ID: %d)", zone.Domain, zone.ID)
+				}
 			}
 		}
 	}
 
+	// Verify cleanup: Account should be empty
+	e.verifyCleanupComplete(t)
+
 	if e.mockServer != nil {
 		e.mockServer.Close()
+	}
+}
+
+// verifyCleanupComplete verifies that all our tracked zones were successfully deleted.
+// For E2E mode with proxy, performs dual verification (proxy + direct API in real mode).
+// For unit tests, only logs information about cleanup status.
+func (e *TestEnv) verifyCleanupComplete(t *testing.T) {
+	t.Helper()
+
+	// Track which zone IDs we created
+	trackedIDs := make(map[int64]bool)
+	for _, zone := range e.Zones {
+		if zone != nil {
+			trackedIDs[zone.ID] = true
+		}
+	}
+
+	// Verification 1: Via proxy (or direct client in unit test mode)
+	var zones []bunny.Zone
+	if e.ProxyURL != "" {
+		// E2E mode: Check via proxy - must be completely empty
+		zones = e.listZonesViaProxy(t)
+		t.Logf("Cleanup verification via proxy: found %d zones", len(zones))
+
+		if len(zones) > 0 {
+			t.Errorf("E2E cleanup failed! Still found %d zones after cleanup: %+v", len(zones), zones)
+		} else {
+			t.Log("✓ E2E cleanup verified via proxy: Account is empty")
+		}
+	} else {
+		// Unit test mode: Check via direct client - just log status (don't fail)
+		// Tests may intentionally create scenarios where cleanup fails
+		resp, err := e.Client.ListZones(e.ctx, nil)
+		if err != nil {
+			t.Logf("Note: Failed to verify cleanup (may be expected): %v", err)
+			return
+		}
+		zones = resp.Items
+
+		// Check if any of our tracked zones still exist
+		foundOurZones := []bunny.Zone{}
+		otherZones := []bunny.Zone{}
+		for _, zone := range zones {
+			if trackedIDs[zone.ID] {
+				foundOurZones = append(foundOurZones, zone)
+			} else {
+				otherZones = append(otherZones, zone)
+			}
+		}
+
+		if len(foundOurZones) > 0 {
+			t.Logf("Note: %d of our tracked zones still exist (may be expected if delete failed): %+v", len(foundOurZones), foundOurZones)
+		} else {
+			t.Logf("✓ Cleanup verified: All %d tracked zones deleted successfully", len(trackedIDs))
+		}
+
+		if len(otherZones) > 0 {
+			t.Logf("Note: %d other zones exist (not created by this test)", len(otherZones))
+		}
+	}
+
+	// Verification 2: Direct API call (E2E real mode only, for absolute confirmation)
+	if e.Mode == ModeReal && e.ProxyURL != "" {
+		resp, err := e.Client.ListZones(e.ctx, nil)
+		if err != nil {
+			t.Logf("Warning: Failed to verify cleanup via direct API: %v", err)
+			return
+		}
+		t.Logf("Cleanup verification via direct bunny.net API: found %d zones", len(resp.Items))
+		if len(resp.Items) > 0 {
+			t.Errorf("Direct API verification failed! Still found %d zones after cleanup: %+v", len(resp.Items), resp.Items)
+		} else {
+			t.Log("✓ Cleanup verified via direct API: Account is empty")
+		}
 	}
 }
 
@@ -130,6 +268,50 @@ func (e *TestEnv) CleanupStaleZones(t *testing.T) {
 			}
 		}
 	}
+}
+
+// VerifyEmptyState verifies that no zones exist in the account before tests start.
+// For E2E tests in real mode, performs dual verification:
+// 1. Via proxy (using admin token)
+// 2. Direct API call to bunny.net (for absolute confirmation)
+// Fails the test if any zones are found - manual cleanup required.
+func (e *TestEnv) VerifyEmptyState(t *testing.T) {
+	t.Helper()
+
+	// Verification 1: Via proxy (or direct client in unit test mode)
+	var zones []bunny.Zone
+	if e.ProxyURL != "" {
+		// E2E mode: Check via proxy
+		e.ensureAdminToken(t)
+		zones = e.listZonesViaProxy(t)
+		t.Logf("Verification via proxy: found %d zones", len(zones))
+	} else {
+		// Unit test mode: Check via direct client
+		resp, err := e.Client.ListZones(e.ctx, nil)
+		if err != nil {
+			t.Fatalf("Failed to verify empty state: %v", err)
+		}
+		zones = resp.Items
+		t.Logf("Verification via direct client: found %d zones", len(zones))
+	}
+
+	if len(zones) > 0 {
+		t.Fatalf("Account is not empty! Found %d zones. Please delete all zones before running tests. Zones: %+v", len(zones), zones)
+	}
+
+	// Verification 2: Direct API call (real mode only, for absolute confirmation)
+	if e.Mode == ModeReal && e.ProxyURL != "" {
+		resp, err := e.Client.ListZones(e.ctx, nil)
+		if err != nil {
+			t.Fatalf("Failed to verify empty state via direct API: %v", err)
+		}
+		t.Logf("Verification via direct bunny.net API: found %d zones", len(resp.Items))
+		if len(resp.Items) > 0 {
+			t.Fatalf("Direct API verification failed! Account not empty. Found %d zones: %+v", len(resp.Items), resp.Items)
+		}
+	}
+
+	t.Log("✓ Empty state verified: Account has no zones")
 }
 
 // Private helpers
@@ -188,4 +370,132 @@ func getCommitHash() string {
 		return fmt.Sprintf("nogit%d", time.Now().Unix()%100000)
 	}
 	return strings.TrimSpace(string(output))
+}
+
+// ensureAdminToken ensures an admin token exists for E2E tests.
+// Bootstrap: Creates first admin token using BUNNY_MASTER_API_KEY.
+// Subsequent calls return cached token.
+func (e *TestEnv) ensureAdminToken(t *testing.T) {
+	t.Helper()
+
+	if e.AdminToken != "" {
+		return // Already bootstrapped
+	}
+
+	masterAPIKey := os.Getenv("BUNNY_MASTER_API_KEY")
+	if masterAPIKey == "" {
+		masterAPIKey = "test-api-key-for-mockbunny" // Default for mock mode
+	}
+
+	tokenBody := map[string]interface{}{
+		"name":     fmt.Sprintf("testenv-admin-%s", e.CommitHash),
+		"is_admin": true,
+	}
+	body, _ := json.Marshal(tokenBody)
+
+	req, _ := http.NewRequest("POST", e.ProxyURL+"/admin/api/tokens", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("AccessKey", masterAPIKey)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("Failed to bootstrap admin token: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		bodyContent, _ := io.ReadAll(resp.Body)
+		t.Fatalf("Failed to bootstrap admin token, got status %d: %s", resp.StatusCode, string(bodyContent))
+	}
+
+	var result struct {
+		Token string `json:"token"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("Failed to decode admin token response: %v", err)
+	}
+
+	e.AdminToken = result.Token
+	t.Logf("Bootstrapped admin token: %s", e.AdminToken[:12]+"...")
+}
+
+// listZonesViaProxy lists all zones via HTTP request to proxy.
+func (e *TestEnv) listZonesViaProxy(t *testing.T) []bunny.Zone {
+	t.Helper()
+
+	req, _ := http.NewRequest("GET", e.ProxyURL+"/dnszone", nil)
+	req.Header.Set("AccessKey", e.AdminToken)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("Failed to list zones via proxy: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		bodyContent, _ := io.ReadAll(resp.Body)
+		t.Fatalf("Failed to list zones, got status %d: %s", resp.StatusCode, string(bodyContent))
+	}
+
+	var result struct {
+		Items []bunny.Zone `json:"Items"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("Failed to decode zones response: %v", err)
+	}
+
+	return result.Items
+}
+
+// createZoneViaProxy creates a zone via HTTP request to proxy.
+func (e *TestEnv) createZoneViaProxy(t *testing.T, domain string) *bunny.Zone {
+	t.Helper()
+
+	reqBody := map[string]interface{}{
+		"Domain": domain,
+	}
+	body, _ := json.Marshal(reqBody)
+
+	req, _ := http.NewRequest("POST", e.ProxyURL+"/dnszone", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("AccessKey", e.AdminToken)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("Failed to create zone %s via proxy: %v", domain, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		bodyContent, _ := io.ReadAll(resp.Body)
+		t.Fatalf("Failed to create zone, got status %d: %s", resp.StatusCode, string(bodyContent))
+	}
+
+	var zone bunny.Zone
+	if err := json.NewDecoder(resp.Body).Decode(&zone); err != nil {
+		t.Fatalf("Failed to decode zone response: %v", err)
+	}
+
+	return &zone
+}
+
+// deleteZoneViaProxy deletes a zone via HTTP request to proxy.
+func (e *TestEnv) deleteZoneViaProxy(t *testing.T, id int64) error {
+	t.Helper()
+
+	req, _ := http.NewRequest("DELETE", fmt.Sprintf("%s/dnszone/%d", e.ProxyURL, id), nil)
+	req.Header.Set("AccessKey", e.AdminToken)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to delete zone %d via proxy: %w", id, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
+		bodyContent, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to delete zone, got status %d: %s", resp.StatusCode, string(bodyContent))
+	}
+
+	return nil
 }

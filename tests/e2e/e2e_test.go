@@ -3,7 +3,6 @@
 package e2e
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -11,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sipico/bunny-api-proxy/internal/bunny"
 	"github.com/sipico/bunny-api-proxy/tests/testenv"
 	"github.com/stretchr/testify/require"
 )
@@ -150,30 +148,37 @@ func TestE2E_AddAndDeleteRecord(t *testing.T) {
 func TestE2E_ListRecords(t *testing.T) {
 	env := testenv.Setup(t)
 
-	// Create a test zone
+	// Create a test zone via proxy
 	zones := env.CreateTestZones(t, 1)
 	zone := zones[0]
 
-	// Add test records directly via the API client
-	ctx := context.Background()
-	_, err := env.Client.AddRecord(ctx, zone.ID, &bunny.AddRecordRequest{
-		Type:  "TXT",
-		Name:  "_acme",
-		Value: "acme-value-1",
-		TTL:   300,
-	})
-	require.NoError(t, err)
-
-	_, err = env.Client.AddRecord(ctx, zone.ID, &bunny.AddRecordRequest{
-		Type:  "TXT",
-		Name:  "_verify",
-		Value: "acme-value-2",
-		TTL:   300,
-	})
-	require.NoError(t, err)
-
+	// Create a scoped key for this zone
 	apiKey := createScopedKey(t, zone.ID)
 
+	// Add test records via proxy (using the scoped key)
+	addRecord1 := map[string]interface{}{
+		"Type":  "TXT",
+		"Name":  "_acme",
+		"Value": "acme-value-1",
+		"TTL":   300,
+	}
+	body1, _ := json.Marshal(addRecord1)
+	resp1 := proxyRequest(t, "POST", fmt.Sprintf("/dnszone/%d/records", zone.ID), apiKey, body1)
+	resp1.Body.Close()
+	require.Equal(t, http.StatusCreated, resp1.StatusCode)
+
+	addRecord2 := map[string]interface{}{
+		"Type":  "TXT",
+		"Name":  "_verify",
+		"Value": "acme-value-2",
+		"TTL":   300,
+	}
+	body2, _ := json.Marshal(addRecord2)
+	resp2 := proxyRequest(t, "POST", fmt.Sprintf("/dnszone/%d/records", zone.ID), apiKey, body2)
+	resp2.Body.Close()
+	require.Equal(t, http.StatusCreated, resp2.StatusCode)
+
+	// List records via proxy
 	resp := proxyRequest(t, "GET", fmt.Sprintf("/dnszone/%d/records", zone.ID), apiKey, nil)
 	defer resp.Body.Close()
 
@@ -185,7 +190,7 @@ func TestE2E_ListRecords(t *testing.T) {
 		Name  string `json:"Name"`
 		Value string `json:"Value"`
 	}
-	err = json.NewDecoder(resp.Body).Decode(&records)
+	err := json.NewDecoder(resp.Body).Decode(&records)
 	require.NoError(t, err)
 	require.GreaterOrEqual(t, len(records), 2)
 }
