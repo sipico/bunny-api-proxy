@@ -504,3 +504,328 @@ func TestDeleteRecord_InvalidRecordID(t *testing.T) {
 		t.Errorf("expected status %d, got %d", http.StatusBadRequest, resp.StatusCode)
 	}
 }
+
+// Tests for handleCreateZone
+func TestHandleCreateZone_Success(t *testing.T) {
+	s := New()
+	defer s.Close()
+
+	// Create zone via POST /dnszone
+	reqBody := `{"Domain": "test.xyz"}`
+	resp, err := http.Post(s.URL()+"/dnszone", "application/json", strings.NewReader(reqBody))
+	if err != nil {
+		t.Fatalf("failed to create zone: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// Verify 201 Created
+	if resp.StatusCode != http.StatusCreated {
+		t.Errorf("expected status %d, got %d", http.StatusCreated, resp.StatusCode)
+	}
+
+	// Parse response
+	var zone Zone
+	if err := json.NewDecoder(resp.Body).Decode(&zone); err != nil {
+		t.Fatalf("failed to decode zone: %v", err)
+	}
+
+	if zone.Domain != "test.xyz" {
+		t.Errorf("expected domain test.xyz, got %s", zone.Domain)
+	}
+	if zone.ID == 0 {
+		t.Error("expected non-zero zone ID")
+	}
+	if zone.Nameserver1 != "ns1.bunny.net" {
+		t.Errorf("expected nameserver1 ns1.bunny.net, got %s", zone.Nameserver1)
+	}
+	if zone.Nameserver2 != "ns2.bunny.net" {
+		t.Errorf("expected nameserver2 ns2.bunny.net, got %s", zone.Nameserver2)
+	}
+	if zone.SoaEmail != "admin@test.xyz" {
+		t.Errorf("expected SoaEmail admin@test.xyz, got %s", zone.SoaEmail)
+	}
+	if zone.CertificateKeyType != "Ecdsa" {
+		t.Errorf("expected CertificateKeyType Ecdsa, got %s", zone.CertificateKeyType)
+	}
+	if len(zone.Records) != 0 {
+		t.Errorf("expected 0 records for new zone, got %d", len(zone.Records))
+	}
+	if zone.DateCreated.IsZero() {
+		t.Error("expected non-zero DateCreated")
+	}
+	if zone.DateModified.IsZero() {
+		t.Error("expected non-zero DateModified")
+	}
+}
+
+func TestHandleCreateZone_EmptyDomain(t *testing.T) {
+	s := New()
+	defer s.Close()
+
+	reqBody := `{"Domain": ""}`
+	resp, err := http.Post(s.URL()+"/dnszone", "application/json", strings.NewReader(reqBody))
+	if err != nil {
+		t.Fatalf("failed to create zone: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d", http.StatusBadRequest, resp.StatusCode)
+	}
+
+	// Verify error response format
+	var errResp ErrorResponse
+	if err := json.NewDecoder(resp.Body).Decode(&errResp); err != nil {
+		t.Fatalf("failed to decode error response: %v", err)
+	}
+
+	if errResp.ErrorKey != "validation.error" {
+		t.Errorf("expected error key validation.error, got %s", errResp.ErrorKey)
+	}
+	if errResp.Field != "Domain" {
+		t.Errorf("expected field Domain, got %s", errResp.Field)
+	}
+	if errResp.Message != "Domain is required" {
+		t.Errorf("expected message 'Domain is required', got %s", errResp.Message)
+	}
+}
+
+func TestHandleCreateZone_DuplicateDomain(t *testing.T) {
+	s := New()
+	defer s.Close()
+
+	// Create first zone
+	reqBody := `{"Domain": "duplicate.com"}`
+	resp1, err := http.Post(s.URL()+"/dnszone", "application/json", strings.NewReader(reqBody))
+	if err != nil {
+		t.Fatalf("failed to create first zone: %v", err)
+	}
+	resp1.Body.Close()
+
+	if resp1.StatusCode != http.StatusCreated {
+		t.Fatalf("expected first zone creation to succeed with 201, got %d", resp1.StatusCode)
+	}
+
+	// Try to create duplicate zone
+	resp2, err := http.Post(s.URL()+"/dnszone", "application/json", strings.NewReader(reqBody))
+	if err != nil {
+		t.Fatalf("failed to create second zone: %v", err)
+	}
+	defer resp2.Body.Close()
+
+	// Verify 409 Conflict
+	if resp2.StatusCode != http.StatusConflict {
+		t.Errorf("expected status %d, got %d", http.StatusConflict, resp2.StatusCode)
+	}
+
+	// Verify error response
+	var errResp ErrorResponse
+	if err := json.NewDecoder(resp2.Body).Decode(&errResp); err != nil {
+		t.Fatalf("failed to decode error response: %v", err)
+	}
+
+	if errResp.ErrorKey != "conflict" {
+		t.Errorf("expected error key conflict, got %s", errResp.ErrorKey)
+	}
+	if errResp.Message != "Zone already exists" {
+		t.Errorf("expected message 'Zone already exists', got %s", errResp.Message)
+	}
+}
+
+func TestHandleCreateZone_InvalidJSON(t *testing.T) {
+	s := New()
+	defer s.Close()
+
+	// Send malformed JSON
+	reqBody := `{"Domain": "test.com"` // Missing closing brace
+	resp, err := http.Post(s.URL()+"/dnszone", "application/json", strings.NewReader(reqBody))
+	if err != nil {
+		t.Fatalf("failed to create zone: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d", http.StatusBadRequest, resp.StatusCode)
+	}
+}
+
+func TestHandleCreateZone_MultipleZones(t *testing.T) {
+	s := New()
+	defer s.Close()
+
+	// Create multiple zones
+	domains := []string{"zone1.com", "zone2.org", "zone3.net"}
+	zoneIDs := make([]int64, 0, len(domains))
+
+	for _, domain := range domains {
+		reqBody := fmt.Sprintf(`{"Domain": "%s"}`, domain)
+		resp, err := http.Post(s.URL()+"/dnszone", "application/json", strings.NewReader(reqBody))
+		if err != nil {
+			t.Fatalf("failed to create zone %s: %v", domain, err)
+		}
+
+		if resp.StatusCode != http.StatusCreated {
+			t.Errorf("expected status %d for domain %s, got %d", http.StatusCreated, domain, resp.StatusCode)
+		}
+
+		var zone Zone
+		if err := json.NewDecoder(resp.Body).Decode(&zone); err != nil {
+			t.Fatalf("failed to decode zone: %v", err)
+		}
+		resp.Body.Close()
+
+		zoneIDs = append(zoneIDs, zone.ID)
+
+		if zone.Domain != domain {
+			t.Errorf("expected domain %s, got %s", domain, zone.Domain)
+		}
+	}
+
+	// Verify all zones exist and have unique IDs
+	if len(zoneIDs) != len(domains) {
+		t.Errorf("expected %d zone IDs, got %d", len(domains), len(zoneIDs))
+	}
+
+	// Check that all IDs are unique
+	idMap := make(map[int64]bool)
+	for _, id := range zoneIDs {
+		if idMap[id] {
+			t.Error("expected all zone IDs to be unique")
+		}
+		idMap[id] = true
+	}
+}
+
+// Tests for handleDeleteZone
+func TestHandleDeleteZone_Success(t *testing.T) {
+	s := New()
+	defer s.Close()
+
+	// Create a zone first
+	zoneID := s.AddZone("example.com")
+
+	// Verify zone exists
+	resp, err := http.Get(fmt.Sprintf("%s/dnszone/%d", s.URL(), zoneID))
+	if err != nil {
+		t.Fatalf("failed to get zone: %v", err)
+	}
+	resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("zone should exist before delete")
+	}
+
+	// Delete the zone
+	req, _ := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/dnszone/%d", s.URL(), zoneID), nil)
+	client := &http.Client{}
+	resp, err = client.Do(req)
+	if err != nil {
+		t.Fatalf("failed to delete zone: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// Verify 204 No Content
+	if resp.StatusCode != http.StatusNoContent {
+		t.Errorf("expected status %d, got %d", http.StatusNoContent, resp.StatusCode)
+	}
+
+	// Verify zone is deleted by attempting to get it
+	resp, err = http.Get(fmt.Sprintf("%s/dnszone/%d", s.URL(), zoneID))
+	if err != nil {
+		t.Fatalf("failed to get zone: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("expected status %d after delete, got %d", http.StatusNotFound, resp.StatusCode)
+	}
+}
+
+func TestHandleDeleteZone_NotFound(t *testing.T) {
+	s := New()
+	defer s.Close()
+
+	// Try to delete non-existent zone
+	req, _ := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/dnszone/9999", s.URL()), nil)
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("failed to delete zone: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("expected status %d, got %d", http.StatusNotFound, resp.StatusCode)
+	}
+}
+
+func TestHandleDeleteZone_InvalidID(t *testing.T) {
+	s := New()
+	defer s.Close()
+
+	// Try to delete with invalid (non-numeric) zone ID
+	req, _ := http.NewRequest(http.MethodDelete, s.URL()+"/dnszone/invalid", nil)
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("failed to delete zone: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d", http.StatusBadRequest, resp.StatusCode)
+	}
+}
+
+func TestHandleDeleteZone_MultipleZones(t *testing.T) {
+	s := New()
+	defer s.Close()
+
+	// Create multiple zones
+	id1 := s.AddZone("zone1.com")
+	id2 := s.AddZone("zone2.com")
+	id3 := s.AddZone("zone3.com")
+
+	// Delete the middle one
+	req, _ := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/dnszone/%d", s.URL(), id2), nil)
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("failed to delete zone: %v", err)
+	}
+	resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNoContent {
+		t.Errorf("expected status %d, got %d", http.StatusNoContent, resp.StatusCode)
+	}
+
+	// Verify id1 still exists
+	resp, err = http.Get(fmt.Sprintf("%s/dnszone/%d", s.URL(), id1))
+	if err != nil {
+		t.Fatalf("failed to get zone: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected zone %d to still exist", id1)
+	}
+
+	// Verify id2 is deleted
+	resp, err = http.Get(fmt.Sprintf("%s/dnszone/%d", s.URL(), id2))
+	if err != nil {
+		t.Fatalf("failed to get zone: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("expected zone %d to be deleted", id2)
+	}
+
+	// Verify id3 still exists
+	resp, err = http.Get(fmt.Sprintf("%s/dnszone/%d", s.URL(), id3))
+	if err != nil {
+		t.Fatalf("failed to get zone: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected zone %d to still exist", id3)
+	}
+}
