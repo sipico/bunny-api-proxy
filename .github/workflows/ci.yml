@@ -159,6 +159,7 @@ jobs:
       - name: Run E2E tests
         run: |
           mkdir -p e2e-logs
+          set -o pipefail
           docker compose -f .claude/docker/docker-compose.test.yml run --rm test-runner 2>&1 | tee e2e-logs/test-runner.log
 
       - name: Collect logs
