@@ -138,13 +138,13 @@ func TestGetZone(t *testing.T) {
 		// Add a zone with some records
 		zoneID := server.AddZoneWithRecords("example.com", []mockbunny.Record{
 			{
-				Type:  "A",
+				Type:  0, // A
 				Name:  "www",
 				Value: "1.2.3.4",
 				TTL:   300,
 			},
 			{
-				Type:  "CNAME",
+				Type:  2, // CNAME
 				Name:  "alias",
 				Value: "www.example.com",
 				TTL:   300,
@@ -160,6 +160,7 @@ func TestGetZone(t *testing.T) {
 
 		if zone == nil {
 			t.Fatal("expected non-nil zone")
+			return
 		}
 
 		if zone.ID != zoneID {
@@ -175,12 +176,12 @@ func TestGetZone(t *testing.T) {
 		}
 
 		// Verify record details
-		if zone.Records[0].Type != "A" {
-			t.Errorf("expected first record type A, got %s", zone.Records[0].Type)
+		if zone.Records[0].Type != 0 { // A
+			t.Errorf("expected first record type 0 (A), got %d", zone.Records[0].Type)
 		}
 
-		if zone.Records[1].Type != "CNAME" {
-			t.Errorf("expected second record type CNAME, got %s", zone.Records[1].Type)
+		if zone.Records[1].Type != 2 { // CNAME
+			t.Errorf("expected second record type 2 (CNAME), got %d", zone.Records[1].Type)
 		}
 	})
 
@@ -232,7 +233,7 @@ func TestAddRecord(t *testing.T) {
 
 		client := NewClient("test-key", WithBaseURL(server.URL()))
 		req := &AddRecordRequest{
-			Type:  "A",
+			Type:  0, // A
 			Name:  "www",
 			Value: "1.2.3.4",
 			TTL:   300,
@@ -246,10 +247,11 @@ func TestAddRecord(t *testing.T) {
 
 		if record == nil {
 			t.Fatal("expected non-nil record")
+			return
 		}
 
-		if record.Type != "A" {
-			t.Errorf("expected record type A, got %s", record.Type)
+		if record.Type != 0 { // A
+			t.Errorf("expected record type 0 (A), got %d", record.Type)
 		}
 
 		if record.Name != "www" {
@@ -267,7 +269,7 @@ func TestAddRecord(t *testing.T) {
 
 		client := NewClient("test-key", WithBaseURL(server.URL()))
 		req := &AddRecordRequest{
-			Type:  "A",
+			Type:  0, // A
 			Name:  "www",
 			Value: "1.2.3.4",
 			TTL:   300,
@@ -294,7 +296,7 @@ func TestAddRecord(t *testing.T) {
 
 		client := NewClient("test-key", WithHTTPClient(httpClient))
 		req := &AddRecordRequest{
-			Type:  "A",
+			Type:  0, // A
 			Name:  "www",
 			Value: "1.2.3.4",
 			TTL:   300,
@@ -320,7 +322,7 @@ func TestAddRecord(t *testing.T) {
 
 		client := NewClient("test-key", WithHTTPClient(httpClient))
 		req := &AddRecordRequest{
-			Type:  "INVALID",
+			Type:  999, // Invalid type
 			Name:  "www",
 			Value: "1.2.3.4",
 			TTL:   300,
@@ -351,7 +353,7 @@ func TestAddRecord(t *testing.T) {
 
 		client := NewClient("test-key", WithHTTPClient(httpClient))
 		req := &AddRecordRequest{
-			Type:  "A",
+			Type:  0, // A
 			Name:  "www",
 			Value: "1.2.3.4",
 			TTL:   300,
@@ -377,7 +379,7 @@ func TestAddRecord(t *testing.T) {
 
 		client := NewClient("test-key", WithHTTPClient(httpClient))
 		req := &AddRecordRequest{
-			Type:  "A",
+			Type:  0, // A
 			Name:  "www",
 			Value: "1.2.3.4",
 			TTL:   300,
@@ -404,7 +406,7 @@ func TestDeleteRecord(t *testing.T) {
 		// Add a zone with a record
 		zoneID := server.AddZoneWithRecords("example.com", []mockbunny.Record{
 			{
-				Type:  "A",
+				Type:  0, // A
 				Name:  "www",
 				Value: "1.2.3.4",
 				TTL:   300,
@@ -629,6 +631,203 @@ func TestAPIError(t *testing.T) {
 		expected := "bunny: ServerError: Internal server error occurred"
 		if apiErr.Error() != expected {
 			t.Errorf("expected %q, got %q", expected, apiErr.Error())
+		}
+	})
+}
+
+// TestCreateZone tests the CreateZone method with various scenarios.
+func TestCreateZone(t *testing.T) {
+	t.Run("success creating zone", func(t *testing.T) {
+		server := mockbunny.New()
+		defer server.Close()
+
+		client := NewClient("test-key", WithBaseURL(server.URL()))
+		zone, err := client.CreateZone(context.Background(), "example.com")
+
+		if err != nil {
+			t.Fatalf("CreateZone failed: %v", err)
+		}
+
+		if zone == nil {
+			t.Fatal("expected non-nil zone")
+			return
+		}
+
+		if zone.Domain != "example.com" {
+			t.Errorf("expected domain example.com, got %s", zone.Domain)
+		}
+
+		if zone.ID == 0 {
+			t.Error("expected non-zero zone ID")
+		}
+	})
+
+	t.Run("invalid domain error (400)", func(t *testing.T) {
+		transport := &mockTransport{
+			statusCode: http.StatusBadRequest,
+			body:       []byte(`{"ErrorKey":"BadRequest","Message":"Invalid domain format"}`),
+		}
+		httpClient := &http.Client{Transport: transport}
+
+		client := NewClient("test-key", WithHTTPClient(httpClient))
+		zone, err := client.CreateZone(context.Background(), "invalid..domain")
+
+		if err == nil {
+			t.Fatal("expected error for invalid domain")
+		}
+
+		if zone != nil {
+			t.Errorf("expected nil zone, got %v", zone)
+		}
+
+		// Verify it's an APIError
+		apiErr, ok := err.(*APIError)
+		if !ok {
+			t.Fatalf("expected *APIError, got %T", err)
+		}
+
+		if apiErr.Message != "Invalid domain format" {
+			t.Errorf("expected message 'Invalid domain format', got %s", apiErr.Message)
+		}
+	})
+
+	t.Run("unauthorized error (401)", func(t *testing.T) {
+		transport := &mockTransport{
+			statusCode: http.StatusUnauthorized,
+			body:       []byte(""),
+		}
+		httpClient := &http.Client{Transport: transport}
+
+		client := NewClient("test-key", WithHTTPClient(httpClient))
+		zone, err := client.CreateZone(context.Background(), "example.com")
+
+		if err != ErrUnauthorized {
+			t.Errorf("expected ErrUnauthorized, got %v", err)
+		}
+
+		if zone != nil {
+			t.Errorf("expected nil zone, got %v", zone)
+		}
+	})
+
+	t.Run("conflict error zone already exists (409)", func(t *testing.T) {
+		transport := &mockTransport{
+			statusCode: http.StatusConflict,
+			body:       []byte(`{"ErrorKey":"Conflict","Message":"Zone already exists"}`),
+		}
+		httpClient := &http.Client{Transport: transport}
+
+		client := NewClient("test-key", WithHTTPClient(httpClient))
+		zone, err := client.CreateZone(context.Background(), "example.com")
+
+		if err == nil {
+			t.Fatal("expected error for zone conflict")
+		}
+
+		if zone != nil {
+			t.Errorf("expected nil zone, got %v", zone)
+		}
+
+		// Verify it's an APIError
+		apiErr, ok := err.(*APIError)
+		if !ok {
+			t.Fatalf("expected *APIError, got %T", err)
+		}
+
+		if apiErr.Message != "Zone already exists" {
+			t.Errorf("expected message 'Zone already exists', got %s", apiErr.Message)
+		}
+
+		if apiErr.StatusCode != http.StatusConflict {
+			t.Errorf("expected status 409, got %d", apiErr.StatusCode)
+		}
+	})
+
+	t.Run("context cancellation", func(t *testing.T) {
+		server := mockbunny.New()
+		defer server.Close()
+
+		server.AddZone("example.com")
+		client := NewClient("test-key", WithBaseURL(server.URL()))
+
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		zone, err := client.CreateZone(ctx, "test.com")
+
+		if err == nil {
+			t.Error("expected error with cancelled context")
+		}
+		if zone != nil {
+			t.Error("expected nil zone on error")
+		}
+	})
+}
+
+// TestDeleteZone tests the DeleteZone method with various scenarios.
+func TestDeleteZone(t *testing.T) {
+	t.Run("success deleting zone", func(t *testing.T) {
+		server := mockbunny.New()
+		defer server.Close()
+
+		// Add a zone
+		zoneID := server.AddZone("example.com")
+
+		client := NewClient("test-key", WithBaseURL(server.URL()))
+		err := client.DeleteZone(context.Background(), zoneID)
+
+		if err != nil {
+			t.Fatalf("DeleteZone failed: %v", err)
+		}
+
+		// Verify zone is deleted
+		zone := server.GetZone(zoneID)
+		if zone != nil {
+			t.Errorf("expected zone to be deleted, but found: %v", zone)
+		}
+	})
+
+	t.Run("not found error (404)", func(t *testing.T) {
+		server := mockbunny.New()
+		defer server.Close()
+
+		client := NewClient("test-key", WithBaseURL(server.URL()))
+		err := client.DeleteZone(context.Background(), 999)
+
+		if err != ErrNotFound {
+			t.Errorf("expected ErrNotFound, got %v", err)
+		}
+	})
+
+	t.Run("unauthorized error (401)", func(t *testing.T) {
+		transport := &mockTransport{
+			statusCode: http.StatusUnauthorized,
+			body:       []byte(""),
+		}
+		httpClient := &http.Client{Transport: transport}
+
+		client := NewClient("test-key", WithHTTPClient(httpClient))
+		err := client.DeleteZone(context.Background(), 1)
+
+		if err != ErrUnauthorized {
+			t.Errorf("expected ErrUnauthorized, got %v", err)
+		}
+	})
+
+	t.Run("context cancellation", func(t *testing.T) {
+		server := mockbunny.New()
+		defer server.Close()
+
+		server.AddZone("example.com")
+		client := NewClient("test-key", WithBaseURL(server.URL()))
+
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		err := client.DeleteZone(ctx, 1)
+
+		if err == nil {
+			t.Error("expected error with cancelled context")
 		}
 	})
 }

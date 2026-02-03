@@ -144,7 +144,7 @@ func (s *Server) handleDeleteRecord(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Update zone's DateModified
-	zone.DateModified = time.Now().UTC()
+	zone.DateModified = MockBunnyTime{Time: time.Now().UTC()}
 
 	// Return 204 No Content on success
 	w.WriteHeader(http.StatusNoContent)
@@ -152,7 +152,7 @@ func (s *Server) handleDeleteRecord(w http.ResponseWriter, r *http.Request) {
 
 // AddRecordRequest represents the request body for creating a new DNS record.
 type AddRecordRequest struct {
-	Type     string `json:"Type"`
+	Type     int    `json:"Type"` // 0 = A, 1 = AAAA, 2 = CNAME, 3 = TXT, 4 = MX, 5 = SPF, 6 = Flatten, 7 = PullZone, 8 = SRV, 9 = CAA, 10 = PTR, 11 = Script, 12 = NS
 	Name     string `json:"Name"`
 	Value    string `json:"Value"`
 	TTL      int32  `json:"Ttl"`
@@ -181,10 +181,7 @@ func (s *Server) handleAddRecord(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Validate required fields
-	if req.Type == "" {
-		s.writeError(w, http.StatusBadRequest, "validation.error", "Type", "Type is required")
-		return
-	}
+	// Type is validated implicitly (must be provided as int 0-12)
 	if req.Name == "" {
 		s.writeError(w, http.StatusBadRequest, "validation.error", "Name", "Name is required")
 		return
@@ -217,19 +214,107 @@ func (s *Server) handleAddRecord(w http.ResponseWriter, r *http.Request) {
 		Tag:              req.Tag,
 		Disabled:         req.Disabled,
 		Comment:          req.Comment,
-		MonitorStatus:    "Unknown",
-		MonitorType:      "None",
-		SmartRoutingType: "None",
+		MonitorStatus:    0, // 0 = Unknown
+		MonitorType:      0, // 0 = None
+		SmartRoutingType: 0, // 0 = None
 	}
 	s.state.nextRecordID++
 
 	zone.Records = append(zone.Records, record)
-	zone.DateModified = time.Now().UTC()
+	zone.DateModified = MockBunnyTime{Time: time.Now().UTC()}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	//nolint:errcheck
 	json.NewEncoder(w).Encode(record)
+}
+
+// handleCreateZone handles POST /dnszone to create a new DNS zone.
+// Returns 201 Created on success, 400 for invalid domain, 409 if zone already exists.
+func (s *Server) handleCreateZone(w http.ResponseWriter, r *http.Request) {
+	// Parse request body
+	var req struct {
+		Domain string `json:"Domain"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// Validate domain
+	if req.Domain == "" {
+		s.writeError(w, http.StatusBadRequest, "validation.error", "Domain", "Domain is required")
+		return
+	}
+
+	s.state.mu.Lock()
+	defer s.state.mu.Unlock()
+
+	// Check if domain already exists
+	for _, zone := range s.state.zones {
+		if zone.Domain == req.Domain {
+			s.writeError(w, http.StatusConflict, "conflict", "", "Zone already exists")
+			return
+		}
+	}
+
+	// Create new zone
+	id := s.state.nextZoneID
+	s.state.nextZoneID++
+
+	now := MockBunnyTime{Time: time.Now().UTC()}
+	zone := &Zone{
+		ID:                       id,
+		Domain:                   req.Domain,
+		Records:                  []Record{},
+		DateCreated:              now,
+		DateModified:             now,
+		NameserversDetected:      true,
+		CustomNameserversEnabled: false,
+		Nameserver1:              "ns1.bunny.net",
+		Nameserver2:              "ns2.bunny.net",
+		SoaEmail:                 "admin@" + req.Domain,
+		LoggingEnabled:           false,
+		LogAnonymizationType:     0, // 0 = OneDigit (default)
+		DnsSecEnabled:            false,
+		CertificateKeyType:       0, // 0 = Ecdsa (default)
+	}
+
+	s.state.zones[id] = zone
+
+	// Return 201 Created with zone JSON
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	//nolint:errcheck
+	json.NewEncoder(w).Encode(zone)
+}
+
+// handleDeleteZone handles DELETE /dnszone/{id} to delete a DNS zone.
+// Returns 204 No Content on success, 404 if zone not found, 400 for invalid zone ID.
+func (s *Server) handleDeleteZone(w http.ResponseWriter, r *http.Request) {
+	// Parse zone ID from URL
+	idStr := chi.URLParam(r, "id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		http.Error(w, "invalid zone ID", http.StatusBadRequest)
+		return
+	}
+
+	s.state.mu.Lock()
+	defer s.state.mu.Unlock()
+
+	// Check if zone exists
+	_, ok := s.state.zones[id]
+	if !ok {
+		http.Error(w, "zone not found", http.StatusNotFound)
+		return
+	}
+
+	// Delete zone
+	delete(s.state.zones, id)
+
+	// Return 204 No Content on success
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // writeError writes an error response in the bunny.net API format.

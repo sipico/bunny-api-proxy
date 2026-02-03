@@ -1,8 +1,13 @@
 services:
   mockbunny:
+    profiles: ["mock"]  # Only start in mock mode
+    image: mockbunny:test  # Pre-built image tag
     build:
       context: ../..
       dockerfile: .claude/docker/Dockerfile.mockbunny
+    environment:
+      - DEBUG=${DEBUG:-true}  # Enable debug logging by default for E2E tests
+      - BUNNY_API_KEY=${BUNNY_MASTER_API_KEY}  # Master key for validation
     networks:
       - test-network
     healthcheck:
@@ -13,6 +18,7 @@ services:
       start_period: 5s
 
   proxy:
+    image: bunny-api-proxy:test  # Pre-built image tag
     build:
       context: ../..
       dockerfile: Dockerfile
@@ -22,10 +28,12 @@ services:
       - LOG_LEVEL=debug
       - HTTP_PORT=8080
       - DATA_PATH=/data/proxy.db
-      - BUNNY_API_URL=http://mockbunny:8081
+      - BUNNY_API_URL=${BUNNY_API_URL-http://mockbunny:8081}  # Default to mock only if unset (not if empty)
+      - BUNNY_API_KEY=${BUNNY_MASTER_API_KEY}  # Master key (MOCKBUNNY_API_TEST_KEY or BUNNY_API_TEST_KEY)
     depends_on:
       mockbunny:
         condition: service_healthy
+        required: false  # Optional dependency - not needed for real API mode
     networks:
       - test-network
     healthcheck:
@@ -38,13 +46,14 @@ services:
       - /tmp/proxy-data:/data
 
   test-runner:
+    profiles: ["manual"]  # Don't auto-start; only run via 'docker compose run'
+    image: test-runner:test  # Pre-built image tag
     build:
       context: ../..
       dockerfile: .claude/docker/Dockerfile.testrunner
     environment:
       - PROXY_URL=http://proxy:8080
-      - MOCKBUNNY_URL=http://mockbunny:8081
-      - ADMIN_PASSWORD=testpassword123
+      - BUNNY_MASTER_API_KEY=${BUNNY_MASTER_API_KEY}  # Master key for bootstrap
     depends_on:
       proxy:
         condition: service_healthy
@@ -54,4 +63,4 @@ services:
 networks:
   test-network:
     driver: bridge
-    internal: true
+    internal: true  # Isolate mock tests from external network

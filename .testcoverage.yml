@@ -13,7 +13,8 @@ threshold:
 force-annotation-comment: true
 
 # Exclude test utilities from coverage requirements
-# These are helper binaries for E2E testing, not production code
+# These are helper binaries and test infrastructure, not production code
 exclude:
   paths:
     - cmd/mockbunny/.*
+    - tests/testenv/.*

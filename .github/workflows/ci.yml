@@ -4,13 +4,11 @@ on:
   push:
     branches: [ main, 'claude/**' ]
     paths-ignore:
-      - '.claude/**'
       - '**/*.md'
       - 'docs/**'
   pull_request:
     branches: [ main ]
     paths-ignore:
-      - '.claude/**'
       - '**/*.md'
       - 'docs/**'
 
@@ -99,70 +97,172 @@ jobs:
         with:
           go-version: '1.25'
 
-      - name: Build binary
+      - name: Build proxy binary
+        env:
+          CGO_ENABLED: 0
         run: go build -o bunny-api-proxy ./cmd/bunny-api-proxy
 
-      - name: Upload binary artifact
+      - name: Build mockbunny binary
+        env:
+          CGO_ENABLED: 0
+        run: go build -o mockbunny ./cmd/mockbunny
+
+      - name: Upload proxy binary artifact
         uses: actions/upload-artifact@v4
         with:
           name: bunny-api-proxy
           path: bunny-api-proxy
           retention-days: 7
 
+      - name: Upload mockbunny binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mockbunny
+          path: mockbunny
+          retention-days: 7
+
   docker:
     name: Docker Build
     runs-on: ubuntu-latest
-    needs: [test, lint]
+    needs: [test, lint, build]  # Wait for binary to be built
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Create build contexts for pre-built binaries
+        run: |
+          # Create separate build directories to avoid .dockerignore conflicts
+          mkdir -p ci-build/proxy ci-build/mockbunny
+
+      - name: Download binary artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: bunny-api-proxy
+          path: ci-build/proxy
+
+      - name: Download mockbunny binary artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: mockbunny
+          path: ci-build/mockbunny
+
+      - name: Make binaries executable
+        run: |
+          chmod +x ci-build/proxy/bunny-api-proxy
+          chmod +x ci-build/mockbunny/mockbunny
+
+      - name: Verify binaries exist
+        run: |
+          ls -lah ci-build/proxy/bunny-api-proxy ci-build/mockbunny/mockbunny
+          file ci-build/proxy/bunny-api-proxy ci-build/mockbunny/mockbunny
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build Docker image
+      - name: Build proxy Docker image (using pre-built binary)
+        uses: docker/build-push-action@v5
+        with:
+          context: ci-build/proxy
+          file: .claude/docker/Dockerfile.prebuilt
+          push: false
+          load: true
+          tags: bunny-api-proxy:test
+
+      - name: Build mockbunny Docker image (using pre-built binary)
+        uses: docker/build-push-action@v5
+        with:
+          context: ci-build/mockbunny
+          file: .claude/docker/Dockerfile.mockbunny.prebuilt
+          push: false
+          load: true
+          tags: mockbunny:test
+
+      - name: Build test-runner Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
+          file: .claude/docker/Dockerfile.testrunner
           push: false
-          tags: bunny-api-proxy:test
+          load: true
+          tags: test-runner:test
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Save Docker images as tarballs
+        run: |
+          docker save bunny-api-proxy:test -o /tmp/bunny-api-proxy.tar
+          docker save mockbunny:test -o /tmp/mockbunny.tar
+          docker save test-runner:test -o /tmp/test-runner.tar
+          ls -lh /tmp/*.tar
+
+      - name: Upload Docker images
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-images
+          path: |
+            /tmp/bunny-api-proxy.tar
+            /tmp/mockbunny.tar
+            /tmp/test-runner.tar
+          retention-days: 1
+
   e2e-test:
-    name: E2E Tests
+    name: E2E Tests (Mock)
     runs-on: ubuntu-latest
-    needs: [test, lint]
+    needs: [test, lint, docker]  # Wait for Docker images to be built
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Download Docker images
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-images
+          path: /tmp
+
+      - name: Load Docker images
+        run: |
+          docker load --input /tmp/bunny-api-proxy.tar
+          docker load --input /tmp/mockbunny.tar
+          docker load --input /tmp/test-runner.tar
+          docker images
 
       - name: Create test data directory
         run: |
+          rm -rf /tmp/proxy-data
           mkdir -p /tmp/proxy-data
           chmod 777 /tmp/proxy-data
 
-      - name: Build and start services
+      - name: Stop and remove previous containers
         run: |
-          docker compose -f .claude/docker/docker-compose.test.yml up -d --build proxy mockbunny
+          docker compose -f .claude/docker/docker-compose.test.yml --profile mock down -v || true
+
+      - name: Start services (Mock Mode - using pre-built images)
+        env:
+          BUNNY_MASTER_API_KEY: ${{ secrets.MOCKBUNNY_API_TEST_KEY }}
+        run: |
+          docker compose -f .claude/docker/docker-compose.test.yml --profile mock up -d
 
       - name: Wait for services to be healthy
+        env:
+          BUNNY_MASTER_API_KEY: ${{ secrets.MOCKBUNNY_API_TEST_KEY }}
         run: |
           echo "Waiting for services..."
           timeout 60 bash -c 'until docker compose -f .claude/docker/docker-compose.test.yml ps | grep -q "healthy"; do sleep 2; done'
           docker compose -f .claude/docker/docker-compose.test.yml ps
 
       - name: Run E2E tests
+        env:
+          BUNNY_MASTER_API_KEY: ${{ secrets.MOCKBUNNY_API_TEST_KEY }}
         run: |
           mkdir -p e2e-logs
-          docker compose -f .claude/docker/docker-compose.test.yml run --rm test-runner 2>&1 | tee e2e-logs/test-runner.log
+          set -o pipefail
+          docker compose -f .claude/docker/docker-compose.test.yml run --rm --no-deps test-runner 2>&1 | tee e2e-logs/test-runner.log
 
       - name: Collect logs
         if: always()
+        env:
+          BUNNY_MASTER_API_KEY: ${{ secrets.MOCKBUNNY_API_TEST_KEY }}
         run: |
           mkdir -p e2e-logs
           docker compose -f .claude/docker/docker-compose.test.yml logs proxy > e2e-logs/proxy.log 2>&1 || true
@@ -179,5 +279,85 @@ jobs:
 
       - name: Cleanup
         if: always()
+        env:
+          BUNNY_MASTER_API_KEY: ${{ secrets.MOCKBUNNY_API_TEST_KEY }}
         run: |
           docker compose -f .claude/docker/docker-compose.test.yml down -v
+
+  e2e-test-real-api:
+    name: E2E Tests (Real Bunny.net API)
+    runs-on: ubuntu-latest
+    needs: [test, lint, docker, e2e-test]  # Wait for docker build and mock tests to pass
+    # Only run on PRs to main
+    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download Docker images
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-images
+          path: /tmp
+
+      - name: Load Docker images
+        run: |
+          docker load --input /tmp/bunny-api-proxy.tar
+          docker load --input /tmp/test-runner.tar
+          docker images
+
+      - name: Create test data directory
+        run: |
+          rm -rf /tmp/proxy-data
+          mkdir -p /tmp/proxy-data
+          chmod 777 /tmp/proxy-data
+
+      - name: Start services (Real API Mode - using pre-built images)
+        env:
+          BUNNY_MASTER_API_KEY: ${{ secrets.BUNNY_API_TEST_KEY }}
+          BUNNY_API_URL: ""  # Empty to use default (https://api.bunny.net)
+        run: |
+          # Use override file to allow external network access for real API
+          # No --profile mock: skips mockbunny, only starts proxy
+          docker compose -f .claude/docker/docker-compose.test.yml -f .claude/docker/docker-compose.real-api.yml up -d proxy
+
+      - name: Wait for proxy to be healthy
+        env:
+          BUNNY_MASTER_API_KEY: ${{ secrets.BUNNY_API_TEST_KEY }}
+        run: |
+          echo "Waiting for proxy..."
+          timeout 60 bash -c 'until docker compose -f .claude/docker/docker-compose.test.yml -f .claude/docker/docker-compose.real-api.yml ps proxy | grep -q "healthy"; do sleep 2; done'
+          docker compose -f .claude/docker/docker-compose.test.yml -f .claude/docker/docker-compose.real-api.yml ps
+
+      - name: Run E2E tests against real API
+        env:
+          BUNNY_MASTER_API_KEY: ${{ secrets.BUNNY_API_TEST_KEY }}
+        run: |
+          mkdir -p e2e-logs
+          set -o pipefail
+          docker compose -f .claude/docker/docker-compose.test.yml -f .claude/docker/docker-compose.real-api.yml run --rm --no-deps test-runner 2>&1 | tee e2e-logs/test-runner.log
+
+      - name: Collect logs
+        if: always()
+        env:
+          BUNNY_MASTER_API_KEY: ${{ secrets.BUNNY_API_TEST_KEY }}
+        run: |
+          mkdir -p e2e-logs
+          docker compose -f .claude/docker/docker-compose.test.yml -f .claude/docker/docker-compose.real-api.yml logs proxy > e2e-logs/proxy.log 2>&1 || true
+          docker compose -f .claude/docker/docker-compose.test.yml -f .claude/docker/docker-compose.real-api.yml ps > e2e-logs/services.log 2>&1 || true
+
+      - name: Upload E2E logs (Real API)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-logs-real-api
+          path: e2e-logs/
+          retention-days: 7
+
+      - name: Cleanup
+        if: always()
+        env:
+          BUNNY_MASTER_API_KEY: ${{ secrets.BUNNY_API_TEST_KEY }}
+        run: |
+          docker compose -f .claude/docker/docker-compose.test.yml -f .claude/docker/docker-compose.real-api.yml down -v

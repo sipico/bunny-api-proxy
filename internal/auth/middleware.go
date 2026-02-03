@@ -125,6 +125,60 @@ func (m *Authenticator) RequireAdmin(next http.Handler) http.Handler {
 	})
 }
 
+// CheckPermissions is middleware that validates token permissions for proxy requests.
+// It must be used after Authenticate middleware.
+// Admin tokens and master key bypass permission checks.
+// Scoped tokens are validated against their permissions.
+func (m *Authenticator) CheckPermissions(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+
+		// Admin and master key bypass permission checks
+		if IsAdminFromContext(ctx) {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		// Get permissions from context (set by Authenticate middleware)
+		perms := PermissionsFromContext(ctx)
+		if perms == nil {
+			perms = []*storage.Permission{} // Empty permissions for scoped tokens
+		}
+
+		// Parse the request to determine required permissions
+		req, err := ParseRequest(r)
+		if err != nil {
+			writeJSONError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+
+		// Build KeyInfo for permission checking
+		token := TokenFromContext(ctx)
+		var keyInfo *KeyInfo
+		if token != nil {
+			keyInfo = &KeyInfo{
+				KeyID:       token.ID,
+				KeyName:     token.Name,
+				Permissions: perms,
+			}
+		} else {
+			// Shouldn't happen if Authenticate ran first, but handle gracefully
+			keyInfo = &KeyInfo{
+				Permissions: perms,
+			}
+		}
+
+		// Use existing Validator logic for permission checking
+		validator := &Validator{} // Empty validator just for CheckPermission method
+		if err := validator.CheckPermission(keyInfo, req); err != nil {
+			writeJSONError(w, http.StatusForbidden, "permission denied")
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
 // --- Legacy support for existing Validator-based middleware ---
 // The following functions maintain backward compatibility with existing code.
 

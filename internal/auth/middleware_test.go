@@ -123,6 +123,7 @@ func TestTokenFromContext(t *testing.T) {
 	got := TokenFromContext(ctx)
 	if got == nil {
 		t.Fatal("TokenFromContext returned nil")
+		return
 	}
 	if got.ID != 42 {
 		t.Errorf("TokenFromContext().ID = %d, want 42", got.ID)
@@ -957,7 +958,7 @@ func TestParseRequest_ListRecords(t *testing.T) {
 }
 
 func TestParseRequest_AddRecord(t *testing.T) {
-	body := `{"Type":"TXT","Name":"test","Value":"hello"}`
+	body := `{"Type":3,"Name":"test","Value":"hello"}`
 	req := httptest.NewRequest("POST", "/dnszone/123/records", bytes.NewReader([]byte(body)))
 	parsed, err := ParseRequest(req)
 
@@ -1386,11 +1387,334 @@ func TestNewAuthenticator(t *testing.T) {
 
 	if middleware == nil {
 		t.Fatal("NewAuthenticator returned nil")
+		return
 	}
 	if middleware.tokens != tokenStore {
 		t.Error("tokens not set correctly")
 	}
 	if middleware.bootstrap != bootstrap {
 		t.Error("bootstrap not set correctly")
+	}
+}
+
+// --- CheckPermissions middleware tests ---
+
+func TestCheckPermissions_AdminBypass(t *testing.T) {
+	tokenStore := newAuthTestTokenStore()
+	bootstrap := NewBootstrapService(tokenStore, "master-key")
+	authenticator := NewAuthenticator(tokenStore, bootstrap)
+
+	handlerCalled := false
+	handler := authenticator.CheckPermissions(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		handlerCalled = true
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest("GET", "/dnszone/123", nil)
+	ctx := withAdmin(req.Context(), true)
+	req = req.WithContext(ctx)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("status = %d, want 200", rec.Code)
+	}
+	if !handlerCalled {
+		t.Error("handler should have been called for admin")
+	}
+}
+
+func TestCheckPermissions_MasterKeyBypass(t *testing.T) {
+	tokenStore := newAuthTestTokenStore()
+	bootstrap := NewBootstrapService(tokenStore, "master-key")
+	authenticator := NewAuthenticator(tokenStore, bootstrap)
+
+	handlerCalled := false
+	handler := authenticator.CheckPermissions(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		handlerCalled = true
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest("GET", "/dnszone/123", nil)
+	ctx := withAdmin(req.Context(), true)
+	ctx = withMasterKey(ctx, true)
+	req = req.WithContext(ctx)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("status = %d, want 200", rec.Code)
+	}
+	if !handlerCalled {
+		t.Error("handler should have been called for master key")
+	}
+}
+
+func TestCheckPermissions_ValidPermissions(t *testing.T) {
+	tokenStore := newAuthTestTokenStore()
+	bootstrap := NewBootstrapService(tokenStore, "master-key")
+	authenticator := NewAuthenticator(tokenStore, bootstrap)
+
+	token := &storage.Token{
+		ID:      1,
+		Name:    "test-token",
+		IsAdmin: false,
+	}
+	perms := []*storage.Permission{
+		{
+			ZoneID:         123,
+			AllowedActions: []string{"get_zone", "list_records"},
+			RecordTypes:    []string{"TXT", "A"},
+		},
+	}
+
+	handlerCalled := false
+	handler := authenticator.CheckPermissions(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		handlerCalled = true
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest("GET", "/dnszone/123", nil)
+	ctx := withAdmin(req.Context(), false)
+	ctx = withToken(ctx, token)
+	ctx = withPermissions(ctx, perms)
+	req = req.WithContext(ctx)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("status = %d, want 200", rec.Code)
+	}
+	if !handlerCalled {
+		t.Error("handler should have been called with valid permissions")
+	}
+}
+
+func TestCheckPermissions_MissingZonePermission(t *testing.T) {
+	tokenStore := newAuthTestTokenStore()
+	bootstrap := NewBootstrapService(tokenStore, "master-key")
+	authenticator := NewAuthenticator(tokenStore, bootstrap)
+
+	token := &storage.Token{
+		ID:      1,
+		Name:    "test-token",
+		IsAdmin: false,
+	}
+	perms := []*storage.Permission{
+		{
+			ZoneID:         456, // Different zone
+			AllowedActions: []string{"get_zone"},
+			RecordTypes:    []string{"TXT"},
+		},
+	}
+
+	handler := authenticator.CheckPermissions(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("handler should not be called")
+	}))
+
+	req := httptest.NewRequest("GET", "/dnszone/123", nil)
+	ctx := withAdmin(req.Context(), false)
+	ctx = withToken(ctx, token)
+	ctx = withPermissions(ctx, perms)
+	req = req.WithContext(ctx)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("status = %d, want 403", rec.Code)
+	}
+
+	var resp map[string]string
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if resp["error"] != "permission denied" {
+		t.Errorf("error = %q, want 'permission denied'", resp["error"])
+	}
+}
+
+func TestCheckPermissions_MissingActionPermission(t *testing.T) {
+	tokenStore := newAuthTestTokenStore()
+	bootstrap := NewBootstrapService(tokenStore, "master-key")
+	authenticator := NewAuthenticator(tokenStore, bootstrap)
+
+	token := &storage.Token{
+		ID:      1,
+		Name:    "test-token",
+		IsAdmin: false,
+	}
+	perms := []*storage.Permission{
+		{
+			ZoneID:         123,
+			AllowedActions: []string{"get_zone"}, // Missing list_records
+			RecordTypes:    []string{"TXT"},
+		},
+	}
+
+	handler := authenticator.CheckPermissions(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("handler should not be called")
+	}))
+
+	req := httptest.NewRequest("GET", "/dnszone/123/records", nil)
+	ctx := withAdmin(req.Context(), false)
+	ctx = withToken(ctx, token)
+	ctx = withPermissions(ctx, perms)
+	req = req.WithContext(ctx)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("status = %d, want 403", rec.Code)
+	}
+}
+
+func TestCheckPermissions_MissingRecordTypePermission(t *testing.T) {
+	tokenStore := newAuthTestTokenStore()
+	bootstrap := NewBootstrapService(tokenStore, "master-key")
+	authenticator := NewAuthenticator(tokenStore, bootstrap)
+
+	token := &storage.Token{
+		ID:      1,
+		Name:    "test-token",
+		IsAdmin: false,
+	}
+	perms := []*storage.Permission{
+		{
+			ZoneID:         123,
+			AllowedActions: []string{"add_record"},
+			RecordTypes:    []string{"TXT"}, // Missing "A"
+		},
+	}
+
+	handler := authenticator.CheckPermissions(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("handler should not be called")
+	}))
+
+	body := bytes.NewBufferString(`{"Type":0,"Name":"www","Value":"1.2.3.4"}`)
+	req := httptest.NewRequest("POST", "/dnszone/123/records", body)
+	ctx := withAdmin(req.Context(), false)
+	ctx = withToken(ctx, token)
+	ctx = withPermissions(ctx, perms)
+	req = req.WithContext(ctx)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("status = %d, want 403", rec.Code)
+	}
+}
+
+func TestCheckPermissions_ParseRequestError(t *testing.T) {
+	tokenStore := newAuthTestTokenStore()
+	bootstrap := NewBootstrapService(tokenStore, "master-key")
+	authenticator := NewAuthenticator(tokenStore, bootstrap)
+
+	token := &storage.Token{
+		ID:      1,
+		Name:    "test-token",
+		IsAdmin: false,
+	}
+
+	handler := authenticator.CheckPermissions(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("handler should not be called")
+	}))
+
+	// Invalid endpoint
+	req := httptest.NewRequest("GET", "/invalid/endpoint", nil)
+	ctx := withAdmin(req.Context(), false)
+	ctx = withToken(ctx, token)
+	req = req.WithContext(ctx)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("status = %d, want 400", rec.Code)
+	}
+}
+
+func TestCheckPermissions_EmptyPermissions(t *testing.T) {
+	tokenStore := newAuthTestTokenStore()
+	bootstrap := NewBootstrapService(tokenStore, "master-key")
+	authenticator := NewAuthenticator(tokenStore, bootstrap)
+
+	token := &storage.Token{
+		ID:      1,
+		Name:    "test-token",
+		IsAdmin: false,
+	}
+
+	handler := authenticator.CheckPermissions(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("handler should not be called")
+	}))
+
+	req := httptest.NewRequest("GET", "/dnszone/123", nil)
+	ctx := withAdmin(req.Context(), false)
+	ctx = withToken(ctx, token)
+	ctx = withPermissions(ctx, []*storage.Permission{}) // Empty
+	req = req.WithContext(ctx)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("status = %d, want 403", rec.Code)
+	}
+}
+
+func TestCheckPermissions_NilPermissions(t *testing.T) {
+	tokenStore := newAuthTestTokenStore()
+	bootstrap := NewBootstrapService(tokenStore, "master-key")
+	authenticator := NewAuthenticator(tokenStore, bootstrap)
+
+	token := &storage.Token{
+		ID:      1,
+		Name:    "test-token",
+		IsAdmin: false,
+	}
+
+	handler := authenticator.CheckPermissions(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("handler should not be called")
+	}))
+
+	req := httptest.NewRequest("GET", "/dnszone/123", nil)
+	ctx := withAdmin(req.Context(), false)
+	ctx = withToken(ctx, token)
+	// No permissions set in context (nil)
+	req = req.WithContext(ctx)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("status = %d, want 403", rec.Code)
+	}
+}
+
+func TestCheckPermissions_NoToken(t *testing.T) {
+	tokenStore := newAuthTestTokenStore()
+	bootstrap := NewBootstrapService(tokenStore, "master-key")
+	authenticator := NewAuthenticator(tokenStore, bootstrap)
+
+	handler := authenticator.CheckPermissions(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("handler should not be called")
+	}))
+
+	req := httptest.NewRequest("GET", "/dnszone/123", nil)
+	ctx := withAdmin(req.Context(), false)
+	// No token in context
+	req = req.WithContext(ctx)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("status = %d, want 403", rec.Code)
 	}
 }

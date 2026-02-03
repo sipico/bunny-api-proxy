@@ -1,0 +1,21 @@
+# Dockerfile for CI: Uses pre-built binary from Build job
+# This ensures Docker image contains the EXACT binary that was tested
+FROM gcr.io/distroless/static:nonroot
+
+WORKDIR /app
+
+# Copy pre-built binary (expected to be in build context as "bunny-api-proxy")
+COPY bunny-api-proxy .
+
+# Expose port
+EXPOSE 8080
+
+# Health check using built-in health subcommand (no shell/wget needed)
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD ["/app/bunny-api-proxy", "health"]
+
+# Run as nonroot user (UID 65532, already default in :nonroot variant)
+USER nonroot:nonroot
+
+# Run the binary (exec form required - no shell available)
+ENTRYPOINT ["/app/bunny-api-proxy"]

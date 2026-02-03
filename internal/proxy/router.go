@@ -17,7 +17,9 @@ func NewRouter(handler *Handler, authMiddleware func(http.Handler) http.Handler)
 
 	// Wire handler methods to routes
 	r.Get("/dnszone", handler.HandleListZones)
+	r.Post("/dnszone", handler.HandleCreateZone)
 	r.Get("/dnszone/{zoneID}", handler.HandleGetZone)
+	r.Delete("/dnszone/{zoneID}", handler.HandleDeleteZone)
 	r.Get("/dnszone/{zoneID}/records", handler.HandleListRecords)
 	r.Post("/dnszone/{zoneID}/records", handler.HandleAddRecord)
 	r.Delete("/dnszone/{zoneID}/records/{recordID}", handler.HandleDeleteRecord)

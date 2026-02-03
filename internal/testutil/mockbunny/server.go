@@ -1,7 +1,10 @@
 package mockbunny
 
 import (
+	"log/slog"
+	"net/http"
 	"net/http/httptest"
+	"os"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -13,15 +16,33 @@ type Server struct {
 	*httptest.Server
 	state  *State
 	router chi.Router
+	logger *slog.Logger
+	apiKey string // Expected API key for authentication
 }
 
 // New creates a new mock bunny.net server for testing.
 // It initializes the server with placeholder routes that return 501 Not Implemented.
 // The state is initialized with empty zones and auto-incrementing IDs.
+// If DEBUG environment variable is set to "true", HTTP request/response logging is enabled.
+// If BUNNY_API_KEY is set, API key authentication is required for DNS API endpoints.
 func New() *Server {
 	state := NewState()
 
 	r := chi.NewRouter()
+
+	// Read expected API key from environment (optional)
+	apiKey := os.Getenv("BUNNY_API_KEY")
+
+	// Create logger if DEBUG=true
+	var logger *slog.Logger
+	if os.Getenv("DEBUG") == "true" {
+		logger = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+			Level: slog.LevelDebug,
+		}))
+		if apiKey != "" {
+			logger.Info("mockbunny initialized with API key authentication")
+		}
+	}
 
 	ts := httptest.NewServer(r)
 
@@ -29,15 +50,29 @@ func New() *Server {
 		Server: ts,
 		state:  state,
 		router: r,
+		logger: logger,
+		apiKey: apiKey,
 	}
 
-	// Wire up handlers
-	r.Get("/dnszone", server.handleListZones)
-	r.Get("/dnszone/{id}", server.handleGetZone)
-	r.Put("/dnszone/{zoneId}/records", server.handleAddRecord)
-	r.Delete("/dnszone/{zoneId}/records/{id}", server.handleDeleteRecord)
+	// Apply logging middleware if logger present
+	if logger != nil {
+		r.Use(LoggingMiddleware(logger))
+	}
 
-	// Admin endpoints for test seeding
+	// Wire up DNS API handlers with authentication (if API key is configured)
+	r.Group(func(r chi.Router) {
+		if apiKey != "" {
+			r.Use(server.authMiddleware)
+		}
+		r.Get("/dnszone", server.handleListZones)
+		r.Post("/dnszone", server.handleCreateZone)
+		r.Get("/dnszone/{id}", server.handleGetZone)
+		r.Delete("/dnszone/{id}", server.handleDeleteZone)
+		r.Put("/dnszone/{zoneId}/records", server.handleAddRecord)
+		r.Delete("/dnszone/{zoneId}/records/{id}", server.handleDeleteRecord)
+	})
+
+	// Admin endpoints for test seeding (no authentication required)
 	r.Route("/admin", func(r chi.Router) {
 		r.Post("/zones", server.handleAdminCreateZone)
 		r.Post("/zones/{zoneId}/records", server.handleAdminCreateRecord)
@@ -46,6 +81,32 @@ func New() *Server {
 	})
 
 	return server
+}
+
+// authMiddleware validates the AccessKey header against the configured API key.
+// Returns 401 Unauthorized if the key is missing or doesn't match.
+func (s *Server) authMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		accessKey := r.Header.Get("AccessKey")
+
+		if accessKey == "" {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusUnauthorized)
+			//nolint:errcheck // Error responses are best effort
+			w.Write([]byte(`{"ErrorKey":"unauthorized","Message":"The request authorization header is not valid."}`))
+			return
+		}
+
+		if accessKey != s.apiKey {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusUnauthorized)
+			//nolint:errcheck // Error responses are best effort
+			w.Write([]byte(`{"ErrorKey":"unauthorized","Message":"The request authorization header is not valid."}`))
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
 }
 
 // URL returns the base URL of the mock server.
@@ -62,7 +123,7 @@ func (s *Server) AddZone(domain string) int64 {
 	id := s.state.nextZoneID
 	s.state.nextZoneID++
 
-	now := time.Now().UTC()
+	now := MockBunnyTime{Time: time.Now().UTC()}
 	zone := &Zone{
 		ID:                       id,
 		Domain:                   domain,
@@ -75,8 +136,9 @@ func (s *Server) AddZone(domain string) int64 {
 		Nameserver2:              "ns2.bunny.net",
 		SoaEmail:                 "admin@" + domain,
 		LoggingEnabled:           false,
+		LogAnonymizationType:     0, // 0 = OneDigit (default)
 		DnsSecEnabled:            false,
-		CertificateKeyType:       "Ecdsa",
+		CertificateKeyType:       0, // 0 = Ecdsa (default)
 	}
 
 	s.state.zones[id] = zone
@@ -95,19 +157,13 @@ func (s *Server) AddZoneWithRecords(domain string, records []Record) int64 {
 	for i := range records {
 		records[i].ID = s.state.nextRecordID
 		s.state.nextRecordID++
-		// Set defaults for unset fields
-		if records[i].MonitorStatus == "" {
-			records[i].MonitorStatus = "Unknown"
-		}
-		if records[i].MonitorType == "" {
-			records[i].MonitorType = "None"
-		}
-		if records[i].SmartRoutingType == "" {
-			records[i].SmartRoutingType = "None"
-		}
+		// Set defaults for unset fields (0 values)
+		// MonitorStatus defaults to 0 (Unknown)
+		// MonitorType defaults to 0 (None)
+		// SmartRoutingType defaults to 0 (None)
 	}
 	zone.Records = records
-	zone.DateModified = time.Now().UTC()
+	zone.DateModified = MockBunnyTime{Time: time.Now().UTC()}
 
 	return id
 }
