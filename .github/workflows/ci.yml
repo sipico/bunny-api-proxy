@@ -147,6 +147,10 @@ jobs:
           mkdir -p /tmp/proxy-data
           chmod 777 /tmp/proxy-data
 
+      - name: Stop and remove previous containers
+        run: |
+          docker compose -f .claude/docker/docker-compose.test.yml --profile mock down -v || true
+
       - name: Build and start services (Mock Mode)
         run: |
           docker compose -f .claude/docker/docker-compose.test.yml --profile mock up -d --build
