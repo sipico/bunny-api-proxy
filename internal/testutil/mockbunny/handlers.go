@@ -152,7 +152,7 @@ func (s *Server) handleDeleteRecord(w http.ResponseWriter, r *http.Request) {
 
 // AddRecordRequest represents the request body for creating a new DNS record.
 type AddRecordRequest struct {
-	Type     string `json:"Type"`
+	Type     int    `json:"Type"` // 0 = A, 1 = AAAA, 2 = CNAME, 3 = TXT, 4 = MX, 5 = SPF, 6 = Flatten, 7 = PullZone, 8 = SRV, 9 = CAA, 10 = PTR, 11 = Script, 12 = NS
 	Name     string `json:"Name"`
 	Value    string `json:"Value"`
 	TTL      int32  `json:"Ttl"`
@@ -181,10 +181,7 @@ func (s *Server) handleAddRecord(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Validate required fields
-	if req.Type == "" {
-		s.writeError(w, http.StatusBadRequest, "validation.error", "Type", "Type is required")
-		return
-	}
+	// Type is validated implicitly (must be provided as int 0-12)
 	if req.Name == "" {
 		s.writeError(w, http.StatusBadRequest, "validation.error", "Name", "Name is required")
 		return
@@ -217,9 +214,9 @@ func (s *Server) handleAddRecord(w http.ResponseWriter, r *http.Request) {
 		Tag:              req.Tag,
 		Disabled:         req.Disabled,
 		Comment:          req.Comment,
-		MonitorStatus:    "Unknown",
-		MonitorType:      "None",
-		SmartRoutingType: "None",
+		MonitorStatus:    0, // 0 = Unknown
+		MonitorType:      0, // 0 = None
+		SmartRoutingType: 0, // 0 = None
 	}
 	s.state.nextRecordID++
 

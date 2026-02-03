@@ -138,13 +138,13 @@ func TestGetZone(t *testing.T) {
 		// Add a zone with some records
 		zoneID := server.AddZoneWithRecords("example.com", []mockbunny.Record{
 			{
-				Type:  "A",
+				Type:  0, // A
 				Name:  "www",
 				Value: "1.2.3.4",
 				TTL:   300,
 			},
 			{
-				Type:  "CNAME",
+				Type:  2, // CNAME
 				Name:  "alias",
 				Value: "www.example.com",
 				TTL:   300,
@@ -176,12 +176,12 @@ func TestGetZone(t *testing.T) {
 		}
 
 		// Verify record details
-		if zone.Records[0].Type != "A" {
-			t.Errorf("expected first record type A, got %s", zone.Records[0].Type)
+		if zone.Records[0].Type != 0 { // A
+			t.Errorf("expected first record type 0 (A), got %d", zone.Records[0].Type)
 		}
 
-		if zone.Records[1].Type != "CNAME" {
-			t.Errorf("expected second record type CNAME, got %s", zone.Records[1].Type)
+		if zone.Records[1].Type != 2 { // CNAME
+			t.Errorf("expected second record type 2 (CNAME), got %d", zone.Records[1].Type)
 		}
 	})
 
@@ -233,7 +233,7 @@ func TestAddRecord(t *testing.T) {
 
 		client := NewClient("test-key", WithBaseURL(server.URL()))
 		req := &AddRecordRequest{
-			Type:  "A",
+			Type:  0, // A
 			Name:  "www",
 			Value: "1.2.3.4",
 			TTL:   300,
@@ -250,8 +250,8 @@ func TestAddRecord(t *testing.T) {
 			return
 		}
 
-		if record.Type != "A" {
-			t.Errorf("expected record type A, got %s", record.Type)
+		if record.Type != 0 { // A
+			t.Errorf("expected record type 0 (A), got %d", record.Type)
 		}
 
 		if record.Name != "www" {
@@ -269,7 +269,7 @@ func TestAddRecord(t *testing.T) {
 
 		client := NewClient("test-key", WithBaseURL(server.URL()))
 		req := &AddRecordRequest{
-			Type:  "A",
+			Type:  0, // A
 			Name:  "www",
 			Value: "1.2.3.4",
 			TTL:   300,
@@ -296,7 +296,7 @@ func TestAddRecord(t *testing.T) {
 
 		client := NewClient("test-key", WithHTTPClient(httpClient))
 		req := &AddRecordRequest{
-			Type:  "A",
+			Type:  0, // A
 			Name:  "www",
 			Value: "1.2.3.4",
 			TTL:   300,
@@ -322,7 +322,7 @@ func TestAddRecord(t *testing.T) {
 
 		client := NewClient("test-key", WithHTTPClient(httpClient))
 		req := &AddRecordRequest{
-			Type:  "INVALID",
+			Type:  999, // Invalid type
 			Name:  "www",
 			Value: "1.2.3.4",
 			TTL:   300,
@@ -353,7 +353,7 @@ func TestAddRecord(t *testing.T) {
 
 		client := NewClient("test-key", WithHTTPClient(httpClient))
 		req := &AddRecordRequest{
-			Type:  "A",
+			Type:  0, // A
 			Name:  "www",
 			Value: "1.2.3.4",
 			TTL:   300,
@@ -379,7 +379,7 @@ func TestAddRecord(t *testing.T) {
 
 		client := NewClient("test-key", WithHTTPClient(httpClient))
 		req := &AddRecordRequest{
-			Type:  "A",
+			Type:  0, // A
 			Name:  "www",
 			Value: "1.2.3.4",
 			TTL:   300,
@@ -406,7 +406,7 @@ func TestDeleteRecord(t *testing.T) {
 		// Add a zone with a record
 		zoneID := server.AddZoneWithRecords("example.com", []mockbunny.Record{
 			{
-				Type:  "A",
+				Type:  0, // A
 				Name:  "www",
 				Value: "1.2.3.4",
 				TTL:   300,

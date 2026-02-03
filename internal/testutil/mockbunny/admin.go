@@ -15,7 +15,7 @@ type CreateZoneRequest struct {
 
 // CreateRecordRequest is the request body for POST /admin/zones/{zoneId}/records
 type CreateRecordRequest struct {
-	Type  string `json:"Type"`
+	Type  int    `json:"Type"` // 0 = A, 1 = AAAA, 2 = CNAME, 3 = TXT, 4 = MX, 5 = SPF, 6 = Flatten, 7 = PullZone, 8 = SRV, 9 = CAA, 10 = PTR, 11 = Script, 12 = NS
 	Name  string `json:"Name"`
 	Value string `json:"Value"`
 	TTL   int32  `json:"Ttl"`
@@ -89,9 +89,9 @@ func (s *Server) handleAdminCreateRecord(w http.ResponseWriter, r *http.Request)
 		Name:             req.Name,
 		Value:            req.Value,
 		TTL:              req.TTL,
-		MonitorStatus:    "Unknown",
-		MonitorType:      "None",
-		SmartRoutingType: "None",
+		MonitorStatus:    0, // 0 = Unknown
+		MonitorType:      0, // 0 = None
+		SmartRoutingType: 0, // 0 = None
 	}
 	s.state.nextRecordID++
 	zone.Records = append(zone.Records, record)

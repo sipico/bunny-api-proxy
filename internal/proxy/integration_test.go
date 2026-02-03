@@ -217,9 +217,9 @@ func TestIntegration_ListRecords(t *testing.T) {
 
 	// Add zone with records
 	records := []mockbunny.Record{
-		{Type: "TXT", Name: "acme", Value: "acme-validation-1"},
-		{Type: "TXT", Name: "_acme", Value: "acme-validation-2"},
-		{Type: "A", Name: "www", Value: "1.2.3.4"},
+		{Type: 3, Name: "acme", Value: "acme-validation-1"},   // TXT
+		{Type: 3, Name: "_acme", Value: "acme-validation-2"}, // TXT
+		{Type: 0, Name: "www", Value: "1.2.3.4"},             // A
 	}
 	zoneID := mockBunny.AddZoneWithRecords("example.com", records)
 
@@ -258,8 +258,8 @@ func TestIntegration_ListRecords(t *testing.T) {
 
 	// Verify only TXT records are present
 	for _, rec := range recs {
-		if rec.Type != "TXT" {
-			t.Errorf("expected TXT record, got %s", rec.Type)
+		if rec.Type != 3 {
+			t.Errorf("expected TXT record, got %d", rec.Type)
 		}
 	}
 }
@@ -285,7 +285,7 @@ func TestIntegration_AddRecord(t *testing.T) {
 
 	// Add a TXT record
 	recordReq := bunny.AddRecordRequest{
-		Type:  "TXT",
+		Type:  3, // TXT
 		Name:  "acme-test",
 		Value: "acme-validation-string",
 	}
@@ -310,8 +310,8 @@ func TestIntegration_AddRecord(t *testing.T) {
 		t.Fatalf("failed to decode response: %v", err)
 	}
 
-	if record.Type != "TXT" {
-		t.Errorf("expected record type TXT, got %s", record.Type)
+	if record.Type != 3 {
+		t.Errorf("expected record type TXT, got %d", record.Type)
 	}
 	if record.Name != "acme-test" {
 		t.Errorf("expected record name 'acme-test', got %s", record.Name)
@@ -325,7 +325,7 @@ func TestIntegration_DeleteRecord(t *testing.T) {
 
 	// Add zone with a record
 	records := []mockbunny.Record{
-		{Type: "TXT", Name: "test", Value: "test-value"},
+		{Type: 3, Name: "test", Value: "test-value"},
 	}
 	zoneID := mockBunny.AddZoneWithRecords("example.com", records)
 
@@ -500,7 +500,7 @@ func TestIntegration_Forbidden_WrongRecordType(t *testing.T) {
 
 	// Try to add an A record (not allowed)
 	recordReq := bunny.AddRecordRequest{
-		Type:  "A",
+		Type:  0, // A
 		Name:  "www",
 		Value: "1.2.3.4",
 	}
@@ -629,10 +629,10 @@ func TestIntegration_GetZone_FilteredRecordTypes(t *testing.T) {
 
 	// Add zone with multiple record types
 	records := []mockbunny.Record{
-		{Type: "A", Name: "www", Value: "1.2.3.4"},
-		{Type: "AAAA", Name: "www", Value: "2001:db8::1"},
-		{Type: "TXT", Name: "_acme", Value: "validation-string"},
-		{Type: "CNAME", Name: "alias", Value: "www.example.com"},
+		{Type: 0, Name: "www", Value: "1.2.3.4"},                      // A
+		{Type: 1, Name: "www", Value: "2001:db8::1"},                 // AAAA
+		{Type: 3, Name: "_acme", Value: "validation-string"},         // TXT
+		{Type: 2, Name: "alias", Value: "www.example.com"}, // CNAME
 	}
 	zoneID := mockBunny.AddZoneWithRecords("example.com", records)
 
@@ -689,8 +689,8 @@ func TestIntegration_GetZone_FilteredRecordTypes(t *testing.T) {
 		t.Errorf("expected 1 TXT record after filtering, got %d", len(zone.Records))
 	}
 
-	if len(zone.Records) > 0 && zone.Records[0].Type != "TXT" {
-		t.Errorf("expected TXT record, got %s", zone.Records[0].Type)
+	if len(zone.Records) > 0 && zone.Records[0].Type != 3 {
+		t.Errorf("expected TXT record, got %d", zone.Records[0].Type)
 	}
 }
 
@@ -701,10 +701,10 @@ func TestIntegration_ListRecords_FilteredRecordTypes(t *testing.T) {
 
 	// Add zone with multiple record types
 	records := []mockbunny.Record{
-		{Type: "A", Name: "www", Value: "1.2.3.4"},
-		{Type: "TXT", Name: "_acme1", Value: "token1"},
-		{Type: "TXT", Name: "_acme2", Value: "token2"},
-		{Type: "CNAME", Name: "alias", Value: "www.example.com"},
+		{Type: 0, Name: "www", Value: "1.2.3.4"},                      // A
+		{Type: 3, Name: "_acme1", Value: "token1"},                   // TXT
+		{Type: 3, Name: "_acme2", Value: "token2"},                   // TXT
+		{Type: 2, Name: "alias", Value: "www.example.com"}, // CNAME
 	}
 	zoneID := mockBunny.AddZoneWithRecords("example.com", records)
 
@@ -763,8 +763,8 @@ func TestIntegration_ListRecords_FilteredRecordTypes(t *testing.T) {
 
 	// Verify only A and TXT records are present
 	for _, record := range recs {
-		if record.Type != "A" && record.Type != "TXT" {
-			t.Errorf("unexpected record type %s in filtered records", record.Type)
+		if record.Type != 0 && record.Type != 3 {
+			t.Errorf("unexpected record type %d in filtered records", record.Type)
 		}
 	}
 }

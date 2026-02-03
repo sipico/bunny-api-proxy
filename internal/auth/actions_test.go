@@ -48,7 +48,7 @@ func TestParseRequest(t *testing.T) {
 			name:       "add record",
 			method:     "POST",
 			path:       "/dnszone/789/records",
-			body:       `{"Type":"TXT","Name":"test","Value":"hello"}`,
+			body:       `{"Type":3,"Name":"test","Value":"hello"}`,
 			wantAction: ActionAddRecord,
 			wantZoneID: 789,
 			wantType:   "TXT",
@@ -109,7 +109,7 @@ func TestParseRequest(t *testing.T) {
 }
 
 func TestParseRequest_BodyPreserved(t *testing.T) {
-	body := `{"Type":"A","Name":"www","Value":"1.2.3.4"}`
+	body := `{"Type":0,"Name":"www","Value":"1.2.3.4"}`
 	req := httptest.NewRequest("POST", "/dnszone/123/records", strings.NewReader(body))
 
 	_, err := ParseRequest(req)

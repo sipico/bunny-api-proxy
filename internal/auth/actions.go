@@ -57,16 +57,19 @@ func ParseRequest(r *http.Request) (*Request, error) {
 
 		// Extract record type
 		var payload struct {
-			Type string `json:"Type"`
+			Type int `json:"Type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &payload); err != nil {
 			return nil, fmt.Errorf("failed to parse request body: %w", err)
 		}
 
+		// Map type integer to string for permissions checking
+		recordType := MapRecordTypeToString(payload.Type)
+
 		return &Request{
 			Action:     ActionAddRecord,
 			ZoneID:     zoneID,
-			RecordType: payload.Type,
+			RecordType: recordType,
 		}, nil
 	}
 
@@ -79,4 +82,39 @@ func ParseRequest(r *http.Request) (*Request, error) {
 	}
 
 	return nil, fmt.Errorf("unrecognized endpoint: %s %s", r.Method, path)
+}
+
+// MapRecordTypeToString converts a bunny.net record type integer to its string name.
+// Record types: 0 = A, 1 = AAAA, 2 = CNAME, 3 = TXT, 4 = MX, 5 = SPF, 6 = Flatten, 7 = PullZone, 8 = SRV, 9 = CAA, 10 = PTR, 11 = Script, 12 = NS
+func MapRecordTypeToString(typeInt int) string {
+	switch typeInt {
+	case 0:
+		return "A"
+	case 1:
+		return "AAAA"
+	case 2:
+		return "CNAME"
+	case 3:
+		return "TXT"
+	case 4:
+		return "MX"
+	case 5:
+		return "SPF"
+	case 6:
+		return "Flatten"
+	case 7:
+		return "PullZone"
+	case 8:
+		return "SRV"
+	case 9:
+		return "CAA"
+	case 10:
+		return "PTR"
+	case 11:
+		return "Script"
+	case 12:
+		return "NS"
+	default:
+		return "" // Unknown type
+	}
 }

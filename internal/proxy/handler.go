@@ -217,7 +217,8 @@ func (h *Handler) HandleGetZone(w http.ResponseWriter, r *http.Request) {
 				typeSet[t] = true
 			}
 			for _, record := range zone.Records {
-				if typeSet[record.Type] {
+				recordTypeStr := auth.MapRecordTypeToString(record.Type)
+				if typeSet[recordTypeStr] {
 					filtered = append(filtered, record)
 				}
 			}
@@ -292,7 +293,8 @@ func (h *Handler) HandleListRecords(w http.ResponseWriter, r *http.Request) {
 				typeSet[t] = true
 			}
 			for _, record := range zone.Records {
-				if typeSet[record.Type] {
+				recordTypeStr := auth.MapRecordTypeToString(record.Type)
+				if typeSet[recordTypeStr] {
 					filtered = append(filtered, record)
 				}
 			}

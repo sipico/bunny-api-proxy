@@ -38,7 +38,7 @@ func TestNewState(t *testing.T) {
 func TestRecordFields(t *testing.T) {
 	record := Record{
 		ID:                    1,
-		Type:                  "A",
+		Type:                  0, // A
 		Name:                  "example.com",
 		Value:                 "192.0.2.1",
 		TTL:                   3600,
@@ -49,12 +49,12 @@ func TestRecordFields(t *testing.T) {
 		Tag:                   "test",
 		Accelerated:           false,
 		AcceleratedPullZoneID: 0,
-		MonitorStatus:         "ok",
-		MonitorType:           "HTTP",
+		MonitorStatus:         1, // Online
+		MonitorType:           2, // Http
 		GeolocationLatitude:   0.0,
 		GeolocationLongitude:  0.0,
 		LatencyZone:           "",
-		SmartRoutingType:      "",
+		SmartRoutingType:      1, // Latency
 		Disabled:              false,
 		Comment:               "test record",
 	}
@@ -63,8 +63,8 @@ func TestRecordFields(t *testing.T) {
 		t.Errorf("ID = %d, want 1", record.ID)
 	}
 
-	if record.Type != "A" {
-		t.Errorf("Type = %s, want A", record.Type)
+	if record.Type != 0 {
+		t.Errorf("Type = %d, want 0 (A)", record.Type)
 	}
 
 	if record.Name != "example.com" {

@@ -167,7 +167,7 @@ func (c *Client) GetZone(ctx context.Context, id int64) (*Zone, error) {
 
 // AddRecordRequest represents the request body for creating a new DNS record.
 type AddRecordRequest struct {
-	Type     string `json:"Type"`
+	Type     int    `json:"Type"` // 0 = A, 1 = AAAA, 2 = CNAME, 3 = TXT, 4 = MX, 5 = SPF, 6 = Flatten, 7 = PullZone, 8 = SRV, 9 = CAA, 10 = PTR, 11 = Script, 12 = NS
 	Name     string `json:"Name"`
 	Value    string `json:"Value"`
 	TTL      int32  `json:"Ttl"`

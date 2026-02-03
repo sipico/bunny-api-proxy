@@ -14,7 +14,7 @@ func TestGetZone_Success(t *testing.T) {
 	defer s.Close()
 
 	records := []Record{
-		{Type: "A", Name: "@", Value: "192.168.1.1", TTL: 300},
+		{Type: 0, Name: "@", Value: "192.168.1.1", TTL: 300}, // A record
 	}
 	id := s.AddZoneWithRecords("example.com", records)
 
@@ -42,8 +42,8 @@ func TestGetZone_Success(t *testing.T) {
 	if len(zone.Records) != 1 {
 		t.Errorf("expected 1 record, got %d", len(zone.Records))
 	}
-	if zone.Records[0].Type != "A" {
-		t.Errorf("expected record type A, got %s", zone.Records[0].Type)
+	if zone.Records[0].Type != 0 { // A
+		t.Errorf("expected record type 0 (A), got %d", zone.Records[0].Type)
 	}
 }
 
@@ -374,8 +374,8 @@ func TestDeleteRecord_Success(t *testing.T) {
 	defer s.Close()
 
 	records := []Record{
-		{Type: "A", Name: "@", Value: "192.168.1.1", TTL: 300},
-		{Type: "A", Name: "www", Value: "192.168.1.2", TTL: 300},
+		{Type: 0, Name: "@", Value: "192.168.1.1", TTL: 300},   // A record
+		{Type: 0, Name: "www", Value: "192.168.1.2", TTL: 300}, // A record
 	}
 	zoneID := s.AddZoneWithRecords("example.com", records)
 

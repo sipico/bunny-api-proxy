@@ -958,7 +958,7 @@ func TestParseRequest_ListRecords(t *testing.T) {
 }
 
 func TestParseRequest_AddRecord(t *testing.T) {
-	body := `{"Type":"TXT","Name":"test","Value":"hello"}`
+	body := `{"Type":3,"Name":"test","Value":"hello"}`
 	req := httptest.NewRequest("POST", "/dnszone/123/records", bytes.NewReader([]byte(body)))
 	parsed, err := ParseRequest(req)
 
@@ -1595,7 +1595,7 @@ func TestCheckPermissions_MissingRecordTypePermission(t *testing.T) {
 		t.Error("handler should not be called")
 	}))
 
-	body := bytes.NewBufferString(`{"Type":"A","Name":"www","Value":"1.2.3.4"}`)
+	body := bytes.NewBufferString(`{"Type":0,"Name":"www","Value":"1.2.3.4"}`)
 	req := httptest.NewRequest("POST", "/dnszone/123/records", body)
 	ctx := withAdmin(req.Context(), false)
 	ctx = withToken(ctx, token)

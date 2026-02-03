@@ -119,7 +119,7 @@ func TestE2E_AddAndDeleteRecord(t *testing.T) {
 
 	// Add a TXT record via proxy
 	addRecordBody := map[string]interface{}{
-		"Type":  "TXT",
+		"Type":  3, // TXT
 		"Name":  "_acme-challenge",
 		"Value": "test-challenge-token",
 	}
@@ -157,7 +157,7 @@ func TestE2E_ListRecords(t *testing.T) {
 
 	// Add test records via proxy (using the scoped key)
 	addRecord1 := map[string]interface{}{
-		"Type":  "TXT",
+		"Type":  3, // TXT
 		"Name":  "_acme",
 		"Value": "acme-value-1",
 		"TTL":   300,
@@ -168,7 +168,7 @@ func TestE2E_ListRecords(t *testing.T) {
 	require.Equal(t, http.StatusCreated, resp1.StatusCode)
 
 	addRecord2 := map[string]interface{}{
-		"Type":  "TXT",
+		"Type":  3, // TXT
 		"Name":  "_verify",
 		"Value": "acme-value-2",
 		"TTL":   300,
@@ -186,7 +186,7 @@ func TestE2E_ListRecords(t *testing.T) {
 
 	var records []struct {
 		ID    int64  `json:"Id"`
-		Type  string `json:"Type"`
+		Type  int    `json:"Type"`
 		Name  string `json:"Name"`
 		Value string `json:"Value"`
 	}
@@ -260,7 +260,7 @@ func TestE2E_ForbiddenWrongRecordType(t *testing.T) {
 
 	// Try to add an A record (not allowed)
 	addRecordBody := map[string]interface{}{
-		"Type":  "A",
+		"Type":  0, // A
 		"Name":  "www",
 		"Value": "1.2.3.4",
 	}

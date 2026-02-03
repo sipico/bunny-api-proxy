@@ -157,16 +157,10 @@ func (s *Server) AddZoneWithRecords(domain string, records []Record) int64 {
 	for i := range records {
 		records[i].ID = s.state.nextRecordID
 		s.state.nextRecordID++
-		// Set defaults for unset fields
-		if records[i].MonitorStatus == "" {
-			records[i].MonitorStatus = "Unknown"
-		}
-		if records[i].MonitorType == "" {
-			records[i].MonitorType = "None"
-		}
-		if records[i].SmartRoutingType == "" {
-			records[i].SmartRoutingType = "None"
-		}
+		// Set defaults for unset fields (0 values)
+		// MonitorStatus defaults to 0 (Unknown)
+		// MonitorType defaults to 0 (None)
+		// SmartRoutingType defaults to 0 (None)
 	}
 	zone.Records = records
 	zone.DateModified = MockBunnyTime{Time: time.Now().UTC()}

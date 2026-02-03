@@ -658,7 +658,7 @@ func TestHandleListRecords_Success(t *testing.T) {
 	zone := &bunny.Zone{
 		ID:      123,
 		Domain:  "example.com",
-		Records: []bunny.Record{{ID: 1, Type: "A"}, {ID: 2, Type: "CNAME"}},
+		Records: []bunny.Record{{ID: 1, Type: 0}, {ID: 2, Type: 2}}, // A, CNAME
 	}
 
 	client := &mockBunnyClient{
@@ -756,15 +756,15 @@ func TestHandleListRecords_NotFound(t *testing.T) {
 
 // TestHandleAddRecord_Success tests successful record creation
 func TestHandleAddRecord_Success(t *testing.T) {
-	record := &bunny.Record{ID: 1, Type: "TXT", Name: "_acme-challenge"}
+	record := &bunny.Record{ID: 1, Type: 3, Name: "_acme-challenge"} // TXT
 
 	client := &mockBunnyClient{
 		addRecordFunc: func(ctx context.Context, zoneID int64, req *bunny.AddRecordRequest) (*bunny.Record, error) {
 			if zoneID != 123 {
 				t.Errorf("expected zone ID 123, got %d", zoneID)
 			}
-			if req.Type != "TXT" {
-				t.Errorf("expected record type TXT, got %s", req.Type)
+			if req.Type != 3 { // TXT
+				t.Errorf("expected record type 3 (TXT), got %d", req.Type)
 			}
 			return record, nil
 		},
@@ -773,7 +773,7 @@ func TestHandleAddRecord_Success(t *testing.T) {
 	handler := NewHandler(client, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	w := httptest.NewRecorder()
 
-	body := []byte(`{"Type":"TXT","Name":"_acme-challenge","Value":"token123","Ttl":300}`)
+	body := []byte(`{"Type":3,"Name":"_acme-challenge","Value":"token123","Ttl":300}`)
 	r := newTestRequest(http.MethodPost, "/dnszone/123/records", bytes.NewReader(body), map[string]string{"zoneID": "123"})
 
 	handler.HandleAddRecord(w, r)
@@ -787,8 +787,8 @@ func TestHandleAddRecord_Success(t *testing.T) {
 		t.Fatalf("failed to unmarshal response: %v", err)
 	}
 
-	if result.Type != "TXT" {
-		t.Errorf("expected record type TXT, got %s", result.Type)
+	if result.Type != 3 { // TXT
+		t.Errorf("expected record type %d (TXT), got %d", 3, result.Type)
 	}
 }
 
@@ -814,7 +814,7 @@ func TestHandleAddRecord_InvalidZoneID(t *testing.T) {
 	handler := NewHandler(client, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	w := httptest.NewRecorder()
 
-	body := []byte(`{"Type":"TXT","Name":"test"}`)
+	body := []byte(`{"Type":3,"Name":"test"}`)
 	r := newTestRequest(http.MethodPost, "/dnszone/invalid/records", bytes.NewReader(body), map[string]string{"zoneID": "invalid"})
 
 	handler.HandleAddRecord(w, r)
@@ -835,7 +835,7 @@ func TestHandleAddRecord_ZoneNotFound(t *testing.T) {
 	handler := NewHandler(client, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	w := httptest.NewRecorder()
 
-	body := []byte(`{"Type":"TXT","Name":"test"}`)
+	body := []byte(`{"Type":3,"Name":"test"}`)
 	r := newTestRequest(http.MethodPost, "/dnszone/999/records", bytes.NewReader(body), map[string]string{"zoneID": "999"})
 
 	handler.HandleAddRecord(w, r)
@@ -856,7 +856,7 @@ func TestHandleAddRecord_ClientError(t *testing.T) {
 	handler := NewHandler(client, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	w := httptest.NewRecorder()
 
-	body := []byte(`{"Type":"TXT","Name":"test"}`)
+	body := []byte(`{"Type":3,"Name":"test"}`)
 	r := newTestRequest(http.MethodPost, "/dnszone/123/records", bytes.NewReader(body), map[string]string{"zoneID": "123"})
 
 	handler.HandleAddRecord(w, r)
@@ -1125,10 +1125,10 @@ func TestHandleGetZone_FiltersRecordTypes(t *testing.T) {
 		ID:     123,
 		Domain: "example.com",
 		Records: []bunny.Record{
-			{ID: 1, Type: "A", Name: "www"},
-			{ID: 2, Type: "AAAA", Name: "www"},
-			{ID: 3, Type: "TXT", Name: "_acme-challenge"},
-			{ID: 4, Type: "CNAME", Name: "alias"},
+			{ID: 1, Type: 0, Name: "www"},     // A
+			{ID: 2, Type: 1, Name: "www"},     // AAAA
+			{ID: 3, Type: 3, Name: "_acme-challenge"}, // TXT
+			{ID: 4, Type: 2, Name: "alias"},   // CNAME
 		},
 	}
 
@@ -1172,8 +1172,8 @@ func TestHandleGetZone_FiltersRecordTypes(t *testing.T) {
 	}
 
 	for _, record := range result.Records {
-		if record.Type != "A" && record.Type != "AAAA" {
-			t.Errorf("unexpected record type %s in filtered results", record.Type)
+		if record.Type != 0 && record.Type != 1 { // A and AAAA
+			t.Errorf("unexpected record type %d in filtered results", record.Type)
 		}
 	}
 }
@@ -1184,8 +1184,8 @@ func TestHandleGetZone_AllRecordTypes(t *testing.T) {
 		ID:     123,
 		Domain: "example.com",
 		Records: []bunny.Record{
-			{ID: 1, Type: "A", Name: "www"},
-			{ID: 2, Type: "TXT", Name: "_acme-challenge"},
+			{ID: 1, Type: 0, Name: "www"},     // A
+			{ID: 2, Type: 3, Name: "_acme-challenge"}, // TXT
 		},
 	}
 
@@ -1235,8 +1235,8 @@ func TestHandleGetZone_EmptyRecordsAfterFilter(t *testing.T) {
 		ID:     123,
 		Domain: "example.com",
 		Records: []bunny.Record{
-			{ID: 1, Type: "A", Name: "www"},
-			{ID: 2, Type: "AAAA", Name: "www"},
+			{ID: 1, Type: 0, Name: "www"},  // A
+			{ID: 2, Type: 1, Name: "www"},  // AAAA
 		},
 	}
 
@@ -1286,9 +1286,9 @@ func TestHandleListRecords_FiltersRecordTypes(t *testing.T) {
 		ID:     123,
 		Domain: "example.com",
 		Records: []bunny.Record{
-			{ID: 1, Type: "TXT", Name: "_acme-challenge"},
-			{ID: 2, Type: "A", Name: "www"},
-			{ID: 3, Type: "TXT", Name: "_dnsauth"},
+			{ID: 1, Type: 3, Name: "_acme-challenge"}, // TXT
+			{ID: 2, Type: 0, Name: "www"},             // A
+			{ID: 3, Type: 3, Name: "_dnsauth"},        // TXT
 		},
 	}
 
@@ -1332,8 +1332,8 @@ func TestHandleListRecords_FiltersRecordTypes(t *testing.T) {
 	}
 
 	for _, record := range result {
-		if record.Type != "TXT" {
-			t.Errorf("unexpected record type %s in filtered results", record.Type)
+		if record.Type != 3 { // TXT
+			t.Errorf("unexpected record type %d in filtered results", record.Type)
 		}
 	}
 }
@@ -1344,8 +1344,8 @@ func TestHandleListRecords_EmptyAfterFilter(t *testing.T) {
 		ID:     123,
 		Domain: "example.com",
 		Records: []bunny.Record{
-			{ID: 1, Type: "A", Name: "www"},
-			{ID: 2, Type: "AAAA", Name: "www"},
+			{ID: 1, Type: 0, Name: "www"},  // A
+			{ID: 2, Type: 1, Name: "www"},  // AAAA
 		},
 	}
 

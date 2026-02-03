@@ -94,7 +94,7 @@ func TestAdminCreateRecord_Success(t *testing.T) {
 
 	zoneID := s.AddZone("test.com")
 
-	body := `{"Type": "A", "Name": "_acme", "Value": "192.168.1.1", "Ttl": 300}`
+	body := `{"Type": 0, "Name": "_acme", "Value": "192.168.1.1", "Ttl": 300}`
 	resp, err := http.Post(
 		fmt.Sprintf("%s/admin/zones/%d/records", s.URL(), zoneID),
 		"application/json",
@@ -120,8 +120,8 @@ func TestAdminCreateRecord_Success(t *testing.T) {
 	if record.Value != "192.168.1.1" {
 		t.Errorf("expected value 192.168.1.1, got %s", record.Value)
 	}
-	if record.Type != "A" {
-		t.Errorf("expected type A, got %s", record.Type)
+	if record.Type != 0 { // A
+		t.Errorf("expected type A, got %d", record.Type)
 	}
 	if record.ID == 0 {
 		t.Error("expected non-zero record ID")
@@ -134,7 +134,7 @@ func TestAdminCreateRecord_MissingName(t *testing.T) {
 
 	zoneID := s.AddZone("test.com")
 
-	body := `{"Type": "A", "Name": "", "Value": "192.168.1.1", "Ttl": 300}`
+	body := `{"Type": 0, "Name": "", "Value": "192.168.1.1", "Ttl": 300}`
 	resp, err := http.Post(
 		fmt.Sprintf("%s/admin/zones/%d/records", s.URL(), zoneID),
 		"application/json",
@@ -164,7 +164,7 @@ func TestAdminCreateRecord_MissingValue(t *testing.T) {
 
 	zoneID := s.AddZone("test.com")
 
-	body := `{"Type": "A", "Name": "test", "Value": "", "Ttl": 300}`
+	body := `{"Type": 0, "Name": "test", "Value": "", "Ttl": 300}`
 	resp, err := http.Post(
 		fmt.Sprintf("%s/admin/zones/%d/records", s.URL(), zoneID),
 		"application/json",
@@ -192,7 +192,7 @@ func TestAdminCreateRecord_InvalidZoneID(t *testing.T) {
 	s := New()
 	defer s.Close()
 
-	body := `{"Type": "A", "Name": "test", "Value": "192.168.1.1", "Ttl": 300}`
+	body := `{"Type": 0, "Name": "test", "Value": "192.168.1.1", "Ttl": 300}`
 	resp, err := http.Post(
 		s.URL()+"/admin/zones/invalid/records",
 		"application/json",
@@ -220,7 +220,7 @@ func TestAdminCreateRecord_ZoneNotFound(t *testing.T) {
 	s := New()
 	defer s.Close()
 
-	body := `{"Type": "A", "Name": "test", "Value": "192.168.1.1", "Ttl": 300}`
+	body := `{"Type": 0, "Name": "test", "Value": "192.168.1.1", "Ttl": 300}`
 	resp, err := http.Post(
 		s.URL()+"/admin/zones/9999/records",
 		"application/json",
@@ -254,7 +254,7 @@ func TestAdminReset_Success(t *testing.T) {
 	s.state.mu.Lock()
 	s.state.zones[zoneID1].Records = append(s.state.zones[zoneID1].Records, Record{
 		ID:    1,
-		Type:  "A",
+		Type:  0, // A
 		Name:  "test",
 		Value: "192.168.1.1",
 	})
@@ -316,7 +316,7 @@ func TestAdminState_WithData(t *testing.T) {
 	s.state.mu.Lock()
 	s.state.zones[zoneID].Records = append(s.state.zones[zoneID].Records, Record{
 		ID:    1,
-		Type:  "A",
+		Type:  0, // A
 		Name:  "test",
 		Value: "192.168.1.1",
 	})
@@ -414,7 +414,7 @@ func TestAdminCreateMultipleZonesAndRecords(t *testing.T) {
 	}
 
 	// Create record in first zone
-	recBody1 := `{"Type": "A", "Name": "test1", "Value": "192.168.1.1", "Ttl": 300}`
+	recBody1 := `{"Type": 0, "Name": "test1", "Value": "192.168.1.1", "Ttl": 300}`
 	resp3, err := http.Post(
 		fmt.Sprintf("%s/admin/zones/%d/records", s.URL(), zone1.ID),
 		"application/json",
@@ -430,7 +430,7 @@ func TestAdminCreateMultipleZonesAndRecords(t *testing.T) {
 	}
 
 	// Create record in second zone
-	recBody2 := `{"Type": "A", "Name": "test2", "Value": "192.168.1.2", "Ttl": 300}`
+	recBody2 := `{"Type": 0, "Name": "test2", "Value": "192.168.1.2", "Ttl": 300}`
 	resp4, err := http.Post(
 		fmt.Sprintf("%s/admin/zones/%d/records", s.URL(), zone2.ID),
 		"application/json",
@@ -524,7 +524,7 @@ func TestAdminCreateRecord_WithDefaults(t *testing.T) {
 	zoneID := s.AddZone("test.com")
 
 	// Create a record without specifying all optional fields
-	body := `{"Type": "TXT", "Name": "test", "Value": "hello"}`
+	body := `{"Type": 3, "Name": "test", "Value": "hello"}`
 	resp, err := http.Post(
 		fmt.Sprintf("%s/admin/zones/%d/records", s.URL(), zoneID),
 		"application/json",
@@ -546,13 +546,13 @@ func TestAdminCreateRecord_WithDefaults(t *testing.T) {
 	}
 
 	// Verify defaults were applied
-	if record.MonitorStatus != "Unknown" {
-		t.Errorf("expected MonitorStatus Unknown, got %s", record.MonitorStatus)
+	if record.MonitorStatus != 0 { // Unknown
+		t.Errorf("expected MonitorStatus 0 (Unknown), got %d", record.MonitorStatus)
 	}
-	if record.MonitorType != "None" {
-		t.Errorf("expected MonitorType None, got %s", record.MonitorType)
+	if record.MonitorType != 0 { // None
+		t.Errorf("expected MonitorType 0 (None), got %d", record.MonitorType)
 	}
-	if record.SmartRoutingType != "None" {
-		t.Errorf("expected SmartRoutingType None, got %s", record.SmartRoutingType)
+	if record.SmartRoutingType != 0 { // None
+		t.Errorf("expected SmartRoutingType 0 (None), got %d", record.SmartRoutingType)
 	}
 }
