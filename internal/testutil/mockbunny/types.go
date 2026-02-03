@@ -94,7 +94,7 @@ type Zone struct {
 	LoggingIPAnonymization   bool          `json:"LoggingIPAnonymizationEnabled"`
 	LogAnonymizationType     int           `json:"LogAnonymizationType"` // 0 = OneDigit, 1 = Drop
 	DnsSecEnabled            bool          `json:"DnsSecEnabled"`
-	CertificateKeyType       string        `json:"CertificateKeyType"`
+	CertificateKeyType       int           `json:"CertificateKeyType"` // 0 = Ecdsa, 1 = Rsa
 }
 
 // State holds the internal mock server state.

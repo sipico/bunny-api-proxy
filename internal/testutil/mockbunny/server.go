@@ -138,7 +138,7 @@ func (s *Server) AddZone(domain string) int64 {
 		LoggingEnabled:           false,
 		LogAnonymizationType:     0, // 0 = OneDigit (default)
 		DnsSecEnabled:            false,
-		CertificateKeyType:       "Ecdsa",
+		CertificateKeyType:       0, // 0 = Ecdsa (default)
 	}
 
 	s.state.zones[id] = zone

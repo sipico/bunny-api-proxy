@@ -79,7 +79,7 @@ func TestBunnyTime_UnmarshalJSON_InStruct(t *testing.T) {
 		"LoggingIPAnonymizationEnabled": false,
 		"LogAnonymizationType": 0,
 		"DnsSecEnabled": false,
-		"CertificateKeyType": "Ecdsa"
+		"CertificateKeyType": 0
 	}`
 
 	var zone Zone

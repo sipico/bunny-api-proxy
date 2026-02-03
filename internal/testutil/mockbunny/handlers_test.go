@@ -104,8 +104,8 @@ func TestGetZone_IncludesAllFields(t *testing.T) {
 	if zone.SoaEmail == "" {
 		t.Error("expected non-empty SoaEmail")
 	}
-	if zone.CertificateKeyType == "" {
-		t.Error("expected non-empty CertificateKeyType")
+	if zone.CertificateKeyType < 0 || zone.CertificateKeyType > 1 {
+		t.Errorf("expected valid CertificateKeyType (0=Ecdsa, 1=Rsa), got %d", zone.CertificateKeyType)
 	}
 	if zone.DateCreated.IsZero() {
 		t.Error("expected non-zero DateCreated")
@@ -544,8 +544,8 @@ func TestHandleCreateZone_Success(t *testing.T) {
 	if zone.SoaEmail != "admin@test.xyz" {
 		t.Errorf("expected SoaEmail admin@test.xyz, got %s", zone.SoaEmail)
 	}
-	if zone.CertificateKeyType != "Ecdsa" {
-		t.Errorf("expected CertificateKeyType Ecdsa, got %s", zone.CertificateKeyType)
+	if zone.CertificateKeyType != 0 { // 0 = Ecdsa
+		t.Errorf("expected CertificateKeyType Ecdsa (0), got %d", zone.CertificateKeyType)
 	}
 	if len(zone.Records) != 0 {
 		t.Errorf("expected 0 records for new zone, got %d", len(zone.Records))

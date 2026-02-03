@@ -177,8 +177,8 @@ func TestAddZone(t *testing.T) {
 	if zone.DnsSecEnabled {
 		t.Error("expected DnsSecEnabled to be false")
 	}
-	if zone.CertificateKeyType != "Ecdsa" {
-		t.Errorf("expected Ecdsa, got %s", zone.CertificateKeyType)
+	if zone.CertificateKeyType != 0 { // 0 = Ecdsa
+		t.Errorf("expected Ecdsa (0), got %d", zone.CertificateKeyType)
 	}
 	if len(zone.Records) != 0 {
 		t.Errorf("expected 0 records initially, got %d", len(zone.Records))

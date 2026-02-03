@@ -86,7 +86,7 @@ func TestZoneFields(t *testing.T) {
 		LoggingIPAnonymization:   true,
 		LogAnonymizationType:     0, // 0 = OneDigit
 		DnsSecEnabled:            false,
-		CertificateKeyType:       "RSA",
+		CertificateKeyType:       1, // 1 = Rsa
 	}
 
 	if zone.ID != 1 {
