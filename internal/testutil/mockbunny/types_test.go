@@ -81,7 +81,7 @@ func TestZoneFields(t *testing.T) {
 		SoaEmail:                 "admin@example.com",
 		LoggingEnabled:           false,
 		LoggingIPAnonymization:   true,
-		LogAnonymizationType:     "Full",
+		LogAnonymizationType:     0, // 0 = OneDigit
 		DnsSecEnabled:            false,
 		CertificateKeyType:       "RSA",
 	}

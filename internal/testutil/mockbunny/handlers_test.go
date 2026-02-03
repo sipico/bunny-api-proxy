@@ -424,7 +424,7 @@ func TestDeleteRecord_Success(t *testing.T) {
 	}
 
 	// Verify DateModified was updated
-	if zoneAfter.DateModified.Before(zone.DateModified) {
+	if zoneAfter.DateModified.Before(zone.DateModified.Time) {
 		t.Error("expected DateModified to be updated")
 	}
 }

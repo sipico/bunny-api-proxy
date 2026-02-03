@@ -123,7 +123,7 @@ func (s *Server) AddZone(domain string) int64 {
 	id := s.state.nextZoneID
 	s.state.nextZoneID++
 
-	now := time.Now().UTC()
+	now := MockBunnyTime{Time: time.Now().UTC()}
 	zone := &Zone{
 		ID:                       id,
 		Domain:                   domain,
@@ -136,6 +136,7 @@ func (s *Server) AddZone(domain string) int64 {
 		Nameserver2:              "ns2.bunny.net",
 		SoaEmail:                 "admin@" + domain,
 		LoggingEnabled:           false,
+		LogAnonymizationType:     0, // 0 = OneDigit (default)
 		DnsSecEnabled:            false,
 		CertificateKeyType:       "Ecdsa",
 	}
@@ -168,7 +169,7 @@ func (s *Server) AddZoneWithRecords(domain string, records []Record) int64 {
 		}
 	}
 	zone.Records = records
-	zone.DateModified = time.Now().UTC()
+	zone.DateModified = MockBunnyTime{Time: time.Now().UTC()}
 
 	return id
 }

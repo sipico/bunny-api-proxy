@@ -3,9 +3,55 @@
 package mockbunny
 
 import (
+	"fmt"
+	"strings"
 	"sync"
 	"time"
 )
+
+// MockBunnyTime wraps time.Time to serialize in bunny.net's format
+// (without timezone suffix, matching real API behavior).
+//
+//nolint:revive // MockBunnyTime is descriptive and distinguishes from time.Time
+type MockBunnyTime struct {
+	time.Time
+}
+
+// MarshalJSON implements json.Marshaler for MockBunnyTime.
+// It returns timestamps in "2006-01-02T15:04:05" format (no timezone),
+// matching bunny.net's actual API behavior.
+func (t MockBunnyTime) MarshalJSON() ([]byte, error) {
+	if t.IsZero() {
+		return []byte("null"), nil
+	}
+	// Format without timezone suffix to match real bunny.net API
+	formatted := `"` + t.UTC().Format("2006-01-02T15:04:05") + `"`
+	return []byte(formatted), nil
+}
+
+// UnmarshalJSON implements json.Unmarshaler for MockBunnyTime.
+// It handles both RFC3339 format (with timezone) and bunny.net's
+// format without timezone (treated as UTC).
+func (t *MockBunnyTime) UnmarshalJSON(b []byte) error {
+	s := strings.Trim(string(b), `"`)
+	if s == "null" || s == "" {
+		return nil
+	}
+
+	// Try RFC3339 first (with timezone like "2006-01-02T15:04:05Z")
+	if parsed, err := time.Parse(time.RFC3339, s); err == nil {
+		t.Time = parsed
+		return nil
+	}
+
+	// No timezone suffix - treat as UTC by appending "Z"
+	if parsed, err := time.Parse(time.RFC3339, s+"Z"); err == nil {
+		t.Time = parsed
+		return nil
+	}
+
+	return fmt.Errorf("invalid timestamp format: %s", s)
+}
 
 // Record represents a DNS record within a zone.
 type Record struct {
@@ -33,22 +79,22 @@ type Record struct {
 
 // Zone represents a DNS zone.
 type Zone struct {
-	ID                       int64     `json:"Id"`
-	Domain                   string    `json:"Domain"`
-	Records                  []Record  `json:"Records"`
-	DateModified             time.Time `json:"DateModified"`
-	DateCreated              time.Time `json:"DateCreated"`
-	NameserversDetected      bool      `json:"NameserversDetected"`
-	CustomNameserversEnabled bool      `json:"CustomNameserversEnabled"`
-	Nameserver1              string    `json:"Nameserver1"`
-	Nameserver2              string    `json:"Nameserver2"`
-	SoaEmail                 string    `json:"SoaEmail"`
-	NameserversNextCheck     time.Time `json:"NameserversNextCheck,omitempty"`
-	LoggingEnabled           bool      `json:"LoggingEnabled"`
-	LoggingIPAnonymization   bool      `json:"LoggingIPAnonymizationEnabled"`
-	LogAnonymizationType     string    `json:"LogAnonymizationType"`
-	DnsSecEnabled            bool      `json:"DnsSecEnabled"`
-	CertificateKeyType       string    `json:"CertificateKeyType"`
+	ID                       int64         `json:"Id"`
+	Domain                   string        `json:"Domain"`
+	Records                  []Record      `json:"Records"`
+	DateModified             MockBunnyTime `json:"DateModified"`
+	DateCreated              MockBunnyTime `json:"DateCreated"`
+	NameserversDetected      bool          `json:"NameserversDetected"`
+	CustomNameserversEnabled bool          `json:"CustomNameserversEnabled"`
+	Nameserver1              string        `json:"Nameserver1"`
+	Nameserver2              string        `json:"Nameserver2"`
+	SoaEmail                 string        `json:"SoaEmail"`
+	NameserversNextCheck     MockBunnyTime `json:"NameserversNextCheck,omitempty"`
+	LoggingEnabled           bool          `json:"LoggingEnabled"`
+	LoggingIPAnonymization   bool          `json:"LoggingIPAnonymizationEnabled"`
+	LogAnonymizationType     int           `json:"LogAnonymizationType"` // 0 = OneDigit, 1 = Drop
+	DnsSecEnabled            bool          `json:"DnsSecEnabled"`
+	CertificateKeyType       string        `json:"CertificateKeyType"`
 }
 
 // State holds the internal mock server state.

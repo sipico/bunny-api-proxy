@@ -144,7 +144,7 @@ func (s *Server) handleDeleteRecord(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Update zone's DateModified
-	zone.DateModified = time.Now().UTC()
+	zone.DateModified = MockBunnyTime{Time: time.Now().UTC()}
 
 	// Return 204 No Content on success
 	w.WriteHeader(http.StatusNoContent)
@@ -224,7 +224,7 @@ func (s *Server) handleAddRecord(w http.ResponseWriter, r *http.Request) {
 	s.state.nextRecordID++
 
 	zone.Records = append(zone.Records, record)
-	zone.DateModified = time.Now().UTC()
+	zone.DateModified = MockBunnyTime{Time: time.Now().UTC()}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
@@ -265,7 +265,7 @@ func (s *Server) handleCreateZone(w http.ResponseWriter, r *http.Request) {
 	id := s.state.nextZoneID
 	s.state.nextZoneID++
 
-	now := time.Now().UTC()
+	now := MockBunnyTime{Time: time.Now().UTC()}
 	zone := &Zone{
 		ID:                       id,
 		Domain:                   req.Domain,
@@ -278,6 +278,7 @@ func (s *Server) handleCreateZone(w http.ResponseWriter, r *http.Request) {
 		Nameserver2:              "ns2.bunny.net",
 		SoaEmail:                 "admin@" + req.Domain,
 		LoggingEnabled:           false,
+		LogAnonymizationType:     0, // 0 = OneDigit (default)
 		DnsSecEnabled:            false,
 		CertificateKeyType:       "Ecdsa",
 	}
