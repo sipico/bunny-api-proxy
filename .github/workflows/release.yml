@@ -1,0 +1,237 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (skip tag/release creation)'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  calculate-version:
+    name: Calculate Version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.calver.outputs.version }}
+      year_month: ${{ steps.calver.outputs.year_month }}
+      micro: ${{ steps.calver.outputs.micro }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for tag analysis
+
+      - name: Calculate CalVer version
+        id: calver
+        run: |
+          # Get current year and month (zero-padded)
+          YEAR=$(date +%Y)
+          MONTH=$(date +%m)
+          YEAR_MONTH="${YEAR}.${MONTH}"
+
+          echo "Current year-month: ${YEAR_MONTH}"
+
+          # Find existing tags for this month
+          EXISTING_TAGS=$(git tag -l "${YEAR_MONTH}.*" | sort -V)
+
+          if [ -z "$EXISTING_TAGS" ]; then
+            # No tags this month, start with .1
+            MICRO=1
+          else
+            # Get the highest micro version
+            LAST_TAG=$(echo "$EXISTING_TAGS" | tail -1)
+            LAST_MICRO=$(echo "$LAST_TAG" | cut -d. -f3)
+            MICRO=$((LAST_MICRO + 1))
+          fi
+
+          VERSION="${YEAR_MONTH}.${MICRO}"
+          echo "Calculated version: ${VERSION}"
+
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "year_month=${YEAR_MONTH}" >> $GITHUB_OUTPUT
+          echo "micro=${MICRO}" >> $GITHUB_OUTPUT
+
+      - name: Display version info
+        run: |
+          echo "### Release Version Information" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version**: ${{ steps.calver.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Year-Month**: ${{ steps.calver.outputs.year_month }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Micro**: ${{ steps.calver.outputs.micro }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Dry Run**: ${{ inputs.dry_run }}" >> $GITHUB_STEP_SUMMARY
+
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+
+      - name: Run tests
+        run: go test -race -cover ./...
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.8.0
+
+  build-binaries:
+    name: Build Binaries
+    runs-on: ubuntu-latest
+    needs: [test, lint]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+
+      - name: Build proxy binary
+        env:
+          CGO_ENABLED: 0
+        run: go build -o bunny-api-proxy ./cmd/bunny-api-proxy
+
+      - name: Upload proxy binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bunny-api-proxy
+          path: bunny-api-proxy
+          retention-days: 1
+
+  publish-docker:
+    name: Publish Docker Images
+    runs-on: ubuntu-latest
+    needs: [calculate-version, build-binaries]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create build context
+        run: mkdir -p ci-build/proxy
+
+      - name: Download binary artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: bunny-api-proxy
+          path: ci-build/proxy
+
+      - name: Make binary executable
+        run: chmod +x ci-build/proxy/bunny-api-proxy
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        if: ${{ !inputs.dry_run }}
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ci-build/proxy
+          file: .claude/docker/Dockerfile.prebuilt
+          push: ${{ !inputs.dry_run }}
+          tags: |
+            ghcr.io/sipico/bunny-api-proxy:${{ needs.calculate-version.outputs.version }}
+            ghcr.io/sipico/bunny-api-proxy:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Image info
+        run: |
+          echo "### Docker Images Published" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- \`ghcr.io/sipico/bunny-api-proxy:${{ needs.calculate-version.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`ghcr.io/sipico/bunny-api-proxy:latest\`" >> $GITHUB_STEP_SUMMARY
+
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [calculate-version, publish-docker]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create git tag
+        if: ${{ !inputs.dry_run }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "${{ needs.calculate-version.outputs.version }}" -m "Release ${{ needs.calculate-version.outputs.version }}"
+          git push origin "${{ needs.calculate-version.outputs.version }}"
+
+      - name: Check for custom changelog
+        id: check_changelog
+        run: |
+          CHANGELOG_FILE=".claude/CHANGELOG-${{ needs.calculate-version.outputs.version }}.md"
+          if [ -f "$CHANGELOG_FILE" ]; then
+            echo "has_custom_changelog=true" >> $GITHUB_OUTPUT
+            echo "changelog_file=$CHANGELOG_FILE" >> $GITHUB_OUTPUT
+          else
+            echo "has_custom_changelog=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create GitHub Release (with custom changelog)
+        if: ${{ !inputs.dry_run && steps.check_changelog.outputs.has_custom_changelog == 'true' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ needs.calculate-version.outputs.version }}" \
+            --repo sipico/bunny-api-proxy \
+            --title "Release ${{ needs.calculate-version.outputs.version }}" \
+            --notes-file "${{ steps.check_changelog.outputs.changelog_file }}"
+
+      - name: Create GitHub Release (with auto-generated notes)
+        if: ${{ !inputs.dry_run && steps.check_changelog.outputs.has_custom_changelog == 'false' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ needs.calculate-version.outputs.version }}" \
+            --repo sipico/bunny-api-proxy \
+            --title "Release ${{ needs.calculate-version.outputs.version }}" \
+            --generate-notes
+
+      - name: Release summary
+        run: |
+          echo "### 🎉 Release Created" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Version**: ${{ needs.calculate-version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Docker Images**:" >> $GITHUB_STEP_SUMMARY
+          echo '```bash' >> $GITHUB_STEP_SUMMARY
+          echo "docker pull ghcr.io/sipico/bunny-api-proxy:${{ needs.calculate-version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "docker pull ghcr.io/sipico/bunny-api-proxy:latest" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Release URL**: https://github.com/sipico/bunny-api-proxy/releases/tag/${{ needs.calculate-version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
