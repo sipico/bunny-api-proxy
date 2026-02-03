@@ -65,22 +65,22 @@ type Record struct {
 
 // Zone represents a DNS zone.
 type Zone struct {
-	ID                       int64      `json:"Id"`
-	Domain                   string     `json:"Domain"`
-	Records                  []Record   `json:"Records"`
-	DateModified             BunnyTime  `json:"DateModified"`
-	DateCreated              BunnyTime  `json:"DateCreated"`
-	NameserversDetected      bool       `json:"NameserversDetected"`
-	CustomNameserversEnabled bool       `json:"CustomNameserversEnabled"`
-	Nameserver1              string     `json:"Nameserver1"`
-	Nameserver2              string     `json:"Nameserver2"`
-	SoaEmail                 string     `json:"SoaEmail"`
-	NameserversNextCheck     BunnyTime  `json:"NameserversNextCheck,omitempty"`
-	LoggingEnabled           bool       `json:"LoggingEnabled"`
-	LoggingIPAnonymization   bool       `json:"LoggingIPAnonymizationEnabled"`
-	LogAnonymizationType     int        `json:"LogAnonymizationType"` // 0 = OneDigit, 1 = Drop
-	DnsSecEnabled            bool       `json:"DnsSecEnabled"`
-	CertificateKeyType       string     `json:"CertificateKeyType"`
+	ID                       int64     `json:"Id"`
+	Domain                   string    `json:"Domain"`
+	Records                  []Record  `json:"Records"`
+	DateModified             BunnyTime `json:"DateModified"`
+	DateCreated              BunnyTime `json:"DateCreated"`
+	NameserversDetected      bool      `json:"NameserversDetected"`
+	CustomNameserversEnabled bool      `json:"CustomNameserversEnabled"`
+	Nameserver1              string    `json:"Nameserver1"`
+	Nameserver2              string    `json:"Nameserver2"`
+	SoaEmail                 string    `json:"SoaEmail"`
+	NameserversNextCheck     BunnyTime `json:"NameserversNextCheck,omitempty"`
+	LoggingEnabled           bool      `json:"LoggingEnabled"`
+	LoggingIPAnonymization   bool      `json:"LoggingIPAnonymizationEnabled"`
+	LogAnonymizationType     int       `json:"LogAnonymizationType"` // 0 = OneDigit, 1 = Drop
+	DnsSecEnabled            bool      `json:"DnsSecEnabled"`
+	CertificateKeyType       string    `json:"CertificateKeyType"`
 }
 
 // ListZonesResponse is a paginated response for the List Zones endpoint.

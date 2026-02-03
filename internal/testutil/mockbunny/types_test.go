@@ -1,7 +1,9 @@
 package mockbunny
 
 import (
+	"encoding/json"
 	"testing"
+	"time"
 )
 
 func TestNewState(t *testing.T) {
@@ -137,5 +139,120 @@ func TestErrorResponse(t *testing.T) {
 
 	if errResp.Message != "Invalid domain" {
 		t.Errorf("Message = %s, want Invalid domain", errResp.Message)
+	}
+}
+
+func TestMockBunnyTime_MarshalJSON(t *testing.T) {
+	tests := []struct {
+		name     string
+		time     MockBunnyTime
+		expected string
+	}{
+		{
+			name:     "zero time marshals to null",
+			time:     MockBunnyTime{},
+			expected: `null`,
+		},
+		{
+			name:     "timestamp marshals without timezone",
+			time:     MockBunnyTime{Time: time.Date(2026, 2, 3, 14, 7, 45, 0, time.UTC)},
+			expected: `"2026-02-03T14:07:45"`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := json.Marshal(tt.time)
+			if err != nil {
+				t.Fatalf("MarshalJSON() error = %v", err)
+			}
+			if string(got) != tt.expected {
+				t.Errorf("MarshalJSON() = %s, want %s", got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestMockBunnyTime_UnmarshalJSON(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		wantErr bool
+	}{
+		{
+			name:    "RFC3339 with Z timezone",
+			input:   `"2026-02-03T14:07:45Z"`,
+			wantErr: false,
+		},
+		{
+			name:    "RFC3339 with offset timezone",
+			input:   `"2026-02-03T14:07:45+01:00"`,
+			wantErr: false,
+		},
+		{
+			name:    "bunny.net format without timezone (treated as UTC)",
+			input:   `"2026-02-03T14:07:45"`,
+			wantErr: false,
+		},
+		{
+			name:    "null value",
+			input:   `null`,
+			wantErr: false,
+		},
+		{
+			name:    "empty string",
+			input:   `""`,
+			wantErr: false,
+		},
+		{
+			name:    "invalid format",
+			input:   `"invalid-timestamp"`,
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var mbt MockBunnyTime
+			err := json.Unmarshal([]byte(tt.input), &mbt)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("UnmarshalJSON() error = %v, wantErr %v", err, tt.wantErr)
+			}
+
+			// Verify that timezone-less format is treated as UTC
+			if !tt.wantErr && tt.input == `"2026-02-03T14:07:45"` {
+				if mbt.Location() != time.UTC {
+					t.Errorf("Expected timezone-less timestamp to be parsed as UTC, got %v", mbt.Location())
+				}
+			}
+		})
+	}
+}
+
+func TestMockBunnyTime_RoundTrip(t *testing.T) {
+	// Test that marshaling and unmarshaling produces consistent results
+	original := MockBunnyTime{Time: time.Date(2026, 2, 3, 14, 7, 45, 0, time.UTC)}
+
+	// Marshal to JSON
+	marshaled, err := json.Marshal(original)
+	if err != nil {
+		t.Fatalf("Marshal error: %v", err)
+	}
+
+	// Should produce format without timezone
+	expected := `"2026-02-03T14:07:45"`
+	if string(marshaled) != expected {
+		t.Errorf("Marshaled = %s, want %s", marshaled, expected)
+	}
+
+	// Unmarshal back
+	var unmarshaled MockBunnyTime
+	if err := json.Unmarshal(marshaled, &unmarshaled); err != nil {
+		t.Fatalf("Unmarshal error: %v", err)
+	}
+
+	// Should equal original
+	if !unmarshaled.Equal(original.Time) {
+		t.Errorf("Round trip failed: got %v, want %v", unmarshaled, original)
 	}
 }
