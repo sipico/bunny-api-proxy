@@ -1417,6 +1417,7 @@ func TestRunComponentInitializationPath(t *testing.T) {
 	// Verify all components were initialized
 	if components == nil {
 		t.Fatal("components should not be nil")
+		return
 	}
 	defer components.store.Close()
 	if components.mainRouter == nil {

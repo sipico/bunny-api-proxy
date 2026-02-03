@@ -123,6 +123,7 @@ func TestTokenFromContext(t *testing.T) {
 	got := TokenFromContext(ctx)
 	if got == nil {
 		t.Fatal("TokenFromContext returned nil")
+		return
 	}
 	if got.ID != 42 {
 		t.Errorf("TokenFromContext().ID = %d, want 42", got.ID)
@@ -1386,6 +1387,7 @@ func TestNewAuthenticator(t *testing.T) {
 
 	if middleware == nil {
 		t.Fatal("NewAuthenticator returned nil")
+		return
 	}
 	if middleware.tokens != tokenStore {
 		t.Error("tokens not set correctly")
