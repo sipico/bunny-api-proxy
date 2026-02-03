@@ -112,22 +112,15 @@ func Setup(t *testing.T) *TestEnv {
 // Domain format: {index+1}-{commit-hash}-bap.xyz
 // Example: 1-a42cdbc-bap.xyz, 2-a42cdbc-bap.xyz
 //
-// In E2E mode (ProxyURL set): Creates zones via proxy using admin token.
-// In unit test mode: Creates zones directly via Client.
+// Note: Zones are always created via direct bunny.net API (not through proxy).
+// The proxy doesn't support zone creation - it's for scoped record operations only.
 func (e *TestEnv) CreateTestZones(t *testing.T, count int) []*bunny.Zone {
-	// E2E mode: Ensure we have admin token and create via proxy
+	// Ensure admin token exists in E2E mode (needed for later operations)
 	if e.ProxyURL != "" {
 		e.ensureAdminToken(t)
-		for i := 0; i < count; i++ {
-			domain := e.getZoneDomain(i)
-			zone := e.createZoneViaProxy(t, domain)
-			e.Zones = append(e.Zones, zone)
-			t.Logf("Created zone via proxy: %s (ID: %d)", zone.Domain, zone.ID)
-		}
-		return e.Zones
 	}
 
-	// Unit test mode: Create directly via client
+	// Create zones via direct bunny.net API (both E2E and unit test mode)
 	for i := 0; i < count; i++ {
 		domain := e.getZoneDomain(i)
 		zone, err := e.Client.CreateZone(e.ctx, domain)
@@ -135,7 +128,7 @@ func (e *TestEnv) CreateTestZones(t *testing.T, count int) []*bunny.Zone {
 			t.Fatalf("Failed to create zone %s: %v", domain, err)
 		}
 		e.Zones = append(e.Zones, zone)
-		t.Logf("Created zone directly: %s (ID: %d)", zone.Domain, zone.ID)
+		t.Logf("Created zone: %s (ID: %d)", zone.Domain, zone.ID)
 	}
 	return e.Zones
 }
@@ -148,27 +141,15 @@ func (e *TestEnv) CreateTestZones(t *testing.T, count int) []*bunny.Zone {
 func (e *TestEnv) Cleanup(t *testing.T) {
 	t.Helper()
 
-	// Delete all tracked zones
-	if e.ProxyURL != "" {
-		// E2E mode: Delete via proxy
-		for _, zone := range e.Zones {
-			if zone != nil {
-				if err := e.deleteZoneViaProxy(t, zone.ID); err != nil {
-					t.Logf("Warning: Failed to delete zone %d via proxy: %v", zone.ID, err)
-				} else {
-					t.Logf("Deleted zone via proxy: %s (ID: %d)", zone.Domain, zone.ID)
-				}
-			}
-		}
-	} else {
-		// Unit test mode: Delete via direct client
-		for _, zone := range e.Zones {
-			if zone != nil {
-				if err := e.Client.DeleteZone(e.ctx, zone.ID); err != nil {
-					t.Logf("Warning: Failed to delete zone %d: %v", zone.ID, err)
-				} else {
-					t.Logf("Deleted zone directly: %s (ID: %d)", zone.Domain, zone.ID)
-				}
+	// Delete all tracked zones via direct bunny.net API
+	// Note: Zones are always deleted via direct API (not through proxy).
+	// The proxy doesn't support zone deletion - it's for scoped record operations only.
+	for _, zone := range e.Zones {
+		if zone != nil {
+			if err := e.Client.DeleteZone(e.ctx, zone.ID); err != nil {
+				t.Logf("Warning: Failed to delete zone %d: %v", zone.ID, err)
+			} else {
+				t.Logf("Deleted zone: %s (ID: %d)", zone.Domain, zone.ID)
 			}
 		}
 	}
