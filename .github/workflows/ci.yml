@@ -163,7 +163,7 @@ jobs:
         run: |
           mkdir -p e2e-logs
           set -o pipefail
-          docker compose -f .claude/docker/docker-compose.test.yml run --rm test-runner 2>&1 | tee e2e-logs/test-runner.log
+          docker compose -f .claude/docker/docker-compose.test.yml run --rm --no-deps test-runner 2>&1 | tee e2e-logs/test-runner.log
 
       - name: Collect logs
         if: always()
@@ -231,7 +231,7 @@ jobs:
         run: |
           mkdir -p e2e-logs
           set -o pipefail
-          docker compose -f .claude/docker/docker-compose.test.yml run --rm \
+          docker compose -f .claude/docker/docker-compose.test.yml run --rm --no-deps \
             -e BUNNY_TEST_MODE=real \
             -e BUNNY_API_KEY=$BUNNY_API_KEY \
             test-runner 2>&1 | tee e2e-logs/test-runner.log
