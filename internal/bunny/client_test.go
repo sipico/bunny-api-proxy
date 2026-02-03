@@ -160,6 +160,7 @@ func TestGetZone(t *testing.T) {
 
 		if zone == nil {
 			t.Fatal("expected non-nil zone")
+			return
 		}
 
 		if zone.ID != zoneID {
@@ -246,6 +247,7 @@ func TestAddRecord(t *testing.T) {
 
 		if record == nil {
 			t.Fatal("expected non-nil record")
+			return
 		}
 
 		if record.Type != "A" {

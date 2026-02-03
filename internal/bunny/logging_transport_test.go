@@ -119,6 +119,7 @@ func TestLoggingTransport_Success(t *testing.T) {
 	// Verify response is returned
 	if resp == nil {
 		t.Fatal("Expected response, got nil")
+		return
 	}
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("Expected status 200, got %d", resp.StatusCode)
