@@ -19,6 +19,7 @@ func TestNewHandler(t *testing.T) {
 
 		if h == nil {
 			t.Fatal("expected handler to be created")
+			return
 		}
 		if h.storage == nil {
 			t.Error("expected storage to be set")
@@ -36,6 +37,7 @@ func TestNewHandler(t *testing.T) {
 
 		if h == nil {
 			t.Fatal("expected handler to be created")
+			return
 		}
 		if h.logger == nil {
 			t.Error("expected default logger to be set")
@@ -51,6 +53,7 @@ func TestNewHandler(t *testing.T) {
 
 		if h == nil {
 			t.Fatal("expected handler to be created")
+			return
 		}
 		if h.logLevel == nil {
 			t.Error("expected default logLevel to be created")
