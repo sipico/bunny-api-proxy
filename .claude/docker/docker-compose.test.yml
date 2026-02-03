@@ -6,6 +6,7 @@ services:
       dockerfile: .claude/docker/Dockerfile.mockbunny
     environment:
       - DEBUG=${DEBUG:-false}  # Enable via DEBUG=true
+      - BUNNY_API_KEY=${BUNNY_MASTER_API_KEY}  # Master key for validation
     networks:
       - test-network
     healthcheck:
@@ -25,8 +26,8 @@ services:
       - LOG_LEVEL=debug
       - HTTP_PORT=8080
       - DATA_PATH=/data/proxy.db
-      - BUNNY_API_URL=${BUNNY_API_URL:-http://mockbunny:8081}
-      - BUNNY_API_KEY=${BUNNY_API_KEY:-test-api-key-for-mockbunny}
+      - BUNNY_API_URL=${BUNNY_API_URL:-http://mockbunny:8081}  # Default to mock
+      - BUNNY_API_KEY=${BUNNY_MASTER_API_KEY}  # Master key (MOCKBUNNY_API_TEST_KEY or BUNNY_API_TEST_KEY)
     depends_on:
       mockbunny:
         condition: service_healthy
@@ -49,9 +50,7 @@ services:
       dockerfile: .claude/docker/Dockerfile.testrunner
     environment:
       - PROXY_URL=http://proxy:8080
-      - MOCKBUNNY_URL=${MOCKBUNNY_URL:-http://mockbunny:8081}
-      - ADMIN_PASSWORD=testpassword123
-      - BUNNY_MASTER_API_KEY=${BUNNY_API_KEY:-test-api-key-for-mockbunny}
+      - BUNNY_MASTER_API_KEY=${BUNNY_MASTER_API_KEY}  # Master key for bootstrap
     depends_on:
       proxy:
         condition: service_healthy

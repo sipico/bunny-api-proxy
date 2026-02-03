@@ -2,6 +2,7 @@ package mockbunny
 
 import (
 	"log/slog"
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"time"
@@ -16,16 +17,21 @@ type Server struct {
 	state  *State
 	router chi.Router
 	logger *slog.Logger
+	apiKey string // Expected API key for authentication
 }
 
 // New creates a new mock bunny.net server for testing.
 // It initializes the server with placeholder routes that return 501 Not Implemented.
 // The state is initialized with empty zones and auto-incrementing IDs.
 // If DEBUG environment variable is set to "true", HTTP request/response logging is enabled.
+// If BUNNY_API_KEY is set, API key authentication is required for DNS API endpoints.
 func New() *Server {
 	state := NewState()
 
 	r := chi.NewRouter()
+
+	// Read expected API key from environment (optional)
+	apiKey := os.Getenv("BUNNY_API_KEY")
 
 	// Create logger if DEBUG=true
 	var logger *slog.Logger
@@ -33,6 +39,9 @@ func New() *Server {
 		logger = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
 			Level: slog.LevelDebug,
 		}))
+		if apiKey != "" {
+			logger.Info("mockbunny initialized with API key authentication")
+		}
 	}
 
 	ts := httptest.NewServer(r)
@@ -42,6 +51,7 @@ func New() *Server {
 		state:  state,
 		router: r,
 		logger: logger,
+		apiKey: apiKey,
 	}
 
 	// Apply logging middleware if logger present
@@ -49,15 +59,20 @@ func New() *Server {
 		r.Use(LoggingMiddleware(logger))
 	}
 
-	// Wire up handlers
-	r.Get("/dnszone", server.handleListZones)
-	r.Post("/dnszone", server.handleCreateZone)
-	r.Get("/dnszone/{id}", server.handleGetZone)
-	r.Delete("/dnszone/{id}", server.handleDeleteZone)
-	r.Put("/dnszone/{zoneId}/records", server.handleAddRecord)
-	r.Delete("/dnszone/{zoneId}/records/{id}", server.handleDeleteRecord)
+	// Wire up DNS API handlers with authentication (if API key is configured)
+	r.Group(func(r chi.Router) {
+		if apiKey != "" {
+			r.Use(server.authMiddleware)
+		}
+		r.Get("/dnszone", server.handleListZones)
+		r.Post("/dnszone", server.handleCreateZone)
+		r.Get("/dnszone/{id}", server.handleGetZone)
+		r.Delete("/dnszone/{id}", server.handleDeleteZone)
+		r.Put("/dnszone/{zoneId}/records", server.handleAddRecord)
+		r.Delete("/dnszone/{zoneId}/records/{id}", server.handleDeleteRecord)
+	})
 
-	// Admin endpoints for test seeding
+	// Admin endpoints for test seeding (no authentication required)
 	r.Route("/admin", func(r chi.Router) {
 		r.Post("/zones", server.handleAdminCreateZone)
 		r.Post("/zones/{zoneId}/records", server.handleAdminCreateRecord)
@@ -66,6 +81,30 @@ func New() *Server {
 	})
 
 	return server
+}
+
+// authMiddleware validates the AccessKey header against the configured API key.
+// Returns 401 Unauthorized if the key is missing or doesn't match.
+func (s *Server) authMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		accessKey := r.Header.Get("AccessKey")
+
+		if accessKey == "" {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusUnauthorized)
+			w.Write([]byte(`{"ErrorKey":"unauthorized","Message":"The request authorization header is not valid."}`))
+			return
+		}
+
+		if accessKey != s.apiKey {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusUnauthorized)
+			w.Write([]byte(`{"ErrorKey":"unauthorized","Message":"The request authorization header is not valid."}`))
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
 }
 
 // URL returns the base URL of the mock server.

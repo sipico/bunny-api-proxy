@@ -128,7 +128,7 @@ jobs:
           cache-to: type=gha,mode=max
 
   e2e-test:
-    name: E2E Tests
+    name: E2E Tests (Mock)
     runs-on: ubuntu-latest
     needs: [test, lint]
 
@@ -150,6 +150,8 @@ jobs:
           docker compose -f .claude/docker/docker-compose.test.yml --profile mock down -v || true
 
       - name: Build and start services (Mock Mode)
+        env:
+          BUNNY_MASTER_API_KEY: ${{ secrets.MOCKBUNNY_API_TEST_KEY }}
         run: |
           docker compose -f .claude/docker/docker-compose.test.yml --profile mock up -d --build
 
@@ -160,6 +162,8 @@ jobs:
           docker compose -f .claude/docker/docker-compose.test.yml ps
 
       - name: Run E2E tests
+        env:
+          BUNNY_MASTER_API_KEY: ${{ secrets.MOCKBUNNY_API_TEST_KEY }}
         run: |
           mkdir -p e2e-logs
           set -o pipefail
@@ -189,12 +193,9 @@ jobs:
   e2e-test-real-api:
     name: E2E Tests (Real Bunny.net API)
     runs-on: ubuntu-latest
-    needs: [test, lint]
-    # Only run on: PRs to main, pushes to main, or manual trigger
-    if: |
-      (github.event_name == 'pull_request' && github.base_ref == 'main') ||
-      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-      github.event_name == 'workflow_dispatch'
+    needs: [test, lint, e2e-test]  # Wait for mock tests to pass first
+    # Only run on PRs to main
+    if: github.event_name == 'pull_request' && github.base_ref == 'main'
 
     steps:
       - name: Checkout code
@@ -211,11 +212,10 @@ jobs:
 
       - name: Build and start services (Real API Mode)
         env:
-          BUNNY_API_KEY: ${{ secrets.BUNNY_API_TEST_KEY }}
-          BUNNY_API_URL: https://api.bunny.net
-          MOCKBUNNY_URL: ""  # Disable mockbunny URL for TestEnv
+          BUNNY_MASTER_API_KEY: ${{ secrets.BUNNY_API_TEST_KEY }}
+          BUNNY_API_URL: ""  # Empty to use default (https://api.bunny.net)
         run: |
-          # No --profile mock: skips mockbunny, only proxy
+          # No --profile mock: skips mockbunny, only starts proxy
           docker compose -f .claude/docker/docker-compose.test.yml up -d --build proxy
 
       - name: Wait for proxy to be healthy
@@ -226,15 +226,11 @@ jobs:
 
       - name: Run E2E tests against real API
         env:
-          BUNNY_API_KEY: ${{ secrets.BUNNY_API_TEST_KEY }}
-          BUNNY_API_URL: https://api.bunny.net
+          BUNNY_MASTER_API_KEY: ${{ secrets.BUNNY_API_TEST_KEY }}
         run: |
           mkdir -p e2e-logs
           set -o pipefail
-          docker compose -f .claude/docker/docker-compose.test.yml run --rm --no-deps \
-            -e BUNNY_TEST_MODE=real \
-            -e BUNNY_API_KEY=$BUNNY_API_KEY \
-            test-runner 2>&1 | tee e2e-logs/test-runner.log
+          docker compose -f .claude/docker/docker-compose.test.yml run --rm --no-deps test-runner 2>&1 | tee e2e-logs/test-runner.log
 
       - name: Collect logs
         if: always()
