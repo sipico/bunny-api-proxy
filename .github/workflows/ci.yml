@@ -4,13 +4,11 @@ on:
   push:
     branches: [ main, 'claude/**' ]
     paths-ignore:
-      - '.claude/**'
       - '**/*.md'
       - 'docs/**'
   pull_request:
     branches: [ main ]
     paths-ignore:
-      - '.claude/**'
       - '**/*.md'
       - 'docs/**'
 
