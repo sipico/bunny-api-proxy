@@ -41,23 +41,20 @@ func waitForService(url string, timeout time.Duration) error {
 }
 
 // createScopedKey creates a scoped API key via the proxy's admin API with all permissions for a zone.
-func createScopedKey(t *testing.T, zoneID int64) string {
+func createScopedKey(t *testing.T, adminToken string, zoneID int64) string {
 	t.Helper()
-	return createScopedKeyInternal(t, zoneID, []string{"list_zones", "get_zone", "list_records", "add_record", "delete_record"}, []string{"TXT", "A", "CNAME"})
+	return createScopedKeyInternal(t, adminToken, zoneID, []string{"list_zones", "get_zone", "list_records", "add_record", "delete_record"}, []string{"TXT", "A", "CNAME"})
 }
 
 // createScopedKeyWithRecordTypes creates a scoped API key with specific record type restrictions.
-func createScopedKeyWithRecordTypes(t *testing.T, zoneID int64, recordTypes []string) string {
+func createScopedKeyWithRecordTypes(t *testing.T, adminToken string, zoneID int64, recordTypes []string) string {
 	t.Helper()
-	return createScopedKeyInternal(t, zoneID, []string{"list_zones", "get_zone", "list_records", "add_record", "delete_record"}, recordTypes)
+	return createScopedKeyInternal(t, adminToken, zoneID, []string{"list_zones", "get_zone", "list_records", "add_record", "delete_record"}, recordTypes)
 }
 
 // createScopedKeyInternal is a helper that creates a scoped API key with custom actions and record types.
-func createScopedKeyInternal(t *testing.T, zoneID int64, actions []string, recordTypes []string) string {
+func createScopedKeyInternal(t *testing.T, adminToken string, zoneID int64, actions []string, recordTypes []string) string {
 	t.Helper()
-
-	// First, ensure we have an admin token (bootstrap if needed)
-	adminToken := ensureAdminToken(t)
 
 	// Create a scoped token with permission for this zone
 	tokenBody := map[string]interface{}{
@@ -91,55 +88,6 @@ func createScopedKeyInternal(t *testing.T, zoneID int64, actions []string, recor
 		t.Fatalf("Failed to decode token response: %v", err)
 	}
 	return result.Token
-}
-
-// adminTokenCache caches the admin token across test runs to avoid recreating it.
-var adminTokenCache string
-
-// ensureAdminToken ensures an admin token exists, creating one via bootstrap if needed.
-// Uses the bunny.net master API key (from BUNNY_API_KEY env) for bootstrap authentication.
-func ensureAdminToken(t *testing.T) string {
-	t.Helper()
-
-	// Return cached token if we already have one
-	if adminTokenCache != "" {
-		return adminTokenCache
-	}
-
-	// Bootstrap: create first admin token using master API key from environment
-	// The proxy's BUNNY_API_KEY is available as the bootstrap AccessKey
-	masterAPIKey := getEnv("BUNNY_MASTER_API_KEY", "test-api-key-for-mockbunny")
-
-	tokenBody := map[string]interface{}{
-		"name":     "e2e-admin-token",
-		"is_admin": true,
-	}
-	body, _ := json.Marshal(tokenBody)
-
-	req, _ := http.NewRequest("POST", proxyURL+"/admin/api/tokens", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("AccessKey", masterAPIKey) // Bootstrap uses AccessKey, not Basic Auth
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatalf("Failed to create admin token: %v", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusCreated {
-		bodyContent, _ := io.ReadAll(resp.Body)
-		t.Fatalf("Failed to create admin token, got status %d: %s", resp.StatusCode, string(bodyContent))
-	}
-
-	var result struct {
-		Token string `json:"token"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		t.Fatalf("Failed to decode admin token response: %v", err)
-	}
-
-	adminTokenCache = result.Token
-	return adminTokenCache
 }
 
 // proxyRequest makes an authenticated HTTP request to the proxy with the given API key.

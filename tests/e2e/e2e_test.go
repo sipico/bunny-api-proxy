@@ -52,7 +52,7 @@ func TestE2E_ProxyToMockbunny(t *testing.T) {
 	zone := zones[0]
 
 	// 3. Create a scoped API key via proxy admin API
-	apiKey := createScopedKey(t, zone.ID)
+	apiKey := createScopedKey(t, env.AdminToken, zone.ID)
 
 	// 4. Use the scoped key to list zones via proxy
 	resp := proxyRequest(t, "GET", "/dnszone", apiKey, nil)
@@ -89,7 +89,7 @@ func TestE2E_GetZone(t *testing.T) {
 	zones := env.CreateTestZones(t, 1)
 	zone := zones[0]
 
-	apiKey := createScopedKey(t, zone.ID)
+	apiKey := createScopedKey(t, env.AdminToken, zone.ID)
 
 	resp := proxyRequest(t, "GET", fmt.Sprintf("/dnszone/%d", zone.ID), apiKey, nil)
 	defer resp.Body.Close()
@@ -115,7 +115,7 @@ func TestE2E_AddAndDeleteRecord(t *testing.T) {
 	zones := env.CreateTestZones(t, 1)
 	zone := zones[0]
 
-	apiKey := createScopedKey(t, zone.ID)
+	apiKey := createScopedKey(t, env.AdminToken, zone.ID)
 
 	// Add a TXT record via proxy
 	addRecordBody := map[string]interface{}{
@@ -153,7 +153,7 @@ func TestE2E_ListRecords(t *testing.T) {
 	zone := zones[0]
 
 	// Create a scoped key for this zone
-	apiKey := createScopedKey(t, zone.ID)
+	apiKey := createScopedKey(t, env.AdminToken, zone.ID)
 
 	// Add test records via proxy (using the scoped key)
 	addRecord1 := map[string]interface{}{
@@ -233,7 +233,7 @@ func TestE2E_ForbiddenWrongZone(t *testing.T) {
 	zone2 := zones[1]
 
 	// Create key only for zone1
-	apiKey := createScopedKey(t, zone1.ID)
+	apiKey := createScopedKey(t, env.AdminToken, zone1.ID)
 
 	// Try to access zone2 with zone1's key - should fail
 	resp := proxyRequest(t, "GET", fmt.Sprintf("/dnszone/%d", zone2.ID), apiKey, nil)
@@ -256,7 +256,7 @@ func TestE2E_ForbiddenWrongRecordType(t *testing.T) {
 	zone := zones[0]
 
 	// Create key with permission only for TXT records
-	apiKey := createScopedKeyWithRecordTypes(t, zone.ID, []string{"TXT"})
+	apiKey := createScopedKeyWithRecordTypes(t, env.AdminToken, zone.ID, []string{"TXT"})
 
 	// Try to add an A record (not allowed)
 	addRecordBody := map[string]interface{}{
