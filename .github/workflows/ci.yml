@@ -142,6 +142,11 @@ jobs:
           chmod +x bunny-api-proxy
           chmod +x mockbunny
 
+      - name: Verify binaries exist
+        run: |
+          ls -lah bunny-api-proxy mockbunny
+          file bunny-api-proxy mockbunny
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -151,8 +156,8 @@ jobs:
           context: .
           file: .claude/docker/Dockerfile.prebuilt
           push: false
+          load: true
           tags: bunny-api-proxy:test
-          outputs: type=docker,dest=/tmp/bunny-api-proxy.tar
 
       - name: Build mockbunny Docker image (using pre-built binary)
         uses: docker/build-push-action@v5
@@ -160,8 +165,8 @@ jobs:
           context: .
           file: .claude/docker/Dockerfile.mockbunny.prebuilt
           push: false
+          load: true
           tags: mockbunny:test
-          outputs: type=docker,dest=/tmp/mockbunny.tar
 
       - name: Build test-runner Docker image
         uses: docker/build-push-action@v5
@@ -169,10 +174,17 @@ jobs:
           context: .
           file: .claude/docker/Dockerfile.testrunner
           push: false
+          load: true
           tags: test-runner:test
-          outputs: type=docker,dest=/tmp/test-runner.tar
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Save Docker images as tarballs
+        run: |
+          docker save bunny-api-proxy:test -o /tmp/bunny-api-proxy.tar
+          docker save mockbunny:test -o /tmp/mockbunny.tar
+          docker save test-runner:test -o /tmp/test-runner.tar
+          ls -lh /tmp/*.tar
 
       - name: Upload Docker images
         uses: actions/upload-artifact@v4
