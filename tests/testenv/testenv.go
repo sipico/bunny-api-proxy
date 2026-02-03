@@ -13,11 +13,19 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/sipico/bunny-api-proxy/internal/bunny"
 	"github.com/sipico/bunny-api-proxy/internal/testutil/mockbunny"
+)
+
+// adminTokenCache caches the bootstrapped admin token across all tests in the suite.
+// This prevents "master_key_locked" errors when multiple tests run in sequence.
+var (
+	adminTokenCache   string
+	adminTokenCacheMu sync.Mutex
 )
 
 // TestMode represents the testing mode.
@@ -374,14 +382,25 @@ func getCommitHash() string {
 
 // ensureAdminToken ensures an admin token exists for E2E tests.
 // Bootstrap: Creates first admin token using BUNNY_MASTER_API_KEY.
-// Subsequent calls return cached token.
+// Subsequent calls return cached token (shared across all tests in the suite).
 func (e *TestEnv) ensureAdminToken(t *testing.T) {
 	t.Helper()
 
+	// Check instance cache first
 	if e.AdminToken != "" {
-		return // Already bootstrapped
+		return
 	}
 
+	// Check package-level cache (shared across all tests)
+	adminTokenCacheMu.Lock()
+	if adminTokenCache != "" {
+		e.AdminToken = adminTokenCache
+		adminTokenCacheMu.Unlock()
+		return
+	}
+	adminTokenCacheMu.Unlock()
+
+	// Bootstrap new admin token
 	masterAPIKey := os.Getenv("BUNNY_MASTER_API_KEY")
 	if masterAPIKey == "" {
 		masterAPIKey = "test-api-key-for-mockbunny" // Default for mock mode
@@ -428,7 +447,12 @@ func (e *TestEnv) ensureAdminToken(t *testing.T) {
 		t.Fatalf("Failed to decode admin token response: %v", err)
 	}
 
+	// Cache the token both in instance and package-level (shared across all tests)
 	e.AdminToken = result.Token
+	adminTokenCacheMu.Lock()
+	adminTokenCache = result.Token
+	adminTokenCacheMu.Unlock()
+
 	t.Logf("Bootstrapped admin token: %s", e.AdminToken[:12]+"...")
 }
 
