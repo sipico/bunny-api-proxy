@@ -2474,6 +2474,7 @@ func TestCreateZoneViaProxy_Parsing(t *testing.T) {
 
 	if zone == nil {
 		t.Fatal("Expected zone to be returned")
+		return
 	}
 
 	if zone.ID == 0 {
@@ -3045,6 +3046,7 @@ func TestProxyHelpers_HappyPath(t *testing.T) {
 
 	if zone1 == nil || zone2 == nil {
 		t.Fatal("Failed to create zones")
+		return
 	}
 
 	// List zones
