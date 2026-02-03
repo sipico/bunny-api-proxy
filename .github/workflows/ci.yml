@@ -97,14 +97,24 @@ jobs:
         with:
           go-version: '1.25'
 
-      - name: Build binary
+      - name: Build proxy binary
         run: go build -o bunny-api-proxy ./cmd/bunny-api-proxy
 
-      - name: Upload binary artifact
+      - name: Build mockbunny binary
+        run: go build -o mockbunny ./cmd/mockbunny
+
+      - name: Upload proxy binary artifact
         uses: actions/upload-artifact@v4
         with:
           name: bunny-api-proxy
           path: bunny-api-proxy
+          retention-days: 7
+
+      - name: Upload mockbunny binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mockbunny
+          path: mockbunny
           retention-days: 7
 
   docker:
@@ -121,8 +131,16 @@ jobs:
           name: bunny-api-proxy
           path: .
 
-      - name: Make binary executable
-        run: chmod +x bunny-api-proxy
+      - name: Download mockbunny binary artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: mockbunny
+          path: .
+
+      - name: Make binaries executable
+        run: |
+          chmod +x bunny-api-proxy
+          chmod +x mockbunny
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -136,16 +154,14 @@ jobs:
           tags: bunny-api-proxy:test
           outputs: type=docker,dest=/tmp/bunny-api-proxy.tar
 
-      - name: Build mockbunny Docker image
+      - name: Build mockbunny Docker image (using pre-built binary)
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: .claude/docker/Dockerfile.mockbunny
+          file: .claude/docker/Dockerfile.mockbunny.prebuilt
           push: false
           tags: mockbunny:test
           outputs: type=docker,dest=/tmp/mockbunny.tar
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
 
       - name: Build test-runner Docker image
         uses: docker/build-push-action@v5

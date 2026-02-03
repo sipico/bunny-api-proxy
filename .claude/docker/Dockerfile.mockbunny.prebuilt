@@ -1,0 +1,20 @@
+# Dockerfile.mockbunny.prebuilt for CI
+# Uses pre-built mockbunny binary from Build job
+FROM gcr.io/distroless/static:nonroot
+
+WORKDIR /app
+
+# Copy pre-built binary (expected to be in build context as "mockbunny")
+COPY mockbunny .
+
+EXPOSE 8081
+
+# Health check using built-in health subcommand (no shell/wget needed)
+HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=3 \
+	CMD ["/app/mockbunny", "health"]
+
+# Run as nonroot user (UID 65532, already default in :nonroot variant)
+USER nonroot:nonroot
+
+# Run the binary (exec form required - no shell available)
+ENTRYPOINT ["/app/mockbunny"]
