@@ -864,6 +864,7 @@ func TestInitializeComponentsAllComponentsNotNil(t *testing.T) {
 	// Verify every component is not nil
 	if components == nil {
 		t.Fatal("components struct is nil")
+		return
 	}
 	defer components.store.Close()
 	if components.logger == nil {
@@ -1003,6 +1004,7 @@ func TestInitializeComponentsWithInfoLogLevel(t *testing.T) {
 	// Verify components were created
 	if components == nil {
 		t.Fatal("components should not be nil")
+		return
 	}
 	defer components.store.Close()
 	if components.logLevel == nil {
@@ -1150,6 +1152,7 @@ func TestCreateServer(t *testing.T) {
 
 	if server == nil {
 		t.Fatal("server should not be nil")
+		return
 	}
 
 	if server.Addr != ":8080" {
