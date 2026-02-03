@@ -20,7 +20,9 @@ import (
 // mockBunnyClient implements BunnyClient for testing with customizable behavior
 type mockBunnyClient struct {
 	listZonesFunc    func(context.Context, *bunny.ListZonesOptions) (*bunny.ListZonesResponse, error)
+	createZoneFunc   func(context.Context, string) (*bunny.Zone, error)
 	getZoneFunc      func(context.Context, int64) (*bunny.Zone, error)
+	deleteZoneFunc   func(context.Context, int64) error
 	addRecordFunc    func(context.Context, int64, *bunny.AddRecordRequest) (*bunny.Record, error)
 	deleteRecordFunc func(context.Context, int64, int64) error
 }
@@ -32,11 +34,25 @@ func (m *mockBunnyClient) ListZones(ctx context.Context, opts *bunny.ListZonesOp
 	return nil, nil
 }
 
+func (m *mockBunnyClient) CreateZone(ctx context.Context, domain string) (*bunny.Zone, error) {
+	if m.createZoneFunc != nil {
+		return m.createZoneFunc(ctx, domain)
+	}
+	return nil, nil
+}
+
 func (m *mockBunnyClient) GetZone(ctx context.Context, id int64) (*bunny.Zone, error) {
 	if m.getZoneFunc != nil {
 		return m.getZoneFunc(ctx, id)
 	}
 	return nil, nil
+}
+
+func (m *mockBunnyClient) DeleteZone(ctx context.Context, id int64) error {
+	if m.deleteZoneFunc != nil {
+		return m.deleteZoneFunc(ctx, id)
+	}
+	return nil
 }
 
 func (m *mockBunnyClient) AddRecord(ctx context.Context, zoneID int64, req *bunny.AddRecordRequest) (*bunny.Record, error) {
