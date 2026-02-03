@@ -43,6 +43,7 @@ services:
       - /tmp/proxy-data:/data
 
   test-runner:
+    profiles: ["manual"]  # Don't auto-start; only run via 'docker compose run'
     build:
       context: ../..
       dockerfile: .claude/docker/Dockerfile.testrunner
