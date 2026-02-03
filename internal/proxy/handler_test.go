@@ -101,6 +101,7 @@ func TestNewHandler_WithLogger(t *testing.T) {
 
 	if handler == nil {
 		t.Fatalf("expected non-nil handler, got nil")
+		return
 	}
 	if handler.logger != logger {
 		t.Errorf("expected handler.logger to be the provided logger")
@@ -118,6 +119,7 @@ func TestNewHandler_NilLogger(t *testing.T) {
 
 	if handler == nil {
 		t.Fatalf("expected non-nil handler, got nil")
+		return
 	}
 	if handler.logger != slog.Default() {
 		t.Errorf("expected handler.logger to be slog.Default()")
