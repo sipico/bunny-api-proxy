@@ -46,9 +46,10 @@ Complete REST API for token and permission management:
 - **Unified Token System** - Single table for both admin and scoped tokens
 
 ### Container & Deployment
-- **Docker Images** - Production-ready Alpine-based images (~10 MB)
-- **Distroless Support** - Static binaries compatible with distroless/static base
-- **Health Checks** - Integrated Docker health check configuration
+- **Distroless Images** - Minimal attack surface with gcr.io/distroless/static:nonroot (~2-5 MB)
+- **No Shell or Package Manager** - Immutable containers with reduced CVE exposure
+- **Built-in Health Checks** - Native health subcommand (no curl/wget needed)
+- **Static Binaries** - Pure Go, no CGO dependencies for maximum compatibility
 - **Volume Support** - Persistent database storage via Docker volumes
 - **Environment Configuration** - All settings via environment variables
 
@@ -146,12 +147,12 @@ curl -X POST http://localhost:8080/admin/api/tokens \
 
 ## 📊 Project Statistics
 
-- **342 commits** from initial development
-- **175+ merged pull requests**
-- **85%+ test coverage** across all packages
-- **7 DNS API endpoints** supported
-- **8 admin API endpoints** for management
-- **Go 1.25** - Latest stable Go version
+- **340+ commits** from initial development
+- **90+ pull requests** merged
+- **85%+ test coverage** across all packages (enforced minimum threshold)
+- **7 DNS API endpoints** proxied to bunny.net
+- **10 admin endpoints** for management (8 API + 2 health)
+- **Go 1.25** with modernc.org/sqlite (pure Go, no CGO)
 
 ## 🙏 Use Cases
 
