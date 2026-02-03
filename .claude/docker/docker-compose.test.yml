@@ -6,7 +6,7 @@ services:
       context: ../..
       dockerfile: .claude/docker/Dockerfile.mockbunny
     environment:
-      - DEBUG=${DEBUG:-false}  # Enable via DEBUG=true
+      - DEBUG=${DEBUG:-true}  # Enable debug logging by default for E2E tests
       - BUNNY_API_KEY=${BUNNY_MASTER_API_KEY}  # Master key for validation
     networks:
       - test-network
