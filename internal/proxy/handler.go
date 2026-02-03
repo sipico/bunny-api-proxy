@@ -76,15 +76,18 @@ func writeError(w http.ResponseWriter, status int, message string) {
 }
 
 // handleBunnyError maps bunny.net client errors to appropriate HTTP responses.
+// It logs errors to help with debugging upstream issues.
 func handleBunnyError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, bunny.ErrNotFound):
 		writeError(w, http.StatusNotFound, "resource not found")
 	case errors.Is(err, bunny.ErrUnauthorized):
 		// Master key issue - proxy's bunny.net credentials are invalid
+		slog.Default().Error("upstream authentication failed", "error", err)
 		writeError(w, http.StatusBadGateway, "upstream authentication failed")
 	default:
-		// Generic errors (network, parsing, etc.)
+		// Generic errors (network, parsing, etc.) - log for debugging
+		slog.Default().Error("bunny.net API error", "error", err)
 		writeError(w, http.StatusInternalServerError, "internal server error")
 	}
 }
