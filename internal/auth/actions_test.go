@@ -157,8 +157,8 @@ func TestMapRecordTypeToString(t *testing.T) {
 		{10, "PTR"},
 		{11, "Script"},
 		{12, "NS"},
-		{13, ""}, // Unknown type
-		{-1, ""}, // Invalid type
+		{13, ""},  // Unknown type
+		{-1, ""},  // Invalid type
 		{999, ""}, // Out of range
 	}
 
