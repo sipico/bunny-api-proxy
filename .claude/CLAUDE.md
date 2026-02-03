@@ -96,11 +96,11 @@ internal/               # Private application code
 
 ## Sub-Agent Workflow
 
-For implementation tasks, use Haiku sub-agents to save ~99% on costs:
+For implementation tasks, use faster/cheaper sub-agent models to save on costs:
 
-1. **Opus (coordinator):** Creates detailed GitHub issues with specs
-2. **Haiku (sub-agent):** Implements code, tests, runs validation
-3. **Opus (coordinator):** Reviews and merges PRs
+1. **Coordinator (larger model):** Creates detailed GitHub issues with specs
+2. **Sub-agent (smaller model):** Implements code, tests, runs validation
+3. **Coordinator (larger model):** Reviews and merges PRs
 
 See [dev/SUBAGENT_WORKFLOW.md](dev/SUBAGENT_WORKFLOW.md) for detailed patterns.
 
