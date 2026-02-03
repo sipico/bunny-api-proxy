@@ -240,6 +240,8 @@ jobs:
           docker compose -f .claude/docker/docker-compose.test.yml --profile mock up -d
 
       - name: Wait for services to be healthy
+        env:
+          BUNNY_MASTER_API_KEY: ${{ secrets.MOCKBUNNY_API_TEST_KEY }}
         run: |
           echo "Waiting for services..."
           timeout 60 bash -c 'until docker compose -f .claude/docker/docker-compose.test.yml ps | grep -q "healthy"; do sleep 2; done'
@@ -255,6 +257,8 @@ jobs:
 
       - name: Collect logs
         if: always()
+        env:
+          BUNNY_MASTER_API_KEY: ${{ secrets.MOCKBUNNY_API_TEST_KEY }}
         run: |
           mkdir -p e2e-logs
           docker compose -f .claude/docker/docker-compose.test.yml logs proxy > e2e-logs/proxy.log 2>&1 || true
@@ -271,6 +275,8 @@ jobs:
 
       - name: Cleanup
         if: always()
+        env:
+          BUNNY_MASTER_API_KEY: ${{ secrets.MOCKBUNNY_API_TEST_KEY }}
         run: |
           docker compose -f .claude/docker/docker-compose.test.yml down -v
 
@@ -312,6 +318,8 @@ jobs:
           docker compose -f .claude/docker/docker-compose.test.yml up -d proxy
 
       - name: Wait for proxy to be healthy
+        env:
+          BUNNY_MASTER_API_KEY: ${{ secrets.BUNNY_API_TEST_KEY }}
         run: |
           echo "Waiting for proxy..."
           timeout 60 bash -c 'until docker compose -f .claude/docker/docker-compose.test.yml ps proxy | grep -q "healthy"; do sleep 2; done'
@@ -327,6 +335,8 @@ jobs:
 
       - name: Collect logs
         if: always()
+        env:
+          BUNNY_MASTER_API_KEY: ${{ secrets.BUNNY_API_TEST_KEY }}
         run: |
           mkdir -p e2e-logs
           docker compose -f .claude/docker/docker-compose.test.yml logs proxy > e2e-logs/proxy.log 2>&1 || true
@@ -342,5 +352,7 @@ jobs:
 
       - name: Cleanup
         if: always()
+        env:
+          BUNNY_MASTER_API_KEY: ${{ secrets.BUNNY_API_TEST_KEY }}
         run: |
           docker compose -f .claude/docker/docker-compose.test.yml down -v
