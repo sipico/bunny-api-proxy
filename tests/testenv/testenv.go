@@ -382,7 +382,7 @@ func getCommitHash() string {
 
 // ensureAdminToken ensures an admin token exists for E2E tests.
 // Bootstrap: Creates first admin token using BUNNY_MASTER_API_KEY.
-// Subsequent calls return cached token (shared across all tests in the suite).
+// Subsequent calls return cached token (shared across all E2E tests using same proxy).
 func (e *TestEnv) ensureAdminToken(t *testing.T) {
 	t.Helper()
 
@@ -391,14 +391,18 @@ func (e *TestEnv) ensureAdminToken(t *testing.T) {
 		return
 	}
 
-	// Check package-level cache (shared across all tests)
-	adminTokenCacheMu.Lock()
-	if adminTokenCache != "" {
-		e.AdminToken = adminTokenCache
+	// Check package-level cache ONLY if using the shared E2E proxy
+	// Unit tests with MockProxyServer shouldn't share tokens
+	proxyEnvURL := os.Getenv("PROXY_URL")
+	if proxyEnvURL != "" && e.ProxyURL == proxyEnvURL {
+		adminTokenCacheMu.Lock()
+		if adminTokenCache != "" {
+			e.AdminToken = adminTokenCache
+			adminTokenCacheMu.Unlock()
+			return
+		}
 		adminTokenCacheMu.Unlock()
-		return
 	}
-	adminTokenCacheMu.Unlock()
 
 	// Bootstrap new admin token
 	masterAPIKey := os.Getenv("BUNNY_MASTER_API_KEY")
@@ -447,11 +451,17 @@ func (e *TestEnv) ensureAdminToken(t *testing.T) {
 		t.Fatalf("Failed to decode admin token response: %v", err)
 	}
 
-	// Cache the token both in instance and package-level (shared across all tests)
+	// Cache the token in instance
 	e.AdminToken = result.Token
-	adminTokenCacheMu.Lock()
-	adminTokenCache = result.Token
-	adminTokenCacheMu.Unlock()
+
+	// Also cache at package-level ONLY if using the shared E2E proxy
+	// Unit tests with MockProxyServer shouldn't share tokens
+	proxyEnvURL = os.Getenv("PROXY_URL")
+	if proxyEnvURL != "" && e.ProxyURL == proxyEnvURL {
+		adminTokenCacheMu.Lock()
+		adminTokenCache = result.Token
+		adminTokenCacheMu.Unlock()
+	}
 
 	t.Logf("Bootstrapped admin token: %s", e.AdminToken[:12]+"...")
 }
