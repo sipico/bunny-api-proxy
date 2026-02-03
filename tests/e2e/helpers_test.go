@@ -94,7 +94,7 @@ func createScopedKeyInternal(t *testing.T, adminToken string, zoneID int64, acti
 func proxyRequest(t *testing.T, method, path, apiKey string, body []byte) *http.Response {
 	t.Helper()
 
-	var bodyReader *bytes.Reader
+	var bodyReader io.Reader
 	if body != nil {
 		bodyReader = bytes.NewReader(body)
 	}
