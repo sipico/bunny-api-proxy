@@ -13,7 +13,7 @@ An API proxy for bunny.net that enables scoped and limited API keys. Perfect for
 - **Scoped Tokens** - Create tokens with granular permissions for specific zones and operations
 - **Admin Tokens** - Full-access tokens for management operations
 - **Bootstrap Security** - Master key can only create the first admin token, then is locked out
-- **DNS API Support** - Proxies bunny.net DNS operations (list zones, records, add/delete)
+- **DNS API Support** - Proxies bunny.net DNS operations (7 endpoints: zones and records management)
 - **SQLite Storage** - Lightweight, embedded database with persistent storage
 - **Structured Logging** - JSON-formatted logs with runtime log level control
 - **Health Endpoints** - Liveness and readiness probes for container orchestration
@@ -77,24 +77,30 @@ curl -H "AccessKey: YOUR_TOKEN" http://localhost:8080/admin/api/whoami
 
 ### Health Endpoints (No Auth Required)
 
-#### GET /health
+Health endpoints are available at both root and `/admin` paths for compatibility.
+
+#### GET /health (or /admin/health)
 Liveness check - returns OK if the process is running.
 
 ```bash
 curl http://localhost:8080/health
+# or
+curl http://localhost:8080/admin/health
 ```
 ```json
 {"status":"ok"}
 ```
 
-#### GET /ready
+#### GET /ready (or /admin/ready)
 Readiness check - returns OK if the database is accessible.
 
 ```bash
 curl http://localhost:8080/ready
+# or
+curl http://localhost:8080/admin/ready
 ```
 ```json
-{"status":"ok"}
+{"status":"ok","database":"connected"}
 ```
 
 ### Admin API
@@ -274,11 +280,29 @@ List all DNS zones.
 curl -H "AccessKey: YOUR_TOKEN" http://localhost:8080/dnszone
 ```
 
+#### POST /dnszone
+Create a new DNS zone.
+
+```bash
+curl -X POST http://localhost:8080/dnszone \
+  -H "AccessKey: YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"Domain": "example.com"}'
+```
+
 #### GET /dnszone/{zoneID}
 Get zone details.
 
 ```bash
 curl -H "AccessKey: YOUR_TOKEN" http://localhost:8080/dnszone/12345
+```
+
+#### DELETE /dnszone/{zoneID}
+Delete a DNS zone.
+
+```bash
+curl -X DELETE -H "AccessKey: YOUR_TOKEN" \
+  http://localhost:8080/dnszone/12345
 ```
 
 #### GET /dnszone/{zoneID}/records

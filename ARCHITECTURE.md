@@ -130,7 +130,9 @@ Every push runs:
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
 | `/dnszone` | GET | List zones |
+| `/dnszone` | POST | Create zone |
 | `/dnszone/{id}` | GET | Get zone details |
+| `/dnszone/{id}` | DELETE | Delete zone |
 | `/dnszone/{id}/records` | GET | List records |
 | `/dnszone/{id}/records` | POST | Add record |
 | `/dnszone/{id}/records/{id}` | DELETE | Delete record |
@@ -148,12 +150,21 @@ Every push runs:
   "permissions": [
     {
       "zone_id": 12345,
-      "allowed_actions": ["list_records", "add_record", "delete_record"],
+      "allowed_actions": ["list_zones", "get_zone", "list_records", "add_record", "delete_record"],
       "record_types": ["TXT"]
     }
   ]
 }
 ```
+
+**Available Actions:**
+- `list_zones` - List all zones
+- `create_zone` - Create new zones
+- `get_zone` - Get zone details
+- `delete_zone` - Delete zones
+- `list_records` - List records in a zone
+- `add_record` - Add DNS records
+- `delete_record` - Delete DNS records
 
 ## Configuration
 
@@ -232,15 +243,16 @@ Mirror bunny.net DNS API structure (MVP endpoints listed above).
 
 | Endpoint | Purpose |
 |----------|---------|
+| `GET /admin/api/whoami` | Get current token/key information |
 | `GET /admin/api/tokens` | List all tokens (admin and scoped) |
-| `POST /admin/api/tokens` | Create token (admin or scoped) - bootstrap uses `BUNNY_API_KEY` |
+| `POST /admin/api/tokens` | Create token (admin or scoped) - bootstrap uses master key |
 | `GET /admin/api/tokens/{id}` | Get token details |
 | `DELETE /admin/api/tokens/{id}` | Delete token |
 | `POST /admin/api/tokens/{id}/permissions` | Add permission to token |
 | `DELETE /admin/api/tokens/{id}/permissions/{pid}` | Remove permission |
 | `POST /admin/api/loglevel` | Change log level dynamically |
-| `GET /health` | Liveness check |
-| `GET /ready` | Readiness check (DB connected) |
+| `GET /health` or `/admin/health` | Liveness check |
+| `GET /ready` or `/admin/ready` | Readiness check (DB connected) |
 
 ## Docker
 
