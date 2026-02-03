@@ -92,6 +92,7 @@ func (s *Server) authMiddleware(next http.Handler) http.Handler {
 		if accessKey == "" {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusUnauthorized)
+			//nolint:errcheck // Error responses are best effort
 			w.Write([]byte(`{"ErrorKey":"unauthorized","Message":"The request authorization header is not valid."}`))
 			return
 		}
@@ -99,6 +100,7 @@ func (s *Server) authMiddleware(next http.Handler) http.Handler {
 		if accessKey != s.apiKey {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusUnauthorized)
+			//nolint:errcheck // Error responses are best effort
 			w.Write([]byte(`{"ErrorKey":"unauthorized","Message":"The request authorization header is not valid."}`))
 			return
 		}

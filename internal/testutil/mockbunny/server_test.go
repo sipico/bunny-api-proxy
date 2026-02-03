@@ -590,3 +590,123 @@ func TestAddRecord_MultipleRecords(t *testing.T) {
 		t.Error("expected unique IDs for records")
 	}
 }
+func TestAuthMiddleware_NoAPIKeyConfigured(t *testing.T) {
+	// When BUNNY_API_KEY is not set, auth is disabled
+	s := New()
+	defer s.Close()
+
+	// Request without AccessKey header should succeed
+	req, _ := http.NewRequest("GET", s.URL()+"/dnszone", nil)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("failed to send request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected 200, got %d (auth should be disabled)", resp.StatusCode)
+	}
+}
+
+func TestAuthMiddleware_ValidAPIKey(t *testing.T) {
+	// Set API key for this test
+	t.Setenv("BUNNY_API_KEY", "test-api-key-12345")
+
+	s := New()
+	defer s.Close()
+
+	// Request with valid AccessKey header should succeed
+	req, _ := http.NewRequest("GET", s.URL()+"/dnszone", nil)
+	req.Header.Set("AccessKey", "test-api-key-12345")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("failed to send request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected 200, got %d (valid key should succeed)", resp.StatusCode)
+	}
+}
+
+func TestAuthMiddleware_MissingAccessKey(t *testing.T) {
+	// Set API key for this test
+	t.Setenv("BUNNY_API_KEY", "test-api-key-12345")
+
+	s := New()
+	defer s.Close()
+
+	// Request without AccessKey header should fail
+	req, _ := http.NewRequest("GET", s.URL()+"/dnszone", nil)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("failed to send request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Errorf("expected 401, got %d (missing key should fail)", resp.StatusCode)
+	}
+
+	var errResp map[string]string
+	if err := json.NewDecoder(resp.Body).Decode(&errResp); err != nil {
+		t.Fatalf("failed to decode error response: %v", err)
+	}
+
+	if errResp["ErrorKey"] != "unauthorized" {
+		t.Errorf("expected ErrorKey=unauthorized, got %s", errResp["ErrorKey"])
+	}
+	if errResp["Message"] == "" {
+		t.Error("expected non-empty Message")
+	}
+}
+
+func TestAuthMiddleware_InvalidAccessKey(t *testing.T) {
+	// Set API key for this test
+	t.Setenv("BUNNY_API_KEY", "test-api-key-12345")
+
+	s := New()
+	defer s.Close()
+
+	// Request with wrong AccessKey header should fail
+	req, _ := http.NewRequest("GET", s.URL()+"/dnszone", nil)
+	req.Header.Set("AccessKey", "wrong-api-key")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("failed to send request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Errorf("expected 401, got %d (invalid key should fail)", resp.StatusCode)
+	}
+
+	var errResp map[string]string
+	if err := json.NewDecoder(resp.Body).Decode(&errResp); err != nil {
+		t.Fatalf("failed to decode error response: %v", err)
+	}
+
+	if errResp["ErrorKey"] != "unauthorized" {
+		t.Errorf("expected ErrorKey=unauthorized, got %s", errResp["ErrorKey"])
+	}
+}
+
+func TestAuthMiddleware_AdminEndpointsNoAuth(t *testing.T) {
+	// Set API key for this test
+	t.Setenv("BUNNY_API_KEY", "test-api-key-12345")
+
+	s := New()
+	defer s.Close()
+
+	// Admin endpoints should work without AccessKey header
+	req, _ := http.NewRequest("GET", s.URL()+"/admin/state", nil)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("failed to send request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected 200, got %d (admin endpoints should not require auth)", resp.StatusCode)
+	}
+}
