@@ -20,8 +20,14 @@ type BunnyClient interface {
 	// ListZones retrieves all DNS zones with optional filtering.
 	ListZones(ctx context.Context, opts *bunny.ListZonesOptions) (*bunny.ListZonesResponse, error)
 
+	// CreateZone creates a new DNS zone.
+	CreateZone(ctx context.Context, domain string) (*bunny.Zone, error)
+
 	// GetZone retrieves a single zone by ID, including all records.
 	GetZone(ctx context.Context, id int64) (*bunny.Zone, error)
+
+	// DeleteZone deletes a DNS zone by ID.
+	DeleteZone(ctx context.Context, id int64) error
 
 	// AddRecord creates a new DNS record in the specified zone.
 	AddRecord(ctx context.Context, zoneID int64, req *bunny.AddRecordRequest) (*bunny.Record, error)
@@ -144,6 +150,38 @@ func (h *Handler) HandleListZones(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, result)
 }
 
+// HandleCreateZone creates a new DNS zone.
+// POST /dnszone
+// Body: {"Domain": "example.com"}
+func (h *Handler) HandleCreateZone(w http.ResponseWriter, r *http.Request) {
+	// Parse request body
+	var req struct {
+		Domain string `json:"Domain"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if req.Domain == "" {
+		writeError(w, http.StatusBadRequest, "missing domain")
+		return
+	}
+
+	// Create zone via bunny client
+	zone, err := h.client.CreateZone(r.Context(), req.Domain)
+	if err != nil {
+		handleBunnyError(w, err)
+		return
+	}
+
+	// Log the request
+	h.logger.Info("create zone", "domain", req.Domain, "zoneID", zone.ID)
+
+	// Return successful response
+	writeJSON(w, http.StatusCreated, zone)
+}
+
 // HandleGetZone retrieves a single DNS zone by ID.
 func (h *Handler) HandleGetZone(w http.ResponseWriter, r *http.Request) {
 	zoneIDStr := chi.URLParam(r, "zoneID")
@@ -189,6 +227,34 @@ func (h *Handler) HandleGetZone(w http.ResponseWriter, r *http.Request) {
 
 	// Return successful response
 	writeJSON(w, http.StatusOK, zone)
+}
+
+// HandleDeleteZone deletes a DNS zone by ID.
+// DELETE /dnszone/{zoneID}
+func (h *Handler) HandleDeleteZone(w http.ResponseWriter, r *http.Request) {
+	zoneIDStr := chi.URLParam(r, "zoneID")
+	if zoneIDStr == "" {
+		writeError(w, http.StatusBadRequest, "missing zone ID")
+		return
+	}
+
+	zoneID, err := strconv.ParseInt(zoneIDStr, 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid zone ID")
+		return
+	}
+
+	// Delete zone via bunny client
+	if err := h.client.DeleteZone(r.Context(), zoneID); err != nil {
+		handleBunnyError(w, err)
+		return
+	}
+
+	// Log the request
+	h.logger.Info("delete zone", "zone_id", zoneID)
+
+	// Return successful response (204 No Content)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // HandleListRecords lists all DNS records for a zone.
