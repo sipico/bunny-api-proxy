@@ -3022,7 +3022,6 @@ func TestVerifyCleanupComplete_AllZonesDeleted(t *testing.T) {
 // COVERAGE IMPROVEMENT TESTS - Focus on uncovered error paths
 // ============================================================================
 
-
 // TestProxyHelpers_HappyPath tests successful happy path execution.
 func TestProxyHelpers_HappyPath(t *testing.T) {
 	mockProxy := NewMockProxyServer(t)
@@ -3152,7 +3151,7 @@ func TestVerifyEmptyState_DirectClientMode(t *testing.T) {
 
 	env := &TestEnv{
 		Mode:       ModeMock,
-		ProxyURL:   "",  // No proxy - use direct client
+		ProxyURL:   "", // No proxy - use direct client
 		CommitHash: "test",
 		ctx:        context.Background(),
 		Client: bunny.NewClient("test-key",
@@ -3173,7 +3172,7 @@ func TestVerifyEmptyState_RealModeWithBothChecks(t *testing.T) {
 	defer mockServer.Close()
 
 	env := &TestEnv{
-		Mode:       ModeReal,  // Real mode triggers both checks
+		Mode:       ModeReal, // Real mode triggers both checks
 		ProxyURL:   mockProxy.URL,
 		AdminToken: "test-token",
 		CommitHash: "test",
@@ -3239,5 +3238,3 @@ func TestDeleteZoneViaProxy_NotFound_Error(t *testing.T) {
 		t.Error("Expected error when deleting non-existent zone")
 	}
 }
-
-
