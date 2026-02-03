@@ -1125,10 +1125,10 @@ func TestHandleGetZone_FiltersRecordTypes(t *testing.T) {
 		ID:     123,
 		Domain: "example.com",
 		Records: []bunny.Record{
-			{ID: 1, Type: 0, Name: "www"},     // A
-			{ID: 2, Type: 1, Name: "www"},     // AAAA
+			{ID: 1, Type: 0, Name: "www"},             // A
+			{ID: 2, Type: 1, Name: "www"},             // AAAA
 			{ID: 3, Type: 3, Name: "_acme-challenge"}, // TXT
-			{ID: 4, Type: 2, Name: "alias"},   // CNAME
+			{ID: 4, Type: 2, Name: "alias"},           // CNAME
 		},
 	}
 
@@ -1184,7 +1184,7 @@ func TestHandleGetZone_AllRecordTypes(t *testing.T) {
 		ID:     123,
 		Domain: "example.com",
 		Records: []bunny.Record{
-			{ID: 1, Type: 0, Name: "www"},     // A
+			{ID: 1, Type: 0, Name: "www"},             // A
 			{ID: 2, Type: 3, Name: "_acme-challenge"}, // TXT
 		},
 	}
@@ -1235,8 +1235,8 @@ func TestHandleGetZone_EmptyRecordsAfterFilter(t *testing.T) {
 		ID:     123,
 		Domain: "example.com",
 		Records: []bunny.Record{
-			{ID: 1, Type: 0, Name: "www"},  // A
-			{ID: 2, Type: 1, Name: "www"},  // AAAA
+			{ID: 1, Type: 0, Name: "www"}, // A
+			{ID: 2, Type: 1, Name: "www"}, // AAAA
 		},
 	}
 
@@ -1344,8 +1344,8 @@ func TestHandleListRecords_EmptyAfterFilter(t *testing.T) {
 		ID:     123,
 		Domain: "example.com",
 		Records: []bunny.Record{
-			{ID: 1, Type: 0, Name: "www"},  // A
-			{ID: 2, Type: 1, Name: "www"},  // AAAA
+			{ID: 1, Type: 0, Name: "www"}, // A
+			{ID: 2, Type: 1, Name: "www"}, // AAAA
 		},
 	}
 

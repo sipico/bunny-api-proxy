@@ -223,7 +223,7 @@ func TestAddZoneWithRecords(t *testing.T) {
 	defer s.Close()
 
 	records := []Record{
-		{Type: 0, Name: "@", Value: "192.168.1.1", TTL: 300},                  // A
+		{Type: 0, Name: "@", Value: "192.168.1.1", TTL: 300},         // A
 		{Type: 3, Name: "_acme-challenge", Value: "abc123", TTL: 60}, // TXT
 	}
 
@@ -480,7 +480,6 @@ func TestAddRecord_ZoneNotFound(t *testing.T) {
 		t.Errorf("expected 404, got %d", resp.StatusCode)
 	}
 }
-
 
 func TestAddRecord_MissingName(t *testing.T) {
 	s := New()

@@ -67,8 +67,8 @@ type Record struct {
 	Tag                   string  `json:"Tag"`
 	Accelerated           bool    `json:"Accelerated"`
 	AcceleratedPullZoneID int64   `json:"AcceleratedPullZoneId"`
-	MonitorStatus         int     `json:"MonitorStatus"`   // 0 = Unknown, 1 = Online, 2 = Offline
-	MonitorType           int     `json:"MonitorType"`     // 0 = None, 1 = Ping, 2 = Http, 3 = Monitor
+	MonitorStatus         int     `json:"MonitorStatus"` // 0 = Unknown, 1 = Online, 2 = Offline
+	MonitorType           int     `json:"MonitorType"`   // 0 = None, 1 = Ping, 2 = Http, 3 = Monitor
 	GeolocationLatitude   float64 `json:"GeolocationLatitude"`
 	GeolocationLongitude  float64 `json:"GeolocationLongitude"`
 	LatencyZone           string  `json:"LatencyZone"`

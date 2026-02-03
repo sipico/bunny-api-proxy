@@ -217,7 +217,7 @@ func TestIntegration_ListRecords(t *testing.T) {
 
 	// Add zone with records
 	records := []mockbunny.Record{
-		{Type: 3, Name: "acme", Value: "acme-validation-1"},   // TXT
+		{Type: 3, Name: "acme", Value: "acme-validation-1"},  // TXT
 		{Type: 3, Name: "_acme", Value: "acme-validation-2"}, // TXT
 		{Type: 0, Name: "www", Value: "1.2.3.4"},             // A
 	}
@@ -629,10 +629,10 @@ func TestIntegration_GetZone_FilteredRecordTypes(t *testing.T) {
 
 	// Add zone with multiple record types
 	records := []mockbunny.Record{
-		{Type: 0, Name: "www", Value: "1.2.3.4"},                      // A
-		{Type: 1, Name: "www", Value: "2001:db8::1"},                 // AAAA
-		{Type: 3, Name: "_acme", Value: "validation-string"},         // TXT
-		{Type: 2, Name: "alias", Value: "www.example.com"}, // CNAME
+		{Type: 0, Name: "www", Value: "1.2.3.4"},             // A
+		{Type: 1, Name: "www", Value: "2001:db8::1"},         // AAAA
+		{Type: 3, Name: "_acme", Value: "validation-string"}, // TXT
+		{Type: 2, Name: "alias", Value: "www.example.com"},   // CNAME
 	}
 	zoneID := mockBunny.AddZoneWithRecords("example.com", records)
 
@@ -701,9 +701,9 @@ func TestIntegration_ListRecords_FilteredRecordTypes(t *testing.T) {
 
 	// Add zone with multiple record types
 	records := []mockbunny.Record{
-		{Type: 0, Name: "www", Value: "1.2.3.4"},                      // A
-		{Type: 3, Name: "_acme1", Value: "token1"},                   // TXT
-		{Type: 3, Name: "_acme2", Value: "token2"},                   // TXT
+		{Type: 0, Name: "www", Value: "1.2.3.4"},           // A
+		{Type: 3, Name: "_acme1", Value: "token1"},         // TXT
+		{Type: 3, Name: "_acme2", Value: "token2"},         // TXT
 		{Type: 2, Name: "alias", Value: "www.example.com"}, // CNAME
 	}
 	zoneID := mockBunny.AddZoneWithRecords("example.com", records)
