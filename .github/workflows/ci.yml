@@ -125,27 +125,32 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Create build contexts for pre-built binaries
+        run: |
+          # Create separate build directories to avoid .dockerignore conflicts
+          mkdir -p ci-build/proxy ci-build/mockbunny
+
       - name: Download binary artifact
         uses: actions/download-artifact@v4
         with:
           name: bunny-api-proxy
-          path: .
+          path: ci-build/proxy
 
       - name: Download mockbunny binary artifact
         uses: actions/download-artifact@v4
         with:
           name: mockbunny
-          path: .
+          path: ci-build/mockbunny
 
       - name: Make binaries executable
         run: |
-          chmod +x bunny-api-proxy
-          chmod +x mockbunny
+          chmod +x ci-build/proxy/bunny-api-proxy
+          chmod +x ci-build/mockbunny/mockbunny
 
       - name: Verify binaries exist
         run: |
-          ls -lah bunny-api-proxy mockbunny
-          file bunny-api-proxy mockbunny
+          ls -lah ci-build/proxy/bunny-api-proxy ci-build/mockbunny/mockbunny
+          file ci-build/proxy/bunny-api-proxy ci-build/mockbunny/mockbunny
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -153,7 +158,7 @@ jobs:
       - name: Build proxy Docker image (using pre-built binary)
         uses: docker/build-push-action@v5
         with:
-          context: .
+          context: ci-build/proxy
           file: .claude/docker/Dockerfile.prebuilt
           push: false
           load: true
@@ -162,7 +167,7 @@ jobs:
       - name: Build mockbunny Docker image (using pre-built binary)
         uses: docker/build-push-action@v5
         with:
-          context: .
+          context: ci-build/mockbunny
           file: .claude/docker/Dockerfile.mockbunny.prebuilt
           push: false
           load: true
