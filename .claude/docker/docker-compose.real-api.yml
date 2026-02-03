@@ -1,0 +1,10 @@
+# Override for real bunny.net API testing
+# Use with: docker compose -f docker-compose.test.yml -f docker-compose.real-api.yml up -d proxy
+#
+# This override:
+# 1. Removes internal network restriction to allow external API access
+# 2. Should only be used for real API tests, not mock tests
+
+networks:
+  test-network:
+    internal: false  # Allow proxy to reach api.bunny.net

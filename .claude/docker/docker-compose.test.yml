@@ -63,5 +63,4 @@ services:
 networks:
   test-network:
     driver: bridge
-    # Note: internal: true removed to allow proxy to reach real bunny.net API
-    # Mock tests remain isolated because they use mockbunny within the same network
+    internal: true  # Isolate mock tests from external network

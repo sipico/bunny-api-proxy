@@ -318,16 +318,17 @@ jobs:
           BUNNY_MASTER_API_KEY: ${{ secrets.BUNNY_API_TEST_KEY }}
           BUNNY_API_URL: ""  # Empty to use default (https://api.bunny.net)
         run: |
+          # Use override file to allow external network access for real API
           # No --profile mock: skips mockbunny, only starts proxy
-          docker compose -f .claude/docker/docker-compose.test.yml up -d proxy
+          docker compose -f .claude/docker/docker-compose.test.yml -f .claude/docker/docker-compose.real-api.yml up -d proxy
 
       - name: Wait for proxy to be healthy
         env:
           BUNNY_MASTER_API_KEY: ${{ secrets.BUNNY_API_TEST_KEY }}
         run: |
           echo "Waiting for proxy..."
-          timeout 60 bash -c 'until docker compose -f .claude/docker/docker-compose.test.yml ps proxy | grep -q "healthy"; do sleep 2; done'
-          docker compose -f .claude/docker/docker-compose.test.yml ps
+          timeout 60 bash -c 'until docker compose -f .claude/docker/docker-compose.test.yml -f .claude/docker/docker-compose.real-api.yml ps proxy | grep -q "healthy"; do sleep 2; done'
+          docker compose -f .claude/docker/docker-compose.test.yml -f .claude/docker/docker-compose.real-api.yml ps
 
       - name: Run E2E tests against real API
         env:
@@ -335,7 +336,7 @@ jobs:
         run: |
           mkdir -p e2e-logs
           set -o pipefail
-          docker compose -f .claude/docker/docker-compose.test.yml run --rm --no-deps test-runner 2>&1 | tee e2e-logs/test-runner.log
+          docker compose -f .claude/docker/docker-compose.test.yml -f .claude/docker/docker-compose.real-api.yml run --rm --no-deps test-runner 2>&1 | tee e2e-logs/test-runner.log
 
       - name: Collect logs
         if: always()
@@ -343,8 +344,8 @@ jobs:
           BUNNY_MASTER_API_KEY: ${{ secrets.BUNNY_API_TEST_KEY }}
         run: |
           mkdir -p e2e-logs
-          docker compose -f .claude/docker/docker-compose.test.yml logs proxy > e2e-logs/proxy.log 2>&1 || true
-          docker compose -f .claude/docker/docker-compose.test.yml ps > e2e-logs/services.log 2>&1 || true
+          docker compose -f .claude/docker/docker-compose.test.yml -f .claude/docker/docker-compose.real-api.yml logs proxy > e2e-logs/proxy.log 2>&1 || true
+          docker compose -f .claude/docker/docker-compose.test.yml -f .claude/docker/docker-compose.real-api.yml ps > e2e-logs/services.log 2>&1 || true
 
       - name: Upload E2E logs (Real API)
         if: always()
@@ -359,4 +360,4 @@ jobs:
         env:
           BUNNY_MASTER_API_KEY: ${{ secrets.BUNNY_API_TEST_KEY }}
         run: |
-          docker compose -f .claude/docker/docker-compose.test.yml down -v
+          docker compose -f .claude/docker/docker-compose.test.yml -f .claude/docker/docker-compose.real-api.yml down -v
