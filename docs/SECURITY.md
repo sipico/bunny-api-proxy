@@ -371,8 +371,9 @@ providedHash := sha256.Sum256([]byte(providedToken))
 #### Docker Image
 
 1. **Base Image**
-   - Uses Alpine Linux (~5MB)
-   - Keep Alpine updated via Dependabot
+   - Uses Google's Distroless static:nonroot image (~2-5MB)
+   - No shell, package manager, or unnecessary binaries
+   - Reduced attack surface and fewer CVE alerts
    - Verify integrity of published images
 
 2. **Multi-stage Build**

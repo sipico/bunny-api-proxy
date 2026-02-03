@@ -20,12 +20,12 @@ This guide covers deploying Bunny API Proxy in production environments. The prox
 ### Docker (Recommended)
 
 - Docker 20.10+ or Docker Compose 2.0+
-- No additional dependencies (everything is included in the Alpine-based image)
+- No additional dependencies (everything is included in the distroless-based image)
 
 ### Go (Source Build)
 
-- Go 1.24 or later
-- CGO support with gcc and musl-dev (for SQLite)
+- Go 1.25 or later
+- No CGO required (uses pure Go SQLite driver: modernc.org/sqlite)
 - For testing: golangci-lint, govulncheck
 
 ### bunny.net Account
