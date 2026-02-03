@@ -110,7 +110,8 @@ func initializeComponents(cfg *config.Config) (*serverComponents, error) {
 
 	// 7. Create proxy handler and router
 	proxyHandler := proxy.NewHandler(bunnyClient, logger)
-	proxyRouter := proxy.NewRouter(proxyHandler, auth.Middleware(validator))
+	proxyAuthenticator := auth.NewAuthenticator(store, bootstrapService)
+	proxyRouter := proxy.NewRouter(proxyHandler, proxyAuthenticator.Authenticate)
 
 	// 8. Create admin handler and router
 	adminHandler := admin.NewHandler(store, logLevel, logger)
