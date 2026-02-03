@@ -23,7 +23,7 @@ An API proxy for bunny.net that allows creating scoped/limited API keys. Sits be
 
 | Component | Choice | Rationale |
 |-----------|--------|-----------|
-| Language | Go 1.24 | Aligns with bunny.net's Terraform provider, single binary, excellent for proxies |
+| Language | Go 1.25 | Aligns with bunny.net's Terraform provider, single binary, excellent for proxies |
 | Web Framework | Chi | Lightweight, idiomatic Go, 100% net/http compatible |
 | Database | SQLite | Zero config, single file, perfect for single-container deployment |
 | SQLite Driver | modernc.org/sqlite | Pure Go, no CGO required, enables simpler builds and cross-compilation |
@@ -32,7 +32,6 @@ An API proxy for bunny.net that allows creating scoped/limited API keys. Sits be
 ## Project Policies
 
 - **Stay on latest versions** for all tools and dependencies
-- **Dependabot enabled** for automated dependency updates
 - **TDD approach** - tests first, then implementation
 - **No local development** - all building/testing via GitHub Actions
 
@@ -145,8 +144,9 @@ Every push runs:
 
 ```json
 {
-  "scoped_key_id": "proxy_abc123",
+  "token_id": 1,
   "name": "ACME DNS Validation",
+  "is_admin": false,
   "permissions": [
     {
       "zone_id": 12345,
@@ -211,11 +211,10 @@ docker run -d \
 
 | Secret | Storage |
 |--------|---------|
-| bunny.net master API key | Hashed in SQLite (SHA-256) |
-| Scoped proxy keys | Hashed in SQLite (bcrypt) |
-| Admin API tokens | Hashed in SQLite (SHA-256) |
+| bunny.net master API key | Hashed in memory only (SHA-256, never stored in DB) |
+| All tokens (admin & scoped) | Hashed in SQLite (SHA-256) |
 
-All secrets are stored as one-way hashes. The master API key hash is used only for validation during bootstrap - the actual key is never stored and must be provided via the bunny.net account.
+All secrets are stored as one-way hashes. The master API key is hashed in memory for validation during bootstrap - the actual key is never stored in the database and must be provided via environment variable.
 
 ## Logging
 
