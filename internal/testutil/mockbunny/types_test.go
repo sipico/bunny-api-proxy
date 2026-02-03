@@ -10,6 +10,7 @@ func TestNewState(t *testing.T) {
 	state := NewState()
 	if state == nil {
 		t.Fatal("NewState() returned nil")
+		return
 	}
 
 	// Verify the State has been initialized with correct values

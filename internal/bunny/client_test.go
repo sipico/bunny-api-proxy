@@ -650,6 +650,7 @@ func TestCreateZone(t *testing.T) {
 
 		if zone == nil {
 			t.Fatal("expected non-nil zone")
+			return
 		}
 
 		if zone.Domain != "example.com" {

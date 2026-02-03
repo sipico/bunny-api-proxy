@@ -151,6 +151,7 @@ func TestAddZone(t *testing.T) {
 	zone := s.GetZone(id)
 	if zone == nil {
 		t.Fatal("zone not found")
+		return
 	}
 	if zone.Domain != "example.com" {
 		t.Errorf("expected example.com, got %s", zone.Domain)
