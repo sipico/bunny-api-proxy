@@ -118,26 +118,70 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build Docker image
+      - name: Build proxy Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
+          file: Dockerfile
           push: false
           tags: bunny-api-proxy:test
+          outputs: type=docker,dest=/tmp/bunny-api-proxy.tar
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Build mockbunny Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: .claude/docker/Dockerfile.mockbunny
+          push: false
+          tags: mockbunny:test
+          outputs: type=docker,dest=/tmp/mockbunny.tar
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build test-runner Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: .claude/docker/Dockerfile.testrunner
+          push: false
+          tags: test-runner:test
+          outputs: type=docker,dest=/tmp/test-runner.tar
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Upload Docker images
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-images
+          path: |
+            /tmp/bunny-api-proxy.tar
+            /tmp/mockbunny.tar
+            /tmp/test-runner.tar
+          retention-days: 1
 
   e2e-test:
     name: E2E Tests (Mock)
     runs-on: ubuntu-latest
-    needs: [test, lint]
+    needs: [test, lint, docker]  # Wait for Docker images to be built
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Download Docker images
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-images
+          path: /tmp
+
+      - name: Load Docker images
+        run: |
+          docker load --input /tmp/bunny-api-proxy.tar
+          docker load --input /tmp/mockbunny.tar
+          docker load --input /tmp/test-runner.tar
+          docker images
 
       - name: Create test data directory
         run: |
@@ -149,11 +193,11 @@ jobs:
         run: |
           docker compose -f .claude/docker/docker-compose.test.yml --profile mock down -v || true
 
-      - name: Build and start services (Mock Mode)
+      - name: Start services (Mock Mode - using pre-built images)
         env:
           BUNNY_MASTER_API_KEY: ${{ secrets.MOCKBUNNY_API_TEST_KEY }}
         run: |
-          docker compose -f .claude/docker/docker-compose.test.yml --profile mock up -d --build
+          docker compose -f .claude/docker/docker-compose.test.yml --profile mock up -d
 
       - name: Wait for services to be healthy
         run: |
@@ -193,7 +237,7 @@ jobs:
   e2e-test-real-api:
     name: E2E Tests (Real Bunny.net API)
     runs-on: ubuntu-latest
-    needs: [test, lint, e2e-test]  # Wait for mock tests to pass first
+    needs: [test, lint, docker, e2e-test]  # Wait for docker build and mock tests to pass
     # Only run on PRs to main
     if: github.event_name == 'pull_request' && github.base_ref == 'main'
 
@@ -201,8 +245,17 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Download Docker images
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-images
+          path: /tmp
+
+      - name: Load Docker images
+        run: |
+          docker load --input /tmp/bunny-api-proxy.tar
+          docker load --input /tmp/test-runner.tar
+          docker images
 
       - name: Create test data directory
         run: |
@@ -210,13 +263,13 @@ jobs:
           mkdir -p /tmp/proxy-data
           chmod 777 /tmp/proxy-data
 
-      - name: Build and start services (Real API Mode)
+      - name: Start services (Real API Mode - using pre-built images)
         env:
           BUNNY_MASTER_API_KEY: ${{ secrets.BUNNY_API_TEST_KEY }}
           BUNNY_API_URL: ""  # Empty to use default (https://api.bunny.net)
         run: |
           # No --profile mock: skips mockbunny, only starts proxy
-          docker compose -f .claude/docker/docker-compose.test.yml up -d --build proxy
+          docker compose -f .claude/docker/docker-compose.test.yml up -d proxy
 
       - name: Wait for proxy to be healthy
         run: |

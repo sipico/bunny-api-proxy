@@ -1,6 +1,7 @@
 services:
   mockbunny:
     profiles: ["mock"]  # Only start in mock mode
+    image: mockbunny:test  # Pre-built image tag
     build:
       context: ../..
       dockerfile: .claude/docker/Dockerfile.mockbunny
@@ -17,6 +18,7 @@ services:
       start_period: 5s
 
   proxy:
+    image: bunny-api-proxy:test  # Pre-built image tag
     build:
       context: ../..
       dockerfile: Dockerfile
@@ -45,6 +47,7 @@ services:
 
   test-runner:
     profiles: ["manual"]  # Don't auto-start; only run via 'docker compose run'
+    image: test-runner:test  # Pre-built image tag
     build:
       context: ../..
       dockerfile: .claude/docker/Dockerfile.testrunner
