@@ -5,6 +5,7 @@ package e2e
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"testing"
@@ -39,6 +40,31 @@ func TestE2E_HealthCheck(t *testing.T) {
 	defer resp.Body.Close()
 
 	require.Equal(t, http.StatusOK, resp.StatusCode)
+}
+
+// TestE2E_MetricsEndpoint verifies that the Prometheus metrics endpoint is working.
+func TestE2E_MetricsEndpoint(t *testing.T) {
+	resp, err := http.Get(proxyURL + "/metrics")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	// Verify the response status code
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	// Read the response body
+	bodyBytes, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	bodyStr := string(bodyBytes)
+
+	// Verify response contains Prometheus metric names
+	require.Contains(t, bodyStr, "bunny_proxy", "response should contain bunny_proxy metric names")
+
+	// Verify response contains Prometheus format comments
+	require.Contains(t, bodyStr, "# HELP", "response should contain # HELP comments")
+	require.Contains(t, bodyStr, "# TYPE", "response should contain # TYPE comments")
+
+	// Verify response contains at least one actual metric
+	require.Contains(t, bodyStr, "bunny_proxy_", "response should contain actual bunny_proxy metrics")
 }
 
 // TestE2E_ProxyToMockbunny verifies the complete flow from proxy to mockbunny.
