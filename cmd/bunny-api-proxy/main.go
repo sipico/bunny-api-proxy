@@ -10,15 +10,18 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sipico/bunny-api-proxy/internal/admin"
 	"github.com/sipico/bunny-api-proxy/internal/auth"
 	"github.com/sipico/bunny-api-proxy/internal/bunny"
 	"github.com/sipico/bunny-api-proxy/internal/config"
+	"github.com/sipico/bunny-api-proxy/internal/metrics"
 	"github.com/sipico/bunny-api-proxy/internal/proxy"
 	"github.com/sipico/bunny-api-proxy/internal/storage"
 )
@@ -89,6 +92,18 @@ func initializeComponents(cfg *config.Config) (*serverComponents, error) {
 		"listenAddr", cfg.ListenAddr,
 	)
 
+	// Initialize Prometheus metrics
+	// Note: In tests, this may be called multiple times. We ignore duplicate registration errors
+	// since the metrics will already be registered in the global registry.
+	if err := metrics.Init(prometheus.DefaultRegisterer); err != nil {
+		// Check if this is a duplicate registration error (expected in tests)
+		if !strings.Contains(err.Error(), "duplicate metrics collector registration") {
+			return nil, fmt.Errorf("metrics initialization failed: %w", err)
+		}
+		// Log that metrics were already initialized
+		logger.Debug("Metrics already initialized")
+	}
+
 	// 3. Initialize storage
 	store, err := storage.New(cfg.DatabasePath, nil)
 	if err != nil {
@@ -126,9 +141,11 @@ func initializeComponents(cfg *config.Config) (*serverComponents, error) {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
+	r.Use(metrics.Middleware)
 
 	r.Get("/health", healthHandler)
 	r.Get("/ready", readyHandler(store))
+	r.Handle("/metrics", metrics.Handler())
 	r.Mount("/admin", adminRouter)
 	r.Mount("/", proxyRouter)
 
