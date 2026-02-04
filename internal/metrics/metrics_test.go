@@ -138,8 +138,7 @@ func TestGetMetricsTextWithInitializedRegistry(t *testing.T) {
 
 // TestRecordVariousMetrics tests recording various metrics in sequence
 func TestRecordVariousMetrics(t *testing.T) {
-	t.Parallel()
-
+	// Don't run in parallel - modifies global metrics state
 	reg := prometheus.NewRegistry()
 	if err := Init(reg); err != nil {
 		t.Fatalf("Init() failed: %v", err)

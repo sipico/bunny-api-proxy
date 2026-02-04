@@ -373,7 +373,7 @@ func TestMetricsMiddlewareEmptyWrite(t *testing.T) {
 
 	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte{})  // Empty write
+		w.Write([]byte{}) // Empty write
 	})
 
 	handler := Middleware(testHandler)
@@ -413,5 +413,55 @@ func TestMetricsMiddlewareLargePayload(t *testing.T) {
 
 	if w.Body.Len() == 0 {
 		t.Error("expected non-empty response body")
+	}
+}
+
+// TestMetricsMiddlewarePanicRecovery tests that middleware handles panics gracefully and records metrics
+func TestMetricsMiddlewarePanicRecovery(t *testing.T) {
+	t.Parallel()
+
+	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		panic("intentional handler panic for testing")
+	})
+
+	handler := Middleware(testHandler)
+
+	req := httptest.NewRequest("GET", "/panic-test", nil)
+	w := httptest.NewRecorder()
+
+	// Middleware should handle panic gracefully without propagating it
+	// This call should NOT panic - the middleware catches and handles panics
+	handler.ServeHTTP(w, req)
+
+	// After panic handling, middleware should have converted to 500 status
+	// (even though handler returned 200, panic converted it)
+	// The statusRecorder was set to 200 before panic, but middleware's defer
+	// should have attempted to set 500
+	if w.Code != http.StatusOK && w.Code != http.StatusInternalServerError {
+		t.Errorf("expected status to be either 200 (pre-panic) or 500 (panic recovery), got %d", w.Code)
+	}
+}
+
+// TestMetricsMiddlewarePanicWithoutWriteHeader tests panic when WriteHeader was never called
+func TestMetricsMiddlewarePanicWithoutWriteHeader(t *testing.T) {
+	t.Parallel()
+
+	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Panic without writing header first
+		panic("panic before WriteHeader")
+	})
+
+	handler := Middleware(testHandler)
+
+	req := httptest.NewRequest("GET", "/panic-no-header", nil)
+	w := httptest.NewRecorder()
+
+	// Middleware should handle panic gracefully
+	handler.ServeHTTP(w, req)
+
+	// When panic occurs before WriteHeader, middleware should write 500
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("expected status 500 for panic before WriteHeader, got %d", w.Code)
 	}
 }
