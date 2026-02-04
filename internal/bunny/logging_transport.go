@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/sipico/bunny-api-proxy/internal/middleware"
 )
 
 // LoggingTransport wraps an http.RoundTripper and logs all HTTP interactions.
@@ -20,6 +22,9 @@ type LoggingTransport struct {
 // RoundTrip implements http.RoundTripper interface
 func (t *LoggingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	start := time.Now()
+
+	// Extract request ID from context
+	requestID := middleware.GetRequestID(req.Context())
 
 	// Read request body
 	var reqBodyBytes []byte
@@ -45,6 +50,7 @@ func (t *LoggingTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 
 	// Log the request
 	t.Logger.Info("HTTP Request",
+		"request_id", requestID,
 		"prefix", t.Prefix,
 		"method", req.Method,
 		"url", req.URL.String(),
@@ -59,6 +65,7 @@ func (t *LoggingTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 	if err != nil {
 		// Log error
 		t.Logger.Error("HTTP request failed",
+			"request_id", requestID,
 			"prefix", t.Prefix,
 			"method", req.Method,
 			"url", req.URL.String(),
@@ -78,6 +85,7 @@ func (t *LoggingTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 
 	// Log the response
 	t.Logger.Info("HTTP Response",
+		"request_id", requestID,
 		"prefix", t.Prefix,
 		"status_code", resp.StatusCode,
 		"status", resp.Status,

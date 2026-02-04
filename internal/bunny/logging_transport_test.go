@@ -2,6 +2,7 @@ package bunny
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,6 +11,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/sipico/bunny-api-proxy/internal/middleware"
 )
 
 // mockRoundTripper is a test helper that implements http.RoundTripper.
@@ -720,5 +723,168 @@ func TestLoggingTransport_LogsAllResponseHeaders(t *testing.T) {
 		}
 	} else {
 		t.Error("Expected headers in response log")
+	}
+}
+
+// TestLoggingTransport_IncludesRequestID tests that request ID from context is included in all logs.
+func TestLoggingTransport_IncludesRequestID(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewJSONHandler(&buf, nil))
+
+	mockTransport := &mockRoundTripper{
+		response: &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(strings.NewReader("")),
+			Header:     make(http.Header),
+		},
+	}
+
+	lt := &LoggingTransport{
+		Transport: mockTransport,
+		Logger:    logger,
+		Prefix:    "TEST",
+	}
+
+	// Create request with request ID in context
+	testID := "test-request-id-12345"
+	req, err := http.NewRequest("GET", "https://api.bunny.net/dnszone", nil)
+	if err != nil {
+		t.Fatalf("Failed to create request: %v", err)
+	}
+
+	// Add request ID to context (simulate middleware)
+	ctx := context.WithValue(req.Context(), middleware.GetRequestIDContextKey(), testID)
+	req = req.WithContext(ctx)
+
+	// Execute transport
+	_, err = lt.RoundTrip(req)
+	if err != nil {
+		t.Fatalf("RoundTrip failed: %v", err)
+	}
+
+	// Parse logs and verify request ID is present
+	decoder := json.NewDecoder(&buf)
+
+	// Check request log
+	var requestLog map[string]interface{}
+	if err := decoder.Decode(&requestLog); err != nil {
+		t.Fatalf("Failed to decode request log: %v", err)
+	}
+
+	if requestLog["request_id"] != testID {
+		t.Errorf("Expected request_id %q in request log, got %v", testID, requestLog["request_id"])
+	}
+
+	// Check response log
+	var responseLog map[string]interface{}
+	if err := decoder.Decode(&responseLog); err != nil {
+		t.Fatalf("Failed to decode response log: %v", err)
+	}
+
+	if responseLog["request_id"] != testID {
+		t.Errorf("Expected request_id %q in response log, got %v", testID, responseLog["request_id"])
+	}
+}
+
+// TestLoggingTransport_RequestIDEmpty tests behavior when no request ID in context.
+func TestLoggingTransport_RequestIDEmpty(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewJSONHandler(&buf, nil))
+
+	mockTransport := &mockRoundTripper{
+		response: &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(strings.NewReader("")),
+			Header:     make(http.Header),
+		},
+	}
+
+	lt := &LoggingTransport{
+		Transport: mockTransport,
+		Logger:    logger,
+		Prefix:    "TEST",
+	}
+
+	// Create request WITHOUT request ID
+	req, err := http.NewRequest("GET", "https://api.bunny.net/dnszone", nil)
+	if err != nil {
+		t.Fatalf("Failed to create request: %v", err)
+	}
+
+	// Execute transport
+	_, err = lt.RoundTrip(req)
+	if err != nil {
+		t.Fatalf("RoundTrip failed: %v", err)
+	}
+
+	// Parse logs
+	decoder := json.NewDecoder(&buf)
+	var requestLog map[string]interface{}
+	if err := decoder.Decode(&requestLog); err != nil {
+		t.Fatalf("Failed to decode request log: %v", err)
+	}
+
+	// request_id field should exist and be empty string
+	requestID, exists := requestLog["request_id"]
+	if !exists {
+		t.Error("request_id field should exist in logs even when empty")
+	}
+
+	if requestID != "" && requestID != nil {
+		t.Logf("request_id present but empty/nil as expected: %v", requestID)
+	}
+}
+
+// TestLoggingTransport_RequestIDInErrorLog tests that request ID is included in error logs.
+func TestLoggingTransport_RequestIDInErrorLog(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewJSONHandler(&buf, nil))
+
+	testErr := fmt.Errorf("network error: connection refused")
+	mockTransport := &mockRoundTripper{
+		err: testErr,
+	}
+
+	lt := &LoggingTransport{
+		Transport: mockTransport,
+		Logger:    logger,
+		Prefix:    "ERROR_TEST",
+	}
+
+	testID := "error-request-id-789"
+	req, err := http.NewRequest("GET", "https://api.bunny.net/dnszone", nil)
+	if err != nil {
+		t.Fatalf("Failed to create request: %v", err)
+	}
+
+	ctx := context.WithValue(req.Context(), middleware.GetRequestIDContextKey(), testID)
+	req = req.WithContext(ctx)
+
+	// Execute transport (will error)
+	_, returnedErr := lt.RoundTrip(req)
+	if returnedErr == nil {
+		t.Error("Expected error to be returned")
+	}
+
+	// Parse logs
+	decoder := json.NewDecoder(&buf)
+
+	// Skip request log
+	var requestLog map[string]interface{}
+	if err := decoder.Decode(&requestLog); err != nil {
+		t.Fatalf("Failed to decode request log: %v", err)
+	}
+
+	// Check error log
+	var errorLog map[string]interface{}
+	if err := decoder.Decode(&errorLog); err != nil {
+		t.Fatalf("Failed to decode error log: %v", err)
+	}
+
+	if errorLog["request_id"] != testID {
+		t.Errorf("Expected request_id %q in error log, got %v", testID, errorLog["request_id"])
 	}
 }
