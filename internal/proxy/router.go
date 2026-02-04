@@ -2,18 +2,23 @@
 package proxy
 
 import (
+	"log/slog"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/sipico/bunny-api-proxy/internal/middleware"
 )
 
 // NewRouter creates a Chi router with all proxy endpoints.
 // The authMiddleware parameter should be auth.Middleware(validator).
-func NewRouter(handler *Handler, authMiddleware func(http.Handler) http.Handler) http.Handler {
+// The logger parameter is used for debug logging of HTTP requests/responses.
+func NewRouter(handler *Handler, authMiddleware func(http.Handler) http.Handler, logger *slog.Logger) http.Handler {
 	r := chi.NewRouter()
 
-	// Apply auth middleware to all routes
-	r.Use(authMiddleware)
+	// Apply middlewares in order
+	r.Use(middleware.RequestID)                // Add request ID first
+	r.Use(middleware.HTTPLogging(logger, nil)) // Log with no allowlist (DNS API has no secrets)
+	r.Use(authMiddleware)                      // Auth after logging
 
 	// Wire handler methods to routes
 	r.Get("/dnszone", handler.HandleListZones)
