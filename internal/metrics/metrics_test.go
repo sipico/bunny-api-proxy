@@ -135,3 +135,48 @@ func TestGetMetricsTextWithInitializedRegistry(t *testing.T) {
 		t.Errorf("No expected metrics found in Prometheus output. Output:\n%s", output)
 	}
 }
+
+// TestRecordVariousMetrics tests recording various metrics in sequence
+func TestRecordVariousMetrics(t *testing.T) {
+	t.Parallel()
+
+	reg := prometheus.NewRegistry()
+	if err := Init(reg); err != nil {
+		t.Fatalf("Init() failed: %v", err)
+	}
+
+	// Record multiple requests with different combinations
+	RecordRequest("GET", "/dnszone", "200")
+	RecordRequest("GET", "/dnszone", "200")
+	RecordRequest("POST", "/dnszone", "201")
+	RecordRequest("DELETE", "/dnszone/:id", "204")
+
+	// Record multiple durations
+	RecordRequestDuration("GET", "/dnszone", "200", 0.05)
+	RecordRequestDuration("GET", "/dnszone", "200", 0.10)
+	RecordRequestDuration("GET", "/dnszone", "200", 0.15)
+
+	// Record multiple auth failures with different reasons
+	RecordAuthFailure("invalid_key")
+	RecordAuthFailure("invalid_key")
+	RecordAuthFailure("permission_denied")
+	RecordAuthFailure("missing_key")
+
+	output, err := GetMetricsText(reg)
+	if err != nil {
+		t.Errorf("GetMetricsText() error: %v", err)
+	}
+
+	// Verify all metric types are present
+	expectedMetrics := []string{
+		"bunny_proxy_requests_total",
+		"bunny_proxy_request_duration_seconds",
+		"bunny_proxy_auth_failures_total",
+	}
+
+	for _, metricName := range expectedMetrics {
+		if !strings.Contains(output, metricName) {
+			t.Errorf("Expected metric %s not found in output", metricName)
+		}
+	}
+}

@@ -169,3 +169,249 @@ func TestMetricsMiddlewareHandlesVariousStatusCodes(t *testing.T) {
 		})
 	}
 }
+
+// TestStatusRecorderWrite tests the Write method of statusRecorder
+func TestStatusRecorderWrite(t *testing.T) {
+	t.Parallel()
+
+	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Write without calling WriteHeader - should default to 200
+		w.Write([]byte("test"))
+	})
+
+	handler := Middleware(testHandler)
+
+	req := httptest.NewRequest("GET", "/test", nil)
+	w := httptest.NewRecorder()
+
+	handler.ServeHTTP(w, req)
+
+	// Should default to 200
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status 200, got %d", w.Code)
+	}
+
+	if w.Body.String() != "test" {
+		t.Errorf("expected body 'test', got %q", w.Body.String())
+	}
+}
+
+// TestStatusRecorderMultipleWriteHeaders verifies WriteHeader is only called once
+func TestStatusRecorderMultipleWriteHeaders(t *testing.T) {
+	t.Parallel()
+
+	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		// Second WriteHeader call should be ignored
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("ok"))
+	})
+
+	handler := Middleware(testHandler)
+
+	req := httptest.NewRequest("GET", "/test", nil)
+	w := httptest.NewRecorder()
+
+	handler.ServeHTTP(w, req)
+
+	// Should be 200 (first call), not 500 (second call)
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status 200, got %d", w.Code)
+	}
+}
+
+// TestMetricsMiddlewareRootPath tests handling of root path
+func TestMetricsMiddlewareRootPath(t *testing.T) {
+	t.Parallel()
+
+	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	handler := Middleware(testHandler)
+
+	req := httptest.NewRequest("GET", "/", nil)
+	w := httptest.NewRecorder()
+
+	handler.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status 200, got %d", w.Code)
+	}
+}
+
+// TestMetricsMiddlewareWriteAfterWriteHeader tests that Write after WriteHeader works
+func TestMetricsMiddlewareWriteAfterWriteHeader(t *testing.T) {
+	t.Parallel()
+
+	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusCreated)
+		n, err := w.Write([]byte("created"))
+		if err != nil {
+			t.Errorf("unexpected write error: %v", err)
+		}
+		if n != 7 {
+			t.Errorf("expected 7 bytes written, got %d", n)
+		}
+	})
+
+	handler := Middleware(testHandler)
+
+	req := httptest.NewRequest("POST", "/create", nil)
+	w := httptest.NewRecorder()
+
+	handler.ServeHTTP(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Errorf("expected status 201, got %d", w.Code)
+	}
+
+	if w.Body.String() != "created" {
+		t.Errorf("expected body 'created', got %q", w.Body.String())
+	}
+}
+
+// TestMetricsMiddlewareComplexPath tests handling of paths with multiple segments
+func TestMetricsMiddlewareComplexPath(t *testing.T) {
+	t.Parallel()
+
+	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("response"))
+	})
+
+	handler := Middleware(testHandler)
+
+	req := httptest.NewRequest("GET", "/admin/api/tokens/123/permissions/456", nil)
+	w := httptest.NewRecorder()
+
+	handler.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status 200, got %d", w.Code)
+	}
+}
+
+// TestMetricsMiddlewareZeroStatusCode tests handling when status code is 0
+func TestMetricsMiddlewareZeroStatusCode(t *testing.T) {
+	t.Parallel()
+
+	// Handler that doesn't write a status code (defaults to 200)
+	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Don't write anything - status code stays 0, should default to 200
+	})
+
+	handler := Middleware(testHandler)
+
+	req := httptest.NewRequest("GET", "/test", nil)
+	w := httptest.NewRecorder()
+
+	handler.ServeHTTP(w, req)
+
+	// httptest.ResponseRecorder defaults to 200 when no status is written
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status 200, got %d", w.Code)
+	}
+}
+
+// TestStatusRecorderWriteAfterWriteHeader tests multiple Write calls
+func TestStatusRecorderWriteAfterWriteHeader(t *testing.T) {
+	t.Parallel()
+
+	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("hello"))
+		w.Write([]byte(" "))
+		w.Write([]byte("world"))
+	})
+
+	handler := Middleware(testHandler)
+
+	req := httptest.NewRequest("GET", "/test", nil)
+	w := httptest.NewRecorder()
+
+	handler.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status 200, got %d", w.Code)
+	}
+
+	if w.Body.String() != "hello world" {
+		t.Errorf("expected body 'hello world', got %q", w.Body.String())
+	}
+}
+
+// TestMetricsMiddlewareDifferentMethods tests various HTTP methods
+func TestMetricsMiddlewareDifferentMethods(t *testing.T) {
+	t.Parallel()
+
+	methods := []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"}
+
+	for _, method := range methods {
+		t.Run(method, func(t *testing.T) {
+			testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})
+
+			handler := Middleware(testHandler)
+
+			req := httptest.NewRequest(method, "/api/test", nil)
+			w := httptest.NewRecorder()
+
+			handler.ServeHTTP(w, req)
+
+			if w.Code != http.StatusOK {
+				t.Errorf("expected status 200 for %s, got %d", method, w.Code)
+			}
+		})
+	}
+}
+
+// TestMetricsMiddlewareEmptyWrite tests Write with empty data
+func TestMetricsMiddlewareEmptyWrite(t *testing.T) {
+	t.Parallel()
+
+	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte{})  // Empty write
+	})
+
+	handler := Middleware(testHandler)
+
+	req := httptest.NewRequest("GET", "/test", nil)
+	w := httptest.NewRecorder()
+
+	handler.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status 200, got %d", w.Code)
+	}
+}
+
+// TestMetricsMiddlewareLargePayload tests with large response payload
+func TestMetricsMiddlewareLargePayload(t *testing.T) {
+	t.Parallel()
+
+	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		// Write a large payload in multiple chunks
+		for i := 0; i < 100; i++ {
+			w.Write([]byte("data chunk "))
+		}
+	})
+
+	handler := Middleware(testHandler)
+
+	req := httptest.NewRequest("GET", "/test", nil)
+	w := httptest.NewRecorder()
+
+	handler.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status 200, got %d", w.Code)
+	}
+
+	if w.Body.Len() == 0 {
+		t.Error("expected non-empty response body")
+	}
+}
