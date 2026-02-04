@@ -120,6 +120,7 @@ func (m *mockStorageWithTokenCRUD) GetPermissionsForToken(ctx context.Context, t
 }
 
 func TestHandleSetLogLevel(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name       string
 		body       interface{}
@@ -210,6 +211,7 @@ func TestHandleSetLogLevel(t *testing.T) {
 }
 
 func TestHandleListTokens(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name       string
 		tokens     []*storage.AdminToken
@@ -297,6 +299,7 @@ func TestHandleListTokens(t *testing.T) {
 }
 
 func TestHandleCreateToken(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name       string
 		body       interface{}
@@ -405,6 +408,7 @@ func TestHandleCreateToken(t *testing.T) {
 }
 
 func TestHandleDeleteToken(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name       string
 		tokenID    string
@@ -465,6 +469,7 @@ func TestHandleDeleteToken(t *testing.T) {
 }
 
 func TestGenerateRandomKey(t *testing.T) {
+	t.Parallel()
 	// Test that generateRandomKey produces keys of correct length
 	key1 := generateRandomKey(32)
 	if len(key1) != 32 {
@@ -568,6 +573,7 @@ func newMockUnifiedStorage() *mockUnifiedStorage {
 }
 
 func TestHandleWhoami(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name       string
 		setupCtx   func(context.Context) context.Context
@@ -620,6 +626,7 @@ func TestHandleWhoami(t *testing.T) {
 }
 
 func TestHandleListUnifiedTokens(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name       string
 		tokens     []*storage.Token
@@ -683,6 +690,7 @@ func TestHandleListUnifiedTokens(t *testing.T) {
 }
 
 func TestHandleCreateUnifiedToken(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name          string
 		body          interface{}
@@ -857,6 +865,7 @@ func TestHandleCreateUnifiedToken(t *testing.T) {
 }
 
 func TestHandleGetUnifiedToken(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name        string
 		tokenID     string
@@ -941,6 +950,7 @@ func TestHandleGetUnifiedToken(t *testing.T) {
 }
 
 func TestHandleDeleteUnifiedToken(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name       string
 		tokenID    string
@@ -1055,6 +1065,7 @@ func TestHandleDeleteUnifiedToken(t *testing.T) {
 }
 
 func TestHandleAddTokenPermission(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name       string
 		tokenID    string
@@ -1206,6 +1217,7 @@ func TestHandleAddTokenPermission(t *testing.T) {
 }
 
 func TestHandleDeleteTokenPermission(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name       string
 		tokenID    string

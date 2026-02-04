@@ -8,6 +8,7 @@ import (
 )
 
 func TestWriteError(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name       string
 		status     int
@@ -103,6 +104,7 @@ func TestWriteError(t *testing.T) {
 }
 
 func TestWriteErrorWithHint(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name       string
 		status     int
@@ -193,6 +195,7 @@ func TestWriteErrorWithHint(t *testing.T) {
 }
 
 func TestWriteErrorWithHintOmitsEmptyHint(t *testing.T) {
+	t.Parallel()
 	rec := httptest.NewRecorder()
 	WriteErrorWithHint(rec, http.StatusBadRequest, ErrCodeInvalidRequest, "Test message", "")
 
@@ -210,6 +213,7 @@ func TestWriteErrorWithHintOmitsEmptyHint(t *testing.T) {
 }
 
 func TestErrorCodeConstants(t *testing.T) {
+	t.Parallel()
 	// Verify error code constants are defined correctly
 	codes := map[string]string{
 		"ErrCodeInvalidRequest":        ErrCodeInvalidRequest,
