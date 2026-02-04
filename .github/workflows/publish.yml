@@ -50,7 +50,7 @@ jobs:
         run: mkdir -p ci-build/proxy
 
       - name: Download binary artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: bunny-api-proxy
           path: ci-build/proxy
