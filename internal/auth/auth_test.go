@@ -8,6 +8,7 @@ import (
 
 // TestGetPermittedZoneIDs_SpecificZones tests extracting specific zone IDs.
 func TestGetPermittedZoneIDs_SpecificZones(t *testing.T) {
+	t.Parallel()
 	keyInfo := &KeyInfo{
 		KeyID:   1,
 		KeyName: "test-key",
@@ -44,6 +45,7 @@ func TestGetPermittedZoneIDs_SpecificZones(t *testing.T) {
 
 // TestGetPermittedZoneIDs_AllZones tests that ZoneID=0 returns nil (all zones).
 func TestGetPermittedZoneIDs_AllZones(t *testing.T) {
+	t.Parallel()
 	keyInfo := &KeyInfo{
 		KeyID:   1,
 		KeyName: "test-key",
@@ -62,6 +64,7 @@ func TestGetPermittedZoneIDs_AllZones(t *testing.T) {
 
 // TestGetPermittedZoneIDs_NilKeyInfo tests handling of nil KeyInfo.
 func TestGetPermittedZoneIDs_NilKeyInfo(t *testing.T) {
+	t.Parallel()
 	zones := GetPermittedZoneIDs(nil)
 
 	if zones != nil {
@@ -71,6 +74,7 @@ func TestGetPermittedZoneIDs_NilKeyInfo(t *testing.T) {
 
 // TestGetPermittedZoneIDs_EmptyPermissions tests empty permissions list.
 func TestGetPermittedZoneIDs_EmptyPermissions(t *testing.T) {
+	t.Parallel()
 	keyInfo := &KeyInfo{
 		KeyID:       1,
 		KeyName:     "test-key",
@@ -90,6 +94,7 @@ func TestGetPermittedZoneIDs_EmptyPermissions(t *testing.T) {
 
 // TestHasAllZonesPermission tests detection of all zones permission.
 func TestHasAllZonesPermission(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name     string
 		keyInfo  *KeyInfo
@@ -148,6 +153,7 @@ func TestHasAllZonesPermission(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			result := HasAllZonesPermission(tc.keyInfo)
 			if result != tc.expected {
 				t.Errorf("expected %v, got %v", tc.expected, result)
@@ -158,6 +164,7 @@ func TestHasAllZonesPermission(t *testing.T) {
 
 // TestIsRecordTypePermitted_Allowed tests allowing specific record types.
 func TestIsRecordTypePermitted_Allowed(t *testing.T) {
+	t.Parallel()
 	keyInfo := &KeyInfo{
 		KeyID:   1,
 		KeyName: "test-key",
@@ -187,6 +194,7 @@ func TestIsRecordTypePermitted_Allowed(t *testing.T) {
 
 // TestIsRecordTypePermitted_AllTypes tests allowing all record types.
 func TestIsRecordTypePermitted_AllTypes(t *testing.T) {
+	t.Parallel()
 	keyInfo := &KeyInfo{
 		KeyID:   1,
 		KeyName: "test-key",
@@ -216,6 +224,7 @@ func TestIsRecordTypePermitted_AllTypes(t *testing.T) {
 
 // TestIsRecordTypePermitted_WildcardZone tests wildcard zone (ZoneID=0).
 func TestIsRecordTypePermitted_WildcardZone(t *testing.T) {
+	t.Parallel()
 	keyInfo := &KeyInfo{
 		KeyID:   1,
 		KeyName: "test-key",
@@ -246,6 +255,7 @@ func TestIsRecordTypePermitted_WildcardZone(t *testing.T) {
 
 // TestIsRecordTypePermitted_NoPermission tests when zone has no permission.
 func TestIsRecordTypePermitted_NoPermission(t *testing.T) {
+	t.Parallel()
 	keyInfo := &KeyInfo{
 		KeyID:   1,
 		KeyName: "test-key",
@@ -267,6 +277,7 @@ func TestIsRecordTypePermitted_NoPermission(t *testing.T) {
 
 // TestGetPermittedRecordTypes tests getting record types for a zone.
 func TestGetPermittedRecordTypes(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name      string
 		keyInfo   *KeyInfo
@@ -357,6 +368,7 @@ func TestGetPermittedRecordTypes(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			result := GetPermittedRecordTypes(tc.keyInfo, tc.zoneID)
 
 			if tc.expectNil && result != nil {

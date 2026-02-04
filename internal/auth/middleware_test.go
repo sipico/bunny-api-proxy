@@ -117,6 +117,7 @@ func (m *authTestTokenStore) addToken(id int64, name string, isAdmin bool, plain
 // --- Context helper tests ---
 
 func TestTokenFromContext(t *testing.T) {
+	t.Parallel()
 	token := &storage.Token{ID: 42, Name: "test-token", IsAdmin: false}
 	ctx := withToken(context.Background(), token)
 
@@ -134,6 +135,7 @@ func TestTokenFromContext(t *testing.T) {
 }
 
 func TestTokenFromContext_NotSet(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	got := TokenFromContext(ctx)
 	if got != nil {
@@ -142,6 +144,7 @@ func TestTokenFromContext_NotSet(t *testing.T) {
 }
 
 func TestPermissionsFromContext(t *testing.T) {
+	t.Parallel()
 	perms := []*storage.Permission{
 		{ID: 1, ZoneID: 100, AllowedActions: []string{"list_records"}},
 	}
@@ -157,6 +160,7 @@ func TestPermissionsFromContext(t *testing.T) {
 }
 
 func TestPermissionsFromContext_NotSet(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	got := PermissionsFromContext(ctx)
 	if got != nil {
@@ -165,6 +169,7 @@ func TestPermissionsFromContext_NotSet(t *testing.T) {
 }
 
 func TestIsMasterKeyFromContext(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		setValue bool
@@ -176,6 +181,7 @@ func TestIsMasterKeyFromContext(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			ctx := withMasterKey(context.Background(), tt.setValue)
 			got := IsMasterKeyFromContext(ctx)
 			if got != tt.want {
@@ -186,6 +192,7 @@ func TestIsMasterKeyFromContext(t *testing.T) {
 }
 
 func TestIsMasterKeyFromContext_NotSet(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	got := IsMasterKeyFromContext(ctx)
 	if got != false {
@@ -194,6 +201,7 @@ func TestIsMasterKeyFromContext_NotSet(t *testing.T) {
 }
 
 func TestIsAdminFromContext(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		setValue bool
@@ -205,6 +213,7 @@ func TestIsAdminFromContext(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			ctx := withAdmin(context.Background(), tt.setValue)
 			got := IsAdminFromContext(ctx)
 			if got != tt.want {
@@ -215,6 +224,7 @@ func TestIsAdminFromContext(t *testing.T) {
 }
 
 func TestIsAdminFromContext_NotSet(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	got := IsAdminFromContext(ctx)
 	if got != false {
@@ -225,6 +235,7 @@ func TestIsAdminFromContext_NotSet(t *testing.T) {
 // --- AuthMiddleware tests ---
 
 func TestAuthMiddleware_MissingAccessKey(t *testing.T) {
+	t.Parallel()
 	tokenStore := newAuthTestTokenStore()
 	bootstrap := NewBootstrapService(tokenStore, "master-key")
 	middleware := NewAuthenticator(tokenStore, bootstrap)
@@ -252,6 +263,7 @@ func TestAuthMiddleware_MissingAccessKey(t *testing.T) {
 }
 
 func TestAuthMiddleware_MasterKey_UnconfiguredState(t *testing.T) {
+	t.Parallel()
 	tokenStore := newAuthTestTokenStore()
 	tokenStore.hasAdminToken = false // UNCONFIGURED state
 	bootstrap := NewBootstrapService(tokenStore, "master-key")
@@ -282,6 +294,7 @@ func TestAuthMiddleware_MasterKey_UnconfiguredState(t *testing.T) {
 }
 
 func TestAuthMiddleware_MasterKey_ConfiguredState(t *testing.T) {
+	t.Parallel()
 	tokenStore := newAuthTestTokenStore()
 	tokenStore.hasAdminToken = true // CONFIGURED state - master key locked out
 	bootstrap := NewBootstrapService(tokenStore, "master-key")
@@ -311,6 +324,7 @@ func TestAuthMiddleware_MasterKey_ConfiguredState(t *testing.T) {
 }
 
 func TestAuthMiddleware_AdminToken(t *testing.T) {
+	t.Parallel()
 	tokenStore := newAuthTestTokenStore()
 	tokenStore.hasAdminToken = true
 	tokenStore.addToken(1, "admin-token", true, "admin-key")
@@ -350,6 +364,7 @@ func TestAuthMiddleware_AdminToken(t *testing.T) {
 }
 
 func TestAuthMiddleware_ScopedToken(t *testing.T) {
+	t.Parallel()
 	tokenStore := newAuthTestTokenStore()
 	tokenStore.hasAdminToken = true
 	token := tokenStore.addToken(2, "scoped-token", false, "scoped-key")
@@ -397,6 +412,7 @@ func TestAuthMiddleware_ScopedToken(t *testing.T) {
 }
 
 func TestAuthMiddleware_InvalidToken(t *testing.T) {
+	t.Parallel()
 	tokenStore := newAuthTestTokenStore()
 	tokenStore.hasAdminToken = true
 	bootstrap := NewBootstrapService(tokenStore, "master-key")
@@ -426,6 +442,7 @@ func TestAuthMiddleware_InvalidToken(t *testing.T) {
 }
 
 func TestAuthMiddleware_BootstrapServiceError(t *testing.T) {
+	t.Parallel()
 	tokenStore := newAuthTestTokenStore()
 	tokenStore.hasAdminErr = errors.New("database error")
 	bootstrap := NewBootstrapService(tokenStore, "master-key")
@@ -447,6 +464,7 @@ func TestAuthMiddleware_BootstrapServiceError(t *testing.T) {
 }
 
 func TestAuthMiddleware_TokenStoreError(t *testing.T) {
+	t.Parallel()
 	tokenStore := newAuthTestTokenStore()
 	tokenStore.hasAdminToken = true
 	tokenStore.getByHashErr = errors.New("database error")
@@ -469,6 +487,7 @@ func TestAuthMiddleware_TokenStoreError(t *testing.T) {
 }
 
 func TestAuthMiddleware_PermissionsLoadError(t *testing.T) {
+	t.Parallel()
 	tokenStore := newAuthTestTokenStore()
 	tokenStore.hasAdminToken = true
 	tokenStore.addToken(1, "scoped-token", false, "scoped-key")
@@ -494,6 +513,7 @@ func TestAuthMiddleware_PermissionsLoadError(t *testing.T) {
 // --- RequireAdmin middleware tests ---
 
 func TestRequireAdmin_AdminUser(t *testing.T) {
+	t.Parallel()
 	tokenStore := newAuthTestTokenStore()
 	bootstrap := NewBootstrapService(tokenStore, "master-key")
 	middleware := NewAuthenticator(tokenStore, bootstrap)
@@ -520,6 +540,7 @@ func TestRequireAdmin_AdminUser(t *testing.T) {
 }
 
 func TestRequireAdmin_NonAdminUser(t *testing.T) {
+	t.Parallel()
 	tokenStore := newAuthTestTokenStore()
 	bootstrap := NewBootstrapService(tokenStore, "master-key")
 	middleware := NewAuthenticator(tokenStore, bootstrap)
@@ -552,6 +573,7 @@ func TestRequireAdmin_NonAdminUser(t *testing.T) {
 }
 
 func TestRequireAdmin_NoContextValue(t *testing.T) {
+	t.Parallel()
 	tokenStore := newAuthTestTokenStore()
 	bootstrap := NewBootstrapService(tokenStore, "master-key")
 	middleware := NewAuthenticator(tokenStore, bootstrap)
@@ -573,6 +595,7 @@ func TestRequireAdmin_NoContextValue(t *testing.T) {
 // --- Legacy Middleware tests (keep for backward compatibility) ---
 
 func TestMiddleware_MissingAuth(t *testing.T) {
+	t.Parallel()
 	mockStorage := &mockStorage{}
 	validator := &Validator{storage: mockStorage}
 	handler := Middleware(validator)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -598,6 +621,7 @@ func TestMiddleware_MissingAuth(t *testing.T) {
 }
 
 func TestMiddleware_MissingAccessKey(t *testing.T) {
+	t.Parallel()
 	mockStorage := &mockStorage{}
 	validator := &Validator{storage: mockStorage}
 	handler := Middleware(validator)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -616,6 +640,7 @@ func TestMiddleware_MissingAccessKey(t *testing.T) {
 }
 
 func TestMiddleware_InvalidAPIKey(t *testing.T) {
+	t.Parallel()
 	mockStorage := &mockStorage{}
 	validator := &Validator{storage: mockStorage}
 	handler := Middleware(validator)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -642,6 +667,7 @@ func TestMiddleware_InvalidAPIKey(t *testing.T) {
 }
 
 func TestMiddleware_ListZonesNoAuth(t *testing.T) {
+	t.Parallel()
 	mockStorage := &mockStorage{}
 	validator := &Validator{storage: mockStorage}
 	handler := Middleware(validator)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -659,6 +685,7 @@ func TestMiddleware_ListZonesNoAuth(t *testing.T) {
 }
 
 func TestMiddleware_ValidatorInternalError(t *testing.T) {
+	t.Parallel()
 	mockStorage := &mockStorage{listErr: context.DeadlineExceeded}
 	validator := &Validator{storage: mockStorage}
 	handler := Middleware(validator)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -685,6 +712,7 @@ func TestMiddleware_ValidatorInternalError(t *testing.T) {
 }
 
 func TestGetKeyInfo_ReturnsCorrectValue(t *testing.T) {
+	t.Parallel()
 	keyInfo := &KeyInfo{KeyID: 42, KeyName: "test-key"}
 	ctx := context.WithValue(context.Background(), KeyInfoContextKey, keyInfo)
 
@@ -702,6 +730,7 @@ func TestGetKeyInfo_ReturnsCorrectValue(t *testing.T) {
 }
 
 func TestGetKeyInfo_ReturnsNilWhenNotInContext(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	got := GetKeyInfo(ctx)
 
@@ -711,6 +740,7 @@ func TestGetKeyInfo_ReturnsNilWhenNotInContext(t *testing.T) {
 }
 
 func TestGetKeyInfo_MultipleContextValues(t *testing.T) {
+	t.Parallel()
 	keyInfo := &KeyInfo{KeyID: 1, KeyName: "key1"}
 	ctx := context.WithValue(context.Background(), contextKey("other"), "value")
 	ctx = context.WithValue(ctx, KeyInfoContextKey, keyInfo)
@@ -723,6 +753,7 @@ func TestGetKeyInfo_MultipleContextValues(t *testing.T) {
 }
 
 func TestExtractAccessKey_ValidKey(t *testing.T) {
+	t.Parallel()
 	req := httptest.NewRequest("GET", "/dnszone", nil)
 	req.Header.Set("AccessKey", "mytoken123")
 
@@ -734,6 +765,7 @@ func TestExtractAccessKey_ValidKey(t *testing.T) {
 }
 
 func TestExtractAccessKey_WithWhitespace(t *testing.T) {
+	t.Parallel()
 	req := httptest.NewRequest("GET", "/dnszone", nil)
 	req.Header.Set("AccessKey", "  mytoken123  ")
 
@@ -745,6 +777,7 @@ func TestExtractAccessKey_WithWhitespace(t *testing.T) {
 }
 
 func TestExtractAccessKey_NoHeader(t *testing.T) {
+	t.Parallel()
 	req := httptest.NewRequest("GET", "/dnszone", nil)
 
 	token := extractAccessKey(req)
@@ -755,6 +788,7 @@ func TestExtractAccessKey_NoHeader(t *testing.T) {
 }
 
 func TestExtractAccessKey_EmptyHeader(t *testing.T) {
+	t.Parallel()
 	req := httptest.NewRequest("GET", "/dnszone", nil)
 	req.Header.Set("AccessKey", "")
 
@@ -766,6 +800,7 @@ func TestExtractAccessKey_EmptyHeader(t *testing.T) {
 }
 
 func TestExtractAccessKey_SpecialChars(t *testing.T) {
+	t.Parallel()
 	req := httptest.NewRequest("GET", "/dnszone", nil)
 	req.Header.Set("AccessKey", "token-with-special!@#$%")
 
@@ -778,6 +813,7 @@ func TestExtractAccessKey_SpecialChars(t *testing.T) {
 }
 
 func TestExtractAccessKey_LongKey(t *testing.T) {
+	t.Parallel()
 	longKey := ""
 	for i := 0; i < 50; i++ {
 		longKey += "abcdefghij"
@@ -793,6 +829,7 @@ func TestExtractAccessKey_LongKey(t *testing.T) {
 }
 
 func TestWriteJSONError_Unauthorized(t *testing.T) {
+	t.Parallel()
 	rec := httptest.NewRecorder()
 
 	writeJSONError(rec, http.StatusUnauthorized, "invalid API key")
@@ -816,6 +853,7 @@ func TestWriteJSONError_Unauthorized(t *testing.T) {
 }
 
 func TestWriteJSONError_Forbidden(t *testing.T) {
+	t.Parallel()
 	rec := httptest.NewRecorder()
 
 	writeJSONError(rec, http.StatusForbidden, "permission denied")
@@ -834,6 +872,7 @@ func TestWriteJSONError_Forbidden(t *testing.T) {
 }
 
 func TestWriteJSONError_InternalServerError(t *testing.T) {
+	t.Parallel()
 	rec := httptest.NewRecorder()
 
 	writeJSONError(rec, http.StatusInternalServerError, "internal error")
@@ -852,6 +891,7 @@ func TestWriteJSONError_InternalServerError(t *testing.T) {
 }
 
 func TestWriteJSONError_BadRequest(t *testing.T) {
+	t.Parallel()
 	rec := httptest.NewRecorder()
 
 	writeJSONError(rec, http.StatusBadRequest, "bad request")
@@ -870,6 +910,7 @@ func TestWriteJSONError_BadRequest(t *testing.T) {
 }
 
 func TestWriteJSONError_ContentType(t *testing.T) {
+	t.Parallel()
 	rec := httptest.NewRecorder()
 	writeJSONError(rec, http.StatusOK, "test")
 
@@ -879,6 +920,7 @@ func TestWriteJSONError_ContentType(t *testing.T) {
 }
 
 func TestWriteJSONErrorWithCode(t *testing.T) {
+	t.Parallel()
 	rec := httptest.NewRecorder()
 
 	writeJSONErrorWithCode(rec, http.StatusForbidden, "admin_required", "This endpoint requires an admin token.")
@@ -900,6 +942,7 @@ func TestWriteJSONErrorWithCode(t *testing.T) {
 }
 
 func TestParseRequest_ListZones(t *testing.T) {
+	t.Parallel()
 	req := httptest.NewRequest("GET", "/dnszone", nil)
 	parsed, err := ParseRequest(req)
 
@@ -913,6 +956,7 @@ func TestParseRequest_ListZones(t *testing.T) {
 }
 
 func TestParseRequest_ListZonesTrailingSlash(t *testing.T) {
+	t.Parallel()
 	req := httptest.NewRequest("GET", "/dnszone/", nil)
 	parsed, err := ParseRequest(req)
 
@@ -926,6 +970,7 @@ func TestParseRequest_ListZonesTrailingSlash(t *testing.T) {
 }
 
 func TestParseRequest_GetZone(t *testing.T) {
+	t.Parallel()
 	req := httptest.NewRequest("GET", "/dnszone/456", nil)
 	parsed, err := ParseRequest(req)
 
@@ -942,6 +987,7 @@ func TestParseRequest_GetZone(t *testing.T) {
 }
 
 func TestParseRequest_ListRecords(t *testing.T) {
+	t.Parallel()
 	req := httptest.NewRequest("GET", "/dnszone/789/records", nil)
 	parsed, err := ParseRequest(req)
 
@@ -958,6 +1004,7 @@ func TestParseRequest_ListRecords(t *testing.T) {
 }
 
 func TestParseRequest_AddRecord(t *testing.T) {
+	t.Parallel()
 	body := `{"Type":3,"Name":"test","Value":"hello"}`
 	req := httptest.NewRequest("POST", "/dnszone/123/records", bytes.NewReader([]byte(body)))
 	parsed, err := ParseRequest(req)
@@ -978,6 +1025,7 @@ func TestParseRequest_AddRecord(t *testing.T) {
 }
 
 func TestParseRequest_DeleteRecord(t *testing.T) {
+	t.Parallel()
 	req := httptest.NewRequest("DELETE", "/dnszone/111/records/222", nil)
 	parsed, err := ParseRequest(req)
 
@@ -994,6 +1042,7 @@ func TestParseRequest_DeleteRecord(t *testing.T) {
 }
 
 func TestParseRequest_InvalidEndpoint(t *testing.T) {
+	t.Parallel()
 	req := httptest.NewRequest("GET", "/invalid/endpoint", nil)
 	_, err := ParseRequest(req)
 
@@ -1003,6 +1052,7 @@ func TestParseRequest_InvalidEndpoint(t *testing.T) {
 }
 
 func TestParseRequest_InvalidMethod(t *testing.T) {
+	t.Parallel()
 	req := httptest.NewRequest("PUT", "/dnszone/123", nil)
 	_, err := ParseRequest(req)
 
@@ -1012,6 +1062,7 @@ func TestParseRequest_InvalidMethod(t *testing.T) {
 }
 
 func TestContextKeyString(t *testing.T) {
+	t.Parallel()
 	var key contextKey = "test"
 	if string(key) != "test" {
 		t.Error("contextKey should be convertible to string")
@@ -1019,6 +1070,7 @@ func TestContextKeyString(t *testing.T) {
 }
 
 func TestMiddleware_RespondsWithJSON(t *testing.T) {
+	t.Parallel()
 	mockStorage := &mockStorage{}
 	validator := &Validator{storage: mockStorage}
 	handler := Middleware(validator)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -1042,6 +1094,7 @@ func TestMiddleware_RespondsWithJSON(t *testing.T) {
 }
 
 func TestMiddleware_ParseRequestErrorPath(t *testing.T) {
+	t.Parallel()
 	mockStorage := &mockStorage{}
 	validator := &Validator{storage: mockStorage}
 
@@ -1087,6 +1140,7 @@ func TestMiddleware_ParseRequestErrorPath(t *testing.T) {
 }
 
 func TestMiddleware_PermissionDeniedPath(t *testing.T) {
+	t.Parallel()
 	mockStorage := &mockStorage{}
 	validator := &Validator{storage: mockStorage}
 
@@ -1139,6 +1193,7 @@ func TestMiddleware_PermissionDeniedPath(t *testing.T) {
 }
 
 func TestMiddleware_SuccessfulFlow(t *testing.T) {
+	t.Parallel()
 	// Test the full happy path through middleware
 	mockStorage := &mockStorage{}
 	validator := &Validator{storage: mockStorage}
@@ -1173,6 +1228,7 @@ func TestMiddleware_SuccessfulFlow(t *testing.T) {
 }
 
 func TestMiddleware_AccessKeyWithSpecialChars(t *testing.T) {
+	t.Parallel()
 	mockStorage := &mockStorage{}
 	validator := &Validator{storage: mockStorage}
 	handler := Middleware(validator)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -1200,6 +1256,7 @@ func TestMiddleware_AccessKeyWithSpecialChars(t *testing.T) {
 }
 
 func TestMiddleware_MultipleAuthorizationHeaders(t *testing.T) {
+	t.Parallel()
 	mockStorage := &mockStorage{}
 	validator := &Validator{storage: mockStorage}
 	handler := Middleware(validator)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -1220,6 +1277,7 @@ func TestMiddleware_MultipleAuthorizationHeaders(t *testing.T) {
 }
 
 func TestMiddleware_LargeAuthorizationHeader(t *testing.T) {
+	t.Parallel()
 	mockStorage := &mockStorage{}
 	validator := &Validator{storage: mockStorage}
 	handler := Middleware(validator)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -1253,6 +1311,7 @@ func TestMiddleware_LargeAuthorizationHeader(t *testing.T) {
 
 // Test actual middleware with invalid path (covers ParseRequest error lines 38-42)
 func TestMiddleware_InvalidPath(t *testing.T) {
+	t.Parallel()
 	// Create valid key that will pass validation
 	key := storage.ScopedKey{
 		ID:      1,
@@ -1281,6 +1340,7 @@ func TestMiddleware_InvalidPath(t *testing.T) {
 
 // Test actual middleware with forbidden access (covers CheckPermission error lines 45-48)
 func TestMiddleware_ForbiddenAccess(t *testing.T) {
+	t.Parallel()
 	// Create valid key with no permissions for zone 999
 	key := storage.ScopedKey{
 		ID:      1,
@@ -1311,6 +1371,7 @@ func TestMiddleware_ForbiddenAccess(t *testing.T) {
 
 // Test successful request (covers context lines 51-52 and next.ServeHTTP)
 func TestMiddleware_SuccessfulRequest(t *testing.T) {
+	t.Parallel()
 	// Create valid key with proper permissions
 	key := storage.ScopedKey{
 		ID:      1,
@@ -1355,6 +1416,7 @@ func TestMiddleware_SuccessfulRequest(t *testing.T) {
 // --- Additional tests for new context functionality ---
 
 func TestContextHelpers_MultipleValues(t *testing.T) {
+	t.Parallel()
 	// Test setting multiple context values
 	token := &storage.Token{ID: 1, Name: "test"}
 	perms := []*storage.Permission{{ID: 1, ZoneID: 100}}
@@ -1381,6 +1443,7 @@ func TestContextHelpers_MultipleValues(t *testing.T) {
 }
 
 func TestNewAuthenticator(t *testing.T) {
+	t.Parallel()
 	tokenStore := newAuthTestTokenStore()
 	bootstrap := NewBootstrapService(tokenStore, "master-key")
 	middleware := NewAuthenticator(tokenStore, bootstrap)
@@ -1400,6 +1463,7 @@ func TestNewAuthenticator(t *testing.T) {
 // --- CheckPermissions middleware tests ---
 
 func TestCheckPermissions_AdminBypass(t *testing.T) {
+	t.Parallel()
 	tokenStore := newAuthTestTokenStore()
 	bootstrap := NewBootstrapService(tokenStore, "master-key")
 	authenticator := NewAuthenticator(tokenStore, bootstrap)
@@ -1426,6 +1490,7 @@ func TestCheckPermissions_AdminBypass(t *testing.T) {
 }
 
 func TestCheckPermissions_MasterKeyBypass(t *testing.T) {
+	t.Parallel()
 	tokenStore := newAuthTestTokenStore()
 	bootstrap := NewBootstrapService(tokenStore, "master-key")
 	authenticator := NewAuthenticator(tokenStore, bootstrap)
@@ -1453,6 +1518,7 @@ func TestCheckPermissions_MasterKeyBypass(t *testing.T) {
 }
 
 func TestCheckPermissions_ValidPermissions(t *testing.T) {
+	t.Parallel()
 	tokenStore := newAuthTestTokenStore()
 	bootstrap := NewBootstrapService(tokenStore, "master-key")
 	authenticator := NewAuthenticator(tokenStore, bootstrap)
@@ -1494,6 +1560,7 @@ func TestCheckPermissions_ValidPermissions(t *testing.T) {
 }
 
 func TestCheckPermissions_MissingZonePermission(t *testing.T) {
+	t.Parallel()
 	tokenStore := newAuthTestTokenStore()
 	bootstrap := NewBootstrapService(tokenStore, "master-key")
 	authenticator := NewAuthenticator(tokenStore, bootstrap)
@@ -1538,6 +1605,7 @@ func TestCheckPermissions_MissingZonePermission(t *testing.T) {
 }
 
 func TestCheckPermissions_MissingActionPermission(t *testing.T) {
+	t.Parallel()
 	tokenStore := newAuthTestTokenStore()
 	bootstrap := NewBootstrapService(tokenStore, "master-key")
 	authenticator := NewAuthenticator(tokenStore, bootstrap)
@@ -1574,6 +1642,7 @@ func TestCheckPermissions_MissingActionPermission(t *testing.T) {
 }
 
 func TestCheckPermissions_MissingRecordTypePermission(t *testing.T) {
+	t.Parallel()
 	tokenStore := newAuthTestTokenStore()
 	bootstrap := NewBootstrapService(tokenStore, "master-key")
 	authenticator := NewAuthenticator(tokenStore, bootstrap)
@@ -1611,6 +1680,7 @@ func TestCheckPermissions_MissingRecordTypePermission(t *testing.T) {
 }
 
 func TestCheckPermissions_ParseRequestError(t *testing.T) {
+	t.Parallel()
 	tokenStore := newAuthTestTokenStore()
 	bootstrap := NewBootstrapService(tokenStore, "master-key")
 	authenticator := NewAuthenticator(tokenStore, bootstrap)
@@ -1640,6 +1710,7 @@ func TestCheckPermissions_ParseRequestError(t *testing.T) {
 }
 
 func TestCheckPermissions_EmptyPermissions(t *testing.T) {
+	t.Parallel()
 	tokenStore := newAuthTestTokenStore()
 	bootstrap := NewBootstrapService(tokenStore, "master-key")
 	authenticator := NewAuthenticator(tokenStore, bootstrap)
@@ -1669,6 +1740,7 @@ func TestCheckPermissions_EmptyPermissions(t *testing.T) {
 }
 
 func TestCheckPermissions_NilPermissions(t *testing.T) {
+	t.Parallel()
 	tokenStore := newAuthTestTokenStore()
 	bootstrap := NewBootstrapService(tokenStore, "master-key")
 	authenticator := NewAuthenticator(tokenStore, bootstrap)
@@ -1698,6 +1770,7 @@ func TestCheckPermissions_NilPermissions(t *testing.T) {
 }
 
 func TestCheckPermissions_NoToken(t *testing.T) {
+	t.Parallel()
 	tokenStore := newAuthTestTokenStore()
 	bootstrap := NewBootstrapService(tokenStore, "master-key")
 	authenticator := NewAuthenticator(tokenStore, bootstrap)
