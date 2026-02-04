@@ -52,3 +52,9 @@ func GetRequestID(ctx context.Context) string {
 	}
 	return id
 }
+
+// GetRequestIDContextKey returns the context key used for storing request IDs.
+// This is primarily useful for testing purposes.
+func GetRequestIDContextKey() contextKey {
+	return requestIDKey
+}
