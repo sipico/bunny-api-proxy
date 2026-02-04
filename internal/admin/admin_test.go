@@ -11,6 +11,7 @@ import (
 
 // TestNewHandler tests the NewHandler function with various configurations
 func TestNewHandler(t *testing.T) {
+	t.Parallel()
 	t.Run("with all parameters", func(t *testing.T) {
 		logLevel := new(slog.LevelVar)
 		logger := slog.New(slog.NewTextHandler(io.Discard, nil))
@@ -149,6 +150,7 @@ func (m *mockStorageForAdminTest) GetPermissionsForToken(ctx context.Context, to
 
 // TestContextHelpers tests the context helper functions
 func TestContextHelpers(t *testing.T) {
+	t.Parallel()
 	t.Run("WithTokenInfo and GetTokenInfo", func(t *testing.T) {
 		ctx := context.Background()
 		info := map[string]string{"token": "test-token"}

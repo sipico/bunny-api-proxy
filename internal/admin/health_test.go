@@ -119,6 +119,7 @@ func (f *failingWriter) Write([]byte) (int, error) {
 func (f *failingWriter) WriteHeader(int) {}
 
 func TestHandleHealth(t *testing.T) {
+	t.Parallel()
 	// Test case 1: Returns 200 OK with status
 	h := NewHandler(&mockStorage{}, new(slog.LevelVar), slog.Default())
 
@@ -147,6 +148,7 @@ func TestHandleHealth(t *testing.T) {
 }
 
 func TestHandleReady(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name       string
 		storage    Storage
@@ -193,6 +195,7 @@ func TestHandleReady(t *testing.T) {
 }
 
 func TestNewRouter(t *testing.T) {
+	t.Parallel()
 	h := NewHandler(&mockStorage{}, new(slog.LevelVar), slog.Default())
 	router := h.NewRouter()
 
@@ -223,6 +226,7 @@ func TestNewRouter(t *testing.T) {
 }
 
 func TestHandleHealthEncodingError(t *testing.T) {
+	t.Parallel()
 	h := NewHandler(&mockStorage{}, new(slog.LevelVar), slog.Default())
 
 	req := httptest.NewRequest("GET", "/health", nil)
@@ -233,6 +237,7 @@ func TestHandleHealthEncodingError(t *testing.T) {
 }
 
 func TestHandleReadyStorageNilEncodingError(t *testing.T) {
+	t.Parallel()
 	h := NewHandler(nil, new(slog.LevelVar), slog.Default())
 
 	req := httptest.NewRequest("GET", "/ready", nil)
@@ -243,6 +248,7 @@ func TestHandleReadyStorageNilEncodingError(t *testing.T) {
 }
 
 func TestHandleReadyStorageConnectedEncodingError(t *testing.T) {
+	t.Parallel()
 	h := NewHandler(&mockStorage{}, new(slog.LevelVar), slog.Default())
 
 	req := httptest.NewRequest("GET", "/ready", nil)

@@ -28,7 +28,9 @@ func (mt *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 
 // TestListZones tests the ListZones method with various scenarios.
 func TestListZones(t *testing.T) {
+	t.Parallel()
 	t.Run("success with zones", func(t *testing.T) {
+		t.Parallel()
 		server := mockbunny.New()
 		defer server.Close()
 
@@ -48,6 +50,7 @@ func TestListZones(t *testing.T) {
 	})
 
 	t.Run("success empty list", func(t *testing.T) {
+		t.Parallel()
 		server := mockbunny.New()
 		defer server.Close()
 
@@ -63,6 +66,7 @@ func TestListZones(t *testing.T) {
 	})
 
 	t.Run("with search filter", func(t *testing.T) {
+		t.Parallel()
 		server := mockbunny.New()
 		defer server.Close()
 
@@ -84,6 +88,7 @@ func TestListZones(t *testing.T) {
 	})
 
 	t.Run("with pagination options", func(t *testing.T) {
+		t.Parallel()
 		server := mockbunny.New()
 		defer server.Close()
 
@@ -109,6 +114,7 @@ func TestListZones(t *testing.T) {
 	})
 
 	t.Run("context cancellation", func(t *testing.T) {
+		t.Parallel()
 		server := mockbunny.New()
 		defer server.Close()
 
@@ -131,7 +137,9 @@ func TestListZones(t *testing.T) {
 
 // TestGetZone tests the GetZone method with various scenarios.
 func TestGetZone(t *testing.T) {
+	t.Parallel()
 	t.Run("success with zone and records", func(t *testing.T) {
+		t.Parallel()
 		server := mockbunny.New()
 		defer server.Close()
 
@@ -186,6 +194,7 @@ func TestGetZone(t *testing.T) {
 	})
 
 	t.Run("not found error (404)", func(t *testing.T) {
+		t.Parallel()
 		server := mockbunny.New()
 		defer server.Close()
 
@@ -202,6 +211,7 @@ func TestGetZone(t *testing.T) {
 	})
 
 	t.Run("unauthorized error (401)", func(t *testing.T) {
+		t.Parallel()
 		// Create a custom HTTP client that returns 401
 		transport := &mockTransport{
 			statusCode: http.StatusUnauthorized,
@@ -224,7 +234,9 @@ func TestGetZone(t *testing.T) {
 
 // TestAddRecord tests the AddRecord method with various scenarios.
 func TestAddRecord(t *testing.T) {
+	t.Parallel()
 	t.Run("success creating record", func(t *testing.T) {
+		t.Parallel()
 		server := mockbunny.New()
 		defer server.Close()
 
@@ -264,6 +276,7 @@ func TestAddRecord(t *testing.T) {
 	})
 
 	t.Run("zone not found error (404)", func(t *testing.T) {
+		t.Parallel()
 		server := mockbunny.New()
 		defer server.Close()
 
@@ -287,6 +300,7 @@ func TestAddRecord(t *testing.T) {
 	})
 
 	t.Run("unauthorized error (401)", func(t *testing.T) {
+		t.Parallel()
 		// Create a custom HTTP client that returns 401
 		transport := &mockTransport{
 			statusCode: http.StatusUnauthorized,
@@ -314,6 +328,7 @@ func TestAddRecord(t *testing.T) {
 	})
 
 	t.Run("server error with structured error", func(t *testing.T) {
+		t.Parallel()
 		transport := &mockTransport{
 			statusCode: http.StatusInternalServerError,
 			body:       []byte(`{"ErrorKey":"InvalidInput","Field":"Type","Message":"Invalid record type"}`),
@@ -345,6 +360,7 @@ func TestAddRecord(t *testing.T) {
 	})
 
 	t.Run("service unavailable error", func(t *testing.T) {
+		t.Parallel()
 		transport := &mockTransport{
 			statusCode: http.StatusServiceUnavailable,
 			body:       []byte(`{"ErrorKey":"ServiceUnavailable","Message":"API is temporarily unavailable"}`),
@@ -371,6 +387,7 @@ func TestAddRecord(t *testing.T) {
 	})
 
 	t.Run("server error with invalid JSON", func(t *testing.T) {
+		t.Parallel()
 		transport := &mockTransport{
 			statusCode: http.StatusInternalServerError,
 			body:       []byte(`{invalid json}`),
@@ -399,7 +416,9 @@ func TestAddRecord(t *testing.T) {
 
 // TestDeleteRecord tests the DeleteRecord method with various scenarios.
 func TestDeleteRecord(t *testing.T) {
+	t.Parallel()
 	t.Run("success deleting record", func(t *testing.T) {
+		t.Parallel()
 		server := mockbunny.New()
 		defer server.Close()
 
@@ -436,6 +455,7 @@ func TestDeleteRecord(t *testing.T) {
 	})
 
 	t.Run("zone not found error (404)", func(t *testing.T) {
+		t.Parallel()
 		server := mockbunny.New()
 		defer server.Close()
 
@@ -448,6 +468,7 @@ func TestDeleteRecord(t *testing.T) {
 	})
 
 	t.Run("record not found error (404)", func(t *testing.T) {
+		t.Parallel()
 		server := mockbunny.New()
 		defer server.Close()
 
@@ -463,6 +484,7 @@ func TestDeleteRecord(t *testing.T) {
 	})
 
 	t.Run("unauthorized error (401)", func(t *testing.T) {
+		t.Parallel()
 		// Create a custom HTTP client that returns 401
 		transport := &mockTransport{
 			statusCode: http.StatusUnauthorized,
@@ -481,7 +503,9 @@ func TestDeleteRecord(t *testing.T) {
 
 // TestParseError tests the parseError function with various scenarios.
 func TestParseError(t *testing.T) {
+	t.Parallel()
 	t.Run("unauthorized (401)", func(t *testing.T) {
+		t.Parallel()
 		err := parseError(http.StatusUnauthorized, []byte(""))
 		if err != ErrUnauthorized {
 			t.Errorf("expected ErrUnauthorized, got %v", err)
@@ -489,6 +513,7 @@ func TestParseError(t *testing.T) {
 	})
 
 	t.Run("500 with structured error", func(t *testing.T) {
+		t.Parallel()
 		body := []byte(`{"ErrorKey":"ServerError","Message":"Internal error"}`)
 		err := parseError(http.StatusInternalServerError, body)
 
@@ -511,6 +536,7 @@ func TestParseError(t *testing.T) {
 	})
 
 	t.Run("500 with invalid JSON", func(t *testing.T) {
+		t.Parallel()
 		body := []byte(`{invalid json}`)
 		err := parseError(http.StatusInternalServerError, body)
 
@@ -525,6 +551,7 @@ func TestParseError(t *testing.T) {
 	})
 
 	t.Run("503 with structured error", func(t *testing.T) {
+		t.Parallel()
 		body := []byte(`{"ErrorKey":"ServiceUnavailable","Message":"Service is down"}`)
 		err := parseError(http.StatusServiceUnavailable, body)
 
@@ -547,6 +574,7 @@ func TestParseError(t *testing.T) {
 	})
 
 	t.Run("503 with invalid JSON", func(t *testing.T) {
+		t.Parallel()
 		body := []byte(`{invalid json}`)
 		err := parseError(http.StatusServiceUnavailable, body)
 
@@ -560,6 +588,7 @@ func TestParseError(t *testing.T) {
 	})
 
 	t.Run("400 with structured error", func(t *testing.T) {
+		t.Parallel()
 		body := []byte(`{"ErrorKey":"BadRequest","Message":"Invalid input"}`)
 		err := parseError(http.StatusBadRequest, body)
 
@@ -578,6 +607,7 @@ func TestParseError(t *testing.T) {
 	})
 
 	t.Run("400 with invalid JSON", func(t *testing.T) {
+		t.Parallel()
 		body := []byte(`{invalid json}`)
 		err := parseError(http.StatusBadRequest, body)
 
@@ -591,6 +621,7 @@ func TestParseError(t *testing.T) {
 	})
 
 	t.Run("422 with empty message", func(t *testing.T) {
+		t.Parallel()
 		body := []byte(`{"ErrorKey":"Unprocessable","Message":""}`)
 		err := parseError(http.StatusUnprocessableEntity, body)
 
@@ -607,7 +638,9 @@ func TestParseError(t *testing.T) {
 
 // TestAPIError tests the APIError.Error method.
 func TestAPIError(t *testing.T) {
+	t.Parallel()
 	t.Run("with field", func(t *testing.T) {
+		t.Parallel()
 		apiErr := &APIError{
 			StatusCode: http.StatusBadRequest,
 			ErrorKey:   "ValidationError",
@@ -622,6 +655,7 @@ func TestAPIError(t *testing.T) {
 	})
 
 	t.Run("without field", func(t *testing.T) {
+		t.Parallel()
 		apiErr := &APIError{
 			StatusCode: http.StatusInternalServerError,
 			ErrorKey:   "ServerError",
@@ -637,7 +671,9 @@ func TestAPIError(t *testing.T) {
 
 // TestCreateZone tests the CreateZone method with various scenarios.
 func TestCreateZone(t *testing.T) {
+	t.Parallel()
 	t.Run("success creating zone", func(t *testing.T) {
+		t.Parallel()
 		server := mockbunny.New()
 		defer server.Close()
 
@@ -663,6 +699,7 @@ func TestCreateZone(t *testing.T) {
 	})
 
 	t.Run("invalid domain error (400)", func(t *testing.T) {
+		t.Parallel()
 		transport := &mockTransport{
 			statusCode: http.StatusBadRequest,
 			body:       []byte(`{"ErrorKey":"BadRequest","Message":"Invalid domain format"}`),
@@ -692,6 +729,7 @@ func TestCreateZone(t *testing.T) {
 	})
 
 	t.Run("unauthorized error (401)", func(t *testing.T) {
+		t.Parallel()
 		transport := &mockTransport{
 			statusCode: http.StatusUnauthorized,
 			body:       []byte(""),
@@ -711,6 +749,7 @@ func TestCreateZone(t *testing.T) {
 	})
 
 	t.Run("conflict error zone already exists (409)", func(t *testing.T) {
+		t.Parallel()
 		transport := &mockTransport{
 			statusCode: http.StatusConflict,
 			body:       []byte(`{"ErrorKey":"Conflict","Message":"Zone already exists"}`),
@@ -744,6 +783,7 @@ func TestCreateZone(t *testing.T) {
 	})
 
 	t.Run("context cancellation", func(t *testing.T) {
+		t.Parallel()
 		server := mockbunny.New()
 		defer server.Close()
 
@@ -766,7 +806,9 @@ func TestCreateZone(t *testing.T) {
 
 // TestDeleteZone tests the DeleteZone method with various scenarios.
 func TestDeleteZone(t *testing.T) {
+	t.Parallel()
 	t.Run("success deleting zone", func(t *testing.T) {
+		t.Parallel()
 		server := mockbunny.New()
 		defer server.Close()
 
@@ -788,6 +830,7 @@ func TestDeleteZone(t *testing.T) {
 	})
 
 	t.Run("not found error (404)", func(t *testing.T) {
+		t.Parallel()
 		server := mockbunny.New()
 		defer server.Close()
 
@@ -800,6 +843,7 @@ func TestDeleteZone(t *testing.T) {
 	})
 
 	t.Run("unauthorized error (401)", func(t *testing.T) {
+		t.Parallel()
 		transport := &mockTransport{
 			statusCode: http.StatusUnauthorized,
 			body:       []byte(""),
@@ -815,6 +859,7 @@ func TestDeleteZone(t *testing.T) {
 	})
 
 	t.Run("context cancellation", func(t *testing.T) {
+		t.Parallel()
 		server := mockbunny.New()
 		defer server.Close()
 

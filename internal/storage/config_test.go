@@ -10,6 +10,7 @@ import (
 
 // TestNewIgnoresEncryptionKey tests that New() accepts any key (deprecated parameter).
 func TestNewIgnoresEncryptionKey(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name      string
 		keyLength int
@@ -41,6 +42,7 @@ func TestNewIgnoresEncryptionKey(t *testing.T) {
 
 // TestNewCreatesDatabase tests that New() creates a valid SQLite database.
 func TestNewCreatesDatabase(t *testing.T) {
+	t.Parallel()
 	key := make([]byte, 32)
 	_, _ = rand.Read(key)
 
@@ -63,6 +65,7 @@ func TestNewCreatesDatabase(t *testing.T) {
 
 // TestNewInitializesSchema tests that New() initializes the schema.
 func TestNewInitializesSchema(t *testing.T) {
+	t.Parallel()
 	key := make([]byte, 32)
 	_, _ = rand.Read(key)
 
@@ -90,6 +93,7 @@ func TestNewInitializesSchema(t *testing.T) {
 
 // TestCloseClosesDatabase tests that Close() properly closes the database.
 func TestCloseClosesDatabase(t *testing.T) {
+	t.Parallel()
 	storage, err := New(":memory:", nil)
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
@@ -104,6 +108,7 @@ func TestCloseClosesDatabase(t *testing.T) {
 
 // TestNewEnablesWALMode tests that New() enables WAL journal mode.
 func TestNewEnablesWALMode(t *testing.T) {
+	t.Parallel()
 	storage, err := New(":memory:", nil)
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
@@ -125,6 +130,7 @@ func TestNewEnablesWALMode(t *testing.T) {
 
 // TestNewSetsBusyTimeout tests that New() sets busy timeout.
 func TestNewSetsBusyTimeout(t *testing.T) {
+	t.Parallel()
 	storage, err := New(":memory:", nil)
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
@@ -144,6 +150,7 @@ func TestNewSetsBusyTimeout(t *testing.T) {
 
 // TestCloseWithNilDatabase tests that Close() handles nil database gracefully.
 func TestCloseWithNilDatabase(t *testing.T) {
+	t.Parallel()
 	storage := &SQLiteStorage{
 		db: nil,
 	}
@@ -157,6 +164,7 @@ func TestCloseWithNilDatabase(t *testing.T) {
 
 // TestNewWithInvalidDatabasePath tests that New() handles database open errors.
 func TestNewWithInvalidDatabasePath(t *testing.T) {
+	t.Parallel()
 	// Try to open database in non-existent directory
 	storage, err := New("/nonexistent/path/to/db.sqlite3", nil)
 	if err == nil {

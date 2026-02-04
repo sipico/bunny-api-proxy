@@ -30,6 +30,7 @@ func (m *mockStorage) GetPermissions(ctx context.Context, keyID int64) ([]*stora
 }
 
 func TestValidateKey_EmptyKey(t *testing.T) {
+	t.Parallel()
 	v := NewValidator(&mockStorage{})
 	ctx := context.Background()
 
@@ -40,6 +41,7 @@ func TestValidateKey_EmptyKey(t *testing.T) {
 }
 
 func TestValidateKey_InvalidKey(t *testing.T) {
+	t.Parallel()
 	mock := &mockStorage{
 		keys: []*storage.ScopedKey{
 			{ID: 1, Name: "test-key", KeyHash: "some-hash"},
@@ -56,6 +58,7 @@ func TestValidateKey_InvalidKey(t *testing.T) {
 }
 
 func TestValidateKey_StorageError(t *testing.T) {
+	t.Parallel()
 	storageErr := errors.New("db error")
 	mock := &mockStorage{
 		listErr: storageErr,
@@ -70,6 +73,7 @@ func TestValidateKey_StorageError(t *testing.T) {
 }
 
 func TestValidateKey_PermissionsError(t *testing.T) {
+	t.Parallel()
 	permErr := errors.New("perm error")
 	hash, _ := storage.HashKey("test-key")
 	mock := &mockStorage{
@@ -89,6 +93,7 @@ func TestValidateKey_PermissionsError(t *testing.T) {
 }
 
 func TestValidateKey_ValidKey(t *testing.T) {
+	t.Parallel()
 	hash, _ := storage.HashKey("valid-key")
 	perms := []*storage.Permission{
 		{
@@ -126,6 +131,7 @@ func TestValidateKey_ValidKey(t *testing.T) {
 }
 
 func TestValidateKey_MultipleKeys(t *testing.T) {
+	t.Parallel()
 	hash1, _ := storage.HashKey("key1")
 	hash2, _ := storage.HashKey("key2")
 
@@ -164,6 +170,7 @@ func TestValidateKey_MultipleKeys(t *testing.T) {
 }
 
 func TestCheckPermission_ListZonesAllowed(t *testing.T) {
+	t.Parallel()
 	v := NewValidator(&mockStorage{})
 
 	keyInfo := &KeyInfo{
@@ -182,6 +189,7 @@ func TestCheckPermission_ListZonesAllowed(t *testing.T) {
 }
 
 func TestCheckPermission_GetZoneAllowed(t *testing.T) {
+	t.Parallel()
 	v := NewValidator(&mockStorage{})
 
 	keyInfo := &KeyInfo{
@@ -209,6 +217,7 @@ func TestCheckPermission_GetZoneAllowed(t *testing.T) {
 }
 
 func TestCheckPermission_GetZoneDenied(t *testing.T) {
+	t.Parallel()
 	v := NewValidator(&mockStorage{})
 
 	keyInfo := &KeyInfo{
@@ -228,6 +237,7 @@ func TestCheckPermission_GetZoneDenied(t *testing.T) {
 }
 
 func TestCheckPermission_ListRecordsAllowed(t *testing.T) {
+	t.Parallel()
 	v := NewValidator(&mockStorage{})
 
 	keyInfo := &KeyInfo{
@@ -255,6 +265,7 @@ func TestCheckPermission_ListRecordsAllowed(t *testing.T) {
 }
 
 func TestCheckPermission_ListRecordsDenied(t *testing.T) {
+	t.Parallel()
 	v := NewValidator(&mockStorage{})
 
 	keyInfo := &KeyInfo{
@@ -282,6 +293,7 @@ func TestCheckPermission_ListRecordsDenied(t *testing.T) {
 }
 
 func TestCheckPermission_AddRecordAllowed(t *testing.T) {
+	t.Parallel()
 	v := NewValidator(&mockStorage{})
 
 	keyInfo := &KeyInfo{
@@ -310,6 +322,7 @@ func TestCheckPermission_AddRecordAllowed(t *testing.T) {
 }
 
 func TestCheckPermission_AddRecordWrongType(t *testing.T) {
+	t.Parallel()
 	v := NewValidator(&mockStorage{})
 
 	keyInfo := &KeyInfo{
@@ -338,6 +351,7 @@ func TestCheckPermission_AddRecordWrongType(t *testing.T) {
 }
 
 func TestCheckPermission_AddRecordNoAction(t *testing.T) {
+	t.Parallel()
 	v := NewValidator(&mockStorage{})
 
 	keyInfo := &KeyInfo{
@@ -366,6 +380,7 @@ func TestCheckPermission_AddRecordNoAction(t *testing.T) {
 }
 
 func TestCheckPermission_DeleteRecordAllowed(t *testing.T) {
+	t.Parallel()
 	v := NewValidator(&mockStorage{})
 
 	keyInfo := &KeyInfo{
@@ -393,6 +408,7 @@ func TestCheckPermission_DeleteRecordAllowed(t *testing.T) {
 }
 
 func TestCheckPermission_DeleteRecordDenied(t *testing.T) {
+	t.Parallel()
 	v := NewValidator(&mockStorage{})
 
 	keyInfo := &KeyInfo{
@@ -420,6 +436,7 @@ func TestCheckPermission_DeleteRecordDenied(t *testing.T) {
 }
 
 func TestCheckPermission_NoZonePermission(t *testing.T) {
+	t.Parallel()
 	v := NewValidator(&mockStorage{})
 
 	keyInfo := &KeyInfo{

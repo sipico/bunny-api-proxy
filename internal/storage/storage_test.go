@@ -24,6 +24,7 @@ import (
 // - Update master API key
 // - Delete a scoped key (verify cascade)
 func TestCompleteWorkflow(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -146,6 +147,7 @@ func TestCompleteWorkflow(t *testing.T) {
 // TestAuthenticationFlow exercises the key authentication workflow.
 // This tests the storage layer lookup and permission retrieval.
 func TestAuthenticationFlow(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -215,6 +217,7 @@ func TestAuthenticationFlow(t *testing.T) {
 
 // TestPermissionLookup exercises permission queries and filtering.
 func TestPermissionLookup(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -286,6 +289,7 @@ func TestPermissionLookup(t *testing.T) {
 // TestConcurrentAccess verifies thread-safety with multiple goroutines.
 // This test uses the -race detector to catch data races.
 func TestConcurrentAccess(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -369,6 +373,7 @@ func TestConcurrentAccess(t *testing.T) {
 
 // TestErrorCases exercises error handling paths.
 func TestErrorCases(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -477,6 +482,7 @@ func TestErrorCases(t *testing.T) {
 // TestDataPersistence verifies that data survives database close/reopen.
 // This test is critical for ensuring durability.
 func TestDataPersistence(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -624,6 +630,7 @@ func TestDataPersistence(t *testing.T) {
 
 // TestAdminTokenWorkflow exercises the admin token CRUD operations.
 func TestAdminTokenWorkflow(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -712,6 +719,7 @@ func TestAdminTokenWorkflow(t *testing.T) {
 
 // TestLargeDataSet verifies storage performance and correctness with many records.
 func TestLargeDataSet(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 

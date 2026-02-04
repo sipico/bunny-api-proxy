@@ -14,6 +14,7 @@ import (
 
 // TestLoggingMiddleware_RequestLogging tests that requests are logged correctly.
 func TestLoggingMiddleware_RequestLogging(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	logger := slog.New(slog.NewJSONHandler(&buf, nil))
 
@@ -55,6 +56,7 @@ func TestLoggingMiddleware_RequestLogging(t *testing.T) {
 
 // TestLoggingMiddleware_ResponseLogging tests that responses are logged correctly.
 func TestLoggingMiddleware_ResponseLogging(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	logger := slog.New(slog.NewJSONHandler(&buf, nil))
 
@@ -105,6 +107,7 @@ func TestLoggingMiddleware_ResponseLogging(t *testing.T) {
 
 // TestLoggingMiddleware_RequestBody tests that request bodies are captured.
 func TestLoggingMiddleware_RequestBody(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	logger := slog.New(slog.NewJSONHandler(&buf, nil))
 
@@ -140,6 +143,7 @@ func TestLoggingMiddleware_RequestBody(t *testing.T) {
 
 // TestLoggingMiddleware_HeaderRedaction tests that sensitive headers are redacted.
 func TestLoggingMiddleware_HeaderRedaction(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	logger := slog.New(slog.NewJSONHandler(&buf, nil))
 
@@ -193,6 +197,7 @@ func TestLoggingMiddleware_HeaderRedaction(t *testing.T) {
 
 // TestLoggingMiddleware_DurationLogging tests that request duration is logged.
 func TestLoggingMiddleware_DurationLogging(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	logger := slog.New(slog.NewJSONHandler(&buf, nil))
 
@@ -233,6 +238,7 @@ func TestLoggingMiddleware_DurationLogging(t *testing.T) {
 
 // TestLoggingMiddleware_NilLogger tests that nil logger is handled gracefully.
 func TestLoggingMiddleware_NilLogger(t *testing.T) {
+	t.Parallel()
 	handler := LoggingMiddleware(nil)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("test"))
@@ -255,6 +261,7 @@ func TestLoggingMiddleware_NilLogger(t *testing.T) {
 
 // TestLoggingMiddleware_MultipleHeaders tests multiple header values.
 func TestLoggingMiddleware_MultipleHeaders(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	logger := slog.New(slog.NewJSONHandler(&buf, nil))
 
@@ -287,6 +294,7 @@ func TestLoggingMiddleware_MultipleHeaders(t *testing.T) {
 
 // TestLoggingMiddleware_DifferentStatusCodes tests different HTTP status codes.
 func TestLoggingMiddleware_DifferentStatusCodes(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name       string
 		statusCode int
@@ -331,6 +339,7 @@ func TestLoggingMiddleware_DifferentStatusCodes(t *testing.T) {
 
 // TestLoggingMiddleware_EmptyBody tests handling of empty request and response bodies.
 func TestLoggingMiddleware_EmptyBody(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	logger := slog.New(slog.NewJSONHandler(&buf, nil))
 
@@ -368,6 +377,7 @@ func TestLoggingMiddleware_EmptyBody(t *testing.T) {
 
 // TestRedactAPIKey tests the API key redaction function.
 func TestRedactAPIKey(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		input    string
@@ -412,6 +422,7 @@ func TestRedactAPIKey(t *testing.T) {
 
 // TestRedactHeaders tests the header redaction function.
 func TestRedactHeaders(t *testing.T) {
+	t.Parallel()
 	headers := http.Header{
 		"AccessKey":     []string{"secret-key-12345"},
 		"Authorization": []string{"Bearer token123456"},
@@ -449,6 +460,7 @@ func TestRedactHeaders(t *testing.T) {
 
 // TestLoggingMiddleware_ConcurrentRequests tests concurrent request handling.
 func TestLoggingMiddleware_ConcurrentRequests(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	logger := slog.New(slog.NewJSONHandler(&buf, nil))
 
@@ -492,6 +504,7 @@ func TestLoggingMiddleware_ConcurrentRequests(t *testing.T) {
 
 // TestLoggingMiddleware_LargeBody tests handling of large request/response bodies.
 func TestLoggingMiddleware_LargeBody(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	logger := slog.New(slog.NewJSONHandler(&buf, nil))
 

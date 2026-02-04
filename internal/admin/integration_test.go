@@ -128,6 +128,7 @@ func parseErrorResponse(t *testing.T, resp *http.Response) APIError {
 // =============================================================================
 
 func TestIntegration_BootstrapFlow(t *testing.T) {
+	t.Parallel()
 	ts := newTestServer(t)
 	defer ts.close()
 
@@ -265,6 +266,7 @@ func TestIntegration_BootstrapFlow(t *testing.T) {
 // =============================================================================
 
 func TestIntegration_TokenManagement(t *testing.T) {
+	t.Parallel()
 	ts := newTestServer(t)
 	defer ts.close()
 
@@ -441,6 +443,7 @@ func TestIntegration_TokenManagement(t *testing.T) {
 // =============================================================================
 
 func TestIntegration_PermissionManagement(t *testing.T) {
+	t.Parallel()
 	ts := newTestServer(t)
 	defer ts.close()
 
@@ -605,6 +608,7 @@ func TestIntegration_PermissionManagement(t *testing.T) {
 // =============================================================================
 
 func TestIntegration_WhoamiEndpoint(t *testing.T) {
+	t.Parallel()
 	ts := newTestServer(t)
 	defer ts.close()
 
@@ -742,6 +746,7 @@ func TestIntegration_WhoamiEndpoint(t *testing.T) {
 // =============================================================================
 
 func TestIntegration_HealthEndpoints(t *testing.T) {
+	t.Parallel()
 	ts := newTestServer(t)
 	defer ts.close()
 
@@ -771,6 +776,7 @@ func TestIntegration_HealthEndpoints(t *testing.T) {
 // =============================================================================
 
 func TestIntegration_Authentication(t *testing.T) {
+	t.Parallel()
 	ts := newTestServer(t)
 	defer ts.close()
 
@@ -800,6 +806,7 @@ func TestIntegration_Authentication(t *testing.T) {
 // =============================================================================
 
 func TestIntegration_ErrorCases(t *testing.T) {
+	t.Parallel()
 	ts := newTestServer(t)
 	defer ts.close()
 

@@ -59,6 +59,7 @@ func (m *mockTokenStore) HasAnyAdminToken(ctx context.Context) (bool, error) {
 }
 
 func TestNewBootstrapService(t *testing.T) {
+	t.Parallel()
 	masterKey := "test-master-key"
 	mock := &mockTokenStore{}
 
@@ -78,6 +79,7 @@ func TestNewBootstrapService(t *testing.T) {
 }
 
 func TestGetState_Unconfigured(t *testing.T) {
+	t.Parallel()
 	mock := &mockTokenStore{hasAdmin: false}
 	bs := NewBootstrapService(mock, "test-key")
 
@@ -92,6 +94,7 @@ func TestGetState_Unconfigured(t *testing.T) {
 }
 
 func TestGetState_Configured(t *testing.T) {
+	t.Parallel()
 	mock := &mockTokenStore{hasAdmin: true}
 	bs := NewBootstrapService(mock, "test-key")
 
@@ -106,6 +109,7 @@ func TestGetState_Configured(t *testing.T) {
 }
 
 func TestGetState_Error(t *testing.T) {
+	t.Parallel()
 	expectedErr := errors.New("database error")
 	mock := &mockTokenStore{err: expectedErr}
 	bs := NewBootstrapService(mock, "test-key")
@@ -121,6 +125,7 @@ func TestGetState_Error(t *testing.T) {
 }
 
 func TestIsMasterKey_CorrectKey(t *testing.T) {
+	t.Parallel()
 	masterKey := "my-secret-key"
 	mock := &mockTokenStore{}
 	bs := NewBootstrapService(mock, masterKey)
@@ -131,6 +136,7 @@ func TestIsMasterKey_CorrectKey(t *testing.T) {
 }
 
 func TestIsMasterKey_IncorrectKey(t *testing.T) {
+	t.Parallel()
 	masterKey := "my-secret-key"
 	mock := &mockTokenStore{}
 	bs := NewBootstrapService(mock, masterKey)
@@ -141,6 +147,7 @@ func TestIsMasterKey_IncorrectKey(t *testing.T) {
 }
 
 func TestIsMasterKey_EmptyKey(t *testing.T) {
+	t.Parallel()
 	masterKey := "my-secret-key"
 	mock := &mockTokenStore{}
 	bs := NewBootstrapService(mock, masterKey)
@@ -151,6 +158,7 @@ func TestIsMasterKey_EmptyKey(t *testing.T) {
 }
 
 func TestIsMasterKey_CaseSensitive(t *testing.T) {
+	t.Parallel()
 	masterKey := "MyKey"
 	mock := &mockTokenStore{}
 	bs := NewBootstrapService(mock, masterKey)
@@ -161,6 +169,7 @@ func TestIsMasterKey_CaseSensitive(t *testing.T) {
 }
 
 func TestCanUseMasterKey_Unconfigured(t *testing.T) {
+	t.Parallel()
 	mock := &mockTokenStore{hasAdmin: false}
 	bs := NewBootstrapService(mock, "test-key")
 
@@ -175,6 +184,7 @@ func TestCanUseMasterKey_Unconfigured(t *testing.T) {
 }
 
 func TestCanUseMasterKey_Configured(t *testing.T) {
+	t.Parallel()
 	mock := &mockTokenStore{hasAdmin: true}
 	bs := NewBootstrapService(mock, "test-key")
 
@@ -189,6 +199,7 @@ func TestCanUseMasterKey_Configured(t *testing.T) {
 }
 
 func TestCanUseMasterKey_Error(t *testing.T) {
+	t.Parallel()
 	expectedErr := errors.New("database error")
 	mock := &mockTokenStore{err: expectedErr}
 	bs := NewBootstrapService(mock, "test-key")
@@ -204,6 +215,7 @@ func TestCanUseMasterKey_Error(t *testing.T) {
 }
 
 func TestValidateMasterKey_ValidKeyUnconfigured(t *testing.T) {
+	t.Parallel()
 	masterKey := "correct-key"
 	mock := &mockTokenStore{hasAdmin: false}
 	bs := NewBootstrapService(mock, masterKey)
@@ -219,6 +231,7 @@ func TestValidateMasterKey_ValidKeyUnconfigured(t *testing.T) {
 }
 
 func TestValidateMasterKey_ValidKeyConfigured(t *testing.T) {
+	t.Parallel()
 	masterKey := "correct-key"
 	mock := &mockTokenStore{hasAdmin: true}
 	bs := NewBootstrapService(mock, masterKey)
@@ -234,6 +247,7 @@ func TestValidateMasterKey_ValidKeyConfigured(t *testing.T) {
 }
 
 func TestValidateMasterKey_InvalidKeyUnconfigured(t *testing.T) {
+	t.Parallel()
 	masterKey := "correct-key"
 	mock := &mockTokenStore{hasAdmin: false}
 	bs := NewBootstrapService(mock, masterKey)
@@ -249,6 +263,7 @@ func TestValidateMasterKey_InvalidKeyUnconfigured(t *testing.T) {
 }
 
 func TestValidateMasterKey_InvalidKeyConfigured(t *testing.T) {
+	t.Parallel()
 	masterKey := "correct-key"
 	mock := &mockTokenStore{hasAdmin: true}
 	bs := NewBootstrapService(mock, masterKey)
@@ -264,6 +279,7 @@ func TestValidateMasterKey_InvalidKeyConfigured(t *testing.T) {
 }
 
 func TestValidateMasterKey_Error(t *testing.T) {
+	t.Parallel()
 	masterKey := "correct-key"
 	expectedErr := errors.New("database error")
 	mock := &mockTokenStore{err: expectedErr}
@@ -280,6 +296,7 @@ func TestValidateMasterKey_Error(t *testing.T) {
 }
 
 func TestBootstrapStateString_Unconfigured(t *testing.T) {
+	t.Parallel()
 	s := StateUnconfigured
 	expected := "UNCONFIGURED"
 	if s.String() != expected {
@@ -288,6 +305,7 @@ func TestBootstrapStateString_Unconfigured(t *testing.T) {
 }
 
 func TestBootstrapStateString_Configured(t *testing.T) {
+	t.Parallel()
 	s := StateConfigured
 	expected := "CONFIGURED"
 	if s.String() != expected {
@@ -296,6 +314,7 @@ func TestBootstrapStateString_Configured(t *testing.T) {
 }
 
 func TestBootstrapStateString_Unknown(t *testing.T) {
+	t.Parallel()
 	s := BootstrapState(999)
 	expected := "UNKNOWN"
 	if s.String() != expected {
@@ -304,6 +323,7 @@ func TestBootstrapStateString_Unknown(t *testing.T) {
 }
 
 func TestIsMasterKey_ConstantTimeComparison(t *testing.T) {
+	t.Parallel()
 	// Test that the comparison doesn't leak timing information
 	masterKey := "test-key-12345"
 	mock := &mockTokenStore{}
@@ -319,6 +339,7 @@ func TestIsMasterKey_ConstantTimeComparison(t *testing.T) {
 }
 
 func TestBootstrapService_ZeroLength_MasterKey(t *testing.T) {
+	t.Parallel()
 	mock := &mockTokenStore{hasAdmin: false}
 	bs := NewBootstrapService(mock, "")
 
@@ -334,6 +355,7 @@ func TestBootstrapService_ZeroLength_MasterKey(t *testing.T) {
 }
 
 func TestBootstrapService_LongKey(t *testing.T) {
+	t.Parallel()
 	longKey := "this-is-a-very-long-master-key-that-is-used-for-testing-purposes-to-ensure-it-works-correctly"
 	mock := &mockTokenStore{hasAdmin: false}
 	bs := NewBootstrapService(mock, longKey)
@@ -344,6 +366,7 @@ func TestBootstrapService_LongKey(t *testing.T) {
 }
 
 func TestBootstrapService_UnicodeKey(t *testing.T) {
+	t.Parallel()
 	unicodeKey := "test-key-🔐-secure"
 	mock := &mockTokenStore{hasAdmin: false}
 	bs := NewBootstrapService(mock, unicodeKey)

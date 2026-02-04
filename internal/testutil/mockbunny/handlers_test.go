@@ -10,6 +10,7 @@ import (
 )
 
 func TestGetZone_Success(t *testing.T) {
+	t.Parallel()
 	s := New()
 	defer s.Close()
 
@@ -48,6 +49,7 @@ func TestGetZone_Success(t *testing.T) {
 }
 
 func TestGetZone_NotFound(t *testing.T) {
+	t.Parallel()
 	s := New()
 	defer s.Close()
 
@@ -63,6 +65,7 @@ func TestGetZone_NotFound(t *testing.T) {
 }
 
 func TestGetZone_InvalidID(t *testing.T) {
+	t.Parallel()
 	s := New()
 	defer s.Close()
 
@@ -78,6 +81,7 @@ func TestGetZone_InvalidID(t *testing.T) {
 }
 
 func TestGetZone_IncludesAllFields(t *testing.T) {
+	t.Parallel()
 	s := New()
 	defer s.Close()
 
@@ -117,6 +121,7 @@ func TestGetZone_IncludesAllFields(t *testing.T) {
 
 // Tests for handleListZones
 func TestListZones_Success(t *testing.T) {
+	t.Parallel()
 	s := New()
 	defer s.Close()
 
@@ -155,6 +160,7 @@ func TestListZones_Success(t *testing.T) {
 }
 
 func TestListZones_EmptyResult(t *testing.T) {
+	t.Parallel()
 	s := New()
 	defer s.Close()
 
@@ -182,6 +188,7 @@ func TestListZones_EmptyResult(t *testing.T) {
 }
 
 func TestListZones_WithSearch(t *testing.T) {
+	t.Parallel()
 	s := New()
 	defer s.Close()
 
@@ -217,6 +224,7 @@ func TestListZones_WithSearch(t *testing.T) {
 }
 
 func TestListZones_WithPagination(t *testing.T) {
+	t.Parallel()
 	s := New()
 	defer s.Close()
 
@@ -296,6 +304,7 @@ func TestListZones_WithPagination(t *testing.T) {
 }
 
 func TestListZones_InvalidPageNumber(t *testing.T) {
+	t.Parallel()
 	s := New()
 	defer s.Close()
 
@@ -319,6 +328,7 @@ func TestListZones_InvalidPageNumber(t *testing.T) {
 }
 
 func TestListZones_PageOutOfRange(t *testing.T) {
+	t.Parallel()
 	s := New()
 	defer s.Close()
 
@@ -345,6 +355,7 @@ func TestListZones_PageOutOfRange(t *testing.T) {
 }
 
 func TestListZones_InvalidPerPage(t *testing.T) {
+	t.Parallel()
 	s := New()
 	defer s.Close()
 
@@ -370,6 +381,7 @@ func TestListZones_InvalidPerPage(t *testing.T) {
 
 // Tests for handleDeleteRecord
 func TestDeleteRecord_Success(t *testing.T) {
+	t.Parallel()
 	s := New()
 	defer s.Close()
 
@@ -430,6 +442,7 @@ func TestDeleteRecord_Success(t *testing.T) {
 }
 
 func TestDeleteRecord_RecordNotFound(t *testing.T) {
+	t.Parallel()
 	s := New()
 	defer s.Close()
 
@@ -450,6 +463,7 @@ func TestDeleteRecord_RecordNotFound(t *testing.T) {
 }
 
 func TestDeleteRecord_ZoneNotFound(t *testing.T) {
+	t.Parallel()
 	s := New()
 	defer s.Close()
 
@@ -468,6 +482,7 @@ func TestDeleteRecord_ZoneNotFound(t *testing.T) {
 }
 
 func TestDeleteRecord_InvalidZoneID(t *testing.T) {
+	t.Parallel()
 	s := New()
 	defer s.Close()
 
@@ -486,6 +501,7 @@ func TestDeleteRecord_InvalidZoneID(t *testing.T) {
 }
 
 func TestDeleteRecord_InvalidRecordID(t *testing.T) {
+	t.Parallel()
 	s := New()
 	defer s.Close()
 
@@ -507,6 +523,7 @@ func TestDeleteRecord_InvalidRecordID(t *testing.T) {
 
 // Tests for handleCreateZone
 func TestHandleCreateZone_Success(t *testing.T) {
+	t.Parallel()
 	s := New()
 	defer s.Close()
 
@@ -559,6 +576,7 @@ func TestHandleCreateZone_Success(t *testing.T) {
 }
 
 func TestHandleCreateZone_EmptyDomain(t *testing.T) {
+	t.Parallel()
 	s := New()
 	defer s.Close()
 
@@ -591,6 +609,7 @@ func TestHandleCreateZone_EmptyDomain(t *testing.T) {
 }
 
 func TestHandleCreateZone_DuplicateDomain(t *testing.T) {
+	t.Parallel()
 	s := New()
 	defer s.Close()
 
@@ -633,6 +652,7 @@ func TestHandleCreateZone_DuplicateDomain(t *testing.T) {
 }
 
 func TestHandleCreateZone_InvalidJSON(t *testing.T) {
+	t.Parallel()
 	s := New()
 	defer s.Close()
 
@@ -650,6 +670,7 @@ func TestHandleCreateZone_InvalidJSON(t *testing.T) {
 }
 
 func TestHandleCreateZone_MultipleZones(t *testing.T) {
+	t.Parallel()
 	s := New()
 	defer s.Close()
 
@@ -698,6 +719,7 @@ func TestHandleCreateZone_MultipleZones(t *testing.T) {
 
 // Tests for handleDeleteZone
 func TestHandleDeleteZone_Success(t *testing.T) {
+	t.Parallel()
 	s := New()
 	defer s.Close()
 
@@ -742,6 +764,7 @@ func TestHandleDeleteZone_Success(t *testing.T) {
 }
 
 func TestHandleDeleteZone_NotFound(t *testing.T) {
+	t.Parallel()
 	s := New()
 	defer s.Close()
 
@@ -760,6 +783,7 @@ func TestHandleDeleteZone_NotFound(t *testing.T) {
 }
 
 func TestHandleDeleteZone_InvalidID(t *testing.T) {
+	t.Parallel()
 	s := New()
 	defer s.Close()
 
@@ -778,6 +802,7 @@ func TestHandleDeleteZone_InvalidID(t *testing.T) {
 }
 
 func TestHandleDeleteZone_MultipleZones(t *testing.T) {
+	t.Parallel()
 	s := New()
 	defer s.Close()
 

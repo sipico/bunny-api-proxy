@@ -94,6 +94,7 @@ func newTestRequestWithKeyInfo(path string, params map[string]string, keyInfo *a
 
 // TestNewHandler_WithLogger tests handler creation with non-nil logger
 func TestNewHandler_WithLogger(t *testing.T) {
+	t.Parallel()
 	logger := slog.New(slog.NewTextHandler(nil, nil))
 	client := &mockBunnyClient{}
 
@@ -113,6 +114,7 @@ func TestNewHandler_WithLogger(t *testing.T) {
 
 // TestNewHandler_NilLogger tests handler creation with nil logger
 func TestNewHandler_NilLogger(t *testing.T) {
+	t.Parallel()
 	client := &mockBunnyClient{}
 
 	handler := NewHandler(client, nil)
@@ -131,6 +133,7 @@ func TestNewHandler_NilLogger(t *testing.T) {
 
 // TestWriteJSON_Success tests successful JSON encoding
 func TestWriteJSON_Success(t *testing.T) {
+	t.Parallel()
 	w := httptest.NewRecorder()
 
 	type testData struct {
@@ -163,6 +166,7 @@ func TestWriteJSON_Success(t *testing.T) {
 
 // TestWriteError_VariousStatuses tests error responses with different status codes
 func TestWriteError_VariousStatuses(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		status  int
 		message string
@@ -203,6 +207,7 @@ func TestWriteError_VariousStatuses(t *testing.T) {
 
 // TestHandleBunnyError_NotFound tests ErrNotFound error mapping
 func TestHandleBunnyError_NotFound(t *testing.T) {
+	t.Parallel()
 	w := httptest.NewRecorder()
 	handleBunnyError(w, bunny.ErrNotFound)
 
@@ -223,6 +228,7 @@ func TestHandleBunnyError_NotFound(t *testing.T) {
 
 // TestHandleBunnyError_Unauthorized tests ErrUnauthorized error mapping
 func TestHandleBunnyError_Unauthorized(t *testing.T) {
+	t.Parallel()
 	w := httptest.NewRecorder()
 	handleBunnyError(w, bunny.ErrUnauthorized)
 
@@ -243,6 +249,7 @@ func TestHandleBunnyError_Unauthorized(t *testing.T) {
 
 // TestHandleBunnyError_GenericError tests generic error mapping
 func TestHandleBunnyError_GenericError(t *testing.T) {
+	t.Parallel()
 	w := httptest.NewRecorder()
 	err := fmt.Errorf("network timeout")
 	handleBunnyError(w, err)
@@ -264,6 +271,7 @@ func TestHandleBunnyError_GenericError(t *testing.T) {
 
 // TestHandleBunnyError_WrappedErrors tests error mapping with wrapped errors
 func TestHandleBunnyError_WrappedErrors(t *testing.T) {
+	t.Parallel()
 	w := httptest.NewRecorder()
 	err := fmt.Errorf("failed: %w", bunny.ErrNotFound)
 	handleBunnyError(w, err)
@@ -285,6 +293,7 @@ func TestHandleBunnyError_WrappedErrors(t *testing.T) {
 
 // TestHandleListZones_Success tests successful listing of zones with no params
 func TestHandleListZones_Success(t *testing.T) {
+	t.Parallel()
 	zones := &bunny.ListZonesResponse{
 		Items: []bunny.Zone{
 			{ID: 1, Domain: "example.com"},
@@ -320,6 +329,7 @@ func TestHandleListZones_Success(t *testing.T) {
 
 // TestHandleListZones_WithParams tests query parameter parsing
 func TestHandleListZones_WithParams(t *testing.T) {
+	t.Parallel()
 	client := &mockBunnyClient{
 		listZonesFunc: func(ctx context.Context, opts *bunny.ListZonesOptions) (*bunny.ListZonesResponse, error) {
 			if opts.Page != 2 || opts.PerPage != 10 || opts.Search != "test" {
@@ -343,6 +353,7 @@ func TestHandleListZones_WithParams(t *testing.T) {
 
 // TestHandleListZones_InvalidPage tests handling of invalid page parameter
 func TestHandleListZones_InvalidPage(t *testing.T) {
+	t.Parallel()
 	client := &mockBunnyClient{}
 	handler := NewHandler(client, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	w := httptest.NewRecorder()
@@ -365,6 +376,7 @@ func TestHandleListZones_InvalidPage(t *testing.T) {
 
 // TestHandleListZones_ClientError tests handling of client errors
 func TestHandleListZones_ClientError(t *testing.T) {
+	t.Parallel()
 	client := &mockBunnyClient{
 		listZonesFunc: func(ctx context.Context, opts *bunny.ListZonesOptions) (*bunny.ListZonesResponse, error) {
 			return nil, fmt.Errorf("network error")
@@ -384,6 +396,7 @@ func TestHandleListZones_ClientError(t *testing.T) {
 
 // TestHandleListZones_NotFound tests ErrNotFound response
 func TestHandleListZones_NotFound(t *testing.T) {
+	t.Parallel()
 	client := &mockBunnyClient{
 		listZonesFunc: func(ctx context.Context, opts *bunny.ListZonesOptions) (*bunny.ListZonesResponse, error) {
 			return nil, bunny.ErrNotFound
@@ -403,6 +416,7 @@ func TestHandleListZones_NotFound(t *testing.T) {
 
 // TestHandleCreateZone_Success tests successful zone creation
 func TestHandleCreateZone_Success(t *testing.T) {
+	t.Parallel()
 	zone := &bunny.Zone{ID: 123, Domain: "example.com"}
 
 	client := &mockBunnyClient{
@@ -437,6 +451,7 @@ func TestHandleCreateZone_Success(t *testing.T) {
 
 // TestHandleCreateZone_InvalidJSON tests handling of invalid JSON
 func TestHandleCreateZone_InvalidJSON(t *testing.T) {
+	t.Parallel()
 	client := &mockBunnyClient{}
 	handler := NewHandler(client, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	w := httptest.NewRecorder()
@@ -452,6 +467,7 @@ func TestHandleCreateZone_InvalidJSON(t *testing.T) {
 
 // TestHandleCreateZone_MissingDomain tests handling of missing domain
 func TestHandleCreateZone_MissingDomain(t *testing.T) {
+	t.Parallel()
 	client := &mockBunnyClient{}
 	handler := NewHandler(client, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	w := httptest.NewRecorder()
@@ -467,6 +483,7 @@ func TestHandleCreateZone_MissingDomain(t *testing.T) {
 
 // TestHandleCreateZone_ClientError tests handling of client errors
 func TestHandleCreateZone_ClientError(t *testing.T) {
+	t.Parallel()
 	client := &mockBunnyClient{
 		createZoneFunc: func(ctx context.Context, domain string) (*bunny.Zone, error) {
 			return nil, fmt.Errorf("network error")
@@ -487,6 +504,7 @@ func TestHandleCreateZone_ClientError(t *testing.T) {
 
 // TestHandleGetZone_Success tests successful zone retrieval
 func TestHandleGetZone_Success(t *testing.T) {
+	t.Parallel()
 	zone := &bunny.Zone{ID: 123, Domain: "example.com"}
 
 	client := &mockBunnyClient{
@@ -520,6 +538,7 @@ func TestHandleGetZone_Success(t *testing.T) {
 
 // TestHandleGetZone_InvalidID tests non-numeric zone ID
 func TestHandleGetZone_InvalidID(t *testing.T) {
+	t.Parallel()
 	client := &mockBunnyClient{}
 	handler := NewHandler(client, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	w := httptest.NewRecorder()
@@ -534,6 +553,7 @@ func TestHandleGetZone_InvalidID(t *testing.T) {
 
 // TestHandleGetZone_MissingID tests missing zone ID parameter
 func TestHandleGetZone_MissingID(t *testing.T) {
+	t.Parallel()
 	client := &mockBunnyClient{}
 	handler := NewHandler(client, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	w := httptest.NewRecorder()
@@ -548,6 +568,7 @@ func TestHandleGetZone_MissingID(t *testing.T) {
 
 // TestHandleGetZone_NotFound tests ErrNotFound response
 func TestHandleGetZone_NotFound(t *testing.T) {
+	t.Parallel()
 	client := &mockBunnyClient{
 		getZoneFunc: func(ctx context.Context, id int64) (*bunny.Zone, error) {
 			return nil, bunny.ErrNotFound
@@ -567,6 +588,7 @@ func TestHandleGetZone_NotFound(t *testing.T) {
 
 // TestHandleDeleteZone_Success tests successful zone deletion
 func TestHandleDeleteZone_Success(t *testing.T) {
+	t.Parallel()
 	client := &mockBunnyClient{
 		deleteZoneFunc: func(ctx context.Context, id int64) error {
 			if id != 123 {
@@ -589,6 +611,7 @@ func TestHandleDeleteZone_Success(t *testing.T) {
 
 // TestHandleDeleteZone_InvalidID tests handling of invalid zone ID
 func TestHandleDeleteZone_InvalidID(t *testing.T) {
+	t.Parallel()
 	client := &mockBunnyClient{}
 	handler := NewHandler(client, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	w := httptest.NewRecorder()
@@ -603,6 +626,7 @@ func TestHandleDeleteZone_InvalidID(t *testing.T) {
 
 // TestHandleDeleteZone_MissingID tests handling of missing zone ID
 func TestHandleDeleteZone_MissingID(t *testing.T) {
+	t.Parallel()
 	client := &mockBunnyClient{}
 	handler := NewHandler(client, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	w := httptest.NewRecorder()
@@ -617,6 +641,7 @@ func TestHandleDeleteZone_MissingID(t *testing.T) {
 
 // TestHandleDeleteZone_ClientError tests handling of client errors
 func TestHandleDeleteZone_ClientError(t *testing.T) {
+	t.Parallel()
 	client := &mockBunnyClient{
 		deleteZoneFunc: func(ctx context.Context, id int64) error {
 			return fmt.Errorf("network error")
@@ -636,6 +661,7 @@ func TestHandleDeleteZone_ClientError(t *testing.T) {
 
 // TestHandleDeleteZone_NotFound tests ErrNotFound response
 func TestHandleDeleteZone_NotFound(t *testing.T) {
+	t.Parallel()
 	client := &mockBunnyClient{
 		deleteZoneFunc: func(ctx context.Context, id int64) error {
 			return bunny.ErrNotFound
@@ -655,6 +681,7 @@ func TestHandleDeleteZone_NotFound(t *testing.T) {
 
 // TestHandleListRecords_Success tests successful records listing
 func TestHandleListRecords_Success(t *testing.T) {
+	t.Parallel()
 	zone := &bunny.Zone{
 		ID:      123,
 		Domain:  "example.com",
@@ -689,6 +716,7 @@ func TestHandleListRecords_Success(t *testing.T) {
 
 // TestHandleListRecords_EmptyZone tests zone with no records
 func TestHandleListRecords_EmptyZone(t *testing.T) {
+	t.Parallel()
 	zone := &bunny.Zone{
 		ID:      123,
 		Domain:  "example.com",
@@ -723,6 +751,7 @@ func TestHandleListRecords_EmptyZone(t *testing.T) {
 
 // TestHandleListRecords_InvalidID tests invalid zone ID
 func TestHandleListRecords_InvalidID(t *testing.T) {
+	t.Parallel()
 	client := &mockBunnyClient{}
 	handler := NewHandler(client, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	w := httptest.NewRecorder()
@@ -737,6 +766,7 @@ func TestHandleListRecords_InvalidID(t *testing.T) {
 
 // TestHandleListRecords_NotFound tests ErrNotFound response
 func TestHandleListRecords_NotFound(t *testing.T) {
+	t.Parallel()
 	client := &mockBunnyClient{
 		getZoneFunc: func(ctx context.Context, id int64) (*bunny.Zone, error) {
 			return nil, bunny.ErrNotFound
@@ -756,6 +786,7 @@ func TestHandleListRecords_NotFound(t *testing.T) {
 
 // TestHandleAddRecord_Success tests successful record creation
 func TestHandleAddRecord_Success(t *testing.T) {
+	t.Parallel()
 	record := &bunny.Record{ID: 1, Type: 3, Name: "_acme-challenge"} // TXT
 
 	client := &mockBunnyClient{
@@ -794,6 +825,7 @@ func TestHandleAddRecord_Success(t *testing.T) {
 
 // TestHandleAddRecord_InvalidJSON tests malformed JSON body
 func TestHandleAddRecord_InvalidJSON(t *testing.T) {
+	t.Parallel()
 	client := &mockBunnyClient{}
 	handler := NewHandler(client, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	w := httptest.NewRecorder()
@@ -810,6 +842,7 @@ func TestHandleAddRecord_InvalidJSON(t *testing.T) {
 
 // TestHandleAddRecord_InvalidZoneID tests invalid zone ID
 func TestHandleAddRecord_InvalidZoneID(t *testing.T) {
+	t.Parallel()
 	client := &mockBunnyClient{}
 	handler := NewHandler(client, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	w := httptest.NewRecorder()
@@ -826,6 +859,7 @@ func TestHandleAddRecord_InvalidZoneID(t *testing.T) {
 
 // TestHandleAddRecord_ZoneNotFound tests zone not found error
 func TestHandleAddRecord_ZoneNotFound(t *testing.T) {
+	t.Parallel()
 	client := &mockBunnyClient{
 		addRecordFunc: func(ctx context.Context, zoneID int64, req *bunny.AddRecordRequest) (*bunny.Record, error) {
 			return nil, bunny.ErrNotFound
@@ -847,6 +881,7 @@ func TestHandleAddRecord_ZoneNotFound(t *testing.T) {
 
 // TestHandleAddRecord_ClientError tests client error handling
 func TestHandleAddRecord_ClientError(t *testing.T) {
+	t.Parallel()
 	client := &mockBunnyClient{
 		addRecordFunc: func(ctx context.Context, zoneID int64, req *bunny.AddRecordRequest) (*bunny.Record, error) {
 			return nil, fmt.Errorf("server error")
@@ -868,6 +903,7 @@ func TestHandleAddRecord_ClientError(t *testing.T) {
 
 // TestHandleDeleteRecord_Success tests successful record deletion
 func TestHandleDeleteRecord_Success(t *testing.T) {
+	t.Parallel()
 	client := &mockBunnyClient{
 		deleteRecordFunc: func(ctx context.Context, zoneID, recordID int64) error {
 			if zoneID != 123 || recordID != 456 {
@@ -894,6 +930,7 @@ func TestHandleDeleteRecord_Success(t *testing.T) {
 
 // TestHandleDeleteRecord_InvalidZoneID tests invalid zone ID
 func TestHandleDeleteRecord_InvalidZoneID(t *testing.T) {
+	t.Parallel()
 	client := &mockBunnyClient{}
 	handler := NewHandler(client, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	w := httptest.NewRecorder()
@@ -908,6 +945,7 @@ func TestHandleDeleteRecord_InvalidZoneID(t *testing.T) {
 
 // TestHandleDeleteRecord_InvalidRecordID tests invalid record ID
 func TestHandleDeleteRecord_InvalidRecordID(t *testing.T) {
+	t.Parallel()
 	client := &mockBunnyClient{}
 	handler := NewHandler(client, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	w := httptest.NewRecorder()
@@ -922,6 +960,7 @@ func TestHandleDeleteRecord_InvalidRecordID(t *testing.T) {
 
 // TestHandleDeleteRecord_NotFound tests record not found error
 func TestHandleDeleteRecord_NotFound(t *testing.T) {
+	t.Parallel()
 	client := &mockBunnyClient{
 		deleteRecordFunc: func(ctx context.Context, zoneID, recordID int64) error {
 			return bunny.ErrNotFound
@@ -941,6 +980,7 @@ func TestHandleDeleteRecord_NotFound(t *testing.T) {
 
 // TestHandleDeleteRecord_ClientError tests client error handling
 func TestHandleDeleteRecord_ClientError(t *testing.T) {
+	t.Parallel()
 	client := &mockBunnyClient{
 		deleteRecordFunc: func(ctx context.Context, zoneID, recordID int64) error {
 			return fmt.Errorf("server error")
@@ -960,6 +1000,7 @@ func TestHandleDeleteRecord_ClientError(t *testing.T) {
 
 // TestHandleListZones_FiltersToPermittedZones tests filtering zones to permitted zones only.
 func TestHandleListZones_FiltersToPermittedZones(t *testing.T) {
+	t.Parallel()
 	zones := &bunny.ListZonesResponse{
 		Items: []bunny.Zone{
 			{ID: 1, Domain: "example.com"},
@@ -1022,6 +1063,7 @@ func TestHandleListZones_FiltersToPermittedZones(t *testing.T) {
 
 // TestHandleListZones_AllZonesPermission tests that all zones permission returns all zones.
 func TestHandleListZones_AllZonesPermission(t *testing.T) {
+	t.Parallel()
 	zones := &bunny.ListZonesResponse{
 		Items: []bunny.Zone{
 			{ID: 1, Domain: "example.com"},
@@ -1072,6 +1114,7 @@ func TestHandleListZones_AllZonesPermission(t *testing.T) {
 
 // TestHandleListZones_EmptyAfterFilter tests that filtering can result in empty zones.
 func TestHandleListZones_EmptyAfterFilter(t *testing.T) {
+	t.Parallel()
 	zones := &bunny.ListZonesResponse{
 		Items: []bunny.Zone{
 			{ID: 1, Domain: "example.com"},
@@ -1121,6 +1164,7 @@ func TestHandleListZones_EmptyAfterFilter(t *testing.T) {
 
 // TestHandleGetZone_FiltersRecordTypes tests filtering records by type.
 func TestHandleGetZone_FiltersRecordTypes(t *testing.T) {
+	t.Parallel()
 	zone := &bunny.Zone{
 		ID:     123,
 		Domain: "example.com",
@@ -1180,6 +1224,7 @@ func TestHandleGetZone_FiltersRecordTypes(t *testing.T) {
 
 // TestHandleGetZone_AllRecordTypes tests that empty RecordTypes allows all types.
 func TestHandleGetZone_AllRecordTypes(t *testing.T) {
+	t.Parallel()
 	zone := &bunny.Zone{
 		ID:     123,
 		Domain: "example.com",
@@ -1231,6 +1276,7 @@ func TestHandleGetZone_AllRecordTypes(t *testing.T) {
 
 // TestHandleGetZone_EmptyRecordsAfterFilter tests filtering that results in empty records.
 func TestHandleGetZone_EmptyRecordsAfterFilter(t *testing.T) {
+	t.Parallel()
 	zone := &bunny.Zone{
 		ID:     123,
 		Domain: "example.com",
@@ -1282,6 +1328,7 @@ func TestHandleGetZone_EmptyRecordsAfterFilter(t *testing.T) {
 
 // TestHandleListRecords_FiltersRecordTypes tests filtering records in list endpoint.
 func TestHandleListRecords_FiltersRecordTypes(t *testing.T) {
+	t.Parallel()
 	zone := &bunny.Zone{
 		ID:     123,
 		Domain: "example.com",
@@ -1340,6 +1387,7 @@ func TestHandleListRecords_FiltersRecordTypes(t *testing.T) {
 
 // TestHandleListRecords_EmptyAfterFilter tests filtering that results in empty records.
 func TestHandleListRecords_EmptyAfterFilter(t *testing.T) {
+	t.Parallel()
 	zone := &bunny.Zone{
 		ID:     123,
 		Domain: "example.com",

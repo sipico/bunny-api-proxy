@@ -113,6 +113,7 @@ func (m *mockStorageWithToken) GetTokenByHash(ctx context.Context, keyHash strin
 }
 
 func TestTokenAuthMiddleware(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name           string
 		accessKey      string
@@ -218,6 +219,7 @@ func TestTokenAuthMiddleware(t *testing.T) {
 }
 
 func TestGetTokenInfoFromContext(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name              string
 		setupContext      func(ctx context.Context) context.Context
@@ -284,6 +286,7 @@ func TestGetTokenInfoFromContext(t *testing.T) {
 }
 
 func TestTokenAuthMiddlewareMasterKey(t *testing.T) {
+	t.Parallel()
 	t.Run("master key authentication", func(t *testing.T) {
 		// Setup mock storage
 		mock := &mockStorageWithToken{
@@ -332,6 +335,7 @@ func TestTokenAuthMiddlewareMasterKey(t *testing.T) {
 }
 
 func TestTokenAuthMiddlewareUnifiedToken(t *testing.T) {
+	t.Parallel()
 	// Generate the token hash for a known token
 	knownToken := "unified-token-secret-12345"
 	tokenHash := auth.HashToken(knownToken)
@@ -416,6 +420,7 @@ func TestTokenAuthMiddlewareUnifiedToken(t *testing.T) {
 }
 
 func TestTokenAuthMiddlewareWhitespaceToken(t *testing.T) {
+	t.Parallel()
 	t.Run("token with only whitespace is rejected", func(t *testing.T) {
 		mock := &mockStorageWithToken{
 			mockStorage: &mockStorage{},
@@ -443,6 +448,7 @@ func TestTokenAuthMiddlewareWhitespaceToken(t *testing.T) {
 }
 
 func TestValidateUnifiedToken(t *testing.T) {
+	t.Parallel()
 	knownToken := "test-token-secret"
 	tokenHash := auth.HashToken(knownToken)
 

@@ -8,6 +8,7 @@ import (
 )
 
 func TestParseRequest(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name       string
 		method     string
@@ -76,6 +77,7 @@ func TestParseRequest(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			var body io.Reader
 			if tt.body != "" {
 				body = strings.NewReader(tt.body)
@@ -109,6 +111,7 @@ func TestParseRequest(t *testing.T) {
 }
 
 func TestParseRequest_BodyPreserved(t *testing.T) {
+	t.Parallel()
 	body := `{"Type":0,"Name":"www","Value":"1.2.3.4"}`
 	req := httptest.NewRequest("POST", "/dnszone/123/records", strings.NewReader(body))
 
@@ -125,6 +128,7 @@ func TestParseRequest_BodyPreserved(t *testing.T) {
 }
 
 func TestParseRequest_InvalidJSON(t *testing.T) {
+	t.Parallel()
 	// Test with malformed JSON body
 	req := httptest.NewRequest("POST", "/dnszone/123/records", strings.NewReader(`{invalid json`))
 
@@ -140,6 +144,7 @@ func TestParseRequest_InvalidJSON(t *testing.T) {
 }
 
 func TestMapRecordTypeToString(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		typeInt int
 		want    string
@@ -164,6 +169,7 @@ func TestMapRecordTypeToString(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.want, func(t *testing.T) {
+			t.Parallel()
 			got := MapRecordTypeToString(tt.typeInt)
 			if got != tt.want {
 				t.Errorf("MapRecordTypeToString(%d) = %q, want %q", tt.typeInt, got, tt.want)
