@@ -1,0 +1,49 @@
+version: 2
+updates:
+  # Go modules (go.mod)
+  - package-ecosystem: "gomod"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    # Auto-assign PRs to make them more visible
+    assignees:
+      - "sipico"
+    # Group minor and patch updates to reduce PR noise
+    groups:
+      go-dependencies:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # Docker base images (Dockerfile)
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    assignees:
+      - "sipico"
+
+  # Docker images in .claude/docker/ directory
+  - package-ecosystem: "docker"
+    directory: "/.claude/docker"
+    schedule:
+      interval: "weekly"
+    assignees:
+      - "sipico"
+
+  # GitHub Actions versions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    assignees:
+      - "sipico"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
