@@ -4,6 +4,7 @@ go 1.25
 
 require (
 	github.com/go-chi/chi/v5 v5.2.4
+	github.com/google/uuid v1.6.0
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/crypto v0.47.0
 	modernc.org/sqlite v1.44.3
@@ -30,7 +31,6 @@ require (
 	github.com/gobwas/glob v0.2.3 // indirect
 	github.com/goccy/go-json v0.10.5 // indirect
 	github.com/goccy/go-yaml v1.18.0 // indirect
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/kaptinlin/go-i18n v0.1.7 // indirect
 	github.com/kaptinlin/jsonschema v0.4.14 // indirect
