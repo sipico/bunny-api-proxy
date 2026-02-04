@@ -16,7 +16,16 @@ This document tracks features and improvements deferred from MVP to keep scope m
 ### Additional DNS Operations
 
 - [ ] **Update DNS Record** - `POST /dnszone/{id}/records/{id}`
-- [ ] **Add/Delete DNS Zone** - Zone management
+- [ ] **Add/Delete DNS Zone as Scoped Actions** - Zone management with permissions
+  - **Current state:** POST /dnszone (create) and DELETE /dnszone/{id} (delete) endpoints exist but are admin-only
+  - **Handlers implemented:** `HandleCreateZone` and `HandleDeleteZone` in `internal/proxy/handler.go`
+  - **Missing:** Permission checking - these actions are not defined in `internal/auth/auth.go` Action constants
+  - **Implementation needed:**
+    1. Add `ActionCreateZone` and `ActionDeleteZone` constants to `internal/auth/auth.go`
+    2. Update `ParseRequest` in `internal/auth/actions.go` to parse POST /dnszone and DELETE /dnszone/{id}
+    3. Update `CheckPermission` to validate these actions against token permissions
+    4. Update documentation to include `create_zone` and `delete_zone` in available actions
+  - **Note:** Removed from docs on 2026-02-04 because they were incorrectly listed as available
 - [ ] **Import/Export DNS Records** - Bulk operations
 
 ---
