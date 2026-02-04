@@ -1,4 +1,5 @@
 // Package proxy implements the API proxy for bunny.net requests.
+// Test: Trigger CI to discover status checks for ruleset configuration.
 package proxy
 
 import (
