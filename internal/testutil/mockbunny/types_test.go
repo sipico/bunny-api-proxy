@@ -7,6 +7,7 @@ import (
 )
 
 func TestNewState(t *testing.T) {
+	t.Parallel()
 	state := NewState()
 	if state == nil {
 		t.Fatal("NewState() returned nil")
@@ -36,6 +37,7 @@ func TestNewState(t *testing.T) {
 }
 
 func TestRecordFields(t *testing.T) {
+	t.Parallel()
 	record := Record{
 		ID:                    1,
 		Type:                  0, // A
@@ -73,6 +75,7 @@ func TestRecordFields(t *testing.T) {
 }
 
 func TestZoneFields(t *testing.T) {
+	t.Parallel()
 	zone := Zone{
 		ID:                       1,
 		Domain:                   "example.com",
@@ -103,6 +106,7 @@ func TestZoneFields(t *testing.T) {
 }
 
 func TestListZonesResponse(t *testing.T) {
+	t.Parallel()
 	response := ListZonesResponse{
 		CurrentPage:  1,
 		TotalItems:   10,
@@ -124,6 +128,7 @@ func TestListZonesResponse(t *testing.T) {
 }
 
 func TestErrorResponse(t *testing.T) {
+	t.Parallel()
 	errResp := ErrorResponse{
 		ErrorKey: "ValidationError",
 		Field:    "Domain",
@@ -144,6 +149,7 @@ func TestErrorResponse(t *testing.T) {
 }
 
 func TestMockBunnyTime_MarshalJSON(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		time     MockBunnyTime
@@ -175,6 +181,7 @@ func TestMockBunnyTime_MarshalJSON(t *testing.T) {
 }
 
 func TestMockBunnyTime_UnmarshalJSON(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name    string
 		input   string
@@ -231,6 +238,7 @@ func TestMockBunnyTime_UnmarshalJSON(t *testing.T) {
 }
 
 func TestMockBunnyTime_RoundTrip(t *testing.T) {
+	t.Parallel()
 	// Test that marshaling and unmarshaling produces consistent results
 	original := MockBunnyTime{Time: time.Date(2026, 2, 3, 14, 7, 45, 0, time.UTC)}
 

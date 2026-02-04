@@ -9,6 +9,7 @@ import (
 )
 
 func TestNew(t *testing.T) {
+	t.Parallel()
 	s := New()
 	defer s.Close()
 
@@ -31,6 +32,7 @@ func TestNew(t *testing.T) {
 }
 
 func TestServerStructFields(t *testing.T) {
+	t.Parallel()
 	s := New()
 	defer s.Close()
 
@@ -51,6 +53,7 @@ func TestServerStructFields(t *testing.T) {
 }
 
 func TestURLMethod(t *testing.T) {
+	t.Parallel()
 	s := New()
 	defer s.Close()
 
@@ -72,6 +75,7 @@ func TestURLMethod(t *testing.T) {
 }
 
 func TestCloseMethod(t *testing.T) {
+	t.Parallel()
 	s := New()
 	url := s.URL()
 
@@ -94,6 +98,7 @@ func TestCloseMethod(t *testing.T) {
 }
 
 func TestRoutesAreWiredUp(t *testing.T) {
+	t.Parallel()
 	s := New()
 	defer s.Close()
 
@@ -140,6 +145,7 @@ func TestRoutesAreWiredUp(t *testing.T) {
 }
 
 func TestAddZone(t *testing.T) {
+	t.Parallel()
 	s := New()
 	defer s.Close()
 
@@ -186,6 +192,7 @@ func TestAddZone(t *testing.T) {
 }
 
 func TestAddZoneMultiple(t *testing.T) {
+	t.Parallel()
 	s := New()
 	defer s.Close()
 
@@ -219,6 +226,7 @@ func TestAddZoneMultiple(t *testing.T) {
 }
 
 func TestAddZoneWithRecords(t *testing.T) {
+	t.Parallel()
 	s := New()
 	defer s.Close()
 
@@ -266,6 +274,7 @@ func TestAddZoneWithRecords(t *testing.T) {
 }
 
 func TestAddZoneWithRecordsExistingDefaults(t *testing.T) {
+	t.Parallel()
 	s := New()
 	defer s.Close()
 
@@ -286,6 +295,7 @@ func TestAddZoneWithRecordsExistingDefaults(t *testing.T) {
 }
 
 func TestAddZoneWithRecordsRecordIDIncrement(t *testing.T) {
+	t.Parallel()
 	s := New()
 	defer s.Close()
 
@@ -318,6 +328,7 @@ func TestAddZoneWithRecordsRecordIDIncrement(t *testing.T) {
 }
 
 func TestGetZoneNotFound(t *testing.T) {
+	t.Parallel()
 	s := New()
 	defer s.Close()
 
@@ -328,6 +339,7 @@ func TestGetZoneNotFound(t *testing.T) {
 }
 
 func TestGetZoneReturnsCopy(t *testing.T) {
+	t.Parallel()
 	s := New()
 	defer s.Close()
 
@@ -351,6 +363,7 @@ func TestGetZoneReturnsCopy(t *testing.T) {
 }
 
 func TestGetState(t *testing.T) {
+	t.Parallel()
 	s := New()
 	defer s.Close()
 
@@ -382,6 +395,7 @@ func TestGetState(t *testing.T) {
 }
 
 func TestGetStateEmpty(t *testing.T) {
+	t.Parallel()
 	s := New()
 	defer s.Close()
 
@@ -392,6 +406,7 @@ func TestGetStateEmpty(t *testing.T) {
 }
 
 func TestGetStateReturnsCopies(t *testing.T) {
+	t.Parallel()
 	s := New()
 	defer s.Close()
 
@@ -418,6 +433,7 @@ func TestGetStateReturnsCopies(t *testing.T) {
 }
 
 func TestAddRecord_Success(t *testing.T) {
+	t.Parallel()
 	s := New()
 	defer s.Close()
 
@@ -463,6 +479,7 @@ func TestAddRecord_Success(t *testing.T) {
 }
 
 func TestAddRecord_ZoneNotFound(t *testing.T) {
+	t.Parallel()
 	s := New()
 	defer s.Close()
 
@@ -482,6 +499,7 @@ func TestAddRecord_ZoneNotFound(t *testing.T) {
 }
 
 func TestAddRecord_MissingName(t *testing.T) {
+	t.Parallel()
 	s := New()
 	defer s.Close()
 
@@ -509,6 +527,7 @@ func TestAddRecord_MissingName(t *testing.T) {
 }
 
 func TestAddRecord_MissingValue(t *testing.T) {
+	t.Parallel()
 	s := New()
 	defer s.Close()
 
@@ -536,6 +555,7 @@ func TestAddRecord_MissingValue(t *testing.T) {
 }
 
 func TestAddRecord_MultipleRecords(t *testing.T) {
+	t.Parallel()
 	s := New()
 	defer s.Close()
 
@@ -565,6 +585,7 @@ func TestAddRecord_MultipleRecords(t *testing.T) {
 	}
 }
 func TestAuthMiddleware_NoAPIKeyConfigured(t *testing.T) {
+	t.Parallel()
 	// When BUNNY_API_KEY is not set, auth is disabled
 	s := New()
 	defer s.Close()

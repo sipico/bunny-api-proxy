@@ -10,6 +10,7 @@ import (
 )
 
 func TestAdminCreateZone_Success(t *testing.T) {
+	t.Parallel()
 	s := New()
 	defer s.Close()
 
@@ -41,6 +42,7 @@ func TestAdminCreateZone_Success(t *testing.T) {
 }
 
 func TestAdminCreateZone_MissingDomain(t *testing.T) {
+	t.Parallel()
 	s := New()
 	defer s.Close()
 
@@ -65,6 +67,7 @@ func TestAdminCreateZone_MissingDomain(t *testing.T) {
 }
 
 func TestAdminCreateZone_InvalidJSON(t *testing.T) {
+	t.Parallel()
 	s := New()
 	defer s.Close()
 
@@ -89,6 +92,7 @@ func TestAdminCreateZone_InvalidJSON(t *testing.T) {
 }
 
 func TestAdminCreateRecord_Success(t *testing.T) {
+	t.Parallel()
 	s := New()
 	defer s.Close()
 
@@ -129,6 +133,7 @@ func TestAdminCreateRecord_Success(t *testing.T) {
 }
 
 func TestAdminCreateRecord_MissingName(t *testing.T) {
+	t.Parallel()
 	s := New()
 	defer s.Close()
 
@@ -159,6 +164,7 @@ func TestAdminCreateRecord_MissingName(t *testing.T) {
 }
 
 func TestAdminCreateRecord_MissingValue(t *testing.T) {
+	t.Parallel()
 	s := New()
 	defer s.Close()
 
@@ -189,6 +195,7 @@ func TestAdminCreateRecord_MissingValue(t *testing.T) {
 }
 
 func TestAdminCreateRecord_InvalidZoneID(t *testing.T) {
+	t.Parallel()
 	s := New()
 	defer s.Close()
 
@@ -217,6 +224,7 @@ func TestAdminCreateRecord_InvalidZoneID(t *testing.T) {
 }
 
 func TestAdminCreateRecord_ZoneNotFound(t *testing.T) {
+	t.Parallel()
 	s := New()
 	defer s.Close()
 
@@ -245,6 +253,7 @@ func TestAdminCreateRecord_ZoneNotFound(t *testing.T) {
 }
 
 func TestAdminReset_Success(t *testing.T) {
+	t.Parallel()
 	s := New()
 	defer s.Close()
 
@@ -281,6 +290,7 @@ func TestAdminReset_Success(t *testing.T) {
 }
 
 func TestAdminReset_IDCountersReset(t *testing.T) {
+	t.Parallel()
 	s := New()
 	defer s.Close()
 
@@ -309,6 +319,7 @@ func TestAdminReset_IDCountersReset(t *testing.T) {
 }
 
 func TestAdminState_WithData(t *testing.T) {
+	t.Parallel()
 	s := New()
 	defer s.Close()
 
@@ -352,6 +363,7 @@ func TestAdminState_WithData(t *testing.T) {
 }
 
 func TestAdminState_Empty(t *testing.T) {
+	t.Parallel()
 	s := New()
 	defer s.Close()
 
@@ -382,6 +394,7 @@ func TestAdminState_Empty(t *testing.T) {
 }
 
 func TestAdminCreateMultipleZonesAndRecords(t *testing.T) {
+	t.Parallel()
 	s := New()
 	defer s.Close()
 
@@ -451,6 +464,7 @@ func TestAdminCreateMultipleZonesAndRecords(t *testing.T) {
 }
 
 func TestAdminCreateRecord_InvalidJSON(t *testing.T) {
+	t.Parallel()
 	s := New()
 	defer s.Close()
 
@@ -481,6 +495,7 @@ func TestAdminCreateRecord_InvalidJSON(t *testing.T) {
 }
 
 func TestAdminCreateZone_MultipleZones(t *testing.T) {
+	t.Parallel()
 	s := New()
 	defer s.Close()
 
@@ -518,6 +533,7 @@ func TestAdminCreateZone_MultipleZones(t *testing.T) {
 }
 
 func TestAdminCreateRecord_WithDefaults(t *testing.T) {
+	t.Parallel()
 	s := New()
 	defer s.Close()
 
