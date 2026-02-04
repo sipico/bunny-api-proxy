@@ -94,8 +94,6 @@ func TestReadyHandlerWithClosedStorage(t *testing.T) {
 }
 
 func TestInitializeComponentsWithValidConfig(t *testing.T) {
-	t.Parallel()
-
 	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
 
@@ -156,8 +154,6 @@ func TestInitializeComponentsWithValidConfig(t *testing.T) {
 }
 
 func TestInitializeComponentsWithDebugLogLevel(t *testing.T) {
-	t.Parallel()
-
 	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
 
@@ -194,8 +190,6 @@ func TestInitializeComponentsWithDebugLogLevel(t *testing.T) {
 }
 
 func TestInitializeComponentsWithInvalidLogLevel(t *testing.T) {
-	t.Parallel()
-
 	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
 
@@ -231,8 +225,6 @@ func TestInitializeComponentsWithInvalidLogLevel(t *testing.T) {
 }
 
 func TestInitializeComponentsWithInvalidDataPath(t *testing.T) {
-	t.Parallel()
-
 	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
 
@@ -268,7 +260,6 @@ func TestInitializeComponentsWithInvalidDataPath(t *testing.T) {
 }
 
 func TestRunWithInvalidLogLevel(t *testing.T) {
-	t.Parallel()
 	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
 	oldBunnyAPIKey := os.Getenv("BUNNY_API_KEY")
