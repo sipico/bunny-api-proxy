@@ -37,6 +37,7 @@ func TestGetPort(t *testing.T) {
 }
 
 func TestCreateServer(t *testing.T) {
+	t.Parallel()
 	// Test that createServer() creates a server with Handler() method
 	server := createServer()
 	defer server.Close()
@@ -49,6 +50,7 @@ func TestCreateServer(t *testing.T) {
 }
 
 func TestGetPortAddr(t *testing.T) {
+	t.Parallel()
 	// Test that getPortAddr() formats the port correctly
 	tests := []struct {
 		port     string
@@ -70,6 +72,7 @@ func TestGetPortAddr(t *testing.T) {
 }
 
 func TestCreateHTTPServer(t *testing.T) {
+	t.Parallel()
 	// Test that createHTTPServer() creates a properly configured http.Server
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -88,6 +91,7 @@ func TestCreateHTTPServer(t *testing.T) {
 }
 
 func TestHandlerIsHTTPHandler(t *testing.T) {
+	t.Parallel()
 	// Test that the handler returned from mockbunny.New().Handler()
 	// is a valid http.Handler that responds to requests
 	server := createServer()
@@ -108,6 +112,7 @@ func TestHandlerIsHTTPHandler(t *testing.T) {
 }
 
 func TestAdminStateEndpoint(t *testing.T) {
+	t.Parallel()
 	// Test that the /admin/state endpoint (used by health check) responds
 	server := createServer()
 	defer server.Close()
@@ -131,6 +136,7 @@ func TestAdminStateEndpoint(t *testing.T) {
 }
 
 func TestDNSZoneEndpoint(t *testing.T) {
+	t.Parallel()
 	// Test that the /dnszone endpoint responds
 	server := createServer()
 	defer server.Close()
@@ -149,6 +155,7 @@ func TestDNSZoneEndpoint(t *testing.T) {
 }
 
 func TestHTTPServerPortConfiguration(t *testing.T) {
+	t.Parallel()
 	// Test different port configurations
 	tests := []struct {
 		port string
@@ -175,6 +182,7 @@ func TestHTTPServerPortConfiguration(t *testing.T) {
 }
 
 func TestServerHandlerIntegration(t *testing.T) {
+	t.Parallel()
 	// Test that a server created by createServer() works with
 	// an HTTP server created by createHTTPServer()
 	port := getPort()
@@ -211,6 +219,7 @@ func BenchmarkGetPort(b *testing.B) {
 }
 
 func TestSetupShutdownHandler(t *testing.T) {
+	t.Parallel()
 	// Test that setupShutdownHandler() creates a channel for shutdown signaling
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -250,6 +259,7 @@ func BenchmarkGetPortAddr(b *testing.B) {
 
 // TestDoHealthCheckSuccess tests that doHealthCheck returns 0 when server returns 200 OK
 func TestDoHealthCheckSuccess(t *testing.T) {
+	t.Parallel()
 	// Create a test server that returns 200 OK
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -265,6 +275,7 @@ func TestDoHealthCheckSuccess(t *testing.T) {
 
 // TestDoHealthCheckNon200Status tests that doHealthCheck returns 1 when server returns non-200 status
 func TestDoHealthCheckNon200Status(t *testing.T) {
+	t.Parallel()
 	// Create a test server that returns 503 Service Unavailable
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusServiceUnavailable)
@@ -279,6 +290,7 @@ func TestDoHealthCheckNon200Status(t *testing.T) {
 
 // TestDoHealthCheckConnectionError tests that doHealthCheck returns 1 when connection fails
 func TestDoHealthCheckConnectionError(t *testing.T) {
+	t.Parallel()
 	// Use an invalid URL that will fail to connect
 	result := doHealthCheck("http://localhost:99999/admin/state")
 	if result != 1 {
@@ -288,6 +300,7 @@ func TestDoHealthCheckConnectionError(t *testing.T) {
 
 // TestDoHealthCheck404Status tests that doHealthCheck returns 1 when server returns 404
 func TestDoHealthCheck404Status(t *testing.T) {
+	t.Parallel()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 	}))
@@ -301,6 +314,7 @@ func TestDoHealthCheck404Status(t *testing.T) {
 
 // TestDoHealthCheck500Status tests that doHealthCheck returns 1 when server returns 500
 func TestDoHealthCheck500Status(t *testing.T) {
+	t.Parallel()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
