@@ -159,9 +159,7 @@ Every push runs:
 
 **Available Actions:**
 - `list_zones` - List all zones
-- `create_zone` - Create new zones
 - `get_zone` - Get zone details
-- `delete_zone` - Delete zones
 - `list_records` - List records in a zone
 - `add_record` - Add DNS records
 - `delete_record` - Delete DNS records
@@ -259,7 +257,7 @@ Mirror bunny.net DNS API structure (MVP endpoints listed above).
 
 ```dockerfile
 # Stage 1: Build
-FROM golang:1.24-alpine AS builder
+FROM golang:1.25-alpine AS builder
 WORKDIR /app
 COPY . .
 RUN go build -o bunny-api-proxy ./cmd/bunny-api-proxy
