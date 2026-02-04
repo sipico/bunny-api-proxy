@@ -38,25 +38,28 @@ func (t *LoggingTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 		req.Body = io.NopCloser(bytes.NewReader(reqBodyBytes))
 	}
 
-	// Prepare request headers for logging (with redaction)
-	reqHeaders := make(map[string]string)
-	for k, v := range req.Header {
-		if strings.EqualFold(k, "AccessKey") || strings.EqualFold(k, "Authorization") {
-			reqHeaders[k] = redactSensitiveData(strings.Join(v, ", "))
-		} else {
-			reqHeaders[k] = strings.Join(v, ", ")
+	// Prepare request headers for logging (with redaction) - only for DEBUG
+	var reqHeaders map[string]string
+	if t.Logger.Enabled(req.Context(), slog.LevelDebug) {
+		reqHeaders = make(map[string]string)
+		for k, v := range req.Header {
+			if strings.EqualFold(k, "AccessKey") || strings.EqualFold(k, "Authorization") {
+				reqHeaders[k] = redactSensitiveData(strings.Join(v, ", "))
+			} else {
+				reqHeaders[k] = strings.Join(v, ", ")
+			}
 		}
-	}
 
-	// Log the request
-	t.Logger.Info("HTTP Request",
-		"request_id", requestID,
-		"prefix", t.Prefix,
-		"method", req.Method,
-		"url", req.URL.String(),
-		"headers", reqHeaders,
-		"body", string(reqBodyBytes),
-	)
+		// DEBUG: Log full request details
+		t.Logger.Debug("Bunny API request",
+			"request_id", requestID,
+			"prefix", t.Prefix,
+			"method", req.Method,
+			"url", req.URL.String(),
+			"headers", reqHeaders,
+			"body", string(reqBodyBytes),
+		)
+	}
 
 	// Execute the request
 	resp, err := t.transport().RoundTrip(req)
@@ -64,11 +67,11 @@ func (t *LoggingTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 
 	if err != nil {
 		// Log error
-		t.Logger.Error("HTTP request failed",
+		t.Logger.Error("Bunny API call failed",
 			"request_id", requestID,
 			"prefix", t.Prefix,
 			"method", req.Method,
-			"url", req.URL.String(),
+			"path", req.URL.Path,
 			"duration_ms", duration.Milliseconds(),
 			"error", err,
 		)
@@ -83,16 +86,27 @@ func (t *LoggingTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 	// Restore body for caller
 	resp.Body = io.NopCloser(bytes.NewReader(respBodyBytes))
 
-	// Log the response
-	t.Logger.Info("HTTP Response",
+	// INFO: Log operational summary
+	t.Logger.Info("Bunny API call",
 		"request_id", requestID,
 		"prefix", t.Prefix,
-		"status_code", resp.StatusCode,
-		"status", resp.Status,
+		"method", req.Method,
+		"path", req.URL.Path,
+		"status", resp.StatusCode,
 		"duration_ms", duration.Milliseconds(),
-		"headers", resp.Header,
-		"body", string(respBodyBytes),
 	)
+
+	// DEBUG: Log full response details
+	if t.Logger.Enabled(req.Context(), slog.LevelDebug) {
+		t.Logger.Debug("Bunny API response",
+			"request_id", requestID,
+			"prefix", t.Prefix,
+			"status_code", resp.StatusCode,
+			"status", resp.Status,
+			"headers", resp.Header,
+			"body", string(respBodyBytes),
+		)
+	}
 
 	return resp, nil
 }

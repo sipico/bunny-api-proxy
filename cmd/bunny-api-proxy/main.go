@@ -113,11 +113,21 @@ func initializeComponents(cfg *config.Config) (*serverComponents, error) {
 	// 4. Create auth validator
 	validator := auth.NewValidator(store)
 
-	// 5. Create bunny client with real API key
+	// 5. Create bunny client with real API key and logging transport
 	var bunnyOpts []bunny.Option
 	if cfg.BunnyAPIURL != "" {
 		bunnyOpts = append(bunnyOpts, bunny.WithBaseURL(cfg.BunnyAPIURL))
 	}
+
+	// Wire up LoggingTransport to log bunny.net API calls
+	loggingTransport := &bunny.LoggingTransport{
+		Transport: http.DefaultTransport,
+		Logger:    logger,
+		Prefix:    "BUNNY",
+	}
+	httpClient := &http.Client{Transport: loggingTransport}
+	bunnyOpts = append(bunnyOpts, bunny.WithHTTPClient(httpClient))
+
 	bunnyClient := bunny.NewClient(cfg.BunnyAPIKey, bunnyOpts...)
 
 	// 6. Create bootstrap service for managing master key and bootstrap state

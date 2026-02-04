@@ -189,6 +189,81 @@ func TestInitializeComponentsWithDebugLogLevel(t *testing.T) {
 	}
 }
 
+// TestInitializeComponentsBunnyClientWithLoggingTransport verifies that the bunny client
+// is initialized and can make requests successfully. This test ensures that LoggingTransport
+// is properly wired up in main.go - the actual logging behavior is tested in
+// internal/bunny/logging_transport_test.go and verified in E2E tests.
+func TestInitializeComponentsBunnyClientWithLoggingTransport(t *testing.T) {
+	t.Parallel()
+
+	oldDatabasePath := os.Getenv("DATABASE_PATH")
+	oldLogLevel := os.Getenv("LOG_LEVEL")
+	oldBunnyAPIURL := os.Getenv("BUNNY_API_URL")
+
+	defer func() {
+		if oldDatabasePath != "" {
+			os.Setenv("DATABASE_PATH", oldDatabasePath)
+		} else {
+			os.Unsetenv("DATABASE_PATH")
+		}
+		if oldLogLevel != "" {
+			os.Setenv("LOG_LEVEL", oldLogLevel)
+		} else {
+			os.Unsetenv("LOG_LEVEL")
+		}
+		if oldBunnyAPIURL != "" {
+			os.Setenv("BUNNY_API_URL", oldBunnyAPIURL)
+		} else {
+			os.Unsetenv("BUNNY_API_URL")
+		}
+	}()
+
+	// Create a mock bunny.net API server
+	requestCount := 0
+	mockAPIServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		// Return a simple zone list response
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"Items":[],"CurrentPage":1,"TotalItems":0,"HasMoreItems":false}`))
+	}))
+	defer mockAPIServer.Close()
+
+	// Set up environment with mock API URL
+	os.Setenv("DATABASE_PATH", ":memory:")
+	os.Setenv("LOG_LEVEL", "debug") // Use debug to enable logging
+	os.Setenv("BUNNY_API_URL", mockAPIServer.URL)
+
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("failed to load config: %v", err)
+	}
+
+	// Initialize components (this will create logger that writes to stdout)
+	components, err := initializeComponents(cfg)
+	if err != nil {
+		t.Fatalf("failed to initialize components: %v", err)
+	}
+	defer components.store.Close()
+
+	// Make a request through the bunny client
+	ctx := context.Background()
+	_, err = components.bunnyClient.ListZones(ctx, nil)
+	if err != nil {
+		t.Fatalf("failed to list zones: %v", err)
+	}
+
+	// Verify the request went through (proves LoggingTransport didn't break the client)
+	if requestCount != 1 {
+		t.Errorf("expected 1 request to mock server, got %d", requestCount)
+	}
+
+	// Note: The actual logging behavior (with prefix "BUNNY") is thoroughly tested in
+	// internal/bunny/logging_transport_test.go and is verified in E2E tests.
+	// This integration test ensures that LoggingTransport is wired up without breaking
+	// the bunny client's functionality.
+}
+
 func TestInitializeComponentsWithInvalidLogLevel(t *testing.T) {
 	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
