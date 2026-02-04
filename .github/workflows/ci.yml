@@ -160,7 +160,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Build proxy Docker image (using pre-built binary)
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: ci-build/proxy
           file: .claude/docker/Dockerfile.prebuilt
@@ -169,7 +169,7 @@ jobs:
           tags: bunny-api-proxy:test
 
       - name: Build mockbunny Docker image (using pre-built binary)
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: ci-build/mockbunny
           file: .claude/docker/Dockerfile.mockbunny.prebuilt
@@ -178,7 +178,7 @@ jobs:
           tags: mockbunny:test
 
       - name: Build test-runner Docker image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: .claude/docker/Dockerfile.testrunner
