@@ -11,6 +11,7 @@ import (
 
 // TestCreateAdminToken verifies that CreateAdminToken creates a token successfully.
 func TestCreateAdminToken(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -48,6 +49,7 @@ func TestCreateAdminToken(t *testing.T) {
 
 // TestCreateAdminTokenEmptyName verifies that empty name returns an error.
 func TestCreateAdminTokenEmptyName(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -71,6 +73,7 @@ func TestCreateAdminTokenEmptyName(t *testing.T) {
 
 // TestCreateAdminTokenEmptyToken verifies that empty token returns an error.
 func TestCreateAdminTokenEmptyToken(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -94,6 +97,7 @@ func TestCreateAdminTokenEmptyToken(t *testing.T) {
 
 // TestCreateAdminTokenDuplicate verifies that duplicate token hash returns an error.
 func TestCreateAdminTokenDuplicate(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -129,6 +133,7 @@ func TestCreateAdminTokenDuplicate(t *testing.T) {
 
 // TestValidateAdminToken verifies that ValidateAdminToken retrieves correct token.
 func TestValidateAdminToken(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -162,6 +167,7 @@ func TestValidateAdminToken(t *testing.T) {
 
 // TestValidateAdminTokenInvalid verifies that invalid token returns ErrNotFound.
 func TestValidateAdminTokenInvalid(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -181,6 +187,7 @@ func TestValidateAdminTokenInvalid(t *testing.T) {
 
 // TestValidateAdminTokenEmpty verifies that empty token returns ErrNotFound.
 func TestValidateAdminTokenEmpty(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -201,6 +208,7 @@ func TestValidateAdminTokenEmpty(t *testing.T) {
 // TestListAdminTokens verifies that ListAdminTokens returns tokens in correct order.
 // It also tests that ListAdminTokens filters for admin tokens only.
 func TestListAdminTokens(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -274,6 +282,7 @@ func TestListAdminTokens(t *testing.T) {
 
 // TestDeleteAdminToken verifies that DeleteAdminToken removes token successfully.
 func TestDeleteAdminToken(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -315,6 +324,7 @@ func TestDeleteAdminToken(t *testing.T) {
 
 // TestDeleteAdminTokenNotFound verifies that deleting non-existent token returns ErrNotFound.
 func TestDeleteAdminTokenNotFound(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -334,6 +344,7 @@ func TestDeleteAdminTokenNotFound(t *testing.T) {
 
 // TestHashToken verifies that token hashing is deterministic.
 func TestHashToken(t *testing.T) {
+	t.Parallel()
 	token := "test-secret-token-123"
 
 	// Hash same token twice
@@ -360,6 +371,7 @@ func TestHashToken(t *testing.T) {
 
 // TestHashTokenEmpty verifies that empty token also produces a valid hash.
 func TestHashTokenEmpty(t *testing.T) {
+	t.Parallel()
 	hash := hashToken("")
 	if hash == "" {
 		t.Errorf("expected non-empty hash for empty token")

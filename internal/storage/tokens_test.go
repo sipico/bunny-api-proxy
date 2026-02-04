@@ -12,6 +12,7 @@ import (
 
 // TestCreateToken verifies that CreateToken creates a token successfully.
 func TestCreateToken(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -59,6 +60,7 @@ func TestCreateToken(t *testing.T) {
 
 // TestCreateTokenDuplicate verifies that duplicate hash insertion returns ErrDuplicate.
 func TestCreateTokenDuplicate(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -104,6 +106,7 @@ func TestCreateTokenDuplicate(t *testing.T) {
 
 // TestGetTokenByHash verifies that GetTokenByHash retrieves created tokens.
 func TestGetTokenByHash(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -146,6 +149,7 @@ func TestGetTokenByHash(t *testing.T) {
 
 // TestGetTokenByHashNotFound verifies ErrNotFound for non-existent hash.
 func TestGetTokenByHashNotFound(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -165,6 +169,7 @@ func TestGetTokenByHashNotFound(t *testing.T) {
 
 // TestGetTokenByID verifies that GetTokenByID retrieves a token by ID.
 func TestGetTokenByID(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -207,6 +212,7 @@ func TestGetTokenByID(t *testing.T) {
 
 // TestGetTokenByIDNotFound verifies ErrNotFound for non-existent ID.
 func TestGetTokenByIDNotFound(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -226,6 +232,7 @@ func TestGetTokenByIDNotFound(t *testing.T) {
 
 // TestListTokens verifies listing of tokens.
 func TestListTokens(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -296,6 +303,7 @@ func TestListTokens(t *testing.T) {
 
 // TestDeleteToken verifies deletion of tokens.
 func TestDeleteToken(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -342,6 +350,7 @@ func TestDeleteToken(t *testing.T) {
 
 // TestDeleteTokenNotFound verifies ErrNotFound for deleting non-existent token.
 func TestDeleteTokenNotFound(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -361,6 +370,7 @@ func TestDeleteTokenNotFound(t *testing.T) {
 
 // TestHasAnyAdminToken verifies the admin token check.
 func TestHasAnyAdminToken(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -410,6 +420,7 @@ func TestHasAnyAdminToken(t *testing.T) {
 
 // TestCountAdminTokens verifies counting admin tokens.
 func TestCountAdminTokens(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -465,6 +476,7 @@ func TestCountAdminTokens(t *testing.T) {
 
 // TestAddPermissionForToken verifies adding permissions to tokens.
 func TestAddPermissionForToken(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -509,6 +521,7 @@ func TestAddPermissionForToken(t *testing.T) {
 
 // TestAddPermissionInvalidToken verifies that adding permission to non-existent token fails due to FK constraint.
 func TestAddPermissionInvalidToken(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -544,6 +557,7 @@ func TestAddPermissionInvalidToken(t *testing.T) {
 
 // TestRemovePermission verifies deleting permissions.
 func TestRemovePermission(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -585,6 +599,7 @@ func TestRemovePermission(t *testing.T) {
 
 // TestRemovePermissionNotFound verifies ErrNotFound for non-existent permission.
 func TestRemovePermissionNotFound(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -604,6 +619,7 @@ func TestRemovePermissionNotFound(t *testing.T) {
 
 // TestGetPermissionsForToken verifies retrieving permissions.
 func TestGetPermissionsForToken(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -682,6 +698,7 @@ func TestGetPermissionsForToken(t *testing.T) {
 
 // TestTokenWorkflow tests a complete token workflow.
 func TestTokenWorkflow(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -767,6 +784,7 @@ func TestTokenWorkflow(t *testing.T) {
 
 // TestTokenCascadeDelete verifies that deleting a token cascades to permissions.
 func TestTokenCascadeDelete(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -813,6 +831,7 @@ func TestTokenCascadeDelete(t *testing.T) {
 
 // TestCreateTokenWithCancelledContext tests CreateToken with cancelled context.
 func TestCreateTokenWithCancelledContext(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -834,6 +853,7 @@ func TestCreateTokenWithCancelledContext(t *testing.T) {
 
 // TestGetTokenByHashWithCancelledContext tests GetTokenByHash with cancelled context.
 func TestGetTokenByHashWithCancelledContext(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -854,6 +874,7 @@ func TestGetTokenByHashWithCancelledContext(t *testing.T) {
 
 // TestGetTokenByIDWithCancelledContext tests GetTokenByID with cancelled context.
 func TestGetTokenByIDWithCancelledContext(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -874,6 +895,7 @@ func TestGetTokenByIDWithCancelledContext(t *testing.T) {
 
 // TestListTokensWithCancelledContext tests ListTokens with cancelled context.
 func TestListTokensWithCancelledContext(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -894,6 +916,7 @@ func TestListTokensWithCancelledContext(t *testing.T) {
 
 // TestDeleteTokenWithCancelledContext tests DeleteToken with cancelled context.
 func TestDeleteTokenWithCancelledContext(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -914,6 +937,7 @@ func TestDeleteTokenWithCancelledContext(t *testing.T) {
 
 // TestHasAnyAdminTokenWithCancelledContext tests HasAnyAdminToken with cancelled context.
 func TestHasAnyAdminTokenWithCancelledContext(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -934,6 +958,7 @@ func TestHasAnyAdminTokenWithCancelledContext(t *testing.T) {
 
 // TestCountAdminTokensWithCancelledContext tests CountAdminTokens with cancelled context.
 func TestCountAdminTokensWithCancelledContext(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -954,6 +979,7 @@ func TestCountAdminTokensWithCancelledContext(t *testing.T) {
 
 // TestAddPermissionInvalidZoneID tests validation of ZoneID in AddPermissionForToken.
 func TestAddPermissionInvalidZoneID(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -987,6 +1013,7 @@ func TestAddPermissionInvalidZoneID(t *testing.T) {
 
 // TestAddPermissionEmptyActions tests validation of AllowedActions in AddPermissionForToken.
 func TestAddPermissionEmptyActions(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -1020,6 +1047,7 @@ func TestAddPermissionEmptyActions(t *testing.T) {
 
 // TestAddPermissionEmptyRecordTypes tests validation of RecordTypes in AddPermissionForToken.
 func TestAddPermissionEmptyRecordTypes(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -1053,6 +1081,7 @@ func TestAddPermissionEmptyRecordTypes(t *testing.T) {
 
 // TestAddPermissionWithCancelledContext tests AddPermissionForToken with cancelled context.
 func TestAddPermissionWithCancelledContext(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -1085,6 +1114,7 @@ func TestAddPermissionWithCancelledContext(t *testing.T) {
 
 // TestRemovePermissionWithCancelledContext tests RemovePermission with cancelled context.
 func TestRemovePermissionWithCancelledContext(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -1105,6 +1135,7 @@ func TestRemovePermissionWithCancelledContext(t *testing.T) {
 
 // TestGetPermissionsForTokenWithCancelledContext tests GetPermissionsForToken with cancelled context.
 func TestGetPermissionsForTokenWithCancelledContext(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -1125,6 +1156,7 @@ func TestGetPermissionsForTokenWithCancelledContext(t *testing.T) {
 
 // TestGetPermissionsEmptyList tests that GetPermissionsForToken returns empty slice, not nil.
 func TestGetPermissionsEmptyList(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 

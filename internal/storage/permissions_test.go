@@ -11,6 +11,7 @@ import (
 
 // TestAddPermissionSuccess verifies that a permission is created successfully.
 func TestAddPermissionSuccess(t *testing.T) {
+	t.Parallel()
 	storage := setupTestStorage(t)
 	defer storage.Close()
 
@@ -60,6 +61,7 @@ func TestAddPermissionSuccess(t *testing.T) {
 
 // TestAddPermissionValidateZoneID verifies that invalid zone ID is rejected.
 func TestAddPermissionValidateZoneID(t *testing.T) {
+	t.Parallel()
 	storage := setupTestStorage(t)
 	defer storage.Close()
 	ctx := context.Background()
@@ -95,6 +97,7 @@ func TestAddPermissionValidateZoneID(t *testing.T) {
 
 // TestAddPermissionValidateActions verifies that empty actions are rejected.
 func TestAddPermissionValidateActions(t *testing.T) {
+	t.Parallel()
 	storage := setupTestStorage(t)
 	defer storage.Close()
 	ctx := context.Background()
@@ -116,6 +119,7 @@ func TestAddPermissionValidateActions(t *testing.T) {
 
 // TestAddPermissionValidateRecordTypes verifies that empty record types are rejected.
 func TestAddPermissionValidateRecordTypes(t *testing.T) {
+	t.Parallel()
 	storage := setupTestStorage(t)
 	defer storage.Close()
 	ctx := context.Background()
@@ -137,6 +141,7 @@ func TestAddPermissionValidateRecordTypes(t *testing.T) {
 
 // TestAddPermissionForeignKeyConstraint verifies that non-existent scopedKeyID fails.
 func TestAddPermissionForeignKeyConstraint(t *testing.T) {
+	t.Parallel()
 	storage := setupTestStorage(t)
 	defer storage.Close()
 	ctx := context.Background()
@@ -156,6 +161,7 @@ func TestAddPermissionForeignKeyConstraint(t *testing.T) {
 
 // TestGetPermissionsEmpty verifies that empty list is returned for key with no permissions.
 func TestGetPermissionsEmpty(t *testing.T) {
+	t.Parallel()
 	storage := setupTestStorage(t)
 	defer storage.Close()
 	ctx := context.Background()
@@ -179,6 +185,7 @@ func TestGetPermissionsEmpty(t *testing.T) {
 
 // TestGetPermissionsRetrievesCorrectly verifies that permissions are retrieved correctly.
 func TestGetPermissionsRetrievesCorrectly(t *testing.T) {
+	t.Parallel()
 	storage := setupTestStorage(t)
 	defer storage.Close()
 	ctx := context.Background()
@@ -224,6 +231,7 @@ func TestGetPermissionsRetrievesCorrectly(t *testing.T) {
 
 // TestGetPermissionsMultiple verifies that multiple permissions are retrieved correctly.
 func TestGetPermissionsMultiple(t *testing.T) {
+	t.Parallel()
 	storage := setupTestStorage(t)
 	defer storage.Close()
 	ctx := context.Background()
@@ -265,6 +273,7 @@ func TestGetPermissionsMultiple(t *testing.T) {
 
 // TestGetPermissionsJSONDecoding verifies that JSON arrays are decoded correctly.
 func TestGetPermissionsJSONDecoding(t *testing.T) {
+	t.Parallel()
 	storage := setupTestStorage(t)
 	defer storage.Close()
 	ctx := context.Background()
@@ -313,6 +322,7 @@ func TestGetPermissionsJSONDecoding(t *testing.T) {
 
 // TestDeletePermissionSuccess verifies that a permission is deleted successfully.
 func TestDeletePermissionSuccess(t *testing.T) {
+	t.Parallel()
 	storage := setupTestStorage(t)
 	defer storage.Close()
 	ctx := context.Background()
@@ -348,6 +358,7 @@ func TestDeletePermissionSuccess(t *testing.T) {
 
 // TestDeletePermissionNotFound verifies that deleting non-existent permission returns ErrNotFound.
 func TestDeletePermissionNotFound(t *testing.T) {
+	t.Parallel()
 	storage := setupTestStorage(t)
 	defer storage.Close()
 	ctx := context.Background()
@@ -360,6 +371,7 @@ func TestDeletePermissionNotFound(t *testing.T) {
 
 // TestCascadeDeleteScopedKey verifies that deleting a scoped key deletes its permissions.
 func TestCascadeDeleteScopedKey(t *testing.T) {
+	t.Parallel()
 	storage := setupTestStorage(t)
 	defer storage.Close()
 	ctx := context.Background()
@@ -395,6 +407,7 @@ func TestCascadeDeleteScopedKey(t *testing.T) {
 
 // TestPermissionTimeTracking verifies that created_at is populated.
 func TestPermissionTimeTracking(t *testing.T) {
+	t.Parallel()
 	storage := setupTestStorage(t)
 	defer storage.Close()
 	ctx := context.Background()
@@ -433,6 +446,7 @@ func TestPermissionTimeTracking(t *testing.T) {
 
 // TestPermissionSpecialCharacters verifies that special characters in strings are handled.
 func TestPermissionSpecialCharacters(t *testing.T) {
+	t.Parallel()
 	storage := setupTestStorage(t)
 	defer storage.Close()
 	ctx := context.Background()
@@ -484,6 +498,7 @@ func setupTestStorage(t *testing.T) *SQLiteStorage {
 
 // TestAddPermissionInsertError verifies that database insert errors are handled.
 func TestAddPermissionInsertError(t *testing.T) {
+	t.Parallel()
 	storage := setupTestStorage(t)
 	defer storage.Close()
 
@@ -509,6 +524,7 @@ func TestAddPermissionInsertError(t *testing.T) {
 
 // TestGetPermissionsQueryError verifies that query errors are handled.
 func TestGetPermissionsQueryError(t *testing.T) {
+	t.Parallel()
 	storage := setupTestStorage(t)
 	defer storage.Close()
 
@@ -527,6 +543,7 @@ func TestGetPermissionsQueryError(t *testing.T) {
 
 // TestAddPermissionContextTimeout verifies that context timeout is handled properly.
 func TestAddPermissionContextTimeout(t *testing.T) {
+	t.Parallel()
 	storage := setupTestStorage(t)
 	defer storage.Close()
 
@@ -552,6 +569,7 @@ func TestAddPermissionContextTimeout(t *testing.T) {
 
 // TestGetPermissionsUnmarshalAllowedActionsError verifies that corrupted allowed_actions JSON is handled.
 func TestGetPermissionsUnmarshalAllowedActionsError(t *testing.T) {
+	t.Parallel()
 	storage := setupTestStorage(t)
 	defer storage.Close()
 	ctx := context.Background()
@@ -576,6 +594,7 @@ func TestGetPermissionsUnmarshalAllowedActionsError(t *testing.T) {
 
 // TestGetPermissionsUnmarshalRecordTypesError verifies that corrupted record_types JSON is handled.
 func TestGetPermissionsUnmarshalRecordTypesError(t *testing.T) {
+	t.Parallel()
 	storage := setupTestStorage(t)
 	defer storage.Close()
 	ctx := context.Background()
@@ -600,6 +619,7 @@ func TestGetPermissionsUnmarshalRecordTypesError(t *testing.T) {
 
 // TestDeletePermissionError verifies that delete errors are handled.
 func TestDeletePermissionError(t *testing.T) {
+	t.Parallel()
 	storage := setupTestStorage(t)
 	defer storage.Close()
 
@@ -615,6 +635,7 @@ func TestDeletePermissionError(t *testing.T) {
 
 // TestAddPermissionMultiplePermissions verifies multiple permissions for same key.
 func TestAddPermissionMultiplePermissions(t *testing.T) {
+	t.Parallel()
 	storage := setupTestStorage(t)
 	defer storage.Close()
 	ctx := context.Background()
@@ -666,6 +687,7 @@ func TestAddPermissionMultiplePermissions(t *testing.T) {
 
 // TestGetPermissionsRowsErrError verifies that rows.Err() errors are handled.
 func TestGetPermissionsRowsErrError(t *testing.T) {
+	t.Parallel()
 	storage := setupTestStorage(t)
 	ctx := context.Background()
 
@@ -695,6 +717,7 @@ func TestGetPermissionsRowsErrError(t *testing.T) {
 
 // TestDeletePermissionRowsAffectedError verifies that rows affected errors are handled.
 func TestDeletePermissionRowsAffectedError(t *testing.T) {
+	t.Parallel()
 	storage := setupTestStorage(t)
 	ctx := context.Background()
 

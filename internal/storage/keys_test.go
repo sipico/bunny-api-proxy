@@ -11,6 +11,7 @@ import (
 
 // TestCreateScopedKey verifies that CreateScopedKey creates a key successfully.
 func TestCreateScopedKey(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -46,6 +47,7 @@ func TestCreateScopedKey(t *testing.T) {
 // Note: Normal CreateScopedKey calls cannot produce duplicate hashes due to bcrypt's random salts.
 // This test verifies the constraint by manually inserting a duplicate hash.
 func TestCreateScopedKeyDuplicate(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -94,6 +96,7 @@ func TestCreateScopedKeyDuplicate(t *testing.T) {
 
 // TestCreateScopedKeyContextCancellation verifies context cancellation works.
 func TestCreateScopedKeyContextCancellation(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -113,6 +116,7 @@ func TestCreateScopedKeyContextCancellation(t *testing.T) {
 
 // TestGetScopedKeyByHash verifies that GetScopedKeyByHash retrieves created keys.
 func TestGetScopedKeyByHash(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -166,6 +170,7 @@ func TestGetScopedKeyByHash(t *testing.T) {
 
 // TestGetScopedKeyByHashNotFound verifies ErrNotFound for non-existent hash.
 func TestGetScopedKeyByHashNotFound(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -185,6 +190,7 @@ func TestGetScopedKeyByHashNotFound(t *testing.T) {
 
 // TestGetScopedKey verifies that GetScopedKey retrieves a key by ID.
 func TestGetScopedKey(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -222,6 +228,7 @@ func TestGetScopedKey(t *testing.T) {
 
 // TestGetScopedKeyNotFound verifies ErrNotFound for non-existent ID.
 func TestGetScopedKeyNotFound(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -241,6 +248,7 @@ func TestGetScopedKeyNotFound(t *testing.T) {
 
 // TestListScopedKeys verifies listing of scoped keys.
 func TestListScopedKeys(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -310,6 +318,7 @@ func TestListScopedKeys(t *testing.T) {
 
 // TestDeleteScopedKey verifies deletion of scoped keys.
 func TestDeleteScopedKey(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -355,6 +364,7 @@ func TestDeleteScopedKey(t *testing.T) {
 
 // TestDeleteScopedKeyNotFound verifies ErrNotFound for deleting non-existent key.
 func TestDeleteScopedKeyNotFound(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -374,6 +384,7 @@ func TestDeleteScopedKeyNotFound(t *testing.T) {
 
 // TestScopedKeyWorkflow tests a complete workflow.
 func TestScopedKeyWorkflow(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -441,6 +452,7 @@ func TestScopedKeyWorkflow(t *testing.T) {
 
 // TestSQLiteStorageClose verifies that Close() properly closes the database.
 func TestSQLiteStorageClose(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -464,6 +476,7 @@ func TestSQLiteStorageClose(t *testing.T) {
 
 // TestCreateScopedKeyClosedDB verifies error handling when database is closed.
 func TestCreateScopedKeyClosedDB(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -482,6 +495,7 @@ func TestCreateScopedKeyClosedDB(t *testing.T) {
 
 // TestGetScopedKeyByHashClosedDB verifies error handling when database is closed.
 func TestGetScopedKeyByHashClosedDB(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -500,6 +514,7 @@ func TestGetScopedKeyByHashClosedDB(t *testing.T) {
 
 // TestGetScopedKeyClosedDB verifies error handling when database is closed.
 func TestGetScopedKeyClosedDB(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -518,6 +533,7 @@ func TestGetScopedKeyClosedDB(t *testing.T) {
 
 // TestListScopedKeysClosedDB verifies error handling when database is closed.
 func TestListScopedKeysClosedDB(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -536,6 +552,7 @@ func TestListScopedKeysClosedDB(t *testing.T) {
 
 // TestDeleteScopedKeyClosedDB verifies error handling when database is closed.
 func TestDeleteScopedKeyClosedDB(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -554,6 +571,7 @@ func TestDeleteScopedKeyClosedDB(t *testing.T) {
 
 // TestGetScopedKeyByHashContextCancellation verifies context cancellation handling.
 func TestGetScopedKeyByHashContextCancellation(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -574,6 +592,7 @@ func TestGetScopedKeyByHashContextCancellation(t *testing.T) {
 
 // TestGetScopedKeyContextCancellation verifies context cancellation handling.
 func TestGetScopedKeyContextCancellation(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -594,6 +613,7 @@ func TestGetScopedKeyContextCancellation(t *testing.T) {
 
 // TestListScopedKeysContextCancellation verifies context cancellation handling.
 func TestListScopedKeysContextCancellation(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 
@@ -614,6 +634,7 @@ func TestListScopedKeysContextCancellation(t *testing.T) {
 
 // TestDeleteScopedKeyContextCancellation verifies context cancellation handling.
 func TestDeleteScopedKeyContextCancellation(t *testing.T) {
+	t.Parallel()
 	encryptionKey := make([]byte, 32)
 	_, _ = rand.Read(encryptionKey)
 

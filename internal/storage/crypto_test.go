@@ -8,6 +8,7 @@ import (
 )
 
 func TestEncryptDecryptAPIKey(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name       string
 		apiKey     string
@@ -108,6 +109,7 @@ func TestEncryptDecryptAPIKey(t *testing.T) {
 }
 
 func TestEncryptProducesDifferentCiphertexts(t *testing.T) {
+	t.Parallel()
 	key := make([]byte, 32)
 	if _, err := rand.Read(key); err != nil {
 		t.Fatalf("failed to generate key: %v", err)
@@ -162,6 +164,7 @@ func TestEncryptProducesDifferentCiphertexts(t *testing.T) {
 }
 
 func TestDecryptionWithWrongKey(t *testing.T) {
+	t.Parallel()
 	correctKey := make([]byte, 32)
 	if _, err := rand.Read(correctKey); err != nil {
 		t.Fatalf("failed to generate correct key: %v", err)
@@ -191,6 +194,7 @@ func TestDecryptionWithWrongKey(t *testing.T) {
 }
 
 func TestDecryptionWithInvalidKey(t *testing.T) {
+	t.Parallel()
 	key := make([]byte, 32)
 	if _, err := rand.Read(key); err != nil {
 		t.Fatalf("failed to generate key: %v", err)
@@ -232,6 +236,7 @@ func TestDecryptionWithInvalidKey(t *testing.T) {
 }
 
 func TestDecryptionWithCorruptedData(t *testing.T) {
+	t.Parallel()
 	key := make([]byte, 32)
 	if _, err := rand.Read(key); err != nil {
 		t.Fatalf("failed to generate key: %v", err)
@@ -278,6 +283,7 @@ func TestDecryptionWithCorruptedData(t *testing.T) {
 }
 
 func TestHashKeyDeterministic(t *testing.T) {
+	t.Parallel()
 	key := "test-key-for-hashing"
 
 	// Hash the same key multiple times
@@ -320,6 +326,7 @@ func TestHashKeyDeterministic(t *testing.T) {
 }
 
 func TestVerifyKeySuccess(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name string
 		key  string
@@ -365,6 +372,7 @@ func TestVerifyKeySuccess(t *testing.T) {
 }
 
 func TestVerifyKeyFailure(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		key      string
@@ -409,6 +417,7 @@ func TestVerifyKeyFailure(t *testing.T) {
 }
 
 func TestHashKeyWithDifferentInputs(t *testing.T) {
+	t.Parallel()
 	key1 := "key1"
 	key2 := "key2"
 
@@ -447,6 +456,7 @@ func TestHashKeyWithDifferentInputs(t *testing.T) {
 }
 
 func TestEncryptEmptyKey(t *testing.T) {
+	t.Parallel()
 	key := make([]byte, 32)
 	if _, err := rand.Read(key); err != nil {
 		t.Fatalf("failed to generate key: %v", err)
@@ -469,6 +479,7 @@ func TestEncryptEmptyKey(t *testing.T) {
 }
 
 func TestHashEmptyKey(t *testing.T) {
+	t.Parallel()
 	hash, err := HashKey("")
 	if err != nil {
 		t.Fatalf("hash failed: %v", err)
@@ -484,6 +495,7 @@ func TestHashEmptyKey(t *testing.T) {
 }
 
 func TestEncryptionWithMultipleKeys(t *testing.T) {
+	t.Parallel()
 	plaintext := "my-api-key"
 
 	key1 := make([]byte, 32)
@@ -536,6 +548,7 @@ func TestEncryptionWithMultipleKeys(t *testing.T) {
 }
 
 func TestHashKeyTooLong(t *testing.T) {
+	t.Parallel()
 	// bcrypt has a 72-byte limit
 	longKey := strings.Repeat("a", 73)
 
