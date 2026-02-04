@@ -18,10 +18,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: '1.25'
 
@@ -42,10 +42,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: '1.25'
 
@@ -72,10 +72,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: '1.25'
 
@@ -90,10 +90,10 @@ jobs:
     needs: [test, lint]
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: '1.25'
 
@@ -108,14 +108,14 @@ jobs:
         run: go build -o mockbunny ./cmd/mockbunny
 
       - name: Upload proxy binary artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: bunny-api-proxy
           path: bunny-api-proxy
           retention-days: 7
 
       - name: Upload mockbunny binary artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: mockbunny
           path: mockbunny
@@ -127,7 +127,7 @@ jobs:
     needs: [test, lint, build]  # Wait for binary to be built
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Create build contexts for pre-built binaries
         run: |
@@ -135,13 +135,13 @@ jobs:
           mkdir -p ci-build/proxy ci-build/mockbunny
 
       - name: Download binary artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: bunny-api-proxy
           path: ci-build/proxy
 
       - name: Download mockbunny binary artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: mockbunny
           path: ci-build/mockbunny
@@ -160,7 +160,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Build proxy Docker image (using pre-built binary)
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: ci-build/proxy
           file: .claude/docker/Dockerfile.prebuilt
@@ -169,7 +169,7 @@ jobs:
           tags: bunny-api-proxy:test
 
       - name: Build mockbunny Docker image (using pre-built binary)
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: ci-build/mockbunny
           file: .claude/docker/Dockerfile.mockbunny.prebuilt
@@ -178,7 +178,7 @@ jobs:
           tags: mockbunny:test
 
       - name: Build test-runner Docker image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: .claude/docker/Dockerfile.testrunner
@@ -196,7 +196,7 @@ jobs:
           ls -lh /tmp/*.tar
 
       - name: Upload Docker images
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: docker-images
           path: |
@@ -212,10 +212,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Download Docker images
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: docker-images
           path: /tmp
@@ -271,7 +271,7 @@ jobs:
 
       - name: Upload E2E logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: e2e-logs
           path: e2e-logs/
@@ -293,10 +293,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Download Docker images
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: docker-images
           path: /tmp
@@ -349,7 +349,7 @@ jobs:
 
       - name: Upload E2E logs (Real API)
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: e2e-logs-real-api
           path: e2e-logs/
