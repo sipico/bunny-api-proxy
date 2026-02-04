@@ -19,6 +19,7 @@ import (
 )
 
 func TestHealthHandler(t *testing.T) {
+	t.Parallel()
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	w := httptest.NewRecorder()
 
@@ -39,6 +40,7 @@ func TestHealthHandler(t *testing.T) {
 }
 
 func TestReadyHandler(t *testing.T) {
+	t.Parallel()
 	// Create a temporary in-memory storage for testing
 	store, err := storage.New(":memory:", make([]byte, 32))
 	if err != nil {
@@ -67,6 +69,7 @@ func TestReadyHandler(t *testing.T) {
 }
 
 func TestReadyHandlerWithClosedStorage(t *testing.T) {
+	t.Parallel()
 	// Create a storage and close it to simulate database unavailability
 	store, err := storage.New(":memory:", make([]byte, 32))
 	if err != nil {
@@ -91,6 +94,7 @@ func TestReadyHandlerWithClosedStorage(t *testing.T) {
 }
 
 func TestInitializeComponentsWithValidConfig(t *testing.T) {
+	t.Parallel()
 
 	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
@@ -152,6 +156,7 @@ func TestInitializeComponentsWithValidConfig(t *testing.T) {
 }
 
 func TestInitializeComponentsWithDebugLogLevel(t *testing.T) {
+	t.Parallel()
 
 	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
@@ -189,6 +194,7 @@ func TestInitializeComponentsWithDebugLogLevel(t *testing.T) {
 }
 
 func TestInitializeComponentsWithInvalidLogLevel(t *testing.T) {
+	t.Parallel()
 
 	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
@@ -225,6 +231,7 @@ func TestInitializeComponentsWithInvalidLogLevel(t *testing.T) {
 }
 
 func TestInitializeComponentsWithInvalidDataPath(t *testing.T) {
+	t.Parallel()
 
 	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
@@ -261,6 +268,7 @@ func TestInitializeComponentsWithInvalidDataPath(t *testing.T) {
 }
 
 func TestRunWithInvalidLogLevel(t *testing.T) {
+	t.Parallel()
 	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
 	oldBunnyAPIKey := os.Getenv("BUNNY_API_KEY")
@@ -298,6 +306,7 @@ func TestRunWithInvalidLogLevel(t *testing.T) {
 }
 
 func TestReadyHandlerContextTimeout(t *testing.T) {
+	t.Parallel()
 	store, err := storage.New(":memory:", make([]byte, 32))
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
@@ -351,6 +360,7 @@ func BenchmarkReadyHandler(b *testing.B) {
 
 // TestReadyHandlerWithTimeoutContext tests that ready handler respects context timeout
 func TestReadyHandlerWithTimeoutContext(t *testing.T) {
+	t.Parallel()
 	store, err := storage.New(":memory:", make([]byte, 32))
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
@@ -379,6 +389,7 @@ func TestReadyHandlerWithTimeoutContext(t *testing.T) {
 
 // TestHealthHandlerContentType validates JSON response format
 func TestHealthHandlerContentType(t *testing.T) {
+	t.Parallel()
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	w := httptest.NewRecorder()
 
@@ -392,6 +403,7 @@ func TestHealthHandlerContentType(t *testing.T) {
 
 // TestReadyHandlerContentType validates JSON response format
 func TestReadyHandlerContentType(t *testing.T) {
+	t.Parallel()
 	store, err := storage.New(":memory:", make([]byte, 32))
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
@@ -412,6 +424,7 @@ func TestReadyHandlerContentType(t *testing.T) {
 
 // TestReadyHandlerResponseBody validates response structure
 func TestReadyHandlerResponseBody(t *testing.T) {
+	t.Parallel()
 	store, err := storage.New(":memory:", make([]byte, 32))
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
@@ -433,6 +446,7 @@ func TestReadyHandlerResponseBody(t *testing.T) {
 
 // TestHealthHandlerResponseBody validates response structure
 func TestHealthHandlerResponseBody(t *testing.T) {
+	t.Parallel()
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	w := httptest.NewRecorder()
 
@@ -447,6 +461,7 @@ func TestHealthHandlerResponseBody(t *testing.T) {
 
 // TestReadyHandlerErrorResponseFormat validates error response structure
 func TestReadyHandlerErrorResponseFormat(t *testing.T) {
+	t.Parallel()
 	store, err := storage.New(":memory:", make([]byte, 32))
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
@@ -474,6 +489,7 @@ func TestReadyHandlerErrorResponseFormat(t *testing.T) {
 
 // TestReadyHandlerStatusOKResponse validates successful response
 func TestReadyHandlerStatusOKResponse(t *testing.T) {
+	t.Parallel()
 	store, err := storage.New(":memory:", make([]byte, 32))
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
@@ -493,6 +509,7 @@ func TestReadyHandlerStatusOKResponse(t *testing.T) {
 
 // TestInitializeComponentsWithWarnLogLevel tests debug log level
 func TestInitializeComponentsWithWarnLogLevel(t *testing.T) {
+	t.Parallel()
 
 	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
@@ -531,6 +548,7 @@ func TestInitializeComponentsWithWarnLogLevel(t *testing.T) {
 
 // TestInitializeComponentsWithErrorLogLevel tests error log level
 func TestInitializeComponentsWithErrorLogLevel(t *testing.T) {
+	t.Parallel()
 
 	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
@@ -569,6 +587,7 @@ func TestInitializeComponentsWithErrorLogLevel(t *testing.T) {
 
 // TestInitializeComponentsRouterSetup validates that the main router is properly configured
 func TestInitializeComponentsRouterSetup(t *testing.T) {
+	t.Parallel()
 
 	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
@@ -612,6 +631,7 @@ func TestInitializeComponentsRouterSetup(t *testing.T) {
 
 // TestInitializeComponentsReadyEndpoint validates that ready endpoint works
 func TestInitializeComponentsReadyEndpoint(t *testing.T) {
+	t.Parallel()
 
 	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
@@ -655,6 +675,7 @@ func TestInitializeComponentsReadyEndpoint(t *testing.T) {
 
 // TestInitializeComponentsValidatorCreated validates validator is created
 func TestInitializeComponentsValidatorCreated(t *testing.T) {
+	t.Parallel()
 
 	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
@@ -694,6 +715,7 @@ func TestInitializeComponentsValidatorCreated(t *testing.T) {
 
 // TestInitializeComponentsStorageCreated validates storage is created and working
 func TestInitializeComponentsStorageCreated(t *testing.T) {
+	t.Parallel()
 
 	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
@@ -737,6 +759,7 @@ func TestInitializeComponentsStorageCreated(t *testing.T) {
 
 // TestInitializeComponentsBunnyClientCreated validates bunny client is created
 func TestInitializeComponentsBunnyClientCreated(t *testing.T) {
+	t.Parallel()
 
 	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
@@ -775,6 +798,7 @@ func TestInitializeComponentsBunnyClientCreated(t *testing.T) {
 
 // TestMainServerStartAndHealthCheck tests that the server can start and respond to health checks
 func TestMainServerStartAndHealthCheck(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
@@ -831,6 +855,7 @@ func TestMainServerStartAndHealthCheck(t *testing.T) {
 
 // TestInitializeComponentsAllComponentsNotNil verifies no component is nil
 func TestInitializeComponentsAllComponentsNotNil(t *testing.T) {
+	t.Parallel()
 
 	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
@@ -895,6 +920,7 @@ func TestInitializeComponentsAllComponentsNotNil(t *testing.T) {
 
 // TestInitializeComponentsLogLevelVariantWorks validates the log level can be changed
 func TestInitializeComponentsLogLevelVariantWorks(t *testing.T) {
+	t.Parallel()
 
 	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
@@ -934,6 +960,7 @@ func TestInitializeComponentsLogLevelVariantWorks(t *testing.T) {
 
 // TestRunConfigLoadErrorHandling tests that run() handles config load errors
 func TestRunWithInvalidDatabasePath(t *testing.T) {
+	t.Parallel()
 	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
 	oldBunnyAPIKey := os.Getenv("BUNNY_API_KEY")
@@ -971,6 +998,7 @@ func TestRunWithInvalidDatabasePath(t *testing.T) {
 
 // TestInitializeComponentsWithAllLogLevels tests initialization with multiple log levels
 func TestInitializeComponentsWithInfoLogLevel(t *testing.T) {
+	t.Parallel()
 
 	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
@@ -1014,6 +1042,7 @@ func TestInitializeComponentsWithInfoLogLevel(t *testing.T) {
 
 // TestInitializeComponentsErrorDoesNotLeakResources tests that failed initialization cleans up
 func TestInitializeComponentsErrorHandling(t *testing.T) {
+	t.Parallel()
 
 	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
@@ -1052,6 +1081,7 @@ func TestInitializeComponentsErrorHandling(t *testing.T) {
 
 // TestReadyHandlerDatabaseConnectivity tests ready handler properly checks database
 func TestReadyHandlerDatabaseConnectivity(t *testing.T) {
+	t.Parallel()
 	store, err := storage.New(":memory:", make([]byte, 32))
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
@@ -1077,6 +1107,7 @@ func TestReadyHandlerDatabaseConnectivity(t *testing.T) {
 
 // TestHealthHandlerIsAlwaysOK tests that health handler always returns OK
 func TestHealthHandlerIsAlwaysOK(t *testing.T) {
+	t.Parallel()
 	for i := 0; i < 5; i++ {
 		req := httptest.NewRequest(http.MethodGet, "/health", nil)
 		w := httptest.NewRecorder()
@@ -1091,6 +1122,7 @@ func TestHealthHandlerIsAlwaysOK(t *testing.T) {
 
 // TestReadyHandlerMultipleCalls tests ready handler can be called multiple times
 func TestReadyHandlerMultipleCalls(t *testing.T) {
+	t.Parallel()
 	store, err := storage.New(":memory:", make([]byte, 32))
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
@@ -1113,6 +1145,7 @@ func TestReadyHandlerMultipleCalls(t *testing.T) {
 
 // TestCreateServer tests that the server is created with correct configuration
 func TestCreateServer(t *testing.T) {
+	t.Parallel()
 	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
 	oldListenAddr := os.Getenv("LISTEN_ADDR")
@@ -1178,6 +1211,7 @@ func TestCreateServer(t *testing.T) {
 
 // TestCreateServerWithDifferentPorts tests server creation with different ports
 func TestCreateServerWithDifferentPorts(t *testing.T) {
+	t.Parallel()
 	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
 	oldListenAddr := os.Getenv("LISTEN_ADDR")
@@ -1222,6 +1256,7 @@ func TestCreateServerWithDifferentPorts(t *testing.T) {
 
 // TestServerShutdownTimeoutConstant validates the shutdown timeout is set correctly
 func TestServerShutdownTimeoutConstant(t *testing.T) {
+	t.Parallel()
 	expectedTimeout := serverShutdownTimeout
 	if expectedTimeout != 30*time.Second {
 		t.Errorf("server shutdown timeout should be 30 seconds, got %v", expectedTimeout)
@@ -1230,6 +1265,7 @@ func TestServerShutdownTimeoutConstant(t *testing.T) {
 
 // TestVersionConstant validates the version string is set
 func TestVersionConstant(t *testing.T) {
+	t.Parallel()
 	if version == "" {
 		t.Error("version constant should not be empty")
 	}
@@ -1240,6 +1276,7 @@ func TestVersionConstant(t *testing.T) {
 
 // TestServerWithReadyAndHealthEndpoints tests that both endpoints are properly mounted
 func TestServerWithReadyAndHealthEndpoints(t *testing.T) {
+	t.Parallel()
 
 	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
@@ -1292,6 +1329,7 @@ func TestServerWithReadyAndHealthEndpoints(t *testing.T) {
 
 // TestHealthHandlerResponseHeaders validates response headers are correct
 func TestHealthHandlerResponseHeaders(t *testing.T) {
+	t.Parallel()
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	w := httptest.NewRecorder()
 
@@ -1310,6 +1348,7 @@ func TestHealthHandlerResponseHeaders(t *testing.T) {
 
 // TestReadyHandlerResponseHeaders validates response headers are correct
 func TestReadyHandlerResponseHeaders(t *testing.T) {
+	t.Parallel()
 	store, err := storage.New(":memory:", make([]byte, 32))
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
@@ -1330,6 +1369,7 @@ func TestReadyHandlerResponseHeaders(t *testing.T) {
 
 // TestCreateServerHandlerIsSet tests that server handler is properly assigned
 func TestCreateServerHandlerIsSet(t *testing.T) {
+	t.Parallel()
 
 	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
@@ -1377,6 +1417,7 @@ func TestCreateServerHandlerIsSet(t *testing.T) {
 
 // TestRunComponentInitializationPath tests the full run() component initialization path
 func TestRunComponentInitializationPath(t *testing.T) {
+	t.Parallel()
 
 	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
@@ -1433,6 +1474,7 @@ func TestRunComponentInitializationPath(t *testing.T) {
 
 // TestInitializeComponentsLoggerDefaultLevel tests that logger is set as default
 func TestInitializeComponentsLoggerDefaultLevel(t *testing.T) {
+	t.Parallel()
 
 	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
@@ -1473,6 +1515,7 @@ func TestInitializeComponentsLoggerDefaultLevel(t *testing.T) {
 
 // TestCreateServerTimeouts verifies timeout values are correctly set
 func TestCreateServerTimeouts(t *testing.T) {
+	t.Parallel()
 
 	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
@@ -1528,6 +1571,7 @@ func TestCreateServerTimeouts(t *testing.T) {
 
 // TestStartServerAndWaitForShutdownWithServerError tests server shutdown when ListenAndServe returns error
 func TestStartServerAndWaitForShutdownWithServerError(t *testing.T) {
+	t.Parallel()
 
 	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
@@ -1577,6 +1621,7 @@ func TestStartServerAndWaitForShutdownWithServerError(t *testing.T) {
 
 // TestStorageCloseError tests that storage close errors are logged
 func TestStorageCloseError(t *testing.T) {
+	t.Parallel()
 
 	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
@@ -1616,6 +1661,7 @@ func TestStorageCloseError(t *testing.T) {
 
 // TestInitializeComponentsLoggingLevel tests that log level parsing works correctly
 func TestInitializeComponentsLoggingLevelDebug(t *testing.T) {
+	t.Parallel()
 
 	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
@@ -1655,6 +1701,7 @@ func TestInitializeComponentsLoggingLevelDebug(t *testing.T) {
 
 // TestCreateServerIsServerInitialized tests that createServer initializes all fields
 func TestCreateServerIsServerInitialized(t *testing.T) {
+	t.Parallel()
 
 	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
@@ -1713,6 +1760,7 @@ func TestCreateServerIsServerInitialized(t *testing.T) {
 
 // TestRunCompleteFlow tests the full run() function with all components
 func TestRunCompleteFlow(t *testing.T) {
+	t.Parallel()
 
 	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
@@ -1779,6 +1827,7 @@ func TestRunCompleteFlow(t *testing.T) {
 
 // TestConfigLoadsWithDefaults tests that config loads successfully with all defaults
 func TestConfigLoadsWithDefaults(t *testing.T) {
+	t.Parallel()
 	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
 	oldListenAddr := os.Getenv("LISTEN_ADDR")
@@ -1825,6 +1874,7 @@ func TestConfigLoadsWithDefaults(t *testing.T) {
 
 // TestHealthHandlerAlwaysSucceeds tests that health endpoint is always OK
 func TestHealthHandlerAlwaysReturnsOK(t *testing.T) {
+	t.Parallel()
 	for i := 0; i < 10; i++ {
 		req := httptest.NewRequest(http.MethodGet, "/health", nil)
 		w := httptest.NewRecorder()
@@ -1839,6 +1889,7 @@ func TestHealthHandlerAlwaysReturnsOK(t *testing.T) {
 
 // TestReadyHandlerMultipleRequestsConsistency tests that ready endpoint behaves consistently
 func TestReadyHandlerMultipleRequestsConsistency(t *testing.T) {
+	t.Parallel()
 	store, err := storage.New(":memory:", make([]byte, 32))
 	if err != nil {
 		t.Fatalf("failed to create test storage: %v", err)
@@ -1861,6 +1912,7 @@ func TestReadyHandlerMultipleRequestsConsistency(t *testing.T) {
 
 // TestRunWithHealthEndpoint tests that the server correctly exposes the health endpoint
 func TestRunWithHealthEndpoint(t *testing.T) {
+	t.Parallel()
 	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
 	oldListenAddr := os.Getenv("LISTEN_ADDR")
@@ -1939,6 +1991,7 @@ func TestRunWithHealthEndpoint(t *testing.T) {
 
 // TestInitializeComponentsCreateAllRouters tests that all routers are created
 func TestInitializeComponentsCreateAllRouters(t *testing.T) {
+	t.Parallel()
 
 	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
@@ -2006,6 +2059,7 @@ func TestInitializeComponentsCreateAllRouters(t *testing.T) {
 
 // TestRunInitializeComponentsWithInvalidLogLevel tests that initializeComponents fails with invalid log level
 func TestRunInitializeComponentsWithInvalidLogLevel(t *testing.T) {
+	t.Parallel()
 	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
 
@@ -2041,6 +2095,7 @@ func TestRunInitializeComponentsWithInvalidLogLevel(t *testing.T) {
 
 // TestInitializeComponentsWithErrorPath tests error handling in initialization
 func TestInitializeComponentsValidation(t *testing.T) {
+	t.Parallel()
 
 	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
@@ -2081,6 +2136,7 @@ func TestInitializeComponentsValidation(t *testing.T) {
 
 // TestCreateServerAddrFormatting tests correct address formatting
 func TestCreateServerAddrFormatting(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		addr     string
 		expected string
@@ -2135,6 +2191,7 @@ func TestCreateServerAddrFormatting(t *testing.T) {
 
 // TestServerStartAndHealthCheck starts an actual HTTP server and verifies health endpoints
 func TestStartActualServer(t *testing.T) {
+	t.Parallel()
 	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
 	oldListenAddr := os.Getenv("LISTEN_ADDR")
@@ -2204,6 +2261,7 @@ func TestStartActualServer(t *testing.T) {
 }
 
 func TestRunInitializeComponentsInvalidLogLevel(t *testing.T) {
+	t.Parallel()
 
 	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
@@ -2245,6 +2303,7 @@ func TestRunInitializeComponentsInvalidLogLevel(t *testing.T) {
 
 // TestStartServerAndWaitForShutdownServerStartupError tests server startup error handling
 func TestStartServerAndWaitForShutdownServerStartupError(t *testing.T) {
+	t.Parallel()
 	// Create a test logger
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
 
@@ -2275,6 +2334,7 @@ func TestStartServerAndWaitForShutdownServerStartupError(t *testing.T) {
 
 // TestStartServerAndWaitForShutdownGracefulSignalShutdown tests graceful shutdown when receiving SIGTERM signal
 func TestStartServerAndWaitForShutdownGracefulSignalShutdown(t *testing.T) {
+	t.Parallel()
 	// Create a test logger with a buffer to capture logs
 	var logBuffer bytes.Buffer
 	logger := slog.New(slog.NewTextHandler(&logBuffer, &slog.HandlerOptions{Level: slog.LevelInfo}))
@@ -2332,6 +2392,7 @@ func TestStartServerAndWaitForShutdownGracefulSignalShutdown(t *testing.T) {
 
 // TestDoHealthCheckSuccess tests that doHealthCheck returns 0 when server returns 200 OK
 func TestDoHealthCheckSuccess(t *testing.T) {
+	t.Parallel()
 	// Create a test server that returns 200 OK
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -2347,6 +2408,7 @@ func TestDoHealthCheckSuccess(t *testing.T) {
 
 // TestDoHealthCheckNon200Status tests that doHealthCheck returns 1 when server returns non-200 status
 func TestDoHealthCheckNon200Status(t *testing.T) {
+	t.Parallel()
 	// Create a test server that returns 503 Service Unavailable
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusServiceUnavailable)
@@ -2362,6 +2424,7 @@ func TestDoHealthCheckNon200Status(t *testing.T) {
 
 // TestDoHealthCheckConnectionError tests that doHealthCheck returns 1 when connection fails
 func TestDoHealthCheckConnectionError(t *testing.T) {
+	t.Parallel()
 	// Use an invalid URL that will fail to connect
 	result := doHealthCheck("http://localhost:99999/health")
 	if result != 1 {
@@ -2371,6 +2434,7 @@ func TestDoHealthCheckConnectionError(t *testing.T) {
 
 // TestDoHealthCheck404Status tests that doHealthCheck returns 1 when server returns 404
 func TestDoHealthCheck404Status(t *testing.T) {
+	t.Parallel()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 	}))
@@ -2384,6 +2448,7 @@ func TestDoHealthCheck404Status(t *testing.T) {
 
 // TestDoHealthCheck500Status tests that doHealthCheck returns 1 when server returns 500
 func TestDoHealthCheck500Status(t *testing.T) {
+	t.Parallel()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
@@ -2397,6 +2462,7 @@ func TestDoHealthCheck500Status(t *testing.T) {
 
 // TestRunHealthCheckUsesCorrectURL tests that runHealthCheck calls the correct URL
 func TestRunHealthCheckUsesCorrectURL(t *testing.T) {
+	t.Parallel()
 	// This test verifies the function exists and returns 1 when no server is running
 	// on localhost:8080 (which should be the case during unit tests)
 	result := runHealthCheck()
