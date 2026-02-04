@@ -31,6 +31,7 @@ func (m *mockRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) 
 
 // TestRedactSensitiveData tests the redaction of API keys and authorization headers.
 func TestRedactSensitiveData(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		input    string
@@ -70,6 +71,7 @@ func TestRedactSensitiveData(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := redactSensitiveData(tt.input)
 			if result != tt.expected {
 				t.Errorf("redactSensitiveData(%q) = %q, want %q", tt.input, result, tt.expected)
@@ -80,6 +82,7 @@ func TestRedactSensitiveData(t *testing.T) {
 
 // TestLoggingTransport_Success tests successful HTTP request/response logging.
 func TestLoggingTransport_Success(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	logger := slog.New(slog.NewJSONHandler(&buf, nil))
 
@@ -170,6 +173,7 @@ func TestLoggingTransport_Success(t *testing.T) {
 
 // TestLoggingTransport_RedactsAPIKeys tests that AccessKey and Authorization headers are redacted.
 func TestLoggingTransport_RedactsAPIKeys(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	logger := slog.New(slog.NewJSONHandler(&buf, nil))
 
@@ -234,6 +238,7 @@ func TestLoggingTransport_RedactsAPIKeys(t *testing.T) {
 
 // TestLoggingTransport_HandlesErrors tests error handling and logging.
 func TestLoggingTransport_HandlesErrors(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	logger := slog.New(slog.NewJSONHandler(&buf, nil))
 
@@ -298,6 +303,7 @@ func TestLoggingTransport_HandlesErrors(t *testing.T) {
 
 // TestLoggingTransport_PreservesRequestBody tests that request body can be read by both transport and caller.
 func TestLoggingTransport_PreservesRequestBody(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	logger := slog.New(slog.NewJSONHandler(&buf, nil))
 
@@ -358,6 +364,7 @@ func TestLoggingTransport_PreservesRequestBody(t *testing.T) {
 
 // TestLoggingTransport_PreservesResponseBody tests that response body can be read by caller.
 func TestLoggingTransport_PreservesResponseBody(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	logger := slog.New(slog.NewJSONHandler(&buf, nil))
 
@@ -422,6 +429,7 @@ func TestLoggingTransport_PreservesResponseBody(t *testing.T) {
 
 // TestLoggingTransport_WithPrefix tests that different prefixes are logged correctly.
 func TestLoggingTransport_WithPrefix(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name   string
 		prefix string
@@ -442,6 +450,7 @@ func TestLoggingTransport_WithPrefix(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			var buf bytes.Buffer
 			logger := slog.New(slog.NewJSONHandler(&buf, nil))
 
@@ -495,6 +504,7 @@ func TestLoggingTransport_WithPrefix(t *testing.T) {
 
 // TestLoggingTransport_NilTransport tests fallback to DefaultTransport when Transport is nil.
 func TestLoggingTransport_NilTransport(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	logger := slog.New(slog.NewJSONHandler(&buf, nil))
 
@@ -524,6 +534,7 @@ func TestLoggingTransport_NilTransport(t *testing.T) {
 
 // TestLoggingTransport_LogsRequestDuration tests that request duration is logged.
 func TestLoggingTransport_LogsRequestDuration(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	logger := slog.New(slog.NewJSONHandler(&buf, nil))
 
@@ -590,6 +601,7 @@ func TestLoggingTransport_LogsRequestDuration(t *testing.T) {
 
 // TestLoggingTransport_LogsAllRequestHeaders tests that request headers are logged.
 func TestLoggingTransport_LogsAllRequestHeaders(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	logger := slog.New(slog.NewJSONHandler(&buf, nil))
 
@@ -649,6 +661,7 @@ func TestLoggingTransport_LogsAllRequestHeaders(t *testing.T) {
 
 // TestLoggingTransport_LogsAllResponseHeaders tests that response headers are logged.
 func TestLoggingTransport_LogsAllResponseHeaders(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	logger := slog.New(slog.NewJSONHandler(&buf, nil))
 

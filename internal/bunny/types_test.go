@@ -7,6 +7,7 @@ import (
 )
 
 func TestBunnyTime_UnmarshalJSON(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name    string
 		input   string
@@ -46,6 +47,7 @@ func TestBunnyTime_UnmarshalJSON(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			var bt BunnyTime
 			err := json.Unmarshal([]byte(tt.input), &bt)
 			if (err != nil) != tt.wantErr {
@@ -63,6 +65,7 @@ func TestBunnyTime_UnmarshalJSON(t *testing.T) {
 }
 
 func TestBunnyTime_UnmarshalJSON_InStruct(t *testing.T) {
+	t.Parallel()
 	// Test that BunnyTime works correctly when unmarshaling a full Zone
 	zoneJSON := `{
 		"Id": 123,
