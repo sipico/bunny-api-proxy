@@ -95,6 +95,7 @@ func setupTestStorageMultiZone(t *testing.T, zoneID int64) storage.Storage {
 
 // TestNewRouter_Structure verifies that the router implements http.Handler.
 func TestNewRouter_Structure(t *testing.T) {
+	t.Parallel()
 	// Create minimal storage for middleware
 	encryptionKey := []byte("0123456789abcdef0123456789abcdef")
 	db, err := storage.New(":memory:", encryptionKey)
@@ -117,6 +118,7 @@ func TestNewRouter_Structure(t *testing.T) {
 
 // TestIntegration_ListZones tests listing zones with a valid key.
 func TestIntegration_ListZones(t *testing.T) {
+	t.Parallel()
 	// Setup mock bunny server with zones
 	mockBunny := mockbunny.New()
 	defer mockBunny.Close()
@@ -169,6 +171,7 @@ func TestIntegration_ListZones(t *testing.T) {
 
 // TestIntegration_GetZone tests retrieving a single zone.
 func TestIntegration_GetZone(t *testing.T) {
+	t.Parallel()
 	mockBunny := mockbunny.New()
 	defer mockBunny.Close()
 
@@ -212,6 +215,7 @@ func TestIntegration_GetZone(t *testing.T) {
 
 // TestIntegration_ListRecords tests listing records in a zone.
 func TestIntegration_ListRecords(t *testing.T) {
+	t.Parallel()
 	mockBunny := mockbunny.New()
 	defer mockBunny.Close()
 
@@ -266,6 +270,7 @@ func TestIntegration_ListRecords(t *testing.T) {
 
 // TestIntegration_AddRecord tests creating a new DNS record.
 func TestIntegration_AddRecord(t *testing.T) {
+	t.Parallel()
 	mockBunny := mockbunny.New()
 	defer mockBunny.Close()
 
@@ -320,6 +325,7 @@ func TestIntegration_AddRecord(t *testing.T) {
 
 // TestIntegration_DeleteRecord tests removing a DNS record.
 func TestIntegration_DeleteRecord(t *testing.T) {
+	t.Parallel()
 	mockBunny := mockbunny.New()
 	defer mockBunny.Close()
 
@@ -362,6 +368,7 @@ func TestIntegration_DeleteRecord(t *testing.T) {
 
 // TestIntegration_Unauthorized_NoKey tests request without authorization header.
 func TestIntegration_Unauthorized_NoKey(t *testing.T) {
+	t.Parallel()
 	mockBunny := mockbunny.New()
 	defer mockBunny.Close()
 	zoneID := mockBunny.AddZone("example.com")
@@ -399,6 +406,7 @@ func TestIntegration_Unauthorized_NoKey(t *testing.T) {
 
 // TestIntegration_Unauthorized_InvalidKey tests request with invalid key.
 func TestIntegration_Unauthorized_InvalidKey(t *testing.T) {
+	t.Parallel()
 	mockBunny := mockbunny.New()
 	defer mockBunny.Close()
 	zoneID := mockBunny.AddZone("example.com")
@@ -437,6 +445,7 @@ func TestIntegration_Unauthorized_InvalidKey(t *testing.T) {
 
 // TestIntegration_Forbidden_WrongZone tests accessing a zone without permission.
 func TestIntegration_Forbidden_WrongZone(t *testing.T) {
+	t.Parallel()
 	mockBunny := mockbunny.New()
 	defer mockBunny.Close()
 
@@ -480,6 +489,7 @@ func TestIntegration_Forbidden_WrongZone(t *testing.T) {
 
 // TestIntegration_Forbidden_WrongRecordType tests adding a record type without permission.
 func TestIntegration_Forbidden_WrongRecordType(t *testing.T) {
+	t.Parallel()
 	mockBunny := mockbunny.New()
 	defer mockBunny.Close()
 
@@ -531,6 +541,7 @@ func TestIntegration_Forbidden_WrongRecordType(t *testing.T) {
 
 // TestIntegration_ListZones_FilteredByPermission tests that ListZones filters to permitted zones only.
 func TestIntegration_ListZones_FilteredByPermission(t *testing.T) {
+	t.Parallel()
 	mockBunny := mockbunny.New()
 	defer mockBunny.Close()
 
@@ -624,6 +635,7 @@ func TestIntegration_ListZones_FilteredByPermission(t *testing.T) {
 
 // TestIntegration_GetZone_FilteredRecordTypes tests that GetZone filters records by permitted types.
 func TestIntegration_GetZone_FilteredRecordTypes(t *testing.T) {
+	t.Parallel()
 	mockBunny := mockbunny.New()
 	defer mockBunny.Close()
 
@@ -696,6 +708,7 @@ func TestIntegration_GetZone_FilteredRecordTypes(t *testing.T) {
 
 // TestIntegration_ListRecords_FilteredRecordTypes tests that ListRecords filters by permitted types.
 func TestIntegration_ListRecords_FilteredRecordTypes(t *testing.T) {
+	t.Parallel()
 	mockBunny := mockbunny.New()
 	defer mockBunny.Close()
 
