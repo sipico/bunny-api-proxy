@@ -108,14 +108,14 @@ jobs:
         run: go build -o mockbunny ./cmd/mockbunny
 
       - name: Upload proxy binary artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: bunny-api-proxy
           path: bunny-api-proxy
           retention-days: 7
 
       - name: Upload mockbunny binary artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: mockbunny
           path: mockbunny
@@ -196,7 +196,7 @@ jobs:
           ls -lh /tmp/*.tar
 
       - name: Upload Docker images
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: docker-images
           path: |
@@ -271,7 +271,7 @@ jobs:
 
       - name: Upload E2E logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: e2e-logs
           path: e2e-logs/
@@ -349,7 +349,7 @@ jobs:
 
       - name: Upload E2E logs (Real API)
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: e2e-logs-real-api
           path: e2e-logs/
