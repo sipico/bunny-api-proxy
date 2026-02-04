@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -14,6 +15,11 @@ import (
 	"github.com/sipico/bunny-api-proxy/internal/storage"
 	"github.com/sipico/bunny-api-proxy/internal/testutil/mockbunny"
 )
+
+// testLogger creates a disabled logger for testing (won't produce output).
+func testLogger() *slog.Logger {
+	return slog.New(slog.NewTextHandler(nil, &slog.HandlerOptions{Level: slog.LevelWarn}))
+}
 
 // setupTestStorage creates an in-memory SQLite database with test data.
 // It creates a test scoped key and sets up permissions for testing.
@@ -108,7 +114,7 @@ func TestNewRouter_Structure(t *testing.T) {
 	middleware := auth.Middleware(validator)
 	handler := NewHandler(nil, nil)
 
-	router := NewRouter(handler, middleware)
+	router := NewRouter(handler, middleware, testLogger())
 
 	// Verify it implements http.Handler
 	if _, ok := interface{}(router).(http.Handler); !ok {
@@ -139,7 +145,7 @@ func TestIntegration_ListZones(t *testing.T) {
 
 	// Create router
 	proxyHandler := NewHandler(bunnyClient, nil)
-	proxyRouter := NewRouter(proxyHandler, authMiddleware)
+	proxyRouter := NewRouter(proxyHandler, authMiddleware, testLogger())
 	router := proxyRouter
 
 	// Make test request
@@ -186,7 +192,7 @@ func TestIntegration_GetZone(t *testing.T) {
 	authMiddleware := auth.Middleware(validator)
 
 	proxyHandler := NewHandler(bunnyClient, nil)
-	proxyRouter := NewRouter(proxyHandler, authMiddleware)
+	proxyRouter := NewRouter(proxyHandler, authMiddleware, testLogger())
 	router := proxyRouter
 
 	// Request specific zone
@@ -236,7 +242,7 @@ func TestIntegration_ListRecords(t *testing.T) {
 	authMiddleware := auth.Middleware(validator)
 
 	proxyHandler := NewHandler(bunnyClient, nil)
-	proxyRouter := NewRouter(proxyHandler, authMiddleware)
+	proxyRouter := NewRouter(proxyHandler, authMiddleware, testLogger())
 	router := proxyRouter
 
 	// Request records
@@ -285,7 +291,7 @@ func TestIntegration_AddRecord(t *testing.T) {
 	authMiddleware := auth.Middleware(validator)
 
 	proxyHandler := NewHandler(bunnyClient, nil)
-	proxyRouter := NewRouter(proxyHandler, authMiddleware)
+	proxyRouter := NewRouter(proxyHandler, authMiddleware, testLogger())
 	router := proxyRouter
 
 	// Add a TXT record
@@ -344,7 +350,7 @@ func TestIntegration_DeleteRecord(t *testing.T) {
 	authMiddleware := auth.Middleware(validator)
 
 	proxyHandler := NewHandler(bunnyClient, nil)
-	proxyRouter := NewRouter(proxyHandler, authMiddleware)
+	proxyRouter := NewRouter(proxyHandler, authMiddleware, testLogger())
 	router := proxyRouter
 
 	// Get the zone to find record ID
@@ -382,7 +388,7 @@ func TestIntegration_Unauthorized_NoKey(t *testing.T) {
 	authMiddleware := auth.Middleware(validator)
 
 	proxyHandler := NewHandler(bunnyClient, nil)
-	proxyRouter := NewRouter(proxyHandler, authMiddleware)
+	proxyRouter := NewRouter(proxyHandler, authMiddleware, testLogger())
 	router := proxyRouter
 
 	// Request without Authorization header
@@ -420,7 +426,7 @@ func TestIntegration_Unauthorized_InvalidKey(t *testing.T) {
 	authMiddleware := auth.Middleware(validator)
 
 	proxyHandler := NewHandler(bunnyClient, nil)
-	proxyRouter := NewRouter(proxyHandler, authMiddleware)
+	proxyRouter := NewRouter(proxyHandler, authMiddleware, testLogger())
 	router := proxyRouter
 
 	// Request with invalid key
@@ -461,7 +467,7 @@ func TestIntegration_Forbidden_WrongZone(t *testing.T) {
 	authMiddleware := auth.Middleware(validator)
 
 	proxyHandler := NewHandler(bunnyClient, nil)
-	proxyRouter := NewRouter(proxyHandler, authMiddleware)
+	proxyRouter := NewRouter(proxyHandler, authMiddleware, testLogger())
 	router := proxyRouter
 
 	// Try to access zone with permission
@@ -505,7 +511,7 @@ func TestIntegration_Forbidden_WrongRecordType(t *testing.T) {
 	authMiddleware := auth.Middleware(validator)
 
 	proxyHandler := NewHandler(bunnyClient, nil)
-	proxyRouter := NewRouter(proxyHandler, authMiddleware)
+	proxyRouter := NewRouter(proxyHandler, authMiddleware, testLogger())
 	router := proxyRouter
 
 	// Try to add an A record (not allowed)
@@ -589,7 +595,7 @@ func TestIntegration_ListZones_FilteredByPermission(t *testing.T) {
 	authMiddleware := auth.Middleware(validator)
 
 	proxyHandler := NewHandler(bunnyClient, nil)
-	proxyRouter := NewRouter(proxyHandler, authMiddleware)
+	proxyRouter := NewRouter(proxyHandler, authMiddleware, testLogger())
 	router := proxyRouter
 
 	// Request list zones
@@ -677,7 +683,7 @@ func TestIntegration_GetZone_FilteredRecordTypes(t *testing.T) {
 	authMiddleware := auth.Middleware(validator)
 
 	proxyHandler := NewHandler(bunnyClient, nil)
-	proxyRouter := NewRouter(proxyHandler, authMiddleware)
+	proxyRouter := NewRouter(proxyHandler, authMiddleware, testLogger())
 	router := proxyRouter
 
 	// Request zone details
@@ -750,7 +756,7 @@ func TestIntegration_ListRecords_FilteredRecordTypes(t *testing.T) {
 	authMiddleware := auth.Middleware(validator)
 
 	proxyHandler := NewHandler(bunnyClient, nil)
-	proxyRouter := NewRouter(proxyHandler, authMiddleware)
+	proxyRouter := NewRouter(proxyHandler, authMiddleware, testLogger())
 	router := proxyRouter
 
 	// Request records

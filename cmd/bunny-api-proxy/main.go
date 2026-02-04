@@ -130,7 +130,7 @@ func initializeComponents(cfg *config.Config) (*serverComponents, error) {
 	proxyAuthChain := func(next http.Handler) http.Handler {
 		return proxyAuthenticator.Authenticate(proxyAuthenticator.CheckPermissions(next))
 	}
-	proxyRouter := proxy.NewRouter(proxyHandler, proxyAuthChain)
+	proxyRouter := proxy.NewRouter(proxyHandler, proxyAuthChain, logger)
 
 	// 8. Create admin handler and router
 	adminHandler := admin.NewHandler(store, logLevel, logger)
