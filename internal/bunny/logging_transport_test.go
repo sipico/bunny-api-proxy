@@ -87,7 +87,8 @@ func TestRedactSensitiveData(t *testing.T) {
 func TestLoggingTransport_Success(t *testing.T) {
 	t.Parallel()
 	var buf bytes.Buffer
-	logger := slog.New(slog.NewJSONHandler(&buf, nil))
+	// Use DEBUG level to see detailed logs
+	logger := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
 
 	// Create mock response
 	responseBody := `{"Id": 123, "Domain": "example.com"}`
@@ -140,13 +141,18 @@ func TestLoggingTransport_Success(t *testing.T) {
 		t.Errorf("Expected body %q, got %q", responseBody, string(body))
 	}
 
-	// Parse and verify logs
+	// Parse and verify logs (DEBUG level produces 3 logs: request, summary, response)
 	decoder := json.NewDecoder(&buf)
+
+	// Log 1: DEBUG request
 	var requestLog map[string]interface{}
 	if err := decoder.Decode(&requestLog); err != nil {
 		t.Fatalf("Failed to decode request log: %v", err)
 	}
 
+	if requestLog["msg"] != "Bunny API request" {
+		t.Errorf("Expected msg 'Bunny API request', got %v", requestLog["msg"])
+	}
 	if requestLog["prefix"] != "TEST" {
 		t.Errorf("Expected prefix 'TEST', got %v", requestLog["prefix"])
 	}
@@ -157,20 +163,36 @@ func TestLoggingTransport_Success(t *testing.T) {
 		t.Errorf("Expected URL to contain '/dnszone', got %v", requestLog["url"])
 	}
 
-	// Verify response is logged
+	// Log 2: INFO summary
+	var summaryLog map[string]interface{}
+	if err := decoder.Decode(&summaryLog); err != nil {
+		t.Fatalf("Failed to decode summary log: %v", err)
+	}
+
+	if summaryLog["msg"] != "Bunny API call" {
+		t.Errorf("Expected msg 'Bunny API call', got %v", summaryLog["msg"])
+	}
+	if int(summaryLog["status"].(float64)) != http.StatusOK {
+		t.Errorf("Expected status 200, got %v", summaryLog["status"])
+	}
+	if _, ok := summaryLog["duration_ms"]; !ok {
+		t.Error("Expected duration_ms in summary log")
+	}
+
+	// Log 3: DEBUG response
 	var responseLog map[string]interface{}
 	if err := decoder.Decode(&responseLog); err != nil {
 		t.Fatalf("Failed to decode response log: %v", err)
 	}
 
+	if responseLog["msg"] != "Bunny API response" {
+		t.Errorf("Expected msg 'Bunny API response', got %v", responseLog["msg"])
+	}
 	if responseLog["prefix"] != "TEST" {
 		t.Errorf("Expected response prefix 'TEST', got %v", responseLog["prefix"])
 	}
 	if int(responseLog["status_code"].(float64)) != http.StatusOK {
 		t.Errorf("Expected status 200, got %v", responseLog["status_code"])
-	}
-	if _, ok := responseLog["duration_ms"]; !ok {
-		t.Error("Expected duration_ms to be logged")
 	}
 }
 
@@ -178,7 +200,7 @@ func TestLoggingTransport_Success(t *testing.T) {
 func TestLoggingTransport_RedactsAPIKeys(t *testing.T) {
 	t.Parallel()
 	var buf bytes.Buffer
-	logger := slog.New(slog.NewJSONHandler(&buf, nil))
+	logger := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
 
 	mockTransport := &mockRoundTripper{
 		response: &http.Response{
@@ -243,7 +265,7 @@ func TestLoggingTransport_RedactsAPIKeys(t *testing.T) {
 func TestLoggingTransport_HandlesErrors(t *testing.T) {
 	t.Parallel()
 	var buf bytes.Buffer
-	logger := slog.New(slog.NewJSONHandler(&buf, nil))
+	logger := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
 
 	testErr := fmt.Errorf("network error: connection refused")
 	mockTransport := &mockRoundTripper{
@@ -308,7 +330,7 @@ func TestLoggingTransport_HandlesErrors(t *testing.T) {
 func TestLoggingTransport_PreservesRequestBody(t *testing.T) {
 	t.Parallel()
 	var buf bytes.Buffer
-	logger := slog.New(slog.NewJSONHandler(&buf, nil))
+	logger := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
 
 	requestBody := `{"Domain": "test.com"}`
 
@@ -369,7 +391,7 @@ func TestLoggingTransport_PreservesRequestBody(t *testing.T) {
 func TestLoggingTransport_PreservesResponseBody(t *testing.T) {
 	t.Parallel()
 	var buf bytes.Buffer
-	logger := slog.New(slog.NewJSONHandler(&buf, nil))
+	logger := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
 
 	responseBody := `{"Id": 456, "Domain": "example.org"}`
 
@@ -455,7 +477,7 @@ func TestLoggingTransport_WithPrefix(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			var buf bytes.Buffer
-			logger := slog.New(slog.NewJSONHandler(&buf, nil))
+			logger := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
 
 			mockTransport := &mockRoundTripper{
 				response: &http.Response{
@@ -509,7 +531,7 @@ func TestLoggingTransport_WithPrefix(t *testing.T) {
 func TestLoggingTransport_NilTransport(t *testing.T) {
 	t.Parallel()
 	var buf bytes.Buffer
-	logger := slog.New(slog.NewJSONHandler(&buf, nil))
+	logger := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
 
 	lt := &LoggingTransport{
 		Transport: nil, // Explicitly nil
@@ -539,7 +561,7 @@ func TestLoggingTransport_NilTransport(t *testing.T) {
 func TestLoggingTransport_LogsRequestDuration(t *testing.T) {
 	t.Parallel()
 	var buf bytes.Buffer
-	logger := slog.New(slog.NewJSONHandler(&buf, nil))
+	logger := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
 
 	// Create transport with artificial delay
 	delay := 50 * time.Millisecond
@@ -606,7 +628,7 @@ func TestLoggingTransport_LogsRequestDuration(t *testing.T) {
 func TestLoggingTransport_LogsAllRequestHeaders(t *testing.T) {
 	t.Parallel()
 	var buf bytes.Buffer
-	logger := slog.New(slog.NewJSONHandler(&buf, nil))
+	logger := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
 
 	mockTransport := &mockRoundTripper{
 		response: &http.Response{
@@ -666,7 +688,7 @@ func TestLoggingTransport_LogsAllRequestHeaders(t *testing.T) {
 func TestLoggingTransport_LogsAllResponseHeaders(t *testing.T) {
 	t.Parallel()
 	var buf bytes.Buffer
-	logger := slog.New(slog.NewJSONHandler(&buf, nil))
+	logger := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
 
 	responseHeaders := http.Header{
 		"Content-Type":    []string{"application/json"},
@@ -701,12 +723,20 @@ func TestLoggingTransport_LogsAllResponseHeaders(t *testing.T) {
 	}
 
 	// Parse logs and verify response headers
+	// DEBUG level produces 3 logs: request, summary, response
 	decoder := json.NewDecoder(&buf)
 	var requestLog map[string]interface{}
 	if err := decoder.Decode(&requestLog); err != nil {
 		t.Fatalf("Failed to decode request log: %v", err)
 	}
 
+	// Skip INFO summary log
+	var summaryLog map[string]interface{}
+	if err := decoder.Decode(&summaryLog); err != nil {
+		t.Fatalf("Failed to decode summary log: %v", err)
+	}
+
+	// Decode DEBUG response log
 	var responseLog map[string]interface{}
 	if err := decoder.Decode(&responseLog); err != nil {
 		t.Fatalf("Failed to decode response log: %v", err)
@@ -730,7 +760,7 @@ func TestLoggingTransport_LogsAllResponseHeaders(t *testing.T) {
 func TestLoggingTransport_IncludesRequestID(t *testing.T) {
 	t.Parallel()
 	var buf bytes.Buffer
-	logger := slog.New(slog.NewJSONHandler(&buf, nil))
+	logger := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
 
 	mockTransport := &mockRoundTripper{
 		response: &http.Response{
@@ -791,7 +821,7 @@ func TestLoggingTransport_IncludesRequestID(t *testing.T) {
 func TestLoggingTransport_RequestIDEmpty(t *testing.T) {
 	t.Parallel()
 	var buf bytes.Buffer
-	logger := slog.New(slog.NewJSONHandler(&buf, nil))
+	logger := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
 
 	mockTransport := &mockRoundTripper{
 		response: &http.Response{
@@ -841,7 +871,7 @@ func TestLoggingTransport_RequestIDEmpty(t *testing.T) {
 func TestLoggingTransport_RequestIDInErrorLog(t *testing.T) {
 	t.Parallel()
 	var buf bytes.Buffer
-	logger := slog.New(slog.NewJSONHandler(&buf, nil))
+	logger := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
 
 	testErr := fmt.Errorf("network error: connection refused")
 	mockTransport := &mockRoundTripper{
@@ -886,5 +916,79 @@ func TestLoggingTransport_RequestIDInErrorLog(t *testing.T) {
 
 	if errorLog["request_id"] != testID {
 		t.Errorf("Expected request_id %q in error log, got %v", testID, errorLog["request_id"])
+	}
+}
+
+// TestLoggingTransport_InfoLevel tests that INFO level logs only the summary.
+func TestLoggingTransport_InfoLevel(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	// Use INFO level to see only the summary
+	logger := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo}))
+
+	responseBody := `{"Id": 123}`
+	mockTransport := &mockRoundTripper{
+		response: &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(strings.NewReader(responseBody)),
+			Header:     http.Header{"Content-Type": []string{"application/json"}},
+		},
+	}
+
+	lt := &LoggingTransport{
+		Transport: mockTransport,
+		Logger:    logger,
+		Prefix:    "TEST",
+	}
+
+	req, err := http.NewRequest("GET", "https://api.bunny.net/dnszone/123", nil)
+	if err != nil {
+		t.Fatalf("Failed to create request: %v", err)
+	}
+
+	_, err = lt.RoundTrip(req)
+	if err != nil {
+		t.Fatalf("RoundTrip failed: %v", err)
+	}
+
+	// At INFO level, should only see one log entry (the summary)
+	decoder := json.NewDecoder(&buf)
+	var summaryLog map[string]interface{}
+	if err := decoder.Decode(&summaryLog); err != nil {
+		t.Fatalf("Failed to decode summary log: %v", err)
+	}
+
+	// Verify it's the INFO summary log
+	if summaryLog["msg"] != "Bunny API call" {
+		t.Errorf("Expected msg 'Bunny API call', got %v", summaryLog["msg"])
+	}
+	if summaryLog["prefix"] != "TEST" {
+		t.Errorf("Expected prefix 'TEST', got %v", summaryLog["prefix"])
+	}
+	if summaryLog["method"] != "GET" {
+		t.Errorf("Expected method 'GET', got %v", summaryLog["method"])
+	}
+	if summaryLog["path"] != "/dnszone/123" {
+		t.Errorf("Expected path '/dnszone/123', got %v", summaryLog["path"])
+	}
+	if int(summaryLog["status"].(float64)) != http.StatusOK {
+		t.Errorf("Expected status 200, got %v", summaryLog["status"])
+	}
+	if _, ok := summaryLog["duration_ms"]; !ok {
+		t.Error("Expected duration_ms in summary log")
+	}
+
+	// Verify no detailed logs (headers, body) at INFO level
+	if _, ok := summaryLog["headers"]; ok {
+		t.Error("Should not have headers in INFO level log")
+	}
+	if _, ok := summaryLog["body"]; ok {
+		t.Error("Should not have body in INFO level log")
+	}
+
+	// Should not be able to decode another log (only one summary at INFO)
+	var extraLog map[string]interface{}
+	if err := decoder.Decode(&extraLog); err == nil {
+		t.Error("Expected only one log at INFO level, but found more")
 	}
 }
