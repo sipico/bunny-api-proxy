@@ -41,7 +41,7 @@ Suggestions for improving documentation are appreciated. Please open an Issue de
 For questions about:
 - **Usage**: Open a GitHub Issue with the "question" label
 - **Commercial licensing**: Open an Issue or contact the maintainer
-- **Security issues**: See SECURITY.md (if available) or open a private security advisory
+- **Security issues**: See docs/SECURITY.md or open a private security advisory
 
 ## License
 

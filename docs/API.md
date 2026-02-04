@@ -300,9 +300,7 @@ Each scoped API key has associated permissions that define:
 
 **Available Actions:**
 - `list_zones` - List all zones
-- `create_zone` - Create new zones
 - `get_zone` - Get zone details
-- `delete_zone` - Delete zones
 - `list_records` - List records in a zone
 - `add_record` - Add DNS records
 - `delete_record` - Delete DNS records
@@ -351,8 +349,7 @@ See [Official Documentation](bunny-api-official-docs/dnszone-list.md) for comple
 
 Create a new DNS zone.
 
-**Authentication:** AccessKey required
-**Permissions Required:** `create_zone` action
+**Authentication:** Admin token required (not available for scoped keys)
 
 **Request Body:**
 ```json
@@ -395,8 +392,7 @@ See [Official Documentation](bunny-api-official-docs/dnszone-get.md) for complet
 
 Delete a DNS zone.
 
-**Authentication:** AccessKey required
-**Permissions Required:** `delete_zone` action
+**Authentication:** Admin token required (not available for scoped keys)
 **Path Parameters:** `zoneID` - The zone ID to delete
 
 **Example Request:**

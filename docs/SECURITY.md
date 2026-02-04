@@ -20,7 +20,7 @@ The proxy enforces **allowlist-based permissions** (deny by default):
 - **Master API Key**: Single unscoped key stored encrypted, used only by proxy
 - **Scoped Keys**: Limited to specific zones and actions
 - **No Wildcards**: All permissions must explicitly name zone IDs
-- **Granular Actions**: Can restrict to `list_zones`, `create_zone`, `get_zone`, `delete_zone`, `list_records`, `add_record`, `delete_record`
+- **Granular Actions**: Can restrict to `list_zones`, `get_zone`, `list_records`, `add_record`, `delete_record`
 - **Record Type Filtering**: Can limit record types (e.g., only `TXT` for ACME)
 
 Example permission model:
@@ -98,7 +98,7 @@ The proxy validates each request against the key's permissions:
 
 ```
 For each request:
-  1. Parse action (list_zones, create_zone, get_zone, delete_zone, list_records, add_record, delete_record)
+  1. Parse action (list_zones, get_zone, list_records, add_record, delete_record)
   2. Extract zone_id (if applicable)
   3. Check if key has permission for this zone
   4. Check if action is in allowed_actions for that zone
