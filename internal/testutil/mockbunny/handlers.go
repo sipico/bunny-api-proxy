@@ -266,6 +266,7 @@ func (s *Server) handleCreateZone(w http.ResponseWriter, r *http.Request) {
 		CustomNameserversEnabled: false,
 		Nameserver1:              "kiki.bunny.net",
 		Nameserver2:              "coco.bunny.net",
+		NameserversNextCheck:     MockBunnyTime{Time: time.Now().Add(5 * time.Minute)},
 		SoaEmail:                 "hostmaster@bunny.net",
 		LoggingEnabled:           false,
 		LoggingIPAnonymization:   true,
