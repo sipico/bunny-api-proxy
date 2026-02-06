@@ -69,9 +69,7 @@ func (s *Server) handleListZones(w http.ResponseWriter, r *http.Request) {
 		HasMoreItems: end < total,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	//nolint:errcheck
-	json.NewEncoder(w).Encode(resp)
+	writeJSON(w, http.StatusOK, resp)
 }
 
 // handleGetZone handles GET /dnszone/{id} requests.
@@ -94,9 +92,7 @@ func (s *Server) handleGetZone(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	//nolint:errcheck
-	json.NewEncoder(w).Encode(zone)
+	writeJSON(w, http.StatusOK, zone)
 }
 
 // handleDeleteRecord handles DELETE /dnszone/{zoneId}/records/{id}
@@ -223,10 +219,7 @@ func (s *Server) handleAddRecord(w http.ResponseWriter, r *http.Request) {
 	zone.Records = append(zone.Records, record)
 	zone.DateModified = MockBunnyTime{Time: time.Now().UTC()}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	//nolint:errcheck
-	json.NewEncoder(w).Encode(record)
+	writeJSON(w, http.StatusCreated, record)
 }
 
 // handleCreateZone handles POST /dnszone to create a new DNS zone.
@@ -284,10 +277,7 @@ func (s *Server) handleCreateZone(w http.ResponseWriter, r *http.Request) {
 	s.state.zones[id] = zone
 
 	// Return 201 Created with zone JSON
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	//nolint:errcheck
-	json.NewEncoder(w).Encode(zone)
+	writeJSON(w, http.StatusCreated, zone)
 }
 
 // handleDeleteZone handles DELETE /dnszone/{id} to delete a DNS zone.
@@ -318,12 +308,19 @@ func (s *Server) handleDeleteZone(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// writeError writes an error response in the bunny.net API format.
-func (s *Server) writeError(w http.ResponseWriter, status int, errorKey, field, message string) {
-	w.Header().Set("Content-Type", "application/json")
+// writeJSON writes a JSON response with correct Content-Type and no trailing newline.
+func writeJSON(w http.ResponseWriter, status int, v any) {
+	//nolint:errcheck
+	data, _ := json.Marshal(v)
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
 	//nolint:errcheck
-	json.NewEncoder(w).Encode(ErrorResponse{
+	w.Write(data)
+}
+
+// writeError writes an error response in the bunny.net API format.
+func (s *Server) writeError(w http.ResponseWriter, status int, errorKey, field, message string) {
+	writeJSON(w, status, ErrorResponse{
 		ErrorKey: errorKey,
 		Field:    field,
 		Message:  message,

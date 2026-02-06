@@ -130,8 +130,8 @@ func TestAdminStateEndpoint(t *testing.T) {
 	}
 
 	// Should return JSON
-	if ct := w.Header().Get("Content-Type"); ct != "application/json" {
-		t.Errorf("expected Content-Type application/json, got %s", ct)
+	if ct := w.Header().Get("Content-Type"); ct != "application/json; charset=utf-8" {
+		t.Errorf("expected Content-Type application/json; charset=utf-8, got %s", ct)
 	}
 }
 

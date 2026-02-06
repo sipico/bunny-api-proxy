@@ -45,10 +45,7 @@ func (s *Server) handleAdminCreateZone(w http.ResponseWriter, r *http.Request) {
 	zoneID := s.AddZone(req.Domain)
 	zone := s.GetZone(zoneID)
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	//nolint:errcheck
-	json.NewEncoder(w).Encode(zone)
+	writeJSON(w, http.StatusCreated, zone)
 }
 
 // handleAdminCreateRecord handles POST /admin/zones/{zoneId}/records
@@ -96,10 +93,7 @@ func (s *Server) handleAdminCreateRecord(w http.ResponseWriter, r *http.Request)
 	s.state.nextRecordID++
 	zone.Records = append(zone.Records, record)
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	//nolint:errcheck
-	json.NewEncoder(w).Encode(record)
+	writeJSON(w, http.StatusCreated, record)
 }
 
 // handleAdminReset handles DELETE /admin/reset
@@ -131,7 +125,5 @@ func (s *Server) handleAdminState(w http.ResponseWriter, r *http.Request) {
 		NextRecordID: nextRecordID,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	//nolint:errcheck
-	json.NewEncoder(w).Encode(resp)
+	writeJSON(w, http.StatusOK, resp)
 }
