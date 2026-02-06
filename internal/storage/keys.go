@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"fmt"
 )
 
 // CreateScopedKey creates a new scoped API key with bcrypt hash.
@@ -78,26 +79,27 @@ func (s *SQLiteStorage) GetScopedKey(ctx context.Context, id int64) (*ScopedKey,
 // Returns empty slice if no keys exist.
 // Wraps ListTokens and filters for is_admin=false.
 func (s *SQLiteStorage) ListScopedKeys(ctx context.Context) ([]*ScopedKey, error) {
-	tokens, err := s.ListTokens(ctx)
+	rows, err := s.db.QueryContext(ctx,
+		"SELECT id, key_hash, name, created_at FROM tokens WHERE is_admin = FALSE ORDER BY created_at DESC")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to query scoped keys: %w", err)
 	}
+	defer rows.Close() //nolint:errcheck
 
-	// Filter to only scoped keys (is_admin=false)
 	var keys []*ScopedKey
-	for _, token := range tokens {
-		if !token.IsAdmin {
-			keys = append(keys, &ScopedKey{
-				ID:        token.ID,
-				KeyHash:   token.KeyHash,
-				Name:      token.Name,
-				CreatedAt: token.CreatedAt,
-				UpdatedAt: token.CreatedAt, // Use CreatedAt since Token doesn't track updates
-			})
+	for rows.Next() {
+		var k ScopedKey
+		if err := rows.Scan(&k.ID, &k.KeyHash, &k.Name, &k.CreatedAt); err != nil {
+			return nil, fmt.Errorf("failed to scan scoped key row: %w", err)
 		}
+		k.UpdatedAt = k.CreatedAt // No separate update tracking
+		keys = append(keys, &k)
 	}
 
-	// Return empty slice instead of nil
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating scoped key rows: %w", err)
+	}
+
 	if keys == nil {
 		keys = make([]*ScopedKey, 0)
 	}

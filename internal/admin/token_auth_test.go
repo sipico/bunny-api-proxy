@@ -15,8 +15,9 @@ import (
 // mockStorageWithToken extends mockStorage with ValidateAdminToken
 type mockStorageWithToken struct {
 	*mockStorage
-	validateToken func(ctx context.Context, token string) (*storage.AdminToken, error)
-	listTokens    func(ctx context.Context) ([]*storage.Token, error)
+	validateToken  func(ctx context.Context, token string) (*storage.AdminToken, error)
+	getTokenByHash func(ctx context.Context, keyHash string) (*storage.Token, error)
+	listTokens     func(ctx context.Context) ([]*storage.Token, error)
 }
 
 func (m *mockStorageWithToken) ValidateAdminToken(ctx context.Context, token string) (*storage.AdminToken, error) {
@@ -109,7 +110,10 @@ func (m *mockStorageWithToken) HasAnyAdminToken(ctx context.Context) (bool, erro
 }
 
 func (m *mockStorageWithToken) GetTokenByHash(ctx context.Context, keyHash string) (*storage.Token, error) {
-	return nil, storage.ErrNotFound
+	if m.getTokenByHash != nil {
+		return m.getTokenByHash(ctx, keyHash)
+	}
+	return m.mockStorage.GetTokenByHash(ctx, keyHash)
 }
 
 func TestTokenAuthMiddleware(t *testing.T) {
@@ -372,8 +376,11 @@ func TestTokenAuthMiddlewareUnifiedToken(t *testing.T) {
 			// Setup mock storage
 			mock := &mockStorageWithToken{
 				mockStorage: &mockStorage{},
-				listTokens: func(ctx context.Context) ([]*storage.Token, error) {
-					return tt.tokens, nil
+				getTokenByHash: func(ctx context.Context, keyHash string) (*storage.Token, error) {
+					if len(tt.tokens) > 0 && keyHash == tt.tokens[0].KeyHash {
+						return tt.tokens[0], nil
+					}
+					return nil, storage.ErrNotFound
 				},
 			}
 
@@ -452,10 +459,10 @@ func TestValidateUnifiedToken(t *testing.T) {
 	knownToken := "test-token-secret"
 	tokenHash := auth.HashToken(knownToken)
 
-	t.Run("returns error when ListTokens fails", func(t *testing.T) {
+	t.Run("returns error when GetTokenByHash fails", func(t *testing.T) {
 		mock := &mockStorageWithToken{
 			mockStorage: &mockStorage{},
-			listTokens: func(ctx context.Context) ([]*storage.Token, error) {
+			getTokenByHash: func(ctx context.Context, keyHash string) (*storage.Token, error) {
 				return nil, errors.New("database error")
 			},
 		}
@@ -476,8 +483,11 @@ func TestValidateUnifiedToken(t *testing.T) {
 		expectedToken := &storage.Token{ID: 42, Name: "my-token", IsAdmin: true, KeyHash: tokenHash}
 		mock := &mockStorageWithToken{
 			mockStorage: &mockStorage{},
-			listTokens: func(ctx context.Context) ([]*storage.Token, error) {
-				return []*storage.Token{expectedToken}, nil
+			getTokenByHash: func(ctx context.Context, keyHash string) (*storage.Token, error) {
+				if keyHash == tokenHash {
+					return expectedToken, nil
+				}
+				return nil, storage.ErrNotFound
 			},
 		}
 
@@ -498,10 +508,8 @@ func TestValidateUnifiedToken(t *testing.T) {
 	t.Run("returns ErrNotFound when token not found", func(t *testing.T) {
 		mock := &mockStorageWithToken{
 			mockStorage: &mockStorage{},
-			listTokens: func(ctx context.Context) ([]*storage.Token, error) {
-				return []*storage.Token{
-					{ID: 1, Name: "other-token", KeyHash: "different-hash"},
-				}, nil
+			getTokenByHash: func(ctx context.Context, keyHash string) (*storage.Token, error) {
+				return nil, storage.ErrNotFound
 			},
 		}
 

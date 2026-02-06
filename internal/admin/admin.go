@@ -54,6 +54,7 @@ type Storage interface {
 	// Unified token operations (Issue 147)
 	CreateToken(ctx context.Context, name string, isAdmin bool, keyHash string) (*storage.Token, error)
 	GetTokenByID(ctx context.Context, id int64) (*storage.Token, error)
+	GetTokenByHash(ctx context.Context, keyHash string) (*storage.Token, error)
 	ListTokens(ctx context.Context) ([]*storage.Token, error)
 	DeleteToken(ctx context.Context, id int64) error
 	CountAdminTokens(ctx context.Context) (int, error)

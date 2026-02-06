@@ -119,6 +119,9 @@ func (m *mockStorageWithTokenCRUD) GetPermissionsForToken(ctx context.Context, t
 	return make([]*storage.Permission, 0), nil
 }
 
+func (m *mockStorageWithTokenCRUD) GetTokenByHash(ctx context.Context, keyHash string) (*storage.Token, error) {
+	return nil, storage.ErrNotFound
+}
 func TestHandleSetLogLevel(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

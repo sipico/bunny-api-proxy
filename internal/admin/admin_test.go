@@ -148,6 +148,10 @@ func (m *mockStorageForAdminTest) GetPermissionsForToken(ctx context.Context, to
 	return make([]*storage.Permission, 0), nil
 }
 
+func (m *mockStorageForAdminTest) GetTokenByHash(ctx context.Context, keyHash string) (*storage.Token, error) {
+	return nil, storage.ErrNotFound
+}
+
 // TestContextHelpers tests the context helper functions
 func TestContextHelpers(t *testing.T) {
 	t.Parallel()
