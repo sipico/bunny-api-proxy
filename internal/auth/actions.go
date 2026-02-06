@@ -16,6 +16,7 @@ var (
 	listZonesPattern    = regexp.MustCompile(`^/dnszone/?$`)
 	getZonePattern      = regexp.MustCompile(`^/dnszone/(\d+)/?$`)
 	recordsPattern      = regexp.MustCompile(`^/dnszone/(\d+)/records/?$`)
+	updateRecordPattern = regexp.MustCompile(`^/dnszone/(\d+)/records/(\d+)/?$`)
 	deleteRecordPattern = regexp.MustCompile(`^/dnszone/(\d+)/records/(\d+)/?$`)
 )
 
@@ -71,6 +72,37 @@ func ParseRequest(r *http.Request) (*Request, error) {
 			ZoneID:     zoneID,
 			RecordType: recordType,
 		}, nil
+	}
+
+	// POST /dnszone/{id}/records/{rid} - update record
+	if r.Method == http.MethodPost {
+		if matches := updateRecordPattern.FindStringSubmatch(path); matches != nil {
+			zoneID, _ := strconv.ParseInt(matches[1], 10, 64) //nolint:errcheck // regex ensures valid number
+
+			// Read and restore body for later use
+			bodyBytes, err := io.ReadAll(r.Body)
+			if err != nil {
+				return nil, fmt.Errorf("failed to read request body: %w", err)
+			}
+			r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+
+			// Extract record type
+			var payload struct {
+				Type int `json:"Type"`
+			}
+			if err := json.Unmarshal(bodyBytes, &payload); err != nil {
+				return nil, fmt.Errorf("failed to parse request body: %w", err)
+			}
+
+			// Map type integer to string for permissions checking
+			recordType := MapRecordTypeToString(payload.Type)
+
+			return &Request{
+				Action:     ActionUpdateRecord,
+				ZoneID:     zoneID,
+				RecordType: recordType,
+			}, nil
+		}
 	}
 
 	// DELETE /dnszone/{id}/records/{rid} - delete record

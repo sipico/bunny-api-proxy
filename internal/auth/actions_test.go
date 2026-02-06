@@ -62,6 +62,15 @@ func TestParseRequest(t *testing.T) {
 			wantZoneID: 123,
 		},
 		{
+			name:       "update record",
+			method:     "POST",
+			path:       "/dnszone/789/records/456",
+			body:       `{"Type":0,"Name":"www","Value":"1.2.3.4"}`,
+			wantAction: ActionUpdateRecord,
+			wantZoneID: 789,
+			wantType:   "A",
+		},
+		{
 			name:    "invalid path",
 			method:  "GET",
 			path:    "/invalid",

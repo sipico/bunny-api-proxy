@@ -28,6 +28,8 @@ const (
 	ActionListRecords Action = "list_records"
 	// ActionAddRecord adds a record to a zone.
 	ActionAddRecord Action = "add_record"
+	// ActionUpdateRecord updates a record in a zone.
+	ActionUpdateRecord Action = "update_record"
 	// ActionDeleteRecord deletes a record from a zone.
 	ActionDeleteRecord Action = "delete_record"
 )
@@ -141,8 +143,8 @@ func (v *Validator) CheckPermission(keyInfo *KeyInfo, req *Request) error {
 		return ErrForbidden
 	}
 
-	// add_record: also check record type
-	if req.Action == ActionAddRecord {
+	// add_record and update_record: also check record type
+	if req.Action == ActionAddRecord || req.Action == ActionUpdateRecord {
 		typeAllowed := false
 		for _, t := range zonePerm.RecordTypes {
 			if t == req.RecordType {

@@ -24,6 +24,7 @@ type mockBunnyClient struct {
 	getZoneFunc      func(context.Context, int64) (*bunny.Zone, error)
 	deleteZoneFunc   func(context.Context, int64) error
 	addRecordFunc    func(context.Context, int64, *bunny.AddRecordRequest) (*bunny.Record, error)
+	updateRecordFunc func(context.Context, int64, int64, *bunny.AddRecordRequest) (*bunny.Record, error)
 	deleteRecordFunc func(context.Context, int64, int64) error
 }
 
@@ -58,6 +59,13 @@ func (m *mockBunnyClient) DeleteZone(ctx context.Context, id int64) error {
 func (m *mockBunnyClient) AddRecord(ctx context.Context, zoneID int64, req *bunny.AddRecordRequest) (*bunny.Record, error) {
 	if m.addRecordFunc != nil {
 		return m.addRecordFunc(ctx, zoneID, req)
+	}
+	return nil, nil
+}
+
+func (m *mockBunnyClient) UpdateRecord(ctx context.Context, zoneID, recordID int64, req *bunny.AddRecordRequest) (*bunny.Record, error) {
+	if m.updateRecordFunc != nil {
+		return m.updateRecordFunc(ctx, zoneID, recordID, req)
 	}
 	return nil, nil
 }

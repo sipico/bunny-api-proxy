@@ -32,6 +32,9 @@ type BunnyClient interface {
 	// AddRecord creates a new DNS record in the specified zone.
 	AddRecord(ctx context.Context, zoneID int64, req *bunny.AddRecordRequest) (*bunny.Record, error)
 
+	// UpdateRecord updates an existing DNS record in the specified zone.
+	UpdateRecord(ctx context.Context, zoneID, recordID int64, req *bunny.AddRecordRequest) (*bunny.Record, error)
+
 	// DeleteRecord removes a DNS record from the specified zone.
 	DeleteRecord(ctx context.Context, zoneID, recordID int64) error
 }
@@ -330,6 +333,53 @@ func (h *Handler) HandleAddRecord(w http.ResponseWriter, r *http.Request) {
 
 	// Return 201 Created with the record
 	writeJSON(w, http.StatusCreated, record)
+}
+
+// HandleUpdateRecord updates an existing DNS record in the specified zone.
+func (h *Handler) HandleUpdateRecord(w http.ResponseWriter, r *http.Request) {
+	zoneIDStr := chi.URLParam(r, "zoneID")
+	if zoneIDStr == "" {
+		writeError(w, http.StatusBadRequest, "missing zone ID")
+		return
+	}
+
+	zoneID, err := strconv.ParseInt(zoneIDStr, 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid zone ID")
+		return
+	}
+
+	recordIDStr := chi.URLParam(r, "recordID")
+	if recordIDStr == "" {
+		writeError(w, http.StatusBadRequest, "missing record ID")
+		return
+	}
+
+	recordID, err := strconv.ParseInt(recordIDStr, 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid record ID")
+		return
+	}
+
+	// Decode request body
+	var req bunny.AddRecordRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	// Call client to update record
+	record, err := h.client.UpdateRecord(r.Context(), zoneID, recordID, &req)
+	if err != nil {
+		handleBunnyError(w, err)
+		return
+	}
+
+	// Log the request
+	h.logger.Info("update record", "zone_id", zoneID, "record_id", recordID, "type", req.Type, "name", req.Name)
+
+	// Return 200 OK with the record
+	writeJSON(w, http.StatusOK, record)
 }
 
 // HandleDeleteRecord removes a DNS record from the specified zone.
