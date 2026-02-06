@@ -51,14 +51,20 @@ func TestRecordFields(t *testing.T) {
 		Tag:                   "test",
 		Accelerated:           false,
 		AcceleratedPullZoneID: 0,
+		LinkName:              "",
+		IPGeoLocationInfo:     nil,
+		GeolocationInfo:       nil,
 		MonitorStatus:         1, // Online
 		MonitorType:           2, // Http
 		GeolocationLatitude:   0.0,
 		GeolocationLongitude:  0.0,
+		EnviromentalVariables: []interface{}{},
 		LatencyZone:           nil,
 		SmartRoutingType:      1, // Latency
 		Disabled:              false,
 		Comment:               "test record",
+		AutoSslIssuance:       true,
+		AccelerationStatus:    0,
 	}
 
 	if record.ID != 1 {

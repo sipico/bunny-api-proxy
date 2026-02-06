@@ -267,21 +267,27 @@ func (s *Server) handleAddRecord(w http.ResponseWriter, r *http.Request) {
 
 	// Create record with defaults
 	record := Record{
-		ID:               s.state.nextRecordID,
-		Type:             req.Type,
-		Name:             req.Name,
-		Value:            req.Value,
-		TTL:              req.TTL,
-		Priority:         req.Priority,
-		Weight:           req.Weight,
-		Port:             req.Port,
-		Flags:            req.Flags,
-		Tag:              req.Tag,
-		Disabled:         req.Disabled,
-		Comment:          req.Comment,
-		MonitorStatus:    0, // 0 = Unknown
-		MonitorType:      0, // 0 = None
-		SmartRoutingType: 0, // 0 = None
+		ID:                    s.state.nextRecordID,
+		Type:                  req.Type,
+		Name:                  req.Name,
+		Value:                 req.Value,
+		TTL:                   req.TTL,
+		Priority:              req.Priority,
+		Weight:                req.Weight,
+		Port:                  req.Port,
+		Flags:                 req.Flags,
+		Tag:                   req.Tag,
+		Disabled:              req.Disabled,
+		Comment:               req.Comment,
+		LinkName:              "",
+		IPGeoLocationInfo:     nil,
+		GeolocationInfo:       nil,
+		MonitorStatus:         0, // 0 = Unknown
+		MonitorType:           0, // 0 = None
+		EnviromentalVariables: []interface{}{},
+		SmartRoutingType:      0, // 0 = None
+		AutoSslIssuance:       true,
+		AccelerationStatus:    0,
 	}
 	s.state.nextRecordID++
 

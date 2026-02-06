@@ -55,26 +55,32 @@ func (t *MockBunnyTime) UnmarshalJSON(b []byte) error {
 
 // Record represents a DNS record within a zone.
 type Record struct {
-	ID                    int64   `json:"Id"`
-	Type                  int     `json:"Type"` // 0 = A, 1 = AAAA, 2 = CNAME, 3 = TXT, 4 = MX, 5 = SPF, 6 = Flatten, 7 = PullZone, 8 = SRV, 9 = CAA, 10 = PTR, 11 = Script, 12 = NS
-	Name                  string  `json:"Name"`
-	Value                 string  `json:"Value"`
-	TTL                   int32   `json:"Ttl"`
-	Priority              int32   `json:"Priority"`
-	Weight                int32   `json:"Weight"`
-	Port                  int32   `json:"Port"`
-	Flags                 int     `json:"Flags"`
-	Tag                   string  `json:"Tag"`
-	Accelerated           bool    `json:"Accelerated"`
-	AcceleratedPullZoneID int64   `json:"AcceleratedPullZoneId"`
-	MonitorStatus         int     `json:"MonitorStatus"` // 0 = Unknown, 1 = Online, 2 = Offline
-	MonitorType           int     `json:"MonitorType"`   // 0 = None, 1 = Ping, 2 = Http, 3 = Monitor
-	GeolocationLatitude   float64 `json:"GeolocationLatitude"`
-	GeolocationLongitude  float64 `json:"GeolocationLongitude"`
-	LatencyZone           *string `json:"LatencyZone"`
-	SmartRoutingType      int     `json:"SmartRoutingType"` // 0 = None, 1 = Latency, 2 = Geolocation
-	Disabled              bool    `json:"Disabled"`
-	Comment               string  `json:"Comment"`
+	ID                    int64         `json:"Id"`
+	Type                  int           `json:"Type"` // 0 = A, 1 = AAAA, 2 = CNAME, 3 = TXT, 4 = MX, 5 = SPF, 6 = Flatten, 7 = PullZone, 8 = SRV, 9 = CAA, 10 = PTR, 11 = Script, 12 = NS
+	Name                  string        `json:"Name"`
+	Value                 string        `json:"Value"`
+	TTL                   int32         `json:"Ttl"`
+	Priority              int32         `json:"Priority"`
+	Weight                int32         `json:"Weight"`
+	Port                  int32         `json:"Port"`
+	Flags                 int           `json:"Flags"`
+	Tag                   string        `json:"Tag"`
+	Accelerated           bool          `json:"Accelerated"`
+	AcceleratedPullZoneID int64         `json:"AcceleratedPullZoneId"`
+	LinkName              string        `json:"LinkName"`
+	IPGeoLocationInfo     interface{}   `json:"IPGeoLocationInfo"`
+	GeolocationInfo       interface{}   `json:"GeolocationInfo"`
+	MonitorStatus         int           `json:"MonitorStatus"` // 0 = Unknown, 1 = Online, 2 = Offline
+	MonitorType           int           `json:"MonitorType"`   // 0 = None, 1 = Ping, 2 = Http, 3 = Monitor
+	GeolocationLatitude   float64       `json:"GeolocationLatitude"`
+	GeolocationLongitude  float64       `json:"GeolocationLongitude"`
+	EnviromentalVariables []interface{} `json:"EnviromentalVariables"`
+	LatencyZone           *string       `json:"LatencyZone"`
+	SmartRoutingType      int           `json:"SmartRoutingType"` // 0 = None, 1 = Latency, 2 = Geolocation
+	Disabled              bool          `json:"Disabled"`
+	Comment               string        `json:"Comment"`
+	AutoSslIssuance       bool          `json:"AutoSslIssuance"`
+	AccelerationStatus    int           `json:"AccelerationStatus"`
 }
 
 // Zone represents a DNS zone.
