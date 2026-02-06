@@ -273,7 +273,7 @@ func (s *Server) handleCreateZone(w http.ResponseWriter, r *http.Request) {
 		CustomNameserversEnabled: false,
 		Nameserver1:              "ns1.bunny.net",
 		Nameserver2:              "ns2.bunny.net",
-		SoaEmail:                 "admin@" + req.Domain,
+		SoaEmail:                 "hostmaster@bunny.net",
 		LoggingEnabled:           false,
 		LogAnonymizationType:     0, // 0 = OneDigit (default)
 		DnsSecEnabled:            false,
