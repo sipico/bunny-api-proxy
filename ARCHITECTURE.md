@@ -257,7 +257,7 @@ Mirror bunny.net DNS API structure (MVP endpoints listed above).
 
 ```dockerfile
 # Stage 1: Build
-FROM golang:1.25-alpine AS builder
+FROM golang:1.25.7-alpine AS builder
 WORKDIR /app
 COPY . .
 RUN go build -o bunny-api-proxy ./cmd/bunny-api-proxy
