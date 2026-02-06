@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -157,7 +158,7 @@ func (h *Handler) HandleDeleteToken(w http.ResponseWriter, r *http.Request) {
 
 	err = h.storage.DeleteAdminToken(r.Context(), id)
 	if err != nil {
-		if err == storage.ErrNotFound {
+		if errors.Is(err, storage.ErrNotFound) {
 			WriteError(w, http.StatusNotFound, ErrCodeNotFound, "Token not found")
 			return
 		}
@@ -363,7 +364,7 @@ func (h *Handler) HandleCreateUnifiedToken(w http.ResponseWriter, r *http.Reques
 	// Create the token
 	token, err := h.storage.CreateToken(ctx, req.Name, req.IsAdmin, keyHash)
 	if err != nil {
-		if err == storage.ErrDuplicate {
+		if errors.Is(err, storage.ErrDuplicate) {
 			WriteErrorWithHint(w, http.StatusConflict, "duplicate_token",
 				"A token with this hash already exists", "Try creating the token again.")
 			return
@@ -431,7 +432,7 @@ func (h *Handler) HandleGetUnifiedToken(w http.ResponseWriter, r *http.Request) 
 
 	token, err := h.storage.GetTokenByID(ctx, id)
 	if err != nil {
-		if err == storage.ErrNotFound {
+		if errors.Is(err, storage.ErrNotFound) {
 			WriteError(w, http.StatusNotFound, ErrCodeNotFound, "Token not found")
 			return
 		}
@@ -480,7 +481,7 @@ func (h *Handler) HandleDeleteUnifiedToken(w http.ResponseWriter, r *http.Reques
 	// Get the token to check if it's an admin
 	token, err := h.storage.GetTokenByID(ctx, id)
 	if err != nil {
-		if err == storage.ErrNotFound {
+		if errors.Is(err, storage.ErrNotFound) {
 			WriteError(w, http.StatusNotFound, ErrCodeNotFound, "Token not found")
 			return
 		}
@@ -507,7 +508,7 @@ func (h *Handler) HandleDeleteUnifiedToken(w http.ResponseWriter, r *http.Reques
 
 	err = h.storage.DeleteToken(ctx, id)
 	if err != nil {
-		if err == storage.ErrNotFound {
+		if errors.Is(err, storage.ErrNotFound) {
 			WriteError(w, http.StatusNotFound, ErrCodeNotFound, "Token not found")
 			return
 		}
@@ -551,7 +552,7 @@ func (h *Handler) HandleAddTokenPermission(w http.ResponseWriter, r *http.Reques
 	// Verify token exists
 	token, err := h.storage.GetTokenByID(ctx, tokenID)
 	if err != nil {
-		if err == storage.ErrNotFound {
+		if errors.Is(err, storage.ErrNotFound) {
 			WriteError(w, http.StatusNotFound, ErrCodeNotFound, "Token not found")
 			return
 		}
@@ -639,7 +640,7 @@ func (h *Handler) HandleDeleteTokenPermission(w http.ResponseWriter, r *http.Req
 	// Verify token exists
 	_, err = h.storage.GetTokenByID(ctx, tokenID)
 	if err != nil {
-		if err == storage.ErrNotFound {
+		if errors.Is(err, storage.ErrNotFound) {
 			WriteError(w, http.StatusNotFound, ErrCodeNotFound, "Token not found")
 			return
 		}
@@ -651,7 +652,7 @@ func (h *Handler) HandleDeleteTokenPermission(w http.ResponseWriter, r *http.Req
 	// Delete the permission
 	err = h.storage.RemovePermission(ctx, permID)
 	if err != nil {
-		if err == storage.ErrNotFound {
+		if errors.Is(err, storage.ErrNotFound) {
 			WriteError(w, http.StatusNotFound, ErrCodeNotFound, "Permission not found")
 			return
 		}
