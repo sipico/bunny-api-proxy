@@ -10,7 +10,7 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-// Server represents a mock bunny.net server for testing.
+// Server represents a mock bunny.net API server for testing.
 // It wraps httptest.Server and maintains internal state for zones and records.
 type Server struct {
 	*httptest.Server
