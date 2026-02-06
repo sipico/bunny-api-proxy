@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/sipico/bunny-api-proxy/internal/testutil/mockbunny"
@@ -654,6 +655,39 @@ func TestUpdateRecord(t *testing.T) {
 
 		if record != nil {
 			t.Errorf("expected nil record for error response, got %v", record)
+		}
+	})
+
+	t.Run("malformed response body", func(t *testing.T) {
+		t.Parallel()
+		// Create a custom HTTP client that returns 200 with invalid JSON
+		transport := &mockTransport{
+			statusCode: http.StatusOK,
+			body:       []byte("not valid json"),
+		}
+		httpClient := &http.Client{Transport: transport}
+
+		client := NewClient("test-key", WithHTTPClient(httpClient))
+		req := &AddRecordRequest{
+			Type:  0, // A
+			Name:  "www",
+			Value: "1.2.3.4",
+			TTL:   300,
+		}
+
+		record, err := client.UpdateRecord(context.Background(), 1, 1, req)
+
+		if err == nil {
+			t.Fatalf("expected error for malformed JSON, got nil")
+		}
+
+		if record != nil {
+			t.Errorf("expected nil record for error response, got %v", record)
+		}
+
+		// Error should mention JSON decoding
+		if !strings.Contains(err.Error(), "decode") {
+			t.Errorf("expected decode error message, got %v", err)
 		}
 	})
 }
