@@ -183,11 +183,11 @@ func (s *Server) handleAddRecord(w http.ResponseWriter, r *http.Request) {
 	// Validate required fields
 	// Type is validated implicitly (must be provided as int 0-12)
 	if req.Name == "" {
-		s.writeError(w, http.StatusBadRequest, "validation.error", "Name", "Name is required")
+		s.writeError(w, http.StatusBadRequest, "validation_error", "Name", "Name is required")
 		return
 	}
 	if req.Value == "" {
-		s.writeError(w, http.StatusBadRequest, "validation.error", "Value", "Value is required")
+		s.writeError(w, http.StatusBadRequest, "validation_error", "Value", "Value is required")
 		return
 	}
 
@@ -243,7 +243,7 @@ func (s *Server) handleCreateZone(w http.ResponseWriter, r *http.Request) {
 
 	// Validate domain
 	if req.Domain == "" {
-		s.writeError(w, http.StatusBadRequest, "validation.error", "Domain", "Domain is required")
+		s.writeError(w, http.StatusBadRequest, "validation_error", "Domain", "Domain is required")
 		return
 	}
 

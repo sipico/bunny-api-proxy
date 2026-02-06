@@ -597,8 +597,8 @@ func TestHandleCreateZone_EmptyDomain(t *testing.T) {
 		t.Fatalf("failed to decode error response: %v", err)
 	}
 
-	if errResp.ErrorKey != "validation.error" {
-		t.Errorf("expected error key validation.error, got %s", errResp.ErrorKey)
+	if errResp.ErrorKey != "validation_error" {
+		t.Errorf("expected error key validation_error, got %s", errResp.ErrorKey)
 	}
 	if errResp.Field != "Domain" {
 		t.Errorf("expected field Domain, got %s", errResp.Field)
