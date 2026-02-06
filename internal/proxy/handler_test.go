@@ -1436,3 +1436,120 @@ func TestHandleListRecords_EmptyAfterFilter(t *testing.T) {
 		t.Errorf("expected 0 records after filtering, got %d", len(result))
 	}
 }
+
+// TestHandleListZones_InvalidPerPage tests handling of invalid perPage parameter
+func TestHandleListZones_InvalidPerPage(t *testing.T) {
+	t.Parallel()
+	client := &mockBunnyClient{}
+	handler := NewHandler(client, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodGet, "/dnszone?perPage=invalid", nil)
+
+	handler.HandleListZones(w, r)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d", http.StatusBadRequest, w.Code)
+	}
+
+	var result map[string]string
+	if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+	if result["error"] != "invalid perPage parameter" {
+		t.Errorf("expected error message 'invalid perPage parameter', got %q", result["error"])
+	}
+}
+
+// TestHandleListRecords_MissingZoneID tests handling of missing zone ID parameter
+func TestHandleListRecords_MissingZoneID(t *testing.T) {
+	t.Parallel()
+	client := &mockBunnyClient{}
+	handler := NewHandler(client, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	w := httptest.NewRecorder()
+	r := newTestRequest(http.MethodGet, "/dnszone/records", nil, map[string]string{})
+
+	handler.HandleListRecords(w, r)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d", http.StatusBadRequest, w.Code)
+	}
+
+	var result map[string]string
+	if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+	if result["error"] != "missing zone ID" {
+		t.Errorf("expected error message 'missing zone ID', got %q", result["error"])
+	}
+}
+
+// TestHandleAddRecord_MissingZoneID tests handling of missing zone ID parameter
+func TestHandleAddRecord_MissingZoneID(t *testing.T) {
+	t.Parallel()
+	client := &mockBunnyClient{}
+	handler := NewHandler(client, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	w := httptest.NewRecorder()
+
+	body := []byte(`{"Type":3,"Name":"test"}`)
+	r := newTestRequest(http.MethodPost, "/dnszone/records", bytes.NewReader(body), map[string]string{})
+
+	handler.HandleAddRecord(w, r)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d", http.StatusBadRequest, w.Code)
+	}
+
+	var result map[string]string
+	if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+	if result["error"] != "missing zone ID" {
+		t.Errorf("expected error message 'missing zone ID', got %q", result["error"])
+	}
+}
+
+// TestHandleDeleteRecord_MissingZoneID tests handling of missing zone ID parameter
+func TestHandleDeleteRecord_MissingZoneID(t *testing.T) {
+	t.Parallel()
+	client := &mockBunnyClient{}
+	handler := NewHandler(client, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	w := httptest.NewRecorder()
+	r := newTestRequest(http.MethodDelete, "/dnszone/records/456", nil, map[string]string{"recordID": "456"})
+
+	handler.HandleDeleteRecord(w, r)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d", http.StatusBadRequest, w.Code)
+	}
+
+	var result map[string]string
+	if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+	if result["error"] != "missing zone ID" {
+		t.Errorf("expected error message 'missing zone ID', got %q", result["error"])
+	}
+}
+
+// TestHandleDeleteRecord_MissingRecordID tests handling of missing record ID parameter
+func TestHandleDeleteRecord_MissingRecordID(t *testing.T) {
+	t.Parallel()
+	client := &mockBunnyClient{}
+	handler := NewHandler(client, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	w := httptest.NewRecorder()
+	r := newTestRequest(http.MethodDelete, "/dnszone/123/records", nil, map[string]string{"zoneID": "123"})
+
+	handler.HandleDeleteRecord(w, r)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d", http.StatusBadRequest, w.Code)
+	}
+
+	var result map[string]string
+	if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+	if result["error"] != "missing record ID" {
+		t.Errorf("expected error message 'missing record ID', got %q", result["error"])
+	}
+}
