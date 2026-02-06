@@ -414,6 +414,143 @@ func TestAddRecord(t *testing.T) {
 	})
 }
 
+// TestUpdateRecord tests the UpdateRecord method with various scenarios.
+func TestUpdateRecord(t *testing.T) {
+	t.Parallel()
+	t.Run("success updating record", func(t *testing.T) {
+		t.Parallel()
+		server := mockbunny.New()
+		defer server.Close()
+
+		// Add a zone with a record
+		zoneID := server.AddZoneWithRecords("example.com", []mockbunny.Record{
+			{
+				Type:  0, // A
+				Name:  "www",
+				Value: "1.2.3.4",
+				TTL:   300,
+			},
+		})
+
+		// Get the record ID from the zone
+		zone := server.GetZone(zoneID)
+		if zone == nil || len(zone.Records) == 0 {
+			t.Fatalf("expected zone with record")
+		}
+		recordID := zone.Records[0].ID
+
+		client := NewClient("test-key", WithBaseURL(server.URL()))
+		req := &AddRecordRequest{
+			Type:  0, // A
+			Name:  "www",
+			Value: "2.3.4.5",
+			TTL:   600,
+		}
+
+		record, err := client.UpdateRecord(context.Background(), zoneID, recordID, req)
+
+		if err != nil {
+			t.Fatalf("UpdateRecord failed: %v", err)
+		}
+
+		if record == nil {
+			t.Fatal("expected non-nil record")
+			return
+		}
+
+		if record.Type != 0 { // A
+			t.Errorf("expected record type 0 (A), got %d", record.Type)
+		}
+
+		if record.Name != "www" {
+			t.Errorf("expected record name www, got %s", record.Name)
+		}
+
+		if record.Value != "2.3.4.5" {
+			t.Errorf("expected record value 2.3.4.5, got %s", record.Value)
+		}
+	})
+
+	t.Run("zone not found error (404)", func(t *testing.T) {
+		t.Parallel()
+		server := mockbunny.New()
+		defer server.Close()
+
+		client := NewClient("test-key", WithBaseURL(server.URL()))
+		req := &AddRecordRequest{
+			Type:  0, // A
+			Name:  "www",
+			Value: "1.2.3.4",
+			TTL:   300,
+		}
+
+		record, err := client.UpdateRecord(context.Background(), 999, 1, req)
+
+		if err != ErrNotFound {
+			t.Errorf("expected ErrNotFound, got %v", err)
+		}
+
+		if record != nil {
+			t.Errorf("expected nil record, got %v", record)
+		}
+	})
+
+	t.Run("record not found error (404)", func(t *testing.T) {
+		t.Parallel()
+		server := mockbunny.New()
+		defer server.Close()
+
+		// Add a zone without records
+		zoneID := server.AddZone("example.com")
+
+		client := NewClient("test-key", WithBaseURL(server.URL()))
+		req := &AddRecordRequest{
+			Type:  0, // A
+			Name:  "www",
+			Value: "1.2.3.4",
+			TTL:   300,
+		}
+
+		record, err := client.UpdateRecord(context.Background(), zoneID, 999, req)
+
+		if err != ErrNotFound {
+			t.Errorf("expected ErrNotFound, got %v", err)
+		}
+
+		if record != nil {
+			t.Errorf("expected nil record, got %v", record)
+		}
+	})
+
+	t.Run("unauthorized error (401)", func(t *testing.T) {
+		t.Parallel()
+		// Create a custom HTTP client that returns 401
+		transport := &mockTransport{
+			statusCode: http.StatusUnauthorized,
+			body:       []byte(""),
+		}
+		httpClient := &http.Client{Transport: transport}
+
+		client := NewClient("test-key", WithHTTPClient(httpClient))
+		req := &AddRecordRequest{
+			Type:  0, // A
+			Name:  "www",
+			Value: "1.2.3.4",
+			TTL:   300,
+		}
+
+		record, err := client.UpdateRecord(context.Background(), 1, 1, req)
+
+		if err != ErrUnauthorized {
+			t.Errorf("expected ErrUnauthorized, got %v", err)
+		}
+
+		if record != nil {
+			t.Errorf("expected nil record, got %v", record)
+		}
+	})
+}
+
 // TestDeleteRecord tests the DeleteRecord method with various scenarios.
 func TestDeleteRecord(t *testing.T) {
 	t.Parallel()

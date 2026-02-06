@@ -1006,6 +1006,143 @@ func TestHandleDeleteRecord_ClientError(t *testing.T) {
 	}
 }
 
+// TestHandleUpdateRecord_Success tests successful record update
+func TestHandleUpdateRecord_Success(t *testing.T) {
+	t.Parallel()
+	record := &bunny.Record{ID: 456, Type: 0, Name: "www", Value: "2.3.4.5"}
+
+	client := &mockBunnyClient{
+		updateRecordFunc: func(ctx context.Context, zoneID, recordID int64, req *bunny.AddRecordRequest) (*bunny.Record, error) {
+			if zoneID != 123 || recordID != 456 {
+				t.Errorf("expected zone ID 123 and record ID 456, got %d and %d", zoneID, recordID)
+			}
+			if req.Type != 0 { // A
+				t.Errorf("expected record type 0 (A), got %d", req.Type)
+			}
+			return record, nil
+		},
+	}
+
+	handler := NewHandler(client, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	w := httptest.NewRecorder()
+
+	body := []byte(`{"Type":0,"Name":"www","Value":"2.3.4.5","Ttl":300}`)
+	r := newTestRequest(http.MethodPost, "/dnszone/123/records/456", bytes.NewReader(body), map[string]string{"zoneID": "123", "recordID": "456"})
+
+	handler.HandleUpdateRecord(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status %d, got %d", http.StatusOK, w.Code)
+	}
+
+	var result bunny.Record
+	if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+
+	if result.Type != 0 { // A
+		t.Errorf("expected record type %d (A), got %d", 0, result.Type)
+	}
+	if result.Name != "www" {
+		t.Errorf("expected record name www, got %s", result.Name)
+	}
+}
+
+// TestHandleUpdateRecord_InvalidJSON tests malformed JSON body
+func TestHandleUpdateRecord_InvalidJSON(t *testing.T) {
+	t.Parallel()
+	client := &mockBunnyClient{}
+	handler := NewHandler(client, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	w := httptest.NewRecorder()
+
+	body := []byte(`{invalid json}`)
+	r := newTestRequest(http.MethodPost, "/dnszone/123/records/456", bytes.NewReader(body), map[string]string{"zoneID": "123", "recordID": "456"})
+
+	handler.HandleUpdateRecord(w, r)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d", http.StatusBadRequest, w.Code)
+	}
+}
+
+// TestHandleUpdateRecord_InvalidZoneID tests invalid zone ID
+func TestHandleUpdateRecord_InvalidZoneID(t *testing.T) {
+	t.Parallel()
+	client := &mockBunnyClient{}
+	handler := NewHandler(client, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	w := httptest.NewRecorder()
+
+	body := []byte(`{"Type":0,"Name":"test"}`)
+	r := newTestRequest(http.MethodPost, "/dnszone/invalid/records/456", bytes.NewReader(body), map[string]string{"zoneID": "invalid", "recordID": "456"})
+
+	handler.HandleUpdateRecord(w, r)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d", http.StatusBadRequest, w.Code)
+	}
+}
+
+// TestHandleUpdateRecord_InvalidRecordID tests invalid record ID
+func TestHandleUpdateRecord_InvalidRecordID(t *testing.T) {
+	t.Parallel()
+	client := &mockBunnyClient{}
+	handler := NewHandler(client, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	w := httptest.NewRecorder()
+
+	body := []byte(`{"Type":0,"Name":"test"}`)
+	r := newTestRequest(http.MethodPost, "/dnszone/123/records/invalid", bytes.NewReader(body), map[string]string{"zoneID": "123", "recordID": "invalid"})
+
+	handler.HandleUpdateRecord(w, r)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d", http.StatusBadRequest, w.Code)
+	}
+}
+
+// TestHandleUpdateRecord_ZoneNotFound tests zone not found error
+func TestHandleUpdateRecord_ZoneNotFound(t *testing.T) {
+	t.Parallel()
+	client := &mockBunnyClient{
+		updateRecordFunc: func(ctx context.Context, zoneID, recordID int64, req *bunny.AddRecordRequest) (*bunny.Record, error) {
+			return nil, bunny.ErrNotFound
+		},
+	}
+
+	handler := NewHandler(client, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	w := httptest.NewRecorder()
+
+	body := []byte(`{"Type":0,"Name":"test"}`)
+	r := newTestRequest(http.MethodPost, "/dnszone/999/records/456", bytes.NewReader(body), map[string]string{"zoneID": "999", "recordID": "456"})
+
+	handler.HandleUpdateRecord(w, r)
+
+	if w.Code != http.StatusNotFound {
+		t.Errorf("expected status %d, got %d", http.StatusNotFound, w.Code)
+	}
+}
+
+// TestHandleUpdateRecord_ClientError tests client error handling
+func TestHandleUpdateRecord_ClientError(t *testing.T) {
+	t.Parallel()
+	client := &mockBunnyClient{
+		updateRecordFunc: func(ctx context.Context, zoneID, recordID int64, req *bunny.AddRecordRequest) (*bunny.Record, error) {
+			return nil, fmt.Errorf("server error")
+		},
+	}
+
+	handler := NewHandler(client, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	w := httptest.NewRecorder()
+
+	body := []byte(`{"Type":0,"Name":"test"}`)
+	r := newTestRequest(http.MethodPost, "/dnszone/123/records/456", bytes.NewReader(body), map[string]string{"zoneID": "123", "recordID": "456"})
+
+	handler.HandleUpdateRecord(w, r)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("expected status %d, got %d", http.StatusInternalServerError, w.Code)
+	}
+}
+
 // TestHandleListZones_FiltersToPermittedZones tests filtering zones to permitted zones only.
 func TestHandleListZones_FiltersToPermittedZones(t *testing.T) {
 	t.Parallel()
