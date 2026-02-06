@@ -37,6 +37,18 @@ func (h *Handler) TokenAuthMiddleware(next http.Handler) http.Handler {
 
 		// First, check if this is the master API key using the bootstrap service
 		if h.bootstrap != nil && h.bootstrap.IsMasterKey(token) {
+			// Master key is allowed only during bootstrap (UNCONFIGURED state)
+			canUse, err := h.bootstrap.CanUseMasterKey(ctx)
+			if err != nil {
+				h.logger.Error("failed to check bootstrap state", "error", err)
+				http.Error(w, "Internal error", http.StatusInternalServerError)
+				return
+			}
+			if !canUse {
+				WriteError(w, http.StatusForbidden, ErrCodeMasterKeyLocked,
+					"Master API key is locked. Use an admin token instead.")
+				return
+			}
 			// Master key authenticated - set context flags
 			ctx = auth.WithMasterKey(ctx, true)
 			ctx = auth.WithAdmin(ctx, true)
