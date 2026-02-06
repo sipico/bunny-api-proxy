@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"fmt"
 )
 
 // CreateAdminToken creates a new admin token using the unified tokens table.
@@ -63,27 +64,26 @@ func (s *SQLiteStorage) ValidateAdminToken(ctx context.Context, token string) (*
 // Returns empty slice if no tokens exist.
 // This filters the unified tokens table for records where is_admin=true.
 func (s *SQLiteStorage) ListAdminTokens(ctx context.Context) ([]*AdminToken, error) {
-	// Get all tokens from the unified table
-	tokens, err := s.ListTokens(ctx)
+	rows, err := s.db.QueryContext(ctx,
+		"SELECT id, key_hash, name, created_at FROM tokens WHERE is_admin = TRUE ORDER BY created_at DESC")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to query admin tokens: %w", err)
 	}
+	defer rows.Close() //nolint:errcheck
 
-	// Filter for admin tokens only and convert to AdminToken format
 	var adminTokens []*AdminToken
-	for _, t := range tokens {
-		if t.IsAdmin {
-			at := &AdminToken{
-				ID:        t.ID,
-				TokenHash: t.KeyHash,
-				Name:      t.Name,
-				CreatedAt: t.CreatedAt,
-			}
-			adminTokens = append(adminTokens, at)
+	for rows.Next() {
+		var at AdminToken
+		if err := rows.Scan(&at.ID, &at.TokenHash, &at.Name, &at.CreatedAt); err != nil {
+			return nil, fmt.Errorf("failed to scan admin token row: %w", err)
 		}
+		adminTokens = append(adminTokens, &at)
 	}
 
-	// Return empty slice instead of nil
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating admin token rows: %w", err)
+	}
+
 	if adminTokens == nil {
 		adminTokens = make([]*AdminToken, 0)
 	}

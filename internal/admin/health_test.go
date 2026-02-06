@@ -100,6 +100,10 @@ func (m *mockStorage) GetPermissionsForToken(ctx context.Context, tokenID int64)
 	return make([]*storage.Permission, 0), nil
 }
 
+func (m *mockStorage) GetTokenByHash(ctx context.Context, keyHash string) (*storage.Token, error) {
+	return nil, storage.ErrNotFound
+}
+
 // failingWriter is a ResponseWriter that fails on Write to test error handling
 type failingWriter struct {
 	header http.Header

@@ -97,23 +97,8 @@ func (h *Handler) TokenAuthMiddleware(next http.Handler) http.Handler {
 // validateUnifiedToken validates a token against the unified token system.
 // Returns the token if valid, or nil if not found.
 func (h *Handler) validateUnifiedToken(ctx context.Context, token string) (*storage.Token, error) {
-	// Hash the provided token and look it up
-	// The storage layer handles the hashing
-	tokens, err := h.storage.ListTokens(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	// Hash the provided token for comparison
 	keyHash := auth.HashToken(token)
-
-	for _, t := range tokens {
-		if t.KeyHash == keyHash {
-			return t, nil
-		}
-	}
-
-	return nil, storage.ErrNotFound
+	return h.storage.GetTokenByHash(ctx, keyHash)
 }
 
 // GetTokenInfoFromContext retrieves token info from context
