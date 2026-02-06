@@ -182,12 +182,12 @@ func (s *Server) handleAddRecord(w http.ResponseWriter, r *http.Request) {
 
 	// Validate required fields
 	// Type is validated implicitly (must be provided as int 0-12)
-	if req.Name == "" {
-		s.writeError(w, http.StatusBadRequest, "validation_error", "Name", "Name is required")
-		return
-	}
 	if req.Value == "" {
 		s.writeError(w, http.StatusBadRequest, "validation_error", "Value", "Value is required")
+		return
+	}
+	if req.Name == "" {
+		s.writeError(w, http.StatusBadRequest, "validation_error", "Name", "Name is required")
 		return
 	}
 
