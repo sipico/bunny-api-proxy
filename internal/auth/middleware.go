@@ -57,8 +57,8 @@ func (m *Authenticator) Authenticate(next http.Handler) http.Handler {
 
 		if isMasterKeyValid {
 			// Master key authenticated - set context and continue
-			ctx = withMasterKey(ctx, true)
-			ctx = withAdmin(ctx, true)
+			ctx = WithMasterKey(ctx, true)
+			ctx = WithAdmin(ctx, true)
 			// No token or permissions for master key
 			next.ServeHTTP(w, r.WithContext(ctx))
 			return
@@ -79,9 +79,9 @@ func (m *Authenticator) Authenticate(next http.Handler) http.Handler {
 		}
 
 		// Token found - set context
-		ctx = withToken(ctx, token)
-		ctx = withMasterKey(ctx, false)
-		ctx = withAdmin(ctx, token.IsAdmin)
+		ctx = WithToken(ctx, token)
+		ctx = WithMasterKey(ctx, false)
+		ctx = WithAdmin(ctx, token.IsAdmin)
 
 		// Load permissions for scoped tokens
 		if !token.IsAdmin {
@@ -90,7 +90,7 @@ func (m *Authenticator) Authenticate(next http.Handler) http.Handler {
 				writeJSONError(w, http.StatusInternalServerError, "internal error")
 				return
 			}
-			ctx = withPermissions(ctx, perms)
+			ctx = WithPermissions(ctx, perms)
 		}
 
 		next.ServeHTTP(w, r.WithContext(ctx))

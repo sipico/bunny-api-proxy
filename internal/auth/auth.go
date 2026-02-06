@@ -194,6 +194,30 @@ func HasAllZonesPermission(keyInfo *KeyInfo) bool {
 	return false
 }
 
+// findZonePermission finds the permission entry for a zone.
+// First tries exact zone match, then falls back to wildcard (ZoneID=0).
+// Returns nil if no matching permission is found.
+func findZonePermission(keyInfo *KeyInfo, zoneID int64) *storage.Permission {
+	if keyInfo == nil {
+		return nil
+	}
+	// Try exact zone match first
+	for _, perm := range keyInfo.Permissions {
+		if perm.ZoneID == zoneID {
+			return perm
+		}
+	}
+	// Fall back to wildcard (ZoneID=0) if not an exact match
+	if zoneID != 0 {
+		for _, perm := range keyInfo.Permissions {
+			if perm.ZoneID == 0 {
+				return perm
+			}
+		}
+	}
+	return nil
+}
+
 // IsRecordTypePermitted checks if a record type is permitted for a zone.
 // Returns true if the type is allowed, or if no RecordTypes restriction exists.
 func IsRecordTypePermitted(keyInfo *KeyInfo, zoneID int64, recordType string) bool {
@@ -201,27 +225,7 @@ func IsRecordTypePermitted(keyInfo *KeyInfo, zoneID int64, recordType string) bo
 		return false
 	}
 
-	// Find the permission for this zone
-	var zonePerm *storage.Permission
-
-	// First, try to find an exact zone match
-	for _, perm := range keyInfo.Permissions {
-		if perm.ZoneID == zoneID {
-			zonePerm = perm
-			break
-		}
-	}
-
-	// If no exact match and zone is not 0, try the wildcard (ZoneID = 0)
-	if zonePerm == nil && zoneID != 0 {
-		for _, perm := range keyInfo.Permissions {
-			if perm.ZoneID == 0 {
-				zonePerm = perm
-				break
-			}
-		}
-	}
-
+	zonePerm := findZonePermission(keyInfo, zoneID)
 	if zonePerm == nil {
 		return false
 	}
@@ -247,27 +251,7 @@ func GetPermittedRecordTypes(keyInfo *KeyInfo, zoneID int64) []string {
 		return nil
 	}
 
-	// Find the permission for this zone
-	var zonePerm *storage.Permission
-
-	// First, try to find an exact zone match
-	for _, perm := range keyInfo.Permissions {
-		if perm.ZoneID == zoneID {
-			zonePerm = perm
-			break
-		}
-	}
-
-	// If no exact match and zone is not 0, try the wildcard (ZoneID = 0)
-	if zonePerm == nil && zoneID != 0 {
-		for _, perm := range keyInfo.Permissions {
-			if perm.ZoneID == 0 {
-				zonePerm = perm
-				break
-			}
-		}
-	}
-
+	zonePerm := findZonePermission(keyInfo, zoneID)
 	if zonePerm == nil {
 		return nil
 	}
