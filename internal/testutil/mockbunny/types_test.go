@@ -161,9 +161,9 @@ func TestMockBunnyTime_MarshalJSON(t *testing.T) {
 			expected: `null`,
 		},
 		{
-			name:     "timestamp marshals without timezone",
+			name:     "timestamp marshals with sub-second precision and Z",
 			time:     MockBunnyTime{Time: time.Date(2026, 2, 3, 14, 7, 45, 0, time.UTC)},
-			expected: `"2026-02-03T14:07:45"`,
+			expected: `"2026-02-03T14:07:45.0000000Z"`,
 		},
 	}
 
@@ -248,8 +248,8 @@ func TestMockBunnyTime_RoundTrip(t *testing.T) {
 		t.Fatalf("Marshal error: %v", err)
 	}
 
-	// Should produce format without timezone
-	expected := `"2026-02-03T14:07:45"`
+	// Should produce format with sub-second precision and Z
+	expected := `"2026-02-03T14:07:45.0000000Z"`
 	if string(marshaled) != expected {
 		t.Errorf("Marshaled = %s, want %s", marshaled, expected)
 	}
