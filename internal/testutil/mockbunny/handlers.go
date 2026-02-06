@@ -88,7 +88,7 @@ func (s *Server) handleGetZone(w http.ResponseWriter, r *http.Request) {
 	s.state.mu.RUnlock()
 
 	if !ok {
-		http.Error(w, "zone not found", http.StatusNotFound)
+		s.writeError(w, http.StatusNotFound, "dnszone.zone.not_found", "Id", "The requested DNS zone was not found")
 		return
 	}
 
@@ -120,7 +120,7 @@ func (s *Server) handleDeleteRecord(w http.ResponseWriter, r *http.Request) {
 	// Check if zone exists
 	zone, ok := s.state.zones[zoneID]
 	if !ok {
-		http.Error(w, "zone not found", http.StatusNotFound)
+		s.writeError(w, http.StatusNotFound, "dnszone.zone.not_found", "Id", "The requested DNS zone was not found")
 		return
 	}
 
@@ -135,7 +135,7 @@ func (s *Server) handleDeleteRecord(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !found {
-		http.Error(w, "record not found", http.StatusNotFound)
+		s.writeError(w, http.StatusNotFound, "dnszone.record.not_found", "RecordId", "The requested DNS zone record was not found")
 		return
 	}
 
@@ -194,7 +194,7 @@ func (s *Server) handleUpdateRecord(w http.ResponseWriter, r *http.Request) {
 
 	zone, ok := s.state.zones[zoneID]
 	if !ok {
-		http.Error(w, "zone not found", http.StatusNotFound)
+		s.writeError(w, http.StatusNotFound, "dnszone.zone.not_found", "Id", "The requested DNS zone was not found")
 		return
 	}
 
@@ -225,7 +225,7 @@ func (s *Server) handleUpdateRecord(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !found {
-		http.Error(w, "record not found", http.StatusNotFound)
+		s.writeError(w, http.StatusNotFound, "dnszone.record.not_found", "RecordId", "The requested DNS zone record was not found")
 		return
 	}
 }
@@ -261,7 +261,7 @@ func (s *Server) handleAddRecord(w http.ResponseWriter, r *http.Request) {
 
 	zone, ok := s.state.zones[zoneID]
 	if !ok {
-		http.Error(w, "zone not found", http.StatusNotFound)
+		s.writeError(w, http.StatusNotFound, "dnszone.zone.not_found", "Id", "The requested DNS zone was not found")
 		return
 	}
 
@@ -367,7 +367,7 @@ func (s *Server) handleDeleteZone(w http.ResponseWriter, r *http.Request) {
 	// Check if zone exists
 	_, ok := s.state.zones[id]
 	if !ok {
-		http.Error(w, "zone not found", http.StatusNotFound)
+		s.writeError(w, http.StatusNotFound, "dnszone.zone.not_found", "Id", "The requested DNS zone was not found")
 		return
 	}
 

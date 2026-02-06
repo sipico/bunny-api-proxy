@@ -62,6 +62,26 @@ func TestGetZone_NotFound(t *testing.T) {
 	if resp.StatusCode != http.StatusNotFound {
 		t.Errorf("expected status %d, got %d", http.StatusNotFound, resp.StatusCode)
 	}
+
+	// Verify error response format is JSON
+	if resp.Header.Get("Content-Type") != "application/json; charset=utf-8" {
+		t.Errorf("expected Content-Type application/json, got %s", resp.Header.Get("Content-Type"))
+	}
+
+	var errResp ErrorResponse
+	if err := json.NewDecoder(resp.Body).Decode(&errResp); err != nil {
+		t.Fatalf("failed to decode error response: %v", err)
+	}
+
+	if errResp.ErrorKey != "dnszone.zone.not_found" {
+		t.Errorf("expected error key dnszone.zone.not_found, got %s", errResp.ErrorKey)
+	}
+	if errResp.Field != "Id" {
+		t.Errorf("expected field Id, got %s", errResp.Field)
+	}
+	if errResp.Message != "The requested DNS zone was not found" {
+		t.Errorf("expected message 'The requested DNS zone was not found', got %s", errResp.Message)
+	}
 }
 
 func TestGetZone_InvalidID(t *testing.T) {
@@ -460,6 +480,20 @@ func TestDeleteRecord_RecordNotFound(t *testing.T) {
 	if resp.StatusCode != http.StatusNotFound {
 		t.Errorf("expected status %d, got %d", http.StatusNotFound, resp.StatusCode)
 	}
+
+	// Verify error response format is JSON
+	if resp.Header.Get("Content-Type") != "application/json; charset=utf-8" {
+		t.Errorf("expected Content-Type application/json, got %s", resp.Header.Get("Content-Type"))
+	}
+
+	var errResp ErrorResponse
+	if err := json.NewDecoder(resp.Body).Decode(&errResp); err != nil {
+		t.Fatalf("failed to decode error response: %v", err)
+	}
+
+	if errResp.ErrorKey != "dnszone.record.not_found" {
+		t.Errorf("expected error key dnszone.record.not_found, got %s", errResp.ErrorKey)
+	}
 }
 
 func TestDeleteRecord_ZoneNotFound(t *testing.T) {
@@ -478,6 +512,20 @@ func TestDeleteRecord_ZoneNotFound(t *testing.T) {
 
 	if resp.StatusCode != http.StatusNotFound {
 		t.Errorf("expected status %d, got %d", http.StatusNotFound, resp.StatusCode)
+	}
+
+	// Verify error response format is JSON
+	if resp.Header.Get("Content-Type") != "application/json; charset=utf-8" {
+		t.Errorf("expected Content-Type application/json, got %s", resp.Header.Get("Content-Type"))
+	}
+
+	var errResp ErrorResponse
+	if err := json.NewDecoder(resp.Body).Decode(&errResp); err != nil {
+		t.Fatalf("failed to decode error response: %v", err)
+	}
+
+	if errResp.ErrorKey != "dnszone.zone.not_found" {
+		t.Errorf("expected error key dnszone.zone.not_found, got %s", errResp.ErrorKey)
 	}
 }
 
@@ -780,6 +828,20 @@ func TestHandleDeleteZone_NotFound(t *testing.T) {
 	if resp.StatusCode != http.StatusNotFound {
 		t.Errorf("expected status %d, got %d", http.StatusNotFound, resp.StatusCode)
 	}
+
+	// Verify error response format is JSON
+	if resp.Header.Get("Content-Type") != "application/json; charset=utf-8" {
+		t.Errorf("expected Content-Type application/json, got %s", resp.Header.Get("Content-Type"))
+	}
+
+	var errResp ErrorResponse
+	if err := json.NewDecoder(resp.Body).Decode(&errResp); err != nil {
+		t.Fatalf("failed to decode error response: %v", err)
+	}
+
+	if errResp.ErrorKey != "dnszone.zone.not_found" {
+		t.Errorf("expected error key dnszone.zone.not_found, got %s", errResp.ErrorKey)
+	}
 }
 
 func TestHandleDeleteZone_InvalidID(t *testing.T) {
@@ -941,6 +1003,20 @@ func TestUpdateRecord_ZoneNotFound(t *testing.T) {
 	if resp.StatusCode != http.StatusNotFound {
 		t.Errorf("expected status %d, got %d", http.StatusNotFound, resp.StatusCode)
 	}
+
+	// Verify error response format is JSON
+	if resp.Header.Get("Content-Type") != "application/json; charset=utf-8" {
+		t.Errorf("expected Content-Type application/json, got %s", resp.Header.Get("Content-Type"))
+	}
+
+	var errResp ErrorResponse
+	if err := json.NewDecoder(resp.Body).Decode(&errResp); err != nil {
+		t.Fatalf("failed to decode error response: %v", err)
+	}
+
+	if errResp.ErrorKey != "dnszone.zone.not_found" {
+		t.Errorf("expected error key dnszone.zone.not_found, got %s", errResp.ErrorKey)
+	}
 }
 
 func TestUpdateRecord_RecordNotFound(t *testing.T) {
@@ -963,6 +1039,20 @@ func TestUpdateRecord_RecordNotFound(t *testing.T) {
 
 	if resp.StatusCode != http.StatusNotFound {
 		t.Errorf("expected status %d, got %d", http.StatusNotFound, resp.StatusCode)
+	}
+
+	// Verify error response format is JSON
+	if resp.Header.Get("Content-Type") != "application/json; charset=utf-8" {
+		t.Errorf("expected Content-Type application/json, got %s", resp.Header.Get("Content-Type"))
+	}
+
+	var errResp ErrorResponse
+	if err := json.NewDecoder(resp.Body).Decode(&errResp); err != nil {
+		t.Fatalf("failed to decode error response: %v", err)
+	}
+
+	if errResp.ErrorKey != "dnszone.record.not_found" {
+		t.Errorf("expected error key dnszone.record.not_found, got %s", errResp.ErrorKey)
 	}
 }
 
