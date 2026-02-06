@@ -212,8 +212,7 @@ func (s *Server) handleUpdateRecord(w http.ResponseWriter, r *http.Request) {
 	found := false
 	for i, record := range zone.Records {
 		if record.ID == recordID {
-			// Update record fields
-			zone.Records[i].Type = req.Type
+			// Update record fields (Type is immutable on real bunny.net API — do not update it)
 			zone.Records[i].Name = req.Name
 			zone.Records[i].Value = req.Value
 			zone.Records[i].TTL = req.TTL

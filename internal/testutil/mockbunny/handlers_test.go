@@ -1032,3 +1032,45 @@ func TestUpdateRecord_InvalidRecordID(t *testing.T) {
 		t.Errorf("expected status %d, got %d", http.StatusBadRequest, resp.StatusCode)
 	}
 }
+
+// TestUpdateRecord_TypeImmutable verifies that the record Type field is not changed
+// on update, matching the real bunny.net API behavior.
+func TestUpdateRecord_TypeImmutable(t *testing.T) {
+	t.Parallel()
+	s := New()
+	defer s.Close()
+
+	records := []Record{
+		{Type: 3, Name: "test", Value: "original-value", TTL: 300}, // TXT record
+	}
+	zoneID := s.AddZoneWithRecords("example.com", records)
+
+	zone := s.GetZone(zoneID)
+	recordID := zone.Records[0].ID
+
+	// Update with Type=0 (A) — should be ignored
+	reqBody := `{"Type":0,"Name":"test","Value":"1.2.3.4","Ttl":300}`
+	req, _ := http.NewRequest(http.MethodPost,
+		fmt.Sprintf("%s/dnszone/%d/records/%d", s.URL(), zoneID, recordID), strings.NewReader(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("failed to update record: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNoContent {
+		t.Errorf("expected status %d, got %d", http.StatusNoContent, resp.StatusCode)
+	}
+
+	// Verify Type stayed as TXT (3), not A (0)
+	updatedZone := s.GetZone(zoneID)
+	updated := updatedZone.Records[0]
+	if updated.Type != 3 {
+		t.Errorf("expected record type to remain 3 (TXT), got %d — Type should be immutable on update", updated.Type)
+	}
+	if updated.Value != "1.2.3.4" {
+		t.Errorf("expected updated value 1.2.3.4, got %s", updated.Value)
+	}
+}

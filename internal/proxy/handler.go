@@ -375,17 +375,8 @@ func (h *Handler) HandleUpdateRecord(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate required fields for update
-	if req.Value == "" {
-		writeError(w, http.StatusBadRequest, "Value is required")
-		return
-	}
-	if req.Name == "" {
-		writeError(w, http.StatusBadRequest, "Name is required")
-		return
-	}
-
-	// Call client to update record
+	// Call client to update record — validation is delegated to the backend
+	// (bunny.net API has nuanced validation rules per record type)
 	record, err := h.client.UpdateRecord(r.Context(), zoneID, recordID, &req)
 	if err != nil {
 		handleBunnyError(w, err)

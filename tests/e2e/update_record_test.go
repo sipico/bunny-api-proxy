@@ -500,10 +500,9 @@ func TestE2E_UpdateRecord_Unauthorized(t *testing.T) {
 // Update DNS Record - Record Type Specific Behavior
 // =============================================================================
 
-// TestE2E_UpdateRecord_ChangeRecordType verifies behavior when changing a record's
-// type during an update (e.g., TXT -> A). This tests whether the backend allows
-// type changes on existing records and whether the proxy permission layer correctly
-// validates the NEW type, not the old one.
+// TestE2E_UpdateRecord_ChangeRecordType verifies that the record Type field is
+// immutable on update. The bunny.net API ignores the Type field in update requests,
+// so the record type should remain unchanged even if a different Type is sent.
 func TestE2E_UpdateRecord_ChangeRecordType(t *testing.T) {
 	env := testenv.Setup(t)
 	zones := env.CreateTestZones(t, 1)
@@ -524,18 +523,16 @@ func TestE2E_UpdateRecord_ChangeRecordType(t *testing.T) {
 	}
 	require.NoError(t, json.NewDecoder(addResp.Body).Decode(&created))
 
-	// Update it to be an A record
+	// Try to update it to be an A record — the API accepts the request but ignores Type
 	updateBody := map[string]interface{}{"Type": 0, "Name": "changeme", "Value": "1.2.3.4"}
 	body, _ = json.Marshal(updateBody)
 	updateResp := proxyRequest(t, "POST", fmt.Sprintf("/dnszone/%d/records/%d", zone.ID, created.ID), multiTypeKey, body)
 	defer updateResp.Body.Close()
 
-	// The proxy validates the Type in the request body, so this should be allowed
-	// since the key has both TXT and A permissions
 	assert.Contains(t, []int{200, 204}, updateResp.StatusCode,
-		"key with TXT+A permissions should be able to change record type from TXT to A")
+		"update request should succeed even with different Type in body")
 
-	// Verify the type actually changed
+	// Verify that the Type remained TXT (3) — bunny.net API treats Type as immutable on update
 	listResp := proxyRequest(t, "GET", fmt.Sprintf("/dnszone/%d/records", zone.ID), multiTypeKey, nil)
 	defer listResp.Body.Close()
 
@@ -548,8 +545,8 @@ func TestE2E_UpdateRecord_ChangeRecordType(t *testing.T) {
 
 	for _, rec := range records {
 		if rec.ID == created.ID {
-			assert.Equal(t, 0, rec.Type, "record type should have changed to A (0)")
-			assert.Equal(t, "1.2.3.4", rec.Value, "record value should be the new A record value")
+			assert.Equal(t, 3, rec.Type, "record type should remain TXT (3) — Type is immutable on update")
+			assert.Equal(t, "1.2.3.4", rec.Value, "record value should be updated to the new value")
 		}
 	}
 }
