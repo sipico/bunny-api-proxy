@@ -86,6 +86,13 @@ func handleBunnyError(w http.ResponseWriter, err error) {
 		slog.Default().Error("upstream authentication failed", "error", err)
 		writeError(w, http.StatusBadGateway, "upstream authentication failed")
 	default:
+		// Check if it's a structured APIError with a specific status code
+		var apiErr *bunny.APIError
+		if errors.As(err, &apiErr) {
+			// Forward the APIError status code (e.g., 400 for validation errors)
+			writeError(w, apiErr.StatusCode, apiErr.Message)
+			return
+		}
 		// Generic errors (network, parsing, etc.) - log for debugging
 		slog.Default().Error("bunny.net API error", "error", err)
 		writeError(w, http.StatusInternalServerError, "internal server error")
@@ -377,6 +384,12 @@ func (h *Handler) HandleUpdateRecord(w http.ResponseWriter, r *http.Request) {
 
 	// Log the request
 	h.logger.Info("update record", "zone_id", zoneID, "record_id", recordID, "type", req.Type, "name", req.Name)
+
+	// If record is nil (204 No Content from backend), return 204
+	if record == nil {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
 
 	// Return 200 OK with the record
 	writeJSON(w, http.StatusOK, record)

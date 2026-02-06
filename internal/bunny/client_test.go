@@ -3,6 +3,7 @@ package bunny
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -453,21 +454,32 @@ func TestUpdateRecord(t *testing.T) {
 			t.Fatalf("UpdateRecord failed: %v", err)
 		}
 
-		if record == nil {
-			t.Fatal("expected non-nil record")
-			return
+		// Mock now returns 204 No Content, so record should be nil
+		if record != nil {
+			t.Errorf("expected nil record for 204 response, got %v", record)
 		}
 
-		if record.Type != 0 { // A
-			t.Errorf("expected record type 0 (A), got %d", record.Type)
+		// Verify the update persisted by checking the zone
+		updatedZone := server.GetZone(zoneID)
+		if updatedZone == nil || len(updatedZone.Records) == 0 {
+			t.Fatalf("expected zone with record after update")
 		}
 
-		if record.Name != "www" {
-			t.Errorf("expected record name www, got %s", record.Name)
+		updated := updatedZone.Records[0]
+		if updated.Type != 0 { // A
+			t.Errorf("expected record type 0 (A), got %d", updated.Type)
 		}
 
-		if record.Value != "2.3.4.5" {
-			t.Errorf("expected record value 2.3.4.5, got %s", record.Value)
+		if updated.Name != "www" {
+			t.Errorf("expected record name www, got %s", updated.Name)
+		}
+
+		if updated.Value != "2.3.4.5" {
+			t.Errorf("expected record value 2.3.4.5, got %s", updated.Value)
+		}
+
+		if updated.TTL != 600 {
+			t.Errorf("expected record TTL 600, got %d", updated.TTL)
 		}
 	})
 
@@ -547,6 +559,101 @@ func TestUpdateRecord(t *testing.T) {
 
 		if record != nil {
 			t.Errorf("expected nil record, got %v", record)
+		}
+	})
+
+	t.Run("204 No Content success (real API behavior)", func(t *testing.T) {
+		t.Parallel()
+		server := mockbunny.New()
+		defer server.Close()
+
+		// Add a zone with a record
+		zoneID := server.AddZoneWithRecords("example.com", []mockbunny.Record{
+			{
+				Type:  0, // A
+				Name:  "www",
+				Value: "1.2.3.4",
+				TTL:   300,
+			},
+		})
+
+		// Get the record ID from the zone
+		zone := server.GetZone(zoneID)
+		if zone == nil || len(zone.Records) == 0 {
+			t.Fatalf("expected zone with record")
+		}
+		recordID := zone.Records[0].ID
+
+		client := NewClient("test-key", WithBaseURL(server.URL()))
+		req := &AddRecordRequest{
+			Type:  0, // A
+			Name:  "www",
+			Value: "2.3.4.5",
+			TTL:   600,
+		}
+
+		record, err := client.UpdateRecord(context.Background(), zoneID, recordID, req)
+
+		if err != nil {
+			t.Fatalf("UpdateRecord failed: %v", err)
+		}
+
+		// For 204 No Content, record should be nil
+		if record != nil {
+			t.Errorf("expected nil record for 204 response, got %v", record)
+		}
+	})
+
+	t.Run("400 Bad Request validation error", func(t *testing.T) {
+		t.Parallel()
+		server := mockbunny.New()
+		defer server.Close()
+
+		// Add a zone with a record
+		zoneID := server.AddZoneWithRecords("example.com", []mockbunny.Record{
+			{
+				Type:  0, // A
+				Name:  "www",
+				Value: "1.2.3.4",
+				TTL:   300,
+			},
+		})
+
+		// Get the record ID from the zone
+		zone := server.GetZone(zoneID)
+		if zone == nil || len(zone.Records) == 0 {
+			t.Fatalf("expected zone with record")
+		}
+		recordID := zone.Records[0].ID
+
+		client := NewClient("test-key", WithBaseURL(server.URL()))
+
+		// Try to update with missing Value (should get 400 validation error)
+		req := &AddRecordRequest{
+			Type: 0, // A
+			Name: "www",
+			// Value is missing - should trigger validation error
+			TTL: 600,
+		}
+
+		record, err := client.UpdateRecord(context.Background(), zoneID, recordID, req)
+
+		if err == nil {
+			t.Fatalf("expected error for missing Value, got nil")
+		}
+
+		// Should be an APIError with 400 status
+		var apiErr *APIError
+		if !errors.As(err, &apiErr) {
+			t.Fatalf("expected APIError, got %T: %v", err, err)
+		}
+
+		if apiErr.StatusCode != http.StatusBadRequest {
+			t.Errorf("expected status 400, got %d", apiErr.StatusCode)
+		}
+
+		if record != nil {
+			t.Errorf("expected nil record for error response, got %v", record)
 		}
 	})
 }

@@ -268,6 +268,11 @@ func (c *Client) UpdateRecord(ctx context.Context, zoneID, recordID int64, req *
 		return &record, nil
 	}
 
+	if resp.StatusCode == http.StatusNoContent {
+		// 204 No Content - success with no response body (real bunny.net API behavior)
+		return nil, nil
+	}
+
 	if resp.StatusCode == http.StatusNotFound {
 		return nil, ErrNotFound
 	}

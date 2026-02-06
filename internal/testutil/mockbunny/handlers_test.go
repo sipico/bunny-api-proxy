@@ -892,36 +892,32 @@ func TestUpdateRecord_Success(t *testing.T) {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		t.Errorf("expected status %d, got %d", http.StatusOK, resp.StatusCode)
+	if resp.StatusCode != http.StatusNoContent {
+		t.Errorf("expected status %d, got %d", http.StatusNoContent, resp.StatusCode)
 	}
 
-	// Parse response
-	var record Record
-	if err := json.NewDecoder(resp.Body).Decode(&record); err != nil {
-		t.Fatalf("failed to decode record: %v", err)
-	}
-
-	if record.Value != "192.168.1.2" {
-		t.Errorf("expected updated value 192.168.1.2, got %s", record.Value)
-	}
-	if record.TTL != 600 {
-		t.Errorf("expected updated TTL 600, got %d", record.TTL)
-	}
-
-	// Verify zone DateModified was updated
+	// Verify the record was updated by fetching the zone
 	resp, err = http.Get(fmt.Sprintf("%s/dnszone/%d", s.URL(), zoneID))
 	if err != nil {
-		t.Fatalf("failed to get zone: %v", err)
+		t.Fatalf("failed to get zone after update: %v", err)
 	}
 	defer resp.Body.Close()
 
-	var zoneAfter Zone
-	if err := json.NewDecoder(resp.Body).Decode(&zoneAfter); err != nil {
+	var zoneUpdated Zone
+	if err := json.NewDecoder(resp.Body).Decode(&zoneUpdated); err != nil {
 		t.Fatalf("failed to decode zone: %v", err)
 	}
 
-	if zoneAfter.DateModified.Before(zone.DateModified.Time) {
+	updated := zoneUpdated.Records[0]
+	if updated.Value != "192.168.1.2" {
+		t.Errorf("expected updated value 192.168.1.2, got %s", updated.Value)
+	}
+	if updated.TTL != 600 {
+		t.Errorf("expected updated TTL 600, got %d", updated.TTL)
+	}
+
+	// Verify zone DateModified was updated
+	if zoneUpdated.DateModified.Before(zone.DateModified.Time) {
 		t.Error("expected DateModified to be updated")
 	}
 }

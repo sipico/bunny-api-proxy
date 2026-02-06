@@ -228,10 +228,8 @@ func (s *Server) handleUpdateRecord(w http.ResponseWriter, r *http.Request) {
 			// Update zone's DateModified
 			zone.DateModified = MockBunnyTime{Time: time.Now().UTC()}
 
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			//nolint:errcheck
-			json.NewEncoder(w).Encode(zone.Records[i])
+			// Return 204 No Content on success (matching real bunny.net API behavior)
+			w.WriteHeader(http.StatusNoContent)
 			found = true
 			break
 		}

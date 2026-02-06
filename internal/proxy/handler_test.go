@@ -299,6 +299,33 @@ func TestHandleBunnyError_WrappedErrors(t *testing.T) {
 	}
 }
 
+// TestHandleBunnyError_APIError400 tests that APIError with StatusCode=400 is forwarded as 400
+func TestHandleBunnyError_APIError400(t *testing.T) {
+	t.Parallel()
+	w := httptest.NewRecorder()
+	apiErr := &bunny.APIError{
+		StatusCode: http.StatusBadRequest,
+		ErrorKey:   "validation_error",
+		Field:      "Value",
+		Message:    "Value is required",
+	}
+	handleBunnyError(w, apiErr)
+
+	// Check status code - should be 400
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d", http.StatusBadRequest, w.Code)
+	}
+
+	// Check error message
+	var result map[string]string
+	if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+	if result["error"] != "Value is required" {
+		t.Errorf("expected error message 'Value is required', got %q", result["error"])
+	}
+}
+
 // TestHandleListZones_Success tests successful listing of zones with no params
 func TestHandleListZones_Success(t *testing.T) {
 	t.Parallel()
@@ -1140,6 +1167,33 @@ func TestHandleUpdateRecord_ClientError(t *testing.T) {
 
 	if w.Code != http.StatusInternalServerError {
 		t.Errorf("expected status %d, got %d", http.StatusInternalServerError, w.Code)
+	}
+}
+
+// TestHandleUpdateRecord_NoContent tests 204 No Content response (nil record)
+func TestHandleUpdateRecord_NoContent(t *testing.T) {
+	t.Parallel()
+	client := &mockBunnyClient{
+		updateRecordFunc: func(ctx context.Context, zoneID, recordID int64, req *bunny.AddRecordRequest) (*bunny.Record, error) {
+			// Return nil record (204 No Content from backend)
+			return nil, nil
+		},
+	}
+
+	handler := NewHandler(client, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	w := httptest.NewRecorder()
+
+	body := []byte(`{"Type":0,"Name":"www","Value":"2.3.4.5","Ttl":300}`)
+	r := newTestRequest(http.MethodPost, "/dnszone/123/records/456", bytes.NewReader(body), map[string]string{"zoneID": "123", "recordID": "456"})
+
+	handler.HandleUpdateRecord(w, r)
+
+	if w.Code != http.StatusNoContent {
+		t.Errorf("expected status %d, got %d", http.StatusNoContent, w.Code)
+	}
+
+	if len(w.Body.Bytes()) > 0 {
+		t.Errorf("expected empty response body for 204, got %s", w.Body.String())
 	}
 }
 
