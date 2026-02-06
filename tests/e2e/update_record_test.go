@@ -400,7 +400,8 @@ func TestE2E_UpdateRecord_InvalidJSON(t *testing.T) {
 	require.Equal(t, 400, resp.StatusCode, "malformed JSON should return 400")
 }
 
-// TestE2E_UpdateRecord_EmptyBody verifies handling of an empty request body.
+// TestE2E_UpdateRecord_EmptyBody verifies that the real bunny.net API accepts
+// updates with an empty JSON body (partial update — no fields changed).
 func TestE2E_UpdateRecord_EmptyBody(t *testing.T) {
 	env := testenv.Setup(t)
 	zones := env.CreateTestZones(t, 1)
@@ -419,16 +420,16 @@ func TestE2E_UpdateRecord_EmptyBody(t *testing.T) {
 	}
 	require.NoError(t, json.NewDecoder(addResp.Body).Decode(&created))
 
-	// Send empty body
+	// Send empty body — bunny.net API accepts this (204) without validation error
 	resp := proxyRequest(t, "POST", fmt.Sprintf("/dnszone/%d/records/%d", zone.ID, created.ID), apiKey, []byte("{}"))
 	defer resp.Body.Close()
 
-	// Empty object means missing Name and Value — should be rejected
-	assert.True(t, resp.StatusCode == 400 || resp.StatusCode == 500,
-		"empty update body (missing required fields) should not return success, got %d", resp.StatusCode)
+	assert.Contains(t, []int{200, 204}, resp.StatusCode,
+		"bunny.net accepts empty update body without validation error")
 }
 
-// TestE2E_UpdateRecord_MissingValue verifies that updating with an empty Value is rejected.
+// TestE2E_UpdateRecord_MissingValue verifies that the bunny.net API accepts
+// updates without a Value field (partial update behavior).
 func TestE2E_UpdateRecord_MissingValue(t *testing.T) {
 	env := testenv.Setup(t)
 	zones := env.CreateTestZones(t, 1)
@@ -447,17 +448,18 @@ func TestE2E_UpdateRecord_MissingValue(t *testing.T) {
 	}
 	require.NoError(t, json.NewDecoder(addResp.Body).Decode(&created))
 
-	// Update with Name but no Value
+	// Update with Name but no Value — bunny.net API accepts partial updates
 	updateBody := map[string]interface{}{"Type": 3, "Name": "test"}
 	body, _ = json.Marshal(updateBody)
 	resp := proxyRequest(t, "POST", fmt.Sprintf("/dnszone/%d/records/%d", zone.ID, created.ID), apiKey, body)
 	defer resp.Body.Close()
 
-	require.Equal(t, 400, resp.StatusCode,
-		"updating record without Value should return 400 validation error")
+	assert.Contains(t, []int{200, 204}, resp.StatusCode,
+		"bunny.net accepts update without Value (partial update)")
 }
 
-// TestE2E_UpdateRecord_MissingName verifies that updating with an empty Name is rejected.
+// TestE2E_UpdateRecord_MissingName verifies that the bunny.net API accepts
+// updates without a Name field (partial update behavior).
 func TestE2E_UpdateRecord_MissingName(t *testing.T) {
 	env := testenv.Setup(t)
 	zones := env.CreateTestZones(t, 1)
@@ -476,14 +478,14 @@ func TestE2E_UpdateRecord_MissingName(t *testing.T) {
 	}
 	require.NoError(t, json.NewDecoder(addResp.Body).Decode(&created))
 
-	// Update with Value but no Name
+	// Update with Value but no Name — bunny.net API accepts partial updates
 	updateBody := map[string]interface{}{"Type": 3, "Value": "v2"}
 	body, _ = json.Marshal(updateBody)
 	resp := proxyRequest(t, "POST", fmt.Sprintf("/dnszone/%d/records/%d", zone.ID, created.ID), apiKey, body)
 	defer resp.Body.Close()
 
-	require.Equal(t, 400, resp.StatusCode,
-		"updating record without Name should return 400 validation error")
+	assert.Contains(t, []int{200, 204}, resp.StatusCode,
+		"bunny.net accepts update without Name (partial update)")
 }
 
 // TestE2E_UpdateRecord_Unauthorized verifies that requests without an API key are rejected.

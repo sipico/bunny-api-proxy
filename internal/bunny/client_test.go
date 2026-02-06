@@ -607,40 +607,24 @@ func TestUpdateRecord(t *testing.T) {
 
 	t.Run("400 Bad Request validation error", func(t *testing.T) {
 		t.Parallel()
-		server := mockbunny.New()
-		defer server.Close()
-
-		// Add a zone with a record
-		zoneID := server.AddZoneWithRecords("example.com", []mockbunny.Record{
-			{
-				Type:  0, // A
-				Name:  "www",
-				Value: "1.2.3.4",
-				TTL:   300,
-			},
-		})
-
-		// Get the record ID from the zone
-		zone := server.GetZone(zoneID)
-		if zone == nil || len(zone.Records) == 0 {
-			t.Fatalf("expected zone with record")
+		// Simulate a 400 validation error from the backend
+		transport := &mockTransport{
+			statusCode: http.StatusBadRequest,
+			body:       []byte(`{"ErrorKey":"validation_error","Field":"Value","Message":"Value is required"}`),
 		}
-		recordID := zone.Records[0].ID
+		httpClient := &http.Client{Transport: transport}
 
-		client := NewClient("test-key", WithBaseURL(server.URL()))
-
-		// Try to update with missing Value (should get 400 validation error)
+		client := NewClient("test-key", WithHTTPClient(httpClient))
 		req := &AddRecordRequest{
 			Type: 0, // A
 			Name: "www",
-			// Value is missing - should trigger validation error
-			TTL: 600,
+			TTL:  600,
 		}
 
-		record, err := client.UpdateRecord(context.Background(), zoneID, recordID, req)
+		record, err := client.UpdateRecord(context.Background(), 1, 1, req)
 
 		if err == nil {
-			t.Fatalf("expected error for missing Value, got nil")
+			t.Fatalf("expected error for 400 response, got nil")
 		}
 
 		// Should be an APIError with 400 status
@@ -651,6 +635,10 @@ func TestUpdateRecord(t *testing.T) {
 
 		if apiErr.StatusCode != http.StatusBadRequest {
 			t.Errorf("expected status 400, got %d", apiErr.StatusCode)
+		}
+
+		if apiErr.Message != "Value is required" {
+			t.Errorf("expected message 'Value is required', got %s", apiErr.Message)
 		}
 
 		if record != nil {

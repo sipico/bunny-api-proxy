@@ -189,15 +189,9 @@ func (s *Server) handleUpdateRecord(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate required fields
-	if req.Value == "" {
-		s.writeError(w, http.StatusBadRequest, "validation_error", "Value", "Value is required")
-		return
-	}
-	if req.Name == "" {
-		s.writeError(w, http.StatusBadRequest, "validation_error", "Name", "Name is required")
-		return
-	}
+	// Note: the real bunny.net API does NOT validate required fields on update.
+	// It accepts partial updates (e.g., empty Name/Value) and returns 204.
+	// We match this lenient behavior in the mock.
 
 	s.state.mu.Lock()
 	defer s.state.mu.Unlock()
