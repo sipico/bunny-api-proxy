@@ -2,8 +2,13 @@ package metrics
 
 import (
 	"net/http"
+	"regexp"
 	"time"
 )
+
+// numericSegment is a compiled regex that matches numeric path segments
+// It's compiled once at package init time for efficiency
+var numericSegment = regexp.MustCompile(`/(\d+)`)
 
 // statusRecorder wraps http.ResponseWriter to capture the status code
 type statusRecorder struct {
@@ -94,12 +99,5 @@ func Middleware(next http.Handler) http.Handler {
 //	/dnszone/123 -> /dnszone/:id
 //	/dnszone/456/records/789 -> /dnszone/:id/records/:id
 func normalizePath(path string) string {
-	// Simple implementation: replace sequences of digits after / with :id
-	// A more sophisticated implementation could use route patterns from the router,
-	// but this simple approach works for our use case
-
-	// For now, just return the path as-is
-	// In a real implementation, we'd want to normalize numeric IDs
-	// but we'd need integration with the router to know the actual route patterns
-	return path
+	return numericSegment.ReplaceAllString(path, "/:id")
 }

@@ -91,7 +91,7 @@ func TestHandlerReturnsHTTPHandler(t *testing.T) {
 
 // TestGetMetricsTextWithInitializedRegistry checks GetMetricsText output format
 func TestGetMetricsTextWithInitializedRegistry(t *testing.T) {
-	t.Parallel()
+	// Don't run in parallel - calls Init() which modifies global state
 
 	// Create a new registry and initialize it
 	reg := prometheus.NewRegistry()
@@ -177,5 +177,23 @@ func TestRecordVariousMetrics(t *testing.T) {
 		if !strings.Contains(output, metricName) {
 			t.Errorf("Expected metric %s not found in output", metricName)
 		}
+	}
+}
+
+// TestInitRegistrationErrors tests that Init returns errors when metrics are already registered
+func TestInitRegistrationErrors(t *testing.T) {
+	// Test that Init returns errors when metrics are already registered
+	reg := prometheus.NewRegistry()
+
+	// First Init should succeed
+	err := Init(reg)
+	if err != nil {
+		t.Fatalf("first Init failed: %v", err)
+	}
+
+	// Second Init with same registry should fail (duplicate registration)
+	err = Init(reg)
+	if err == nil {
+		t.Fatal("expected error on duplicate registration, got nil")
 	}
 }

@@ -92,8 +92,6 @@ func Init(reg prometheus.Registerer) error {
 // RecordRequest increments the requests counter for the given method, path, and status code.
 // The path should be normalized (e.g., "/dnszone/:id" instead of "/dnszone/123").
 func RecordRequest(method, path, statusCode string) {
-	globalRegistryLock.Lock()
-	defer globalRegistryLock.Unlock()
 	if requestsTotal != nil {
 		requestsTotal.WithLabelValues(method, path, statusCode).Inc()
 	}
@@ -102,8 +100,6 @@ func RecordRequest(method, path, statusCode string) {
 // RecordRequestDuration records the latency for a request.
 // Duration should be in seconds.
 func RecordRequestDuration(method, path, statusCode string, durationSeconds float64) {
-	globalRegistryLock.Lock()
-	defer globalRegistryLock.Unlock()
 	if requestDuration != nil {
 		requestDuration.WithLabelValues(method, path, statusCode).Observe(durationSeconds)
 	}
@@ -112,8 +108,6 @@ func RecordRequestDuration(method, path, statusCode string, durationSeconds floa
 // RecordAuthFailure increments the auth failures counter for the given reason.
 // Common reasons: "invalid_key", "permission_denied", "missing_key"
 func RecordAuthFailure(reason string) {
-	globalRegistryLock.Lock()
-	defer globalRegistryLock.Unlock()
 	if authFailuresTotal != nil {
 		authFailuresTotal.WithLabelValues(reason).Inc()
 	}
