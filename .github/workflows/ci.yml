@@ -297,6 +297,9 @@ jobs:
     needs: [test, lint, docker, e2e-test]  # Wait for docker build and mock tests to pass
     # Only run on PRs to main
     if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    concurrency:
+      group: e2e-real-api
+      cancel-in-progress: false
 
     steps:
       - name: Checkout code
