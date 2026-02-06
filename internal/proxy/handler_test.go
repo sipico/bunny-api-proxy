@@ -1197,6 +1197,60 @@ func TestHandleUpdateRecord_NoContent(t *testing.T) {
 	}
 }
 
+// TestHandleUpdateRecord_MissingValue tests validation for missing Value field
+func TestHandleUpdateRecord_MissingValue(t *testing.T) {
+	t.Parallel()
+	client := &mockBunnyClient{}
+
+	handler := NewHandler(client, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	w := httptest.NewRecorder()
+
+	// Request with missing Value field (empty string)
+	body := []byte(`{"Type":0,"Name":"www","Ttl":300}`)
+	r := newTestRequest(http.MethodPost, "/dnszone/123/records/456", bytes.NewReader(body), map[string]string{"zoneID": "123", "recordID": "456"})
+
+	handler.HandleUpdateRecord(w, r)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d", http.StatusBadRequest, w.Code)
+	}
+
+	var result map[string]string
+	if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+	if result["error"] != "Value is required" {
+		t.Errorf("expected error message 'Value is required', got %q", result["error"])
+	}
+}
+
+// TestHandleUpdateRecord_MissingName tests validation for missing Name field
+func TestHandleUpdateRecord_MissingName(t *testing.T) {
+	t.Parallel()
+	client := &mockBunnyClient{}
+
+	handler := NewHandler(client, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	w := httptest.NewRecorder()
+
+	// Request with missing Name field (empty string)
+	body := []byte(`{"Type":0,"Value":"2.3.4.5","Ttl":300}`)
+	r := newTestRequest(http.MethodPost, "/dnszone/123/records/456", bytes.NewReader(body), map[string]string{"zoneID": "123", "recordID": "456"})
+
+	handler.HandleUpdateRecord(w, r)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d", http.StatusBadRequest, w.Code)
+	}
+
+	var result map[string]string
+	if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+	if result["error"] != "Name is required" {
+		t.Errorf("expected error message 'Name is required', got %q", result["error"])
+	}
+}
+
 // TestHandleListZones_FiltersToPermittedZones tests filtering zones to permitted zones only.
 func TestHandleListZones_FiltersToPermittedZones(t *testing.T) {
 	t.Parallel()
