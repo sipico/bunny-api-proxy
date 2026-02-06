@@ -91,6 +91,7 @@ func Init(reg prometheus.Registerer) error {
 
 // RecordRequest increments the requests counter for the given method, path, and status code.
 // The path should be normalized (e.g., "/dnszone/:id" instead of "/dnszone/123").
+// The mutex guards the global pointer read; Prometheus operations themselves are thread-safe.
 func RecordRequest(method, path, statusCode string) {
 	globalRegistryLock.Lock()
 	defer globalRegistryLock.Unlock()
@@ -101,6 +102,7 @@ func RecordRequest(method, path, statusCode string) {
 
 // RecordRequestDuration records the latency for a request.
 // Duration should be in seconds.
+// The mutex guards the global pointer read; Prometheus operations themselves are thread-safe.
 func RecordRequestDuration(method, path, statusCode string, durationSeconds float64) {
 	globalRegistryLock.Lock()
 	defer globalRegistryLock.Unlock()
@@ -111,6 +113,7 @@ func RecordRequestDuration(method, path, statusCode string, durationSeconds floa
 
 // RecordAuthFailure increments the auth failures counter for the given reason.
 // Common reasons: "invalid_key", "permission_denied", "missing_key"
+// The mutex guards the global pointer read; Prometheus operations themselves are thread-safe.
 func RecordAuthFailure(reason string) {
 	globalRegistryLock.Lock()
 	defer globalRegistryLock.Unlock()

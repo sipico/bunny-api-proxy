@@ -465,3 +465,32 @@ func TestMetricsMiddlewarePanicWithoutWriteHeader(t *testing.T) {
 		t.Errorf("expected status 500 for panic before WriteHeader, got %d", w.Code)
 	}
 }
+
+// TestNormalizePath tests the normalizePath function with various path formats
+func TestNormalizePath(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"/dnszone", "/dnszone"},
+		{"/dnszone/123", "/dnszone/:id"},
+		{"/dnszone/123/records", "/dnszone/:id/records"},
+		{"/dnszone/123/records/456", "/dnszone/:id/records/:id"},
+		{"/health", "/health"},
+		{"/admin/api/tokens", "/admin/api/tokens"},
+		{"/admin/api/tokens/7", "/admin/api/tokens/:id"},
+		{"/admin/api/tokens/7/permissions/3", "/admin/api/tokens/:id/permissions/:id"},
+		{"/metrics", "/metrics"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			result := normalizePath(tt.input)
+			if result != tt.expected {
+				t.Errorf("normalizePath(%q) = %q, expected %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
