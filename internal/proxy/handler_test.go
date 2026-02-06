@@ -1138,7 +1138,7 @@ func TestHandleUpdateRecord_ZoneNotFound(t *testing.T) {
 	handler := NewHandler(client, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	w := httptest.NewRecorder()
 
-	body := []byte(`{"Type":0,"Name":"test"}`)
+	body := []byte(`{"Type":0,"Name":"test","Value":"1.2.3.4"}`)
 	r := newTestRequest(http.MethodPost, "/dnszone/999/records/456", bytes.NewReader(body), map[string]string{"zoneID": "999", "recordID": "456"})
 
 	handler.HandleUpdateRecord(w, r)
@@ -1160,7 +1160,7 @@ func TestHandleUpdateRecord_ClientError(t *testing.T) {
 	handler := NewHandler(client, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	w := httptest.NewRecorder()
 
-	body := []byte(`{"Type":0,"Name":"test"}`)
+	body := []byte(`{"Type":0,"Name":"test","Value":"1.2.3.4"}`)
 	r := newTestRequest(http.MethodPost, "/dnszone/123/records/456", bytes.NewReader(body), map[string]string{"zoneID": "123", "recordID": "456"})
 
 	handler.HandleUpdateRecord(w, r)
