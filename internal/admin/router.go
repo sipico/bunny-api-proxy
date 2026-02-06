@@ -20,6 +20,7 @@ func (h *Handler) NewRouter() chi.Router {
 	r.Use(internalMiddleware.RequestID)                             // Request ID first
 	r.Use(internalMiddleware.HTTPLogging(h.logger, adminAllowlist)) // Logging with allowlist
 	r.Use(middleware.Recoverer)                                     // Panic recovery
+	r.Use(internalMiddleware.MaxBodySize(1 << 20))                  // 1MB limit
 
 	// Public endpoints (no auth)
 	r.Get("/health", h.HandleHealth)

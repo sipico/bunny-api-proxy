@@ -18,6 +18,7 @@ func NewRouter(handler *Handler, authMiddleware func(http.Handler) http.Handler,
 	// Apply middlewares in order
 	r.Use(middleware.RequestID)                // Add request ID first
 	r.Use(middleware.HTTPLogging(logger, nil)) // Log with no allowlist (DNS API has no secrets)
+	r.Use(middleware.MaxBodySize(1 << 20))     // 1MB limit
 	r.Use(authMiddleware)                      // Auth after logging
 
 	// Wire handler methods to routes

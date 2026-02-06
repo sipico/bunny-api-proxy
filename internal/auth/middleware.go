@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 
@@ -69,7 +70,7 @@ func (m *Authenticator) Authenticate(next http.Handler) http.Handler {
 
 		token, err := m.tokens.GetTokenByHash(ctx, keyHash)
 		if err != nil {
-			if err == storage.ErrNotFound {
+			if errors.Is(err, storage.ErrNotFound) {
 				writeJSONError(w, http.StatusUnauthorized, "invalid API key")
 				return
 			}
@@ -206,7 +207,7 @@ func Middleware(v *Validator) func(http.Handler) http.Handler {
 			// Validate the key
 			keyInfo, err := v.ValidateKey(r.Context(), apiKey)
 			if err != nil {
-				if err == ErrInvalidKey {
+				if errors.Is(err, ErrInvalidKey) {
 					writeJSONError(w, http.StatusUnauthorized, "invalid API key")
 					return
 				}
