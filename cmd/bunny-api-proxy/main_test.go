@@ -42,7 +42,7 @@ func TestHealthHandler(t *testing.T) {
 func TestReadyHandler(t *testing.T) {
 	t.Parallel()
 	// Create a temporary in-memory storage for testing
-	store, err := storage.New(":memory:", make([]byte, 32))
+	store, err := storage.New(":memory:")
 	if err != nil {
 		t.Fatalf("failed to create test storage: %v", err)
 	}
@@ -71,7 +71,7 @@ func TestReadyHandler(t *testing.T) {
 func TestReadyHandlerWithClosedStorage(t *testing.T) {
 	t.Parallel()
 	// Create a storage and close it to simulate database unavailability
-	store, err := storage.New(":memory:", make([]byte, 32))
+	store, err := storage.New(":memory:")
 	if err != nil {
 		t.Fatalf("failed to create test storage: %v", err)
 	}
@@ -373,7 +373,7 @@ func TestRunWithInvalidLogLevel(t *testing.T) {
 
 func TestReadyHandlerContextTimeout(t *testing.T) {
 	t.Parallel()
-	store, err := storage.New(":memory:", make([]byte, 32))
+	store, err := storage.New(":memory:")
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
 	}
@@ -408,7 +408,7 @@ func BenchmarkHealthHandler(b *testing.B) {
 
 // BenchmarkReadyHandler measures ready endpoint performance
 func BenchmarkReadyHandler(b *testing.B) {
-	store, err := storage.New(":memory:", make([]byte, 32))
+	store, err := storage.New(":memory:")
 	if err != nil {
 		b.Fatalf("failed to create storage: %v", err)
 	}
@@ -427,7 +427,7 @@ func BenchmarkReadyHandler(b *testing.B) {
 // TestReadyHandlerWithTimeoutContext tests that ready handler respects context timeout
 func TestReadyHandlerWithTimeoutContext(t *testing.T) {
 	t.Parallel()
-	store, err := storage.New(":memory:", make([]byte, 32))
+	store, err := storage.New(":memory:")
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
 	}
@@ -470,7 +470,7 @@ func TestHealthHandlerContentType(t *testing.T) {
 // TestReadyHandlerContentType validates JSON response format
 func TestReadyHandlerContentType(t *testing.T) {
 	t.Parallel()
-	store, err := storage.New(":memory:", make([]byte, 32))
+	store, err := storage.New(":memory:")
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
 	}
@@ -491,7 +491,7 @@ func TestReadyHandlerContentType(t *testing.T) {
 // TestReadyHandlerResponseBody validates response structure
 func TestReadyHandlerResponseBody(t *testing.T) {
 	t.Parallel()
-	store, err := storage.New(":memory:", make([]byte, 32))
+	store, err := storage.New(":memory:")
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
 	}
@@ -528,7 +528,7 @@ func TestHealthHandlerResponseBody(t *testing.T) {
 // TestReadyHandlerErrorResponseFormat validates error response structure
 func TestReadyHandlerErrorResponseFormat(t *testing.T) {
 	t.Parallel()
-	store, err := storage.New(":memory:", make([]byte, 32))
+	store, err := storage.New(":memory:")
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
 	}
@@ -556,7 +556,7 @@ func TestReadyHandlerErrorResponseFormat(t *testing.T) {
 // TestReadyHandlerStatusOKResponse validates successful response
 func TestReadyHandlerStatusOKResponse(t *testing.T) {
 	t.Parallel()
-	store, err := storage.New(":memory:", make([]byte, 32))
+	store, err := storage.New(":memory:")
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
 	}
@@ -1148,7 +1148,7 @@ func TestInitializeComponentsErrorHandling(t *testing.T) {
 // TestReadyHandlerDatabaseConnectivity tests ready handler properly checks database
 func TestReadyHandlerDatabaseConnectivity(t *testing.T) {
 	t.Parallel()
-	store, err := storage.New(":memory:", make([]byte, 32))
+	store, err := storage.New(":memory:")
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
 	}
@@ -1189,7 +1189,7 @@ func TestHealthHandlerIsAlwaysOK(t *testing.T) {
 // TestReadyHandlerMultipleCalls tests ready handler can be called multiple times
 func TestReadyHandlerMultipleCalls(t *testing.T) {
 	t.Parallel()
-	store, err := storage.New(":memory:", make([]byte, 32))
+	store, err := storage.New(":memory:")
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
 	}
@@ -1415,7 +1415,7 @@ func TestHealthHandlerResponseHeaders(t *testing.T) {
 // TestReadyHandlerResponseHeaders validates response headers are correct
 func TestReadyHandlerResponseHeaders(t *testing.T) {
 	t.Parallel()
-	store, err := storage.New(":memory:", make([]byte, 32))
+	store, err := storage.New(":memory:")
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
 	}
@@ -1956,7 +1956,7 @@ func TestHealthHandlerAlwaysReturnsOK(t *testing.T) {
 // TestReadyHandlerMultipleRequestsConsistency tests that ready endpoint behaves consistently
 func TestReadyHandlerMultipleRequestsConsistency(t *testing.T) {
 	t.Parallel()
-	store, err := storage.New(":memory:", make([]byte, 32))
+	store, err := storage.New(":memory:")
 	if err != nil {
 		t.Fatalf("failed to create test storage: %v", err)
 	}

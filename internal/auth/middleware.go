@@ -183,13 +183,13 @@ func (m *Authenticator) CheckPermissions(next http.Handler) http.Handler {
 // --- Legacy support for existing Validator-based middleware ---
 // The following functions maintain backward compatibility with existing code.
 
-// contextKey for storing KeyInfo in context (legacy).
-type contextKey string
-
 const (
-	// KeyInfoContextKey is the context key for storing KeyInfo (legacy).
-	KeyInfoContextKey contextKey = "keyInfo"
+	// keyInfoKey is the context key for storing KeyInfo (legacy).
+	keyInfoKey ctxKey = 100
 )
+
+// KeyInfoContextKey is the public context key for storing KeyInfo (legacy).
+const KeyInfoContextKey = keyInfoKey
 
 // Middleware returns Chi-compatible middleware for API key validation (legacy).
 // This middleware uses the old Validator-based authentication.
@@ -229,7 +229,7 @@ func Middleware(v *Validator) func(http.Handler) http.Handler {
 			}
 
 			// Attach KeyInfo to context and continue
-			ctx := context.WithValue(r.Context(), KeyInfoContextKey, keyInfo)
+			ctx := context.WithValue(r.Context(), keyInfoKey, keyInfo)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
@@ -237,7 +237,7 @@ func Middleware(v *Validator) func(http.Handler) http.Handler {
 
 // GetKeyInfo retrieves KeyInfo from request context (legacy).
 func GetKeyInfo(ctx context.Context) *KeyInfo {
-	if v := ctx.Value(KeyInfoContextKey); v != nil {
+	if v := ctx.Value(keyInfoKey); v != nil {
 		if info, ok := v.(*KeyInfo); ok {
 			return info
 		}

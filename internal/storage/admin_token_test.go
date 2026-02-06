@@ -2,7 +2,6 @@ package storage
 
 import (
 	"context"
-	"crypto/rand"
 	"testing"
 	"time"
 
@@ -12,10 +11,8 @@ import (
 // TestCreateAdminToken verifies that CreateAdminToken creates a token successfully.
 func TestCreateAdminToken(t *testing.T) {
 	t.Parallel()
-	encryptionKey := make([]byte, 32)
-	_, _ = rand.Read(encryptionKey)
 
-	s, err := New(":memory:", encryptionKey)
+	s, err := New(":memory:")
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
 	}
@@ -50,10 +47,8 @@ func TestCreateAdminToken(t *testing.T) {
 // TestCreateAdminTokenEmptyName verifies that empty name returns an error.
 func TestCreateAdminTokenEmptyName(t *testing.T) {
 	t.Parallel()
-	encryptionKey := make([]byte, 32)
-	_, _ = rand.Read(encryptionKey)
 
-	s, err := New(":memory:", encryptionKey)
+	s, err := New(":memory:")
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
 	}
@@ -74,10 +69,8 @@ func TestCreateAdminTokenEmptyName(t *testing.T) {
 // TestCreateAdminTokenEmptyToken verifies that empty token returns an error.
 func TestCreateAdminTokenEmptyToken(t *testing.T) {
 	t.Parallel()
-	encryptionKey := make([]byte, 32)
-	_, _ = rand.Read(encryptionKey)
 
-	s, err := New(":memory:", encryptionKey)
+	s, err := New(":memory:")
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
 	}
@@ -98,10 +91,8 @@ func TestCreateAdminTokenEmptyToken(t *testing.T) {
 // TestCreateAdminTokenDuplicate verifies that duplicate token hash returns an error.
 func TestCreateAdminTokenDuplicate(t *testing.T) {
 	t.Parallel()
-	encryptionKey := make([]byte, 32)
-	_, _ = rand.Read(encryptionKey)
 
-	s, err := New(":memory:", encryptionKey)
+	s, err := New(":memory:")
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
 	}
@@ -134,10 +125,8 @@ func TestCreateAdminTokenDuplicate(t *testing.T) {
 // TestValidateAdminToken verifies that ValidateAdminToken retrieves correct token.
 func TestValidateAdminToken(t *testing.T) {
 	t.Parallel()
-	encryptionKey := make([]byte, 32)
-	_, _ = rand.Read(encryptionKey)
 
-	s, err := New(":memory:", encryptionKey)
+	s, err := New(":memory:")
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
 	}
@@ -168,10 +157,8 @@ func TestValidateAdminToken(t *testing.T) {
 // TestValidateAdminTokenInvalid verifies that invalid token returns ErrNotFound.
 func TestValidateAdminTokenInvalid(t *testing.T) {
 	t.Parallel()
-	encryptionKey := make([]byte, 32)
-	_, _ = rand.Read(encryptionKey)
 
-	s, err := New(":memory:", encryptionKey)
+	s, err := New(":memory:")
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
 	}
@@ -188,10 +175,8 @@ func TestValidateAdminTokenInvalid(t *testing.T) {
 // TestValidateAdminTokenEmpty verifies that empty token returns ErrNotFound.
 func TestValidateAdminTokenEmpty(t *testing.T) {
 	t.Parallel()
-	encryptionKey := make([]byte, 32)
-	_, _ = rand.Read(encryptionKey)
 
-	s, err := New(":memory:", encryptionKey)
+	s, err := New(":memory:")
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
 	}
@@ -209,10 +194,8 @@ func TestValidateAdminTokenEmpty(t *testing.T) {
 // It also tests that ListAdminTokens filters for admin tokens only.
 func TestListAdminTokens(t *testing.T) {
 	t.Parallel()
-	encryptionKey := make([]byte, 32)
-	_, _ = rand.Read(encryptionKey)
 
-	s, err := New(":memory:", encryptionKey)
+	s, err := New(":memory:")
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
 	}
@@ -283,10 +266,8 @@ func TestListAdminTokens(t *testing.T) {
 // TestDeleteAdminToken verifies that DeleteAdminToken removes token successfully.
 func TestDeleteAdminToken(t *testing.T) {
 	t.Parallel()
-	encryptionKey := make([]byte, 32)
-	_, _ = rand.Read(encryptionKey)
 
-	s, err := New(":memory:", encryptionKey)
+	s, err := New(":memory:")
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
 	}
@@ -325,10 +306,8 @@ func TestDeleteAdminToken(t *testing.T) {
 // TestDeleteAdminTokenNotFound verifies that deleting non-existent token returns ErrNotFound.
 func TestDeleteAdminTokenNotFound(t *testing.T) {
 	t.Parallel()
-	encryptionKey := make([]byte, 32)
-	_, _ = rand.Read(encryptionKey)
 
-	s, err := New(":memory:", encryptionKey)
+	s, err := New(":memory:")
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
 	}

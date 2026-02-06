@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"bytes"
 	"context"
 	"testing"
 	"time"
@@ -483,13 +482,10 @@ func TestPermissionSpecialCharacters(t *testing.T) {
 }
 
 // Helper function to get a 32-byte test encryption key
-func testEncryptionKey() []byte {
-	return bytes.Repeat([]byte{0x01}, 32)
-}
 
 // Helper function to set up test storage
 func setupTestStorage(t *testing.T) *SQLiteStorage {
-	storage, err := New(":memory:", testEncryptionKey())
+	storage, err := New(":memory:")
 	if err != nil {
 		t.Fatalf("failed to create test storage: %v", err)
 	}

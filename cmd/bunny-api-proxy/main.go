@@ -105,7 +105,7 @@ func initializeComponents(cfg *config.Config) (*serverComponents, error) {
 	}
 
 	// 3. Initialize storage
-	store, err := storage.New(cfg.DatabasePath, nil)
+	store, err := storage.New(cfg.DatabasePath)
 	if err != nil {
 		return nil, fmt.Errorf("storage initialization failed: %w", err)
 	}

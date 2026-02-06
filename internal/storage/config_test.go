@@ -29,7 +29,7 @@ func TestNewIgnoresEncryptionKey(t *testing.T) {
 				_, _ = rand.Read(key)
 			}
 
-			storage, err := New(":memory:", key)
+			storage, err := New(":memory:")
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -46,7 +46,7 @@ func TestNewCreatesDatabase(t *testing.T) {
 	key := make([]byte, 32)
 	_, _ = rand.Read(key)
 
-	storage, err := New(":memory:", key)
+	storage, err := New(":memory:")
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
 	}
@@ -69,7 +69,7 @@ func TestNewInitializesSchema(t *testing.T) {
 	key := make([]byte, 32)
 	_, _ = rand.Read(key)
 
-	storage, err := New(":memory:", key)
+	storage, err := New(":memory:")
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
 	}
@@ -94,7 +94,7 @@ func TestNewInitializesSchema(t *testing.T) {
 // TestCloseClosesDatabase tests that Close() properly closes the database.
 func TestCloseClosesDatabase(t *testing.T) {
 	t.Parallel()
-	storage, err := New(":memory:", nil)
+	storage, err := New(":memory:")
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
 	}
@@ -109,7 +109,7 @@ func TestCloseClosesDatabase(t *testing.T) {
 // TestNewEnablesWALMode tests that New() enables WAL journal mode.
 func TestNewEnablesWALMode(t *testing.T) {
 	t.Parallel()
-	storage, err := New(":memory:", nil)
+	storage, err := New(":memory:")
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
 	}
@@ -131,7 +131,7 @@ func TestNewEnablesWALMode(t *testing.T) {
 // TestNewSetsBusyTimeout tests that New() sets busy timeout.
 func TestNewSetsBusyTimeout(t *testing.T) {
 	t.Parallel()
-	storage, err := New(":memory:", nil)
+	storage, err := New(":memory:")
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
 	}
@@ -166,7 +166,7 @@ func TestCloseWithNilDatabase(t *testing.T) {
 func TestNewWithInvalidDatabasePath(t *testing.T) {
 	t.Parallel()
 	// Try to open database in non-existent directory
-	storage, err := New("/nonexistent/path/to/db.sqlite3", nil)
+	storage, err := New("/nonexistent/path/to/db.sqlite3")
 	if err == nil {
 		t.Error("expected error when opening database in non-existent path")
 		if storage != nil {

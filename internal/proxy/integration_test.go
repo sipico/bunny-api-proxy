@@ -28,8 +28,7 @@ func setupTestStorage(t *testing.T, zoneID int64) storage.Storage {
 	t.Helper()
 
 	// Create in-memory database with 32-byte encryption key
-	encryptionKey := []byte("0123456789abcdef0123456789abcdef") // 32 bytes
-	db, err := storage.New(":memory:", encryptionKey)
+	db, err := storage.New(":memory:")
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
 	}
@@ -59,8 +58,7 @@ func setupTestStorageMultiZone(t *testing.T, zoneID int64) storage.Storage {
 	t.Helper()
 
 	// Create in-memory database with 32-byte encryption key
-	encryptionKey := []byte("0123456789abcdef0123456789abcdef") // 32 bytes
-	db, err := storage.New(":memory:", encryptionKey)
+	db, err := storage.New(":memory:")
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
 	}
@@ -103,8 +101,7 @@ func setupTestStorageMultiZone(t *testing.T, zoneID int64) storage.Storage {
 func TestNewRouter_Structure(t *testing.T) {
 	t.Parallel()
 	// Create minimal storage for middleware
-	encryptionKey := []byte("0123456789abcdef0123456789abcdef")
-	db, err := storage.New(":memory:", encryptionKey)
+	db, err := storage.New(":memory:")
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
 	}
@@ -559,8 +556,7 @@ func TestIntegration_ListZones_FilteredByPermission(t *testing.T) {
 	bunnyClient := bunny.NewClient("master-key", bunny.WithBaseURL(mockBunny.URL()))
 
 	// Create storage with permission for only zoneID1 and zoneID2
-	encryptionKey := []byte("0123456789abcdef0123456789abcdef")
-	db, err := storage.New(":memory:", encryptionKey)
+	db, err := storage.New(":memory:")
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
 	}
@@ -657,8 +653,7 @@ func TestIntegration_GetZone_FilteredRecordTypes(t *testing.T) {
 	bunnyClient := bunny.NewClient("master-key", bunny.WithBaseURL(mockBunny.URL()))
 
 	// Create storage with permission for only TXT records
-	encryptionKey := []byte("0123456789abcdef0123456789abcdef")
-	db, err := storage.New(":memory:", encryptionKey)
+	db, err := storage.New(":memory:")
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
 	}
@@ -730,8 +725,7 @@ func TestIntegration_ListRecords_FilteredRecordTypes(t *testing.T) {
 	bunnyClient := bunny.NewClient("master-key", bunny.WithBaseURL(mockBunny.URL()))
 
 	// Create storage with permission for A and TXT records only
-	encryptionKey := []byte("0123456789abcdef0123456789abcdef")
-	db, err := storage.New(":memory:", encryptionKey)
+	db, err := storage.New(":memory:")
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
 	}
