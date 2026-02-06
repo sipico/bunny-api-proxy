@@ -1,8 +1,10 @@
 package admin
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
+	"time"
 )
 
 // HandleHealth returns basic health status
@@ -23,34 +25,37 @@ func (h *Handler) HandleHealth(w http.ResponseWriter, r *http.Request) {
 // GET /ready
 // Returns 200 if database is accessible, 503 otherwise
 func (h *Handler) HandleReady(w http.ResponseWriter, r *http.Request) {
-	// Test database connectivity by checking Close() exists
-	// In a real health check, we'd ping the database
-	// For now, check if storage is not nil
-
 	w.Header().Set("Content-Type", "application/json")
 
 	if h.storage == nil {
 		w.WriteHeader(http.StatusServiceUnavailable)
-		err := json.NewEncoder(w).Encode(map[string]any{
+		//nolint:errcheck // Response write errors are unrecoverable
+		json.NewEncoder(w).Encode(map[string]any{
 			"status":   "error",
 			"database": "not configured",
 		})
-		if err != nil {
-			// Encoding errors are not critical for readiness check responses
-			_ = err
-		}
 		return
 	}
 
-	// If we reach here, assume database is ready
-	// More sophisticated check added when storage interface has Ping()
+	// Check database connectivity
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	_, err := h.storage.ListTokens(ctx)
+	if err != nil {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		//nolint:errcheck // Response write errors are unrecoverable
+		json.NewEncoder(w).Encode(map[string]any{
+			"status":   "error",
+			"database": "unavailable",
+		})
+		return
+	}
+
 	w.WriteHeader(http.StatusOK)
-	err := json.NewEncoder(w).Encode(map[string]any{
+	//nolint:errcheck // Response write errors are unrecoverable
+	json.NewEncoder(w).Encode(map[string]any{
 		"status":   "ok",
 		"database": "connected",
 	})
-	if err != nil {
-		// Encoding errors are not critical for readiness check responses
-		_ = err
-	}
 }

@@ -714,7 +714,7 @@ func TestMiddleware_ValidatorInternalError(t *testing.T) {
 func TestGetKeyInfo_ReturnsCorrectValue(t *testing.T) {
 	t.Parallel()
 	keyInfo := &KeyInfo{KeyID: 42, KeyName: "test-key"}
-	ctx := context.WithValue(context.Background(), KeyInfoContextKey, keyInfo)
+	ctx := context.WithValue(context.Background(), keyInfoKey, keyInfo)
 
 	got := GetKeyInfo(ctx)
 
@@ -742,8 +742,9 @@ func TestGetKeyInfo_ReturnsNilWhenNotInContext(t *testing.T) {
 func TestGetKeyInfo_MultipleContextValues(t *testing.T) {
 	t.Parallel()
 	keyInfo := &KeyInfo{KeyID: 1, KeyName: "key1"}
-	ctx := context.WithValue(context.Background(), contextKey("other"), "value")
-	ctx = context.WithValue(ctx, KeyInfoContextKey, keyInfo)
+	type otherKey struct{}
+	ctx := context.WithValue(context.Background(), otherKey{}, "value")
+	ctx = context.WithValue(ctx, keyInfoKey, keyInfo)
 
 	got := GetKeyInfo(ctx)
 
@@ -1061,14 +1062,6 @@ func TestParseRequest_InvalidMethod(t *testing.T) {
 	}
 }
 
-func TestContextKeyString(t *testing.T) {
-	t.Parallel()
-	var key contextKey = "test"
-	if string(key) != "test" {
-		t.Error("contextKey should be convertible to string")
-	}
-}
-
 func TestMiddleware_RespondsWithJSON(t *testing.T) {
 	t.Parallel()
 	mockStorage := &mockStorage{}
@@ -1122,7 +1115,7 @@ func TestMiddleware_ParseRequestErrorPath(t *testing.T) {
 			return
 		}
 
-		ctx := context.WithValue(r.Context(), KeyInfoContextKey, keyInfo)
+		ctx := context.WithValue(r.Context(), keyInfoKey, keyInfo)
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		}).ServeHTTP(w, r.WithContext(ctx))
@@ -1173,7 +1166,7 @@ func TestMiddleware_PermissionDeniedPath(t *testing.T) {
 			return
 		}
 
-		ctx := context.WithValue(r.Context(), KeyInfoContextKey, keyInfo)
+		ctx := context.WithValue(r.Context(), keyInfoKey, keyInfo)
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		}).ServeHTTP(w, r.WithContext(ctx))

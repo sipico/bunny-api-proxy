@@ -12,10 +12,7 @@ type SQLiteStorage struct {
 
 // New creates a new SQLiteStorage instance.
 // The dbPath is the file path for the SQLite database (or ":memory:" for tests).
-func New(dbPath string, encryptionKey []byte) (*SQLiteStorage, error) {
-	// Note: encryptionKey parameter is deprecated and ignored.
-	// Kept for backward compatibility but no longer used.
-
+func New(dbPath string) (*SQLiteStorage, error) {
 	// Open database connection
 	db, err := sql.Open("sqlite", dbPath)
 	if err != nil { // coverage-ignore: sql.Open only fails for unknown driver names

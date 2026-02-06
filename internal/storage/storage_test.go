@@ -2,7 +2,6 @@ package storage
 
 import (
 	"context"
-	"crypto/rand"
 	"errors"
 	"os"
 	"path/filepath"
@@ -25,10 +24,8 @@ import (
 // - Delete a scoped key (verify cascade)
 func TestCompleteWorkflow(t *testing.T) {
 	t.Parallel()
-	encryptionKey := make([]byte, 32)
-	_, _ = rand.Read(encryptionKey)
 
-	s, err := New(":memory:", encryptionKey)
+	s, err := New(":memory:")
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
 	}
@@ -148,10 +145,8 @@ func TestCompleteWorkflow(t *testing.T) {
 // This tests the storage layer lookup and permission retrieval.
 func TestAuthenticationFlow(t *testing.T) {
 	t.Parallel()
-	encryptionKey := make([]byte, 32)
-	_, _ = rand.Read(encryptionKey)
 
-	s, err := New(":memory:", encryptionKey)
+	s, err := New(":memory:")
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
 	}
@@ -218,10 +213,8 @@ func TestAuthenticationFlow(t *testing.T) {
 // TestPermissionLookup exercises permission queries and filtering.
 func TestPermissionLookup(t *testing.T) {
 	t.Parallel()
-	encryptionKey := make([]byte, 32)
-	_, _ = rand.Read(encryptionKey)
 
-	s, err := New(":memory:", encryptionKey)
+	s, err := New(":memory:")
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
 	}
@@ -290,8 +283,6 @@ func TestPermissionLookup(t *testing.T) {
 // This test uses the -race detector to catch data races.
 func TestConcurrentAccess(t *testing.T) {
 	t.Parallel()
-	encryptionKey := make([]byte, 32)
-	_, _ = rand.Read(encryptionKey)
 
 	// Use a temp file database instead of :memory: for better concurrency support
 	tempDir, err := os.MkdirTemp("", "concurrent-test-*")
@@ -302,7 +293,7 @@ func TestConcurrentAccess(t *testing.T) {
 
 	dbPath := filepath.Join(tempDir, "concurrent.db")
 
-	s, err := New(dbPath, encryptionKey)
+	s, err := New(dbPath)
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
 	}
@@ -374,10 +365,8 @@ func TestConcurrentAccess(t *testing.T) {
 // TestErrorCases exercises error handling paths.
 func TestErrorCases(t *testing.T) {
 	t.Parallel()
-	encryptionKey := make([]byte, 32)
-	_, _ = rand.Read(encryptionKey)
 
-	s, err := New(":memory:", encryptionKey)
+	s, err := New(":memory:")
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
 	}
@@ -483,8 +472,6 @@ func TestErrorCases(t *testing.T) {
 // This test is critical for ensuring durability.
 func TestDataPersistence(t *testing.T) {
 	t.Parallel()
-	encryptionKey := make([]byte, 32)
-	_, _ = rand.Read(encryptionKey)
 
 	// Create temporary database file
 	tempDir, err := os.MkdirTemp("", "storage-test-*")
@@ -497,7 +484,7 @@ func TestDataPersistence(t *testing.T) {
 	ctx := context.Background()
 
 	// Phase 1: Create storage and write data
-	s, err := New(dbPath, encryptionKey)
+	s, err := New(dbPath)
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
 	}
@@ -537,7 +524,7 @@ func TestDataPersistence(t *testing.T) {
 	}
 
 	// Phase 3: Reopen the database
-	s2, err := New(dbPath, encryptionKey)
+	s2, err := New(dbPath)
 	if err != nil {
 		t.Fatalf("failed to reopen storage: %v", err)
 	}
@@ -601,7 +588,7 @@ func TestDataPersistence(t *testing.T) {
 		t.Fatalf("Close failed on second instance: %v", err)
 	}
 
-	s3, err := New(dbPath, encryptionKey)
+	s3, err := New(dbPath)
 	if err != nil {
 		t.Fatalf("failed to open storage third time: %v", err)
 	}
@@ -631,10 +618,8 @@ func TestDataPersistence(t *testing.T) {
 // TestAdminTokenWorkflow exercises the admin token CRUD operations.
 func TestAdminTokenWorkflow(t *testing.T) {
 	t.Parallel()
-	encryptionKey := make([]byte, 32)
-	_, _ = rand.Read(encryptionKey)
 
-	s, err := New(":memory:", encryptionKey)
+	s, err := New(":memory:")
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
 	}
@@ -720,10 +705,8 @@ func TestAdminTokenWorkflow(t *testing.T) {
 // TestLargeDataSet verifies storage performance and correctness with many records.
 func TestLargeDataSet(t *testing.T) {
 	t.Parallel()
-	encryptionKey := make([]byte, 32)
-	_, _ = rand.Read(encryptionKey)
 
-	s, err := New(":memory:", encryptionKey)
+	s, err := New(":memory:")
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
 	}

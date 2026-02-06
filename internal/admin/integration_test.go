@@ -2,7 +2,6 @@ package admin
 
 import (
 	"bytes"
-	"crypto/rand"
 	"encoding/json"
 	"io"
 	"log/slog"
@@ -30,10 +29,8 @@ func newTestServer(t *testing.T) *testServer {
 	t.Helper()
 
 	// Create in-memory database
-	encryptionKey := make([]byte, 32)
-	_, _ = rand.Read(encryptionKey)
 
-	store, err := storage.New(":memory:", encryptionKey)
+	store, err := storage.New(":memory:")
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
 	}

@@ -104,6 +104,15 @@ func (m *mockStorage) GetTokenByHash(ctx context.Context, keyHash string) (*stor
 	return nil, storage.ErrNotFound
 }
 
+// failingListTokensStorage embeds mockStorage but returns an error from ListTokens
+type failingListTokensStorage struct {
+	mockStorage
+}
+
+func (m *failingListTokensStorage) ListTokens(ctx context.Context) ([]*storage.Token, error) {
+	return nil, fmt.Errorf("database connection lost")
+}
+
 // failingWriter is a ResponseWriter that fails on Write to test error handling
 type failingWriter struct {
 	header http.Header
@@ -170,6 +179,12 @@ func TestHandleReady(t *testing.T) {
 			storage:    nil,
 			wantStatus: http.StatusServiceUnavailable,
 			wantDB:     "not configured",
+		},
+		{
+			name:       "database unavailable",
+			storage:    &failingListTokensStorage{},
+			wantStatus: http.StatusServiceUnavailable,
+			wantDB:     "unavailable",
 		},
 	}
 
