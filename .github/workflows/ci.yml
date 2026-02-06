@@ -269,6 +269,11 @@ jobs:
           docker compose -f .claude/docker/docker-compose.test.yml logs mockbunny > e2e-logs/mockbunny.log 2>&1 || true
           docker compose -f .claude/docker/docker-compose.test.yml ps > e2e-logs/services.log 2>&1 || true
 
+      - name: Analyze E2E logs for hidden problems
+        if: always()
+        run: |
+          bash .claude/scripts/analyze-e2e-logs.sh e2e-logs
+
       - name: Upload E2E logs
         if: always()
         uses: actions/upload-artifact@v6
@@ -346,6 +351,11 @@ jobs:
           mkdir -p e2e-logs
           docker compose -f .claude/docker/docker-compose.test.yml -f .claude/docker/docker-compose.real-api.yml logs proxy > e2e-logs/proxy.log 2>&1 || true
           docker compose -f .claude/docker/docker-compose.test.yml -f .claude/docker/docker-compose.real-api.yml ps > e2e-logs/services.log 2>&1 || true
+
+      - name: Analyze E2E logs for hidden problems (Real API)
+        if: always()
+        run: |
+          bash .claude/scripts/analyze-e2e-logs.sh e2e-logs
 
       - name: Upload E2E logs (Real API)
         if: always()
