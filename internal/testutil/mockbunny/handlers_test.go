@@ -558,8 +558,8 @@ func TestHandleCreateZone_Success(t *testing.T) {
 	if zone.Nameserver2 != "ns2.bunny.net" {
 		t.Errorf("expected nameserver2 ns2.bunny.net, got %s", zone.Nameserver2)
 	}
-	if zone.SoaEmail != "admin@test.xyz" {
-		t.Errorf("expected SoaEmail admin@test.xyz, got %s", zone.SoaEmail)
+	if zone.SoaEmail != "hostmaster@bunny.net" {
+		t.Errorf("expected SoaEmail hostmaster@bunny.net, got %s", zone.SoaEmail)
 	}
 	if zone.CertificateKeyType != 0 { // 0 = Ecdsa
 		t.Errorf("expected CertificateKeyType Ecdsa (0), got %d", zone.CertificateKeyType)

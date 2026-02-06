@@ -134,7 +134,7 @@ func (s *Server) AddZone(domain string) int64 {
 		CustomNameserversEnabled: false,
 		Nameserver1:              "ns1.bunny.net",
 		Nameserver2:              "ns2.bunny.net",
-		SoaEmail:                 "admin@" + domain,
+		SoaEmail:                 "hostmaster@bunny.net",
 		LoggingEnabled:           false,
 		LogAnonymizationType:     0, // 0 = OneDigit (default)
 		DnsSecEnabled:            false,
