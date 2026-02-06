@@ -471,12 +471,18 @@ func TestHandleDeleteToken(t *testing.T) {
 func TestGenerateRandomKey(t *testing.T) {
 	t.Parallel()
 	// Test that generateRandomKey produces keys of correct length
-	key1 := generateRandomKey(32)
+	key1, err := generateRandomKey(32)
+	if err != nil {
+		t.Fatalf("generateRandomKey failed: %v", err)
+	}
 	if len(key1) != 32 {
 		t.Errorf("expected key length 32, got %d", len(key1))
 	}
 
-	key2 := generateRandomKey(32)
+	key2, err := generateRandomKey(32)
+	if err != nil {
+		t.Fatalf("generateRandomKey failed: %v", err)
+	}
 	if len(key2) != 32 {
 		t.Errorf("expected key length 32, got %d", len(key2))
 	}

@@ -170,14 +170,14 @@ func (h *Handler) HandleDeleteToken(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// generateRandomKey generates a random hex string of the given length
-func generateRandomKey(length int) string {
+// generateRandomKey generates a random hex string of the given length.
+// Returns an error if cryptographic randomness is not available.
+func generateRandomKey(length int) (string, error) {
 	b := make([]byte, length/2)
 	if _, err := rand.Read(b); err != nil {
-		// Fallback to a simple pseudo-random key if crypto/rand fails
-		return "fallback-key-" + strconv.FormatInt(time.Now().UnixNano(), 16)
+		return "", err
 	}
-	return hex.EncodeToString(b)
+	return hex.EncodeToString(b), nil
 }
 
 // =============================================================================
@@ -304,7 +304,6 @@ func (h *Handler) HandleCreateUnifiedToken(w http.ResponseWriter, r *http.Reques
 	}
 
 	// Check bootstrap state
-	isMasterKey := auth.IsMasterKeyFromContext(ctx)
 	if h.bootstrap != nil {
 		state, err := h.bootstrap.GetState(ctx)
 		if err != nil {
@@ -324,12 +323,7 @@ func (h *Handler) HandleCreateUnifiedToken(w http.ResponseWriter, r *http.Reques
 			}
 		} else {
 			// System is CONFIGURED - master key is locked out
-			if isMasterKey {
-				WriteErrorWithHint(w, http.StatusForbidden, ErrCodeMasterKeyLocked,
-					"Master API key cannot access admin endpoints. Use an admin token.",
-					"Create requests using an admin token instead of the master API key.")
-				return
-			}
+			// Master key lockout is enforced by TokenAuthMiddleware
 			// Only admin tokens can manage tokens
 			if !auth.IsAdminFromContext(ctx) {
 				WriteError(w, http.StatusForbidden, ErrCodeAdminRequired, "Admin token required to manage tokens")
@@ -355,7 +349,12 @@ func (h *Handler) HandleCreateUnifiedToken(w http.ResponseWriter, r *http.Reques
 	}
 
 	// Generate secure token
-	plainToken := generateRandomKey(64) // 64 hex chars = 32 bytes = 256 bits
+	plainToken, err := generateRandomKey(64) // 64 hex chars = 32 bytes = 256 bits
+	if err != nil {
+		h.logger.Error("failed to generate secure token", "error", err)
+		WriteError(w, http.StatusInternalServerError, ErrCodeInternalError, "Failed to generate token")
+		return
+	}
 
 	// Hash the token for storage
 	hash := sha256.Sum256([]byte(plainToken))
