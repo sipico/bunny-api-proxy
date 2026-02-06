@@ -43,13 +43,19 @@ func waitForService(url string, timeout time.Duration) error {
 // createScopedKey creates a scoped API key via the proxy's admin API with all permissions for a zone.
 func createScopedKey(t *testing.T, adminToken string, zoneID int64) string {
 	t.Helper()
-	return createScopedKeyInternal(t, adminToken, zoneID, []string{"list_zones", "get_zone", "list_records", "add_record", "delete_record"}, []string{"TXT", "A", "CNAME"})
+	return createScopedKeyInternal(t, adminToken, zoneID, []string{"list_zones", "get_zone", "list_records", "add_record", "update_record", "delete_record"}, []string{"TXT", "A", "CNAME"})
 }
 
 // createScopedKeyWithRecordTypes creates a scoped API key with specific record type restrictions.
 func createScopedKeyWithRecordTypes(t *testing.T, adminToken string, zoneID int64, recordTypes []string) string {
 	t.Helper()
-	return createScopedKeyInternal(t, adminToken, zoneID, []string{"list_zones", "get_zone", "list_records", "add_record", "delete_record"}, recordTypes)
+	return createScopedKeyInternal(t, adminToken, zoneID, []string{"list_zones", "get_zone", "list_records", "add_record", "update_record", "delete_record"}, recordTypes)
+}
+
+// createScopedKeyWithActions creates a scoped API key with specific actions and record types.
+func createScopedKeyWithActions(t *testing.T, adminToken string, zoneID int64, actions []string, recordTypes []string) string {
+	t.Helper()
+	return createScopedKeyInternal(t, adminToken, zoneID, actions, recordTypes)
 }
 
 // createScopedKeyInternal is a helper that creates a scoped API key with custom actions and record types.

@@ -28,6 +28,7 @@ func NewRouter(handler *Handler, authMiddleware func(http.Handler) http.Handler,
 	r.Delete("/dnszone/{zoneID}", handler.HandleDeleteZone)
 	r.Get("/dnszone/{zoneID}/records", handler.HandleListRecords)
 	r.Post("/dnszone/{zoneID}/records", handler.HandleAddRecord)
+	r.Post("/dnszone/{zoneID}/records/{recordID}", handler.HandleUpdateRecord)
 	r.Delete("/dnszone/{zoneID}/records/{recordID}", handler.HandleDeleteRecord)
 
 	return r

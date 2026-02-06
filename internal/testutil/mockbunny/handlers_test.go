@@ -854,3 +854,223 @@ func TestHandleDeleteZone_MultipleZones(t *testing.T) {
 		t.Errorf("expected zone %d to still exist", id3)
 	}
 }
+
+// Tests for handleUpdateRecord
+func TestUpdateRecord_Success(t *testing.T) {
+	t.Parallel()
+	s := New()
+	defer s.Close()
+
+	records := []Record{
+		{Type: 0, Name: "www", Value: "192.168.1.1", TTL: 300}, // A record
+	}
+	zoneID := s.AddZoneWithRecords("example.com", records)
+
+	// Get the first record ID
+	resp, err := http.Get(fmt.Sprintf("%s/dnszone/%d", s.URL(), zoneID))
+	if err != nil {
+		t.Fatalf("failed to get zone: %v", err)
+	}
+	defer resp.Body.Close()
+
+	var zone Zone
+	if err := json.NewDecoder(resp.Body).Decode(&zone); err != nil {
+		t.Fatalf("failed to decode zone: %v", err)
+	}
+
+	recordID := zone.Records[0].ID
+
+	// Update the record
+	reqBody := `{"Type":0,"Name":"www","Value":"192.168.1.2","Ttl":600}`
+	req, _ := http.NewRequest(http.MethodPost,
+		fmt.Sprintf("%s/dnszone/%d/records/%d", s.URL(), zoneID, recordID), strings.NewReader(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	client := &http.Client{}
+	resp, err = client.Do(req)
+	if err != nil {
+		t.Fatalf("failed to update record: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNoContent {
+		t.Errorf("expected status %d, got %d", http.StatusNoContent, resp.StatusCode)
+	}
+
+	// Verify the record was updated by fetching the zone
+	resp, err = http.Get(fmt.Sprintf("%s/dnszone/%d", s.URL(), zoneID))
+	if err != nil {
+		t.Fatalf("failed to get zone after update: %v", err)
+	}
+	defer resp.Body.Close()
+
+	var zoneUpdated Zone
+	if err := json.NewDecoder(resp.Body).Decode(&zoneUpdated); err != nil {
+		t.Fatalf("failed to decode zone: %v", err)
+	}
+
+	updated := zoneUpdated.Records[0]
+	if updated.Value != "192.168.1.2" {
+		t.Errorf("expected updated value 192.168.1.2, got %s", updated.Value)
+	}
+	if updated.TTL != 600 {
+		t.Errorf("expected updated TTL 600, got %d", updated.TTL)
+	}
+
+	// Verify zone DateModified was updated
+	if zoneUpdated.DateModified.Before(zone.DateModified.Time) {
+		t.Error("expected DateModified to be updated")
+	}
+}
+
+func TestUpdateRecord_ZoneNotFound(t *testing.T) {
+	t.Parallel()
+	s := New()
+	defer s.Close()
+
+	reqBody := `{"Type":0,"Name":"www","Value":"192.168.1.1","Ttl":300}`
+	req, _ := http.NewRequest(http.MethodPost,
+		fmt.Sprintf("%s/dnszone/9999/records/1", s.URL()), strings.NewReader(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("failed to update record: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("expected status %d, got %d", http.StatusNotFound, resp.StatusCode)
+	}
+}
+
+func TestUpdateRecord_RecordNotFound(t *testing.T) {
+	t.Parallel()
+	s := New()
+	defer s.Close()
+
+	zoneID := s.AddZone("example.com")
+
+	reqBody := `{"Type":0,"Name":"www","Value":"192.168.1.1","Ttl":300}`
+	req, _ := http.NewRequest(http.MethodPost,
+		fmt.Sprintf("%s/dnszone/%d/records/9999", s.URL(), zoneID), strings.NewReader(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("failed to update record: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("expected status %d, got %d", http.StatusNotFound, resp.StatusCode)
+	}
+}
+
+func TestUpdateRecord_InvalidJSON(t *testing.T) {
+	t.Parallel()
+	s := New()
+	defer s.Close()
+
+	zoneID := s.AddZone("example.com")
+
+	reqBody := `{invalid json}`
+	req, _ := http.NewRequest(http.MethodPost,
+		fmt.Sprintf("%s/dnszone/%d/records/1", s.URL(), zoneID), strings.NewReader(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("failed to update record: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d", http.StatusBadRequest, resp.StatusCode)
+	}
+}
+
+func TestUpdateRecord_InvalidZoneID(t *testing.T) {
+	t.Parallel()
+	s := New()
+	defer s.Close()
+
+	reqBody := `{"Type":0,"Name":"www","Value":"192.168.1.1","Ttl":300}`
+	req, _ := http.NewRequest(http.MethodPost,
+		fmt.Sprintf("%s/dnszone/invalid/records/1", s.URL()), strings.NewReader(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("failed to update record: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d", http.StatusBadRequest, resp.StatusCode)
+	}
+}
+
+func TestUpdateRecord_InvalidRecordID(t *testing.T) {
+	t.Parallel()
+	s := New()
+	defer s.Close()
+
+	zoneID := s.AddZone("example.com")
+
+	reqBody := `{"Type":0,"Name":"www","Value":"192.168.1.1","Ttl":300}`
+	req, _ := http.NewRequest(http.MethodPost,
+		fmt.Sprintf("%s/dnszone/%d/records/invalid", s.URL(), zoneID), strings.NewReader(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("failed to update record: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d", http.StatusBadRequest, resp.StatusCode)
+	}
+}
+
+// TestUpdateRecord_TypeImmutable verifies that the record Type field is not changed
+// on update, matching the real bunny.net API behavior.
+func TestUpdateRecord_TypeImmutable(t *testing.T) {
+	t.Parallel()
+	s := New()
+	defer s.Close()
+
+	records := []Record{
+		{Type: 3, Name: "test", Value: "original-value", TTL: 300}, // TXT record
+	}
+	zoneID := s.AddZoneWithRecords("example.com", records)
+
+	zone := s.GetZone(zoneID)
+	recordID := zone.Records[0].ID
+
+	// Update with Type=0 (A) — should be ignored
+	reqBody := `{"Type":0,"Name":"test","Value":"1.2.3.4","Ttl":300}`
+	req, _ := http.NewRequest(http.MethodPost,
+		fmt.Sprintf("%s/dnszone/%d/records/%d", s.URL(), zoneID, recordID), strings.NewReader(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("failed to update record: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNoContent {
+		t.Errorf("expected status %d, got %d", http.StatusNoContent, resp.StatusCode)
+	}
+
+	// Verify Type stayed as TXT (3), not A (0)
+	updatedZone := s.GetZone(zoneID)
+	updated := updatedZone.Records[0]
+	if updated.Type != 3 {
+		t.Errorf("expected record type to remain 3 (TXT), got %d — Type should be immutable on update", updated.Type)
+	}
+	if updated.Value != "1.2.3.4" {
+		t.Errorf("expected updated value 1.2.3.4, got %s", updated.Value)
+	}
+}

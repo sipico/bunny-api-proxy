@@ -161,6 +161,75 @@ type AddRecordRequest struct {
 	Comment  string `json:"Comment"`
 }
 
+// handleUpdateRecord handles POST /dnszone/{zoneId}/records/{id} to update an existing DNS record.
+func (s *Server) handleUpdateRecord(w http.ResponseWriter, r *http.Request) {
+	// Parse zone ID from URL
+	zoneIDStr := chi.URLParam(r, "zoneId")
+	zoneID, err := strconv.ParseInt(zoneIDStr, 10, 64)
+	if err != nil {
+		http.Error(w, "invalid zone ID", http.StatusBadRequest)
+		return
+	}
+
+	// Parse record ID from URL
+	recordIDStr := chi.URLParam(r, "id")
+	recordID, err := strconv.ParseInt(recordIDStr, 10, 64)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("invalid record ID: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	var req AddRecordRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// Note: the real bunny.net API does NOT validate required fields on update.
+	// It accepts partial updates (e.g., empty Name/Value) and returns 204.
+	// We match this lenient behavior in the mock.
+
+	s.state.mu.Lock()
+	defer s.state.mu.Unlock()
+
+	zone, ok := s.state.zones[zoneID]
+	if !ok {
+		http.Error(w, "zone not found", http.StatusNotFound)
+		return
+	}
+
+	// Find record by ID
+	found := false
+	for i, record := range zone.Records {
+		if record.ID == recordID {
+			// Update record fields (Type is immutable on real bunny.net API — do not update it)
+			zone.Records[i].Name = req.Name
+			zone.Records[i].Value = req.Value
+			zone.Records[i].TTL = req.TTL
+			zone.Records[i].Priority = req.Priority
+			zone.Records[i].Weight = req.Weight
+			zone.Records[i].Port = req.Port
+			zone.Records[i].Flags = req.Flags
+			zone.Records[i].Tag = req.Tag
+			zone.Records[i].Disabled = req.Disabled
+			zone.Records[i].Comment = req.Comment
+
+			// Update zone's DateModified
+			zone.DateModified = MockBunnyTime{Time: time.Now().UTC()}
+
+			// Return 204 No Content on success (matching real bunny.net API behavior)
+			w.WriteHeader(http.StatusNoContent)
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		http.Error(w, "record not found", http.StatusNotFound)
+		return
+	}
+}
+
 // handleAddRecord handles PUT /dnszone/{zoneId}/records to add a new DNS record.
 func (s *Server) handleAddRecord(w http.ResponseWriter, r *http.Request) {
 	zoneIDStr := chi.URLParam(r, "zoneId")

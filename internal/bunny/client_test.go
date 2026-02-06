@@ -3,9 +3,11 @@ package bunny
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/sipico/bunny-api-proxy/internal/testutil/mockbunny"
@@ -410,6 +412,270 @@ func TestAddRecord(t *testing.T) {
 
 		if record != nil {
 			t.Errorf("expected nil record, got %v", record)
+		}
+	})
+}
+
+// TestUpdateRecord tests the UpdateRecord method with various scenarios.
+func TestUpdateRecord(t *testing.T) {
+	t.Parallel()
+	t.Run("success updating record", func(t *testing.T) {
+		t.Parallel()
+		server := mockbunny.New()
+		defer server.Close()
+
+		// Add a zone with a record
+		zoneID := server.AddZoneWithRecords("example.com", []mockbunny.Record{
+			{
+				Type:  0, // A
+				Name:  "www",
+				Value: "1.2.3.4",
+				TTL:   300,
+			},
+		})
+
+		// Get the record ID from the zone
+		zone := server.GetZone(zoneID)
+		if zone == nil || len(zone.Records) == 0 {
+			t.Fatalf("expected zone with record")
+		}
+		recordID := zone.Records[0].ID
+
+		client := NewClient("test-key", WithBaseURL(server.URL()))
+		req := &AddRecordRequest{
+			Type:  0, // A
+			Name:  "www",
+			Value: "2.3.4.5",
+			TTL:   600,
+		}
+
+		record, err := client.UpdateRecord(context.Background(), zoneID, recordID, req)
+
+		if err != nil {
+			t.Fatalf("UpdateRecord failed: %v", err)
+		}
+
+		// Mock now returns 204 No Content, so record should be nil
+		if record != nil {
+			t.Errorf("expected nil record for 204 response, got %v", record)
+		}
+
+		// Verify the update persisted by checking the zone
+		updatedZone := server.GetZone(zoneID)
+		if updatedZone == nil || len(updatedZone.Records) == 0 {
+			t.Fatalf("expected zone with record after update")
+		}
+
+		updated := updatedZone.Records[0]
+		if updated.Type != 0 { // A
+			t.Errorf("expected record type 0 (A), got %d", updated.Type)
+		}
+
+		if updated.Name != "www" {
+			t.Errorf("expected record name www, got %s", updated.Name)
+		}
+
+		if updated.Value != "2.3.4.5" {
+			t.Errorf("expected record value 2.3.4.5, got %s", updated.Value)
+		}
+
+		if updated.TTL != 600 {
+			t.Errorf("expected record TTL 600, got %d", updated.TTL)
+		}
+	})
+
+	t.Run("zone not found error (404)", func(t *testing.T) {
+		t.Parallel()
+		server := mockbunny.New()
+		defer server.Close()
+
+		client := NewClient("test-key", WithBaseURL(server.URL()))
+		req := &AddRecordRequest{
+			Type:  0, // A
+			Name:  "www",
+			Value: "1.2.3.4",
+			TTL:   300,
+		}
+
+		record, err := client.UpdateRecord(context.Background(), 999, 1, req)
+
+		if err != ErrNotFound {
+			t.Errorf("expected ErrNotFound, got %v", err)
+		}
+
+		if record != nil {
+			t.Errorf("expected nil record, got %v", record)
+		}
+	})
+
+	t.Run("record not found error (404)", func(t *testing.T) {
+		t.Parallel()
+		server := mockbunny.New()
+		defer server.Close()
+
+		// Add a zone without records
+		zoneID := server.AddZone("example.com")
+
+		client := NewClient("test-key", WithBaseURL(server.URL()))
+		req := &AddRecordRequest{
+			Type:  0, // A
+			Name:  "www",
+			Value: "1.2.3.4",
+			TTL:   300,
+		}
+
+		record, err := client.UpdateRecord(context.Background(), zoneID, 999, req)
+
+		if err != ErrNotFound {
+			t.Errorf("expected ErrNotFound, got %v", err)
+		}
+
+		if record != nil {
+			t.Errorf("expected nil record, got %v", record)
+		}
+	})
+
+	t.Run("unauthorized error (401)", func(t *testing.T) {
+		t.Parallel()
+		// Create a custom HTTP client that returns 401
+		transport := &mockTransport{
+			statusCode: http.StatusUnauthorized,
+			body:       []byte(""),
+		}
+		httpClient := &http.Client{Transport: transport}
+
+		client := NewClient("test-key", WithHTTPClient(httpClient))
+		req := &AddRecordRequest{
+			Type:  0, // A
+			Name:  "www",
+			Value: "1.2.3.4",
+			TTL:   300,
+		}
+
+		record, err := client.UpdateRecord(context.Background(), 1, 1, req)
+
+		if err != ErrUnauthorized {
+			t.Errorf("expected ErrUnauthorized, got %v", err)
+		}
+
+		if record != nil {
+			t.Errorf("expected nil record, got %v", record)
+		}
+	})
+
+	t.Run("204 No Content success (real API behavior)", func(t *testing.T) {
+		t.Parallel()
+		server := mockbunny.New()
+		defer server.Close()
+
+		// Add a zone with a record
+		zoneID := server.AddZoneWithRecords("example.com", []mockbunny.Record{
+			{
+				Type:  0, // A
+				Name:  "www",
+				Value: "1.2.3.4",
+				TTL:   300,
+			},
+		})
+
+		// Get the record ID from the zone
+		zone := server.GetZone(zoneID)
+		if zone == nil || len(zone.Records) == 0 {
+			t.Fatalf("expected zone with record")
+		}
+		recordID := zone.Records[0].ID
+
+		client := NewClient("test-key", WithBaseURL(server.URL()))
+		req := &AddRecordRequest{
+			Type:  0, // A
+			Name:  "www",
+			Value: "2.3.4.5",
+			TTL:   600,
+		}
+
+		record, err := client.UpdateRecord(context.Background(), zoneID, recordID, req)
+
+		if err != nil {
+			t.Fatalf("UpdateRecord failed: %v", err)
+		}
+
+		// For 204 No Content, record should be nil
+		if record != nil {
+			t.Errorf("expected nil record for 204 response, got %v", record)
+		}
+	})
+
+	t.Run("400 Bad Request validation error", func(t *testing.T) {
+		t.Parallel()
+		// Simulate a 400 validation error from the backend
+		transport := &mockTransport{
+			statusCode: http.StatusBadRequest,
+			body:       []byte(`{"ErrorKey":"validation_error","Field":"Value","Message":"Value is required"}`),
+		}
+		httpClient := &http.Client{Transport: transport}
+
+		client := NewClient("test-key", WithHTTPClient(httpClient))
+		req := &AddRecordRequest{
+			Type: 0, // A
+			Name: "www",
+			TTL:  600,
+		}
+
+		record, err := client.UpdateRecord(context.Background(), 1, 1, req)
+
+		if err == nil {
+			t.Fatalf("expected error for 400 response, got nil")
+		}
+
+		// Should be an APIError with 400 status
+		var apiErr *APIError
+		if !errors.As(err, &apiErr) {
+			t.Fatalf("expected APIError, got %T: %v", err, err)
+		}
+
+		if apiErr.StatusCode != http.StatusBadRequest {
+			t.Errorf("expected status 400, got %d", apiErr.StatusCode)
+		}
+
+		if apiErr.Message != "Value is required" {
+			t.Errorf("expected message 'Value is required', got %s", apiErr.Message)
+		}
+
+		if record != nil {
+			t.Errorf("expected nil record for error response, got %v", record)
+		}
+	})
+
+	t.Run("malformed response body", func(t *testing.T) {
+		t.Parallel()
+		// Create a custom HTTP client that returns 200 with invalid JSON
+		transport := &mockTransport{
+			statusCode: http.StatusOK,
+			body:       []byte("not valid json"),
+		}
+		httpClient := &http.Client{Transport: transport}
+
+		client := NewClient("test-key", WithHTTPClient(httpClient))
+		req := &AddRecordRequest{
+			Type:  0, // A
+			Name:  "www",
+			Value: "1.2.3.4",
+			TTL:   300,
+		}
+
+		record, err := client.UpdateRecord(context.Background(), 1, 1, req)
+
+		if err == nil {
+			t.Fatalf("expected error for malformed JSON, got nil")
+		}
+
+		if record != nil {
+			t.Errorf("expected nil record for error response, got %v", record)
+		}
+
+		// Error should mention JSON decoding
+		if !strings.Contains(err.Error(), "decode") {
+			t.Errorf("expected decode error message, got %v", err)
 		}
 	})
 }

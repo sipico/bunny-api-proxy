@@ -32,6 +32,9 @@ type BunnyClient interface {
 	// AddRecord creates a new DNS record in the specified zone.
 	AddRecord(ctx context.Context, zoneID int64, req *bunny.AddRecordRequest) (*bunny.Record, error)
 
+	// UpdateRecord updates an existing DNS record in the specified zone.
+	UpdateRecord(ctx context.Context, zoneID, recordID int64, req *bunny.AddRecordRequest) (*bunny.Record, error)
+
 	// DeleteRecord removes a DNS record from the specified zone.
 	DeleteRecord(ctx context.Context, zoneID, recordID int64) error
 }
@@ -83,6 +86,13 @@ func handleBunnyError(w http.ResponseWriter, err error) {
 		slog.Default().Error("upstream authentication failed", "error", err)
 		writeError(w, http.StatusBadGateway, "upstream authentication failed")
 	default:
+		// Check if it's a structured APIError with a specific status code
+		var apiErr *bunny.APIError
+		if errors.As(err, &apiErr) {
+			// Forward the APIError status code (e.g., 400 for validation errors)
+			writeError(w, apiErr.StatusCode, apiErr.Message)
+			return
+		}
 		// Generic errors (network, parsing, etc.) - log for debugging
 		slog.Default().Error("bunny.net API error", "error", err)
 		writeError(w, http.StatusInternalServerError, "internal server error")
@@ -330,6 +340,60 @@ func (h *Handler) HandleAddRecord(w http.ResponseWriter, r *http.Request) {
 
 	// Return 201 Created with the record
 	writeJSON(w, http.StatusCreated, record)
+}
+
+// HandleUpdateRecord updates an existing DNS record in the specified zone.
+func (h *Handler) HandleUpdateRecord(w http.ResponseWriter, r *http.Request) {
+	zoneIDStr := chi.URLParam(r, "zoneID")
+	if zoneIDStr == "" {
+		writeError(w, http.StatusBadRequest, "missing zone ID")
+		return
+	}
+
+	zoneID, err := strconv.ParseInt(zoneIDStr, 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid zone ID")
+		return
+	}
+
+	recordIDStr := chi.URLParam(r, "recordID")
+	if recordIDStr == "" {
+		writeError(w, http.StatusBadRequest, "missing record ID")
+		return
+	}
+
+	recordID, err := strconv.ParseInt(recordIDStr, 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid record ID")
+		return
+	}
+
+	// Decode request body
+	var req bunny.AddRecordRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	// Call client to update record — validation is delegated to the backend
+	// (bunny.net API has nuanced validation rules per record type)
+	record, err := h.client.UpdateRecord(r.Context(), zoneID, recordID, &req)
+	if err != nil {
+		handleBunnyError(w, err)
+		return
+	}
+
+	// Log the request
+	h.logger.Info("update record", "zone_id", zoneID, "record_id", recordID, "type", req.Type, "name", req.Name)
+
+	// If record is nil (204 No Content from backend), return 204
+	if record == nil {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	// Return 200 OK with the record
+	writeJSON(w, http.StatusOK, record)
 }
 
 // HandleDeleteRecord removes a DNS record from the specified zone.
