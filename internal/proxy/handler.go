@@ -68,11 +68,8 @@ func writeJSON(w http.ResponseWriter, status int, data any) {
 func writeError(w http.ResponseWriter, status int, message string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	err := json.NewEncoder(w).Encode(map[string]string{"error": message})
-	if err != nil {
-		// Encoding errors on error responses are not critical
-		_ = err
-	}
+	//nolint:errcheck
+	_ = json.NewEncoder(w).Encode(map[string]string{"error": message})
 }
 
 // handleBunnyError maps bunny.net client errors to appropriate HTTP responses.
@@ -90,6 +87,29 @@ func handleBunnyError(w http.ResponseWriter, err error) {
 		slog.Default().Error("bunny.net API error", "error", err)
 		writeError(w, http.StatusInternalServerError, "internal server error")
 	}
+}
+
+// filterRecordsByPermission filters zone records based on the scoped key's permitted record types.
+// Returns the original records if no type restriction applies.
+func filterRecordsByPermission(records []bunny.Record, keyInfo *auth.KeyInfo, zoneID int64) []bunny.Record {
+	if keyInfo == nil {
+		return records
+	}
+	permittedTypes := auth.GetPermittedRecordTypes(keyInfo, zoneID)
+	if permittedTypes == nil {
+		return records
+	}
+	typeSet := make(map[string]bool, len(permittedTypes))
+	for _, t := range permittedTypes {
+		typeSet[t] = true
+	}
+	filtered := make([]bunny.Record, 0, len(records))
+	for _, record := range records {
+		if typeSet[auth.MapRecordTypeToString(record.Type)] {
+			filtered = append(filtered, record)
+		}
+	}
+	return filtered
 }
 
 // HandleListZones lists all DNS zones with optional filtering.
@@ -208,23 +228,7 @@ func (h *Handler) HandleGetZone(w http.ResponseWriter, r *http.Request) {
 
 	// Filter records by record type if scoped key
 	keyInfo := auth.GetKeyInfo(r.Context())
-	if keyInfo != nil {
-		permittedTypes := auth.GetPermittedRecordTypes(keyInfo, zoneID)
-		if permittedTypes != nil {
-			filtered := make([]bunny.Record, 0)
-			typeSet := make(map[string]bool)
-			for _, t := range permittedTypes {
-				typeSet[t] = true
-			}
-			for _, record := range zone.Records {
-				recordTypeStr := auth.MapRecordTypeToString(record.Type)
-				if typeSet[recordTypeStr] {
-					filtered = append(filtered, record)
-				}
-			}
-			zone.Records = filtered
-		}
-	}
+	zone.Records = filterRecordsByPermission(zone.Records, keyInfo, zoneID)
 
 	// Log the request
 	h.logger.Info("get zone", "zone_id", zoneID)
@@ -284,23 +288,7 @@ func (h *Handler) HandleListRecords(w http.ResponseWriter, r *http.Request) {
 
 	// Filter records by record type if scoped key
 	keyInfo := auth.GetKeyInfo(r.Context())
-	if keyInfo != nil {
-		permittedTypes := auth.GetPermittedRecordTypes(keyInfo, zoneID)
-		if permittedTypes != nil {
-			filtered := make([]bunny.Record, 0)
-			typeSet := make(map[string]bool)
-			for _, t := range permittedTypes {
-				typeSet[t] = true
-			}
-			for _, record := range zone.Records {
-				recordTypeStr := auth.MapRecordTypeToString(record.Type)
-				if typeSet[recordTypeStr] {
-					filtered = append(filtered, record)
-				}
-			}
-			zone.Records = filtered
-		}
-	}
+	zone.Records = filterRecordsByPermission(zone.Records, keyInfo, zoneID)
 
 	// Log the request
 	h.logger.Info("list records", "zone_id", zoneID)

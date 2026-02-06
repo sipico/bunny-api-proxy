@@ -79,20 +79,3 @@ func WithMasterKey(ctx context.Context, isMaster bool) context.Context {
 func WithAdmin(ctx context.Context, isAdmin bool) context.Context {
 	return context.WithValue(ctx, adminKey, isAdmin)
 }
-
-// Lowercase aliases for backward compatibility with existing code
-func withToken(ctx context.Context, token *storage.Token) context.Context {
-	return WithToken(ctx, token)
-}
-
-func withPermissions(ctx context.Context, perms []*storage.Permission) context.Context {
-	return WithPermissions(ctx, perms)
-}
-
-func withMasterKey(ctx context.Context, isMaster bool) context.Context {
-	return WithMasterKey(ctx, isMaster)
-}
-
-func withAdmin(ctx context.Context, isAdmin bool) context.Context {
-	return WithAdmin(ctx, isAdmin)
-}

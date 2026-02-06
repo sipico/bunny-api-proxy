@@ -119,7 +119,7 @@ func (m *authTestTokenStore) addToken(id int64, name string, isAdmin bool, plain
 func TestTokenFromContext(t *testing.T) {
 	t.Parallel()
 	token := &storage.Token{ID: 42, Name: "test-token", IsAdmin: false}
-	ctx := withToken(context.Background(), token)
+	ctx := WithToken(context.Background(), token)
 
 	got := TokenFromContext(ctx)
 	if got == nil {
@@ -148,7 +148,7 @@ func TestPermissionsFromContext(t *testing.T) {
 	perms := []*storage.Permission{
 		{ID: 1, ZoneID: 100, AllowedActions: []string{"list_records"}},
 	}
-	ctx := withPermissions(context.Background(), perms)
+	ctx := WithPermissions(context.Background(), perms)
 
 	got := PermissionsFromContext(ctx)
 	if len(got) != 1 {
@@ -182,7 +182,7 @@ func TestIsMasterKeyFromContext(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			ctx := withMasterKey(context.Background(), tt.setValue)
+			ctx := WithMasterKey(context.Background(), tt.setValue)
 			got := IsMasterKeyFromContext(ctx)
 			if got != tt.want {
 				t.Errorf("IsMasterKeyFromContext() = %v, want %v", got, tt.want)
@@ -214,7 +214,7 @@ func TestIsAdminFromContext(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			ctx := withAdmin(context.Background(), tt.setValue)
+			ctx := WithAdmin(context.Background(), tt.setValue)
 			got := IsAdminFromContext(ctx)
 			if got != tt.want {
 				t.Errorf("IsAdminFromContext() = %v, want %v", got, tt.want)
@@ -525,7 +525,7 @@ func TestRequireAdmin_AdminUser(t *testing.T) {
 	}))
 
 	req := httptest.NewRequest("GET", "/api/tokens", nil)
-	ctx := withAdmin(req.Context(), true)
+	ctx := WithAdmin(req.Context(), true)
 	req = req.WithContext(ctx)
 	rec := httptest.NewRecorder()
 
@@ -550,7 +550,7 @@ func TestRequireAdmin_NonAdminUser(t *testing.T) {
 	}))
 
 	req := httptest.NewRequest("GET", "/api/tokens", nil)
-	ctx := withAdmin(req.Context(), false)
+	ctx := WithAdmin(req.Context(), false)
 	req = req.WithContext(ctx)
 	rec := httptest.NewRecorder()
 
@@ -1422,10 +1422,10 @@ func TestContextHelpers_MultipleValues(t *testing.T) {
 	perms := []*storage.Permission{{ID: 1, ZoneID: 100}}
 
 	ctx := context.Background()
-	ctx = withToken(ctx, token)
-	ctx = withPermissions(ctx, perms)
-	ctx = withMasterKey(ctx, false)
-	ctx = withAdmin(ctx, true)
+	ctx = WithToken(ctx, token)
+	ctx = WithPermissions(ctx, perms)
+	ctx = WithMasterKey(ctx, false)
+	ctx = WithAdmin(ctx, true)
 
 	// Verify all values are accessible
 	if TokenFromContext(ctx) != token {
@@ -1475,7 +1475,7 @@ func TestCheckPermissions_AdminBypass(t *testing.T) {
 	}))
 
 	req := httptest.NewRequest("GET", "/dnszone/123", nil)
-	ctx := withAdmin(req.Context(), true)
+	ctx := WithAdmin(req.Context(), true)
 	req = req.WithContext(ctx)
 	rec := httptest.NewRecorder()
 
@@ -1502,8 +1502,8 @@ func TestCheckPermissions_MasterKeyBypass(t *testing.T) {
 	}))
 
 	req := httptest.NewRequest("GET", "/dnszone/123", nil)
-	ctx := withAdmin(req.Context(), true)
-	ctx = withMasterKey(ctx, true)
+	ctx := WithAdmin(req.Context(), true)
+	ctx = WithMasterKey(ctx, true)
 	req = req.WithContext(ctx)
 	rec := httptest.NewRecorder()
 
@@ -1543,9 +1543,9 @@ func TestCheckPermissions_ValidPermissions(t *testing.T) {
 	}))
 
 	req := httptest.NewRequest("GET", "/dnszone/123", nil)
-	ctx := withAdmin(req.Context(), false)
-	ctx = withToken(ctx, token)
-	ctx = withPermissions(ctx, perms)
+	ctx := WithAdmin(req.Context(), false)
+	ctx = WithToken(ctx, token)
+	ctx = WithPermissions(ctx, perms)
 	req = req.WithContext(ctx)
 	rec := httptest.NewRecorder()
 
@@ -1583,9 +1583,9 @@ func TestCheckPermissions_MissingZonePermission(t *testing.T) {
 	}))
 
 	req := httptest.NewRequest("GET", "/dnszone/123", nil)
-	ctx := withAdmin(req.Context(), false)
-	ctx = withToken(ctx, token)
-	ctx = withPermissions(ctx, perms)
+	ctx := WithAdmin(req.Context(), false)
+	ctx = WithToken(ctx, token)
+	ctx = WithPermissions(ctx, perms)
 	req = req.WithContext(ctx)
 	rec := httptest.NewRecorder()
 
@@ -1628,9 +1628,9 @@ func TestCheckPermissions_MissingActionPermission(t *testing.T) {
 	}))
 
 	req := httptest.NewRequest("GET", "/dnszone/123/records", nil)
-	ctx := withAdmin(req.Context(), false)
-	ctx = withToken(ctx, token)
-	ctx = withPermissions(ctx, perms)
+	ctx := WithAdmin(req.Context(), false)
+	ctx = WithToken(ctx, token)
+	ctx = WithPermissions(ctx, perms)
 	req = req.WithContext(ctx)
 	rec := httptest.NewRecorder()
 
@@ -1666,9 +1666,9 @@ func TestCheckPermissions_MissingRecordTypePermission(t *testing.T) {
 
 	body := bytes.NewBufferString(`{"Type":0,"Name":"www","Value":"1.2.3.4"}`)
 	req := httptest.NewRequest("POST", "/dnszone/123/records", body)
-	ctx := withAdmin(req.Context(), false)
-	ctx = withToken(ctx, token)
-	ctx = withPermissions(ctx, perms)
+	ctx := WithAdmin(req.Context(), false)
+	ctx = WithToken(ctx, token)
+	ctx = WithPermissions(ctx, perms)
 	req = req.WithContext(ctx)
 	rec := httptest.NewRecorder()
 
@@ -1697,8 +1697,8 @@ func TestCheckPermissions_ParseRequestError(t *testing.T) {
 
 	// Invalid endpoint
 	req := httptest.NewRequest("GET", "/invalid/endpoint", nil)
-	ctx := withAdmin(req.Context(), false)
-	ctx = withToken(ctx, token)
+	ctx := WithAdmin(req.Context(), false)
+	ctx = WithToken(ctx, token)
 	req = req.WithContext(ctx)
 	rec := httptest.NewRecorder()
 
@@ -1726,9 +1726,9 @@ func TestCheckPermissions_EmptyPermissions(t *testing.T) {
 	}))
 
 	req := httptest.NewRequest("GET", "/dnszone/123", nil)
-	ctx := withAdmin(req.Context(), false)
-	ctx = withToken(ctx, token)
-	ctx = withPermissions(ctx, []*storage.Permission{}) // Empty
+	ctx := WithAdmin(req.Context(), false)
+	ctx = WithToken(ctx, token)
+	ctx = WithPermissions(ctx, []*storage.Permission{}) // Empty
 	req = req.WithContext(ctx)
 	rec := httptest.NewRecorder()
 
@@ -1756,8 +1756,8 @@ func TestCheckPermissions_NilPermissions(t *testing.T) {
 	}))
 
 	req := httptest.NewRequest("GET", "/dnszone/123", nil)
-	ctx := withAdmin(req.Context(), false)
-	ctx = withToken(ctx, token)
+	ctx := WithAdmin(req.Context(), false)
+	ctx = WithToken(ctx, token)
 	// No permissions set in context (nil)
 	req = req.WithContext(ctx)
 	rec := httptest.NewRecorder()
@@ -1780,7 +1780,7 @@ func TestCheckPermissions_NoToken(t *testing.T) {
 	}))
 
 	req := httptest.NewRequest("GET", "/dnszone/123", nil)
-	ctx := withAdmin(req.Context(), false)
+	ctx := WithAdmin(req.Context(), false)
 	// No token in context
 	req = req.WithContext(ctx)
 	rec := httptest.NewRecorder()
