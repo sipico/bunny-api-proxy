@@ -118,10 +118,10 @@ func NewState() *State {
 
 // ListZonesResponse is a paginated response for the List Zones endpoint.
 type ListZonesResponse struct {
+	Items        []Zone `json:"Items"`
 	CurrentPage  int    `json:"CurrentPage"`
 	TotalItems   int    `json:"TotalItems"`
 	HasMoreItems bool   `json:"HasMoreItems"`
-	Items        []Zone `json:"Items"`
 }
 
 // ErrorResponse represents an error response from the API.

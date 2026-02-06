@@ -63,10 +63,10 @@ func (s *Server) handleListZones(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := ListZonesResponse{
+		Items:        zones,
 		CurrentPage:  page,
 		TotalItems:   total,
 		HasMoreItems: end < total,
-		Items:        zones,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
