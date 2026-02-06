@@ -10,7 +10,7 @@ import (
 )
 
 // MockBunnyTime wraps time.Time to serialize in bunny.net's format
-// (without timezone suffix, matching real API behavior).
+// (with sub-second precision and Z suffix, matching real API behavior).
 //
 //nolint:revive // MockBunnyTime is descriptive and distinguishes from time.Time
 type MockBunnyTime struct {
@@ -18,14 +18,14 @@ type MockBunnyTime struct {
 }
 
 // MarshalJSON implements json.Marshaler for MockBunnyTime.
-// It returns timestamps in "2006-01-02T15:04:05" format (no timezone),
+// It returns timestamps in "2006-01-02T15:04:05.0000000Z" format (with sub-second precision and Z suffix),
 // matching bunny.net's actual API behavior.
 func (t MockBunnyTime) MarshalJSON() ([]byte, error) {
 	if t.IsZero() {
 		return []byte("null"), nil
 	}
-	// Format without timezone suffix to match real bunny.net API
-	formatted := `"` + t.UTC().Format("2006-01-02T15:04:05") + `"`
+	// Format with sub-second precision and Z suffix to match real bunny.net API creation endpoint
+	formatted := `"` + t.UTC().Format("2006-01-02T15:04:05.0000000") + `Z"`
 	return []byte(formatted), nil
 }
 
