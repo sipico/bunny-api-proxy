@@ -82,8 +82,8 @@ func TestZoneFields(t *testing.T) {
 		Records:                  []Record{},
 		NameserversDetected:      true,
 		CustomNameserversEnabled: false,
-		Nameserver1:              "ns1.bunny.net",
-		Nameserver2:              "ns2.bunny.net",
+		Nameserver1:              "kiki.bunny.net",
+		Nameserver2:              "coco.bunny.net",
 		SoaEmail:                 "admin@example.com",
 		LoggingEnabled:           false,
 		LoggingIPAnonymization:   true,
@@ -100,8 +100,8 @@ func TestZoneFields(t *testing.T) {
 		t.Errorf("Zone Domain = %s, want example.com", zone.Domain)
 	}
 
-	if zone.Nameserver1 != "ns1.bunny.net" {
-		t.Errorf("Nameserver1 = %s, want ns1.bunny.net", zone.Nameserver1)
+	if zone.Nameserver1 != "kiki.bunny.net" {
+		t.Errorf("Nameserver1 = %s, want kiki.bunny.net", zone.Nameserver1)
 	}
 }
 

@@ -552,11 +552,11 @@ func TestHandleCreateZone_Success(t *testing.T) {
 	if zone.ID == 0 {
 		t.Error("expected non-zero zone ID")
 	}
-	if zone.Nameserver1 != "ns1.bunny.net" {
-		t.Errorf("expected nameserver1 ns1.bunny.net, got %s", zone.Nameserver1)
+	if zone.Nameserver1 != "kiki.bunny.net" {
+		t.Errorf("expected nameserver1 kiki.bunny.net, got %s", zone.Nameserver1)
 	}
-	if zone.Nameserver2 != "ns2.bunny.net" {
-		t.Errorf("expected nameserver2 ns2.bunny.net, got %s", zone.Nameserver2)
+	if zone.Nameserver2 != "coco.bunny.net" {
+		t.Errorf("expected nameserver2 coco.bunny.net, got %s", zone.Nameserver2)
 	}
 	if zone.SoaEmail != "hostmaster@bunny.net" {
 		t.Errorf("expected SoaEmail hostmaster@bunny.net, got %s", zone.SoaEmail)

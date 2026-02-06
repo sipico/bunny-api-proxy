@@ -165,11 +165,11 @@ func TestAddZone(t *testing.T) {
 	if zone.SoaEmail != "hostmaster@bunny.net" {
 		t.Errorf("expected hostmaster@bunny.net, got %s", zone.SoaEmail)
 	}
-	if zone.Nameserver1 != "ns1.bunny.net" {
-		t.Errorf("expected ns1.bunny.net, got %s", zone.Nameserver1)
+	if zone.Nameserver1 != "kiki.bunny.net" {
+		t.Errorf("expected kiki.bunny.net, got %s", zone.Nameserver1)
 	}
-	if zone.Nameserver2 != "ns2.bunny.net" {
-		t.Errorf("expected ns2.bunny.net, got %s", zone.Nameserver2)
+	if zone.Nameserver2 != "coco.bunny.net" {
+		t.Errorf("expected coco.bunny.net, got %s", zone.Nameserver2)
 	}
 	if !zone.NameserversDetected {
 		t.Error("expected NameserversDetected to be true")
