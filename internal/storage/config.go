@@ -37,6 +37,15 @@ func New(dbPath string) (*SQLiteStorage, error) {
 		return nil, fmt.Errorf("failed to set busy timeout: %w", err)
 	}
 
+	// Disable memory-mapped I/O to prevent SIGBUS on Docker bind mounts
+	// and resource-constrained CI runners. modernc.org/sqlite (pure Go) uses mmap
+	// internally; under pressure, mmap'd regions can become invalid.
+	// Trade-off: minor read performance cost, eliminates SIGBUS-prone codepath.
+	if _, err := db.Exec("PRAGMA mmap_size = 0"); err != nil { // coverage-ignore: pragma fails only on corrupted DB
+		_ = db.Close() //nolint:errcheck
+		return nil, fmt.Errorf("failed to disable mmap: %w", err)
+	}
+
 	// Configure connection pool for concurrent access
 	// modernc.org/sqlite requires single connection for in-process file databases
 	// to avoid "database is locked" errors
