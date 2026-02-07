@@ -42,6 +42,10 @@ const (
 	ActionImportRecords Action = "import_records"
 	// ActionExportRecords exports DNS records (admin only).
 	ActionExportRecords Action = "export_records"
+	// ActionEnableDNSSEC enables DNSSEC for a zone (admin only).
+	ActionEnableDNSSEC Action = "enable_dnssec"
+	// ActionDisableDNSSEC disables DNSSEC for a zone (admin only).
+	ActionDisableDNSSEC Action = "disable_dnssec"
 )
 
 // Errors for authentication and authorization failures.

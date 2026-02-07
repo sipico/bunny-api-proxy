@@ -30,6 +30,8 @@ type mockBunnyClient struct {
 	checkZoneAvailabilityFunc func(context.Context, string) (*bunny.CheckAvailabilityResponse, error)
 	importRecordsFunc         func(context.Context, int64, io.Reader, string) (*bunny.ImportRecordsResponse, error)
 	exportRecordsFunc         func(context.Context, int64) (string, error)
+	enableDNSSECFunc          func(context.Context, int64) (*bunny.DNSSECResponse, error)
+	disableDNSSECFunc         func(context.Context, int64) (*bunny.DNSSECResponse, error)
 }
 
 func (m *mockBunnyClient) ListZones(ctx context.Context, opts *bunny.ListZonesOptions) (*bunny.ListZonesResponse, error) {
@@ -107,6 +109,20 @@ func (m *mockBunnyClient) ExportRecords(ctx context.Context, zoneID int64) (stri
 		return m.exportRecordsFunc(ctx, zoneID)
 	}
 	return "", nil
+}
+
+func (m *mockBunnyClient) EnableDNSSEC(ctx context.Context, zoneID int64) (*bunny.DNSSECResponse, error) {
+	if m.enableDNSSECFunc != nil {
+		return m.enableDNSSECFunc(ctx, zoneID)
+	}
+	return nil, nil
+}
+
+func (m *mockBunnyClient) DisableDNSSEC(ctx context.Context, zoneID int64) (*bunny.DNSSECResponse, error) {
+	if m.disableDNSSECFunc != nil {
+		return m.disableDNSSECFunc(ctx, zoneID)
+	}
+	return nil, nil
 }
 
 // newTestRequest creates a test request with Chi URL parameters
@@ -2249,5 +2265,158 @@ func TestHandleExportRecords_BunnyError(t *testing.T) {
 
 	if w.Code != http.StatusInternalServerError {
 		t.Errorf("expected status %d, got %d", http.StatusInternalServerError, w.Code)
+	}
+}
+
+func TestHandleEnableDNSSEC_Success(t *testing.T) {
+	t.Parallel()
+	mockClient := &mockBunnyClient{
+		enableDNSSECFunc: func(_ context.Context, id int64) (*bunny.DNSSECResponse, error) {
+			return &bunny.DNSSECResponse{Enabled: true, Algorithm: 13, KeyTag: 12345}, nil
+		},
+	}
+	handler := NewHandler(mockClient, slog.Default())
+
+	r := chi.NewRouter()
+	r.Post("/dnszone/{zoneID}/dnssec", handler.HandleEnableDNSSEC)
+
+	req := httptest.NewRequest(http.MethodPost, "/dnszone/1/dnssec", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status %d, got %d", http.StatusOK, w.Code)
+	}
+
+	var resp bunny.DNSSECResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if !resp.Enabled {
+		t.Error("expected DNSSEC to be enabled")
+	}
+}
+
+func TestHandleEnableDNSSEC_InvalidZoneID(t *testing.T) {
+	t.Parallel()
+	handler := NewHandler(&mockBunnyClient{}, slog.Default())
+
+	r := chi.NewRouter()
+	r.Post("/dnszone/{zoneID}/dnssec", handler.HandleEnableDNSSEC)
+
+	req := httptest.NewRequest(http.MethodPost, "/dnszone/abc/dnssec", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d", http.StatusBadRequest, w.Code)
+	}
+}
+
+func TestHandleEnableDNSSEC_NotFound(t *testing.T) {
+	t.Parallel()
+	mockClient := &mockBunnyClient{
+		enableDNSSECFunc: func(_ context.Context, _ int64) (*bunny.DNSSECResponse, error) {
+			return nil, bunny.ErrNotFound
+		},
+	}
+	handler := NewHandler(mockClient, slog.Default())
+
+	r := chi.NewRouter()
+	r.Post("/dnszone/{zoneID}/dnssec", handler.HandleEnableDNSSEC)
+
+	req := httptest.NewRequest(http.MethodPost, "/dnszone/999/dnssec", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusNotFound {
+		t.Errorf("expected status %d, got %d", http.StatusNotFound, w.Code)
+	}
+}
+
+func TestHandleEnableDNSSEC_BunnyError(t *testing.T) {
+	t.Parallel()
+	mockClient := &mockBunnyClient{
+		enableDNSSECFunc: func(_ context.Context, _ int64) (*bunny.DNSSECResponse, error) {
+			return nil, fmt.Errorf("connection failed")
+		},
+	}
+	handler := NewHandler(mockClient, slog.Default())
+
+	r := chi.NewRouter()
+	r.Post("/dnszone/{zoneID}/dnssec", handler.HandleEnableDNSSEC)
+
+	req := httptest.NewRequest(http.MethodPost, "/dnszone/1/dnssec", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("expected status %d, got %d", http.StatusInternalServerError, w.Code)
+	}
+}
+
+func TestHandleDisableDNSSEC_Success(t *testing.T) {
+	t.Parallel()
+	mockClient := &mockBunnyClient{
+		disableDNSSECFunc: func(_ context.Context, id int64) (*bunny.DNSSECResponse, error) {
+			return &bunny.DNSSECResponse{Enabled: false}, nil
+		},
+	}
+	handler := NewHandler(mockClient, slog.Default())
+
+	r := chi.NewRouter()
+	r.Delete("/dnszone/{zoneID}/dnssec", handler.HandleDisableDNSSEC)
+
+	req := httptest.NewRequest(http.MethodDelete, "/dnszone/1/dnssec", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status %d, got %d", http.StatusOK, w.Code)
+	}
+
+	var resp bunny.DNSSECResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if resp.Enabled {
+		t.Error("expected DNSSEC to be disabled")
+	}
+}
+
+func TestHandleDisableDNSSEC_InvalidZoneID(t *testing.T) {
+	t.Parallel()
+	handler := NewHandler(&mockBunnyClient{}, slog.Default())
+
+	r := chi.NewRouter()
+	r.Delete("/dnszone/{zoneID}/dnssec", handler.HandleDisableDNSSEC)
+
+	req := httptest.NewRequest(http.MethodDelete, "/dnszone/abc/dnssec", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d", http.StatusBadRequest, w.Code)
+	}
+}
+
+func TestHandleDisableDNSSEC_NotFound(t *testing.T) {
+	t.Parallel()
+	mockClient := &mockBunnyClient{
+		disableDNSSECFunc: func(_ context.Context, _ int64) (*bunny.DNSSECResponse, error) {
+			return nil, bunny.ErrNotFound
+		},
+	}
+	handler := NewHandler(mockClient, slog.Default())
+
+	r := chi.NewRouter()
+	r.Delete("/dnszone/{zoneID}/dnssec", handler.HandleDisableDNSSEC)
+
+	req := httptest.NewRequest(http.MethodDelete, "/dnszone/999/dnssec", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusNotFound {
+		t.Errorf("expected status %d, got %d", http.StatusNotFound, w.Code)
 	}
 }

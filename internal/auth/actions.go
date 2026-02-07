@@ -22,6 +22,7 @@ var (
 	checkAvailabilityPattern = regexp.MustCompile(`^/dnszone/checkavailability/?$`)
 	importRecordsPattern     = regexp.MustCompile(`^/dnszone/(\d+)/import/?$`)
 	exportRecordsPattern     = regexp.MustCompile(`^/dnszone/(\d+)/export/?$`)
+	dnssecPattern            = regexp.MustCompile(`^/dnszone/(\d+)/dnssec/?$`)
 )
 
 // ParseRequest extracts action, zone ID, and record type from HTTP request.
@@ -63,6 +64,21 @@ func ParseRequest(r *http.Request) (*Request, error) {
 		return &Request{Action: ActionCreateZone}, nil
 	}
 
+	// POST /dnszone/{id}/dnssec - enable DNSSEC (admin only)
+	if r.Method == http.MethodPost {
+		if matches := dnssecPattern.FindStringSubmatch(path); matches != nil {
+			zoneID, _ := strconv.ParseInt(matches[1], 10, 64) //nolint:errcheck // regex ensures valid number
+			return &Request{Action: ActionEnableDNSSEC, ZoneID: zoneID}, nil
+		}
+	}
+
+	// DELETE /dnszone/{id}/dnssec - disable DNSSEC (admin only)
+	if r.Method == http.MethodDelete {
+		if matches := dnssecPattern.FindStringSubmatch(path); matches != nil {
+			zoneID, _ := strconv.ParseInt(matches[1], 10, 64) //nolint:errcheck // regex ensures valid number
+			return &Request{Action: ActionDisableDNSSEC, ZoneID: zoneID}, nil
+		}
+	}
 	// POST /dnszone/{id} - update zone (admin only, no permission checking needed)
 	if r.Method == http.MethodPost {
 		if matches := updateZonePattern.FindStringSubmatch(path); matches != nil {

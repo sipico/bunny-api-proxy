@@ -39,6 +39,10 @@ type BunnyClient interface {
 
 	// ExportRecords exports DNS records in BIND zone file format.
 	ExportRecords(ctx context.Context, zoneID int64) (string, error)
+	// EnableDNSSEC enables DNSSEC for a DNS zone.
+	EnableDNSSEC(ctx context.Context, zoneID int64) (*bunny.DNSSECResponse, error)
+	// DisableDNSSEC disables DNSSEC for a DNS zone.
+	DisableDNSSEC(ctx context.Context, zoneID int64) (*bunny.DNSSECResponse, error)
 	// AddRecord creates a new DNS record in the specified zone.
 	AddRecord(ctx context.Context, zoneID int64, req *bunny.AddRecordRequest) (*bunny.Record, error)
 
@@ -400,6 +404,60 @@ func (h *Handler) HandleExportRecords(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	//nolint:errcheck
 	w.Write([]byte(result))
+}
+
+// HandleEnableDNSSEC enables DNSSEC for a DNS zone.
+// POST /dnszone/{zoneID}/dnssec
+// Admin only — sensitive zone-level configuration.
+func (h *Handler) HandleEnableDNSSEC(w http.ResponseWriter, r *http.Request) {
+	zoneIDStr := chi.URLParam(r, "zoneID")
+	if zoneIDStr == "" {
+		writeError(w, http.StatusBadRequest, "missing zone ID")
+		return
+	}
+
+	zoneID, err := strconv.ParseInt(zoneIDStr, 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid zone ID")
+		return
+	}
+
+	result, err := h.client.EnableDNSSEC(r.Context(), zoneID)
+	if err != nil {
+		handleBunnyError(w, err)
+		return
+	}
+
+	h.logger.Info("enable DNSSEC", "zone_id", zoneID)
+
+	writeJSON(w, http.StatusOK, result)
+}
+
+// HandleDisableDNSSEC disables DNSSEC for a DNS zone.
+// DELETE /dnszone/{zoneID}/dnssec
+// Admin only — sensitive zone-level configuration.
+func (h *Handler) HandleDisableDNSSEC(w http.ResponseWriter, r *http.Request) {
+	zoneIDStr := chi.URLParam(r, "zoneID")
+	if zoneIDStr == "" {
+		writeError(w, http.StatusBadRequest, "missing zone ID")
+		return
+	}
+
+	zoneID, err := strconv.ParseInt(zoneIDStr, 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid zone ID")
+		return
+	}
+
+	result, err := h.client.DisableDNSSEC(r.Context(), zoneID)
+	if err != nil {
+		handleBunnyError(w, err)
+		return
+	}
+
+	h.logger.Info("disable DNSSEC", "zone_id", zoneID)
+
+	writeJSON(w, http.StatusOK, result)
 }
 
 // HandleListRecords lists all DNS records for a zone.
