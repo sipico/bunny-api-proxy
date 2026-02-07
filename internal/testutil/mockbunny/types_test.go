@@ -55,7 +55,7 @@ func TestRecordFields(t *testing.T) {
 		MonitorType:           2, // Http
 		GeolocationLatitude:   0.0,
 		GeolocationLongitude:  0.0,
-		LatencyZone:           "",
+		LatencyZone:           nil,
 		SmartRoutingType:      1, // Latency
 		Disabled:              false,
 		Comment:               "test record",

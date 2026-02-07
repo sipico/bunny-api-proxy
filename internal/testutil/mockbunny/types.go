@@ -71,7 +71,7 @@ type Record struct {
 	MonitorType           int     `json:"MonitorType"`   // 0 = None, 1 = Ping, 2 = Http, 3 = Monitor
 	GeolocationLatitude   float64 `json:"GeolocationLatitude"`
 	GeolocationLongitude  float64 `json:"GeolocationLongitude"`
-	LatencyZone           string  `json:"LatencyZone"`
+	LatencyZone           *string `json:"LatencyZone"`
 	SmartRoutingType      int     `json:"SmartRoutingType"` // 0 = None, 1 = Latency, 2 = Geolocation
 	Disabled              bool    `json:"Disabled"`
 	Comment               string  `json:"Comment"`
