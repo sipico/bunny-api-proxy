@@ -1,4 +1,4 @@
-.PHONY: test coverage lint tidy build setup install-hooks
+.PHONY: test coverage lint tidy build setup install-hooks fmt fmt-check pre-commit-check
 
 # Run tests with coverage
 test:
@@ -17,6 +17,34 @@ tidy:
 	go mod tidy
 	git diff --exit-code go.mod go.sum
 
+# Format all Go code
+fmt:
+	@echo "Formatting Go code..."
+	@gofmt -w .
+	@echo "Code formatted successfully!"
+
+# Check if code is formatted (use before committing)
+fmt-check:
+	@echo "Checking code formatting..."
+	@if [ -n "$$(gofmt -l .)" ]; then \
+		echo "❌ Unformatted files found:"; \
+		gofmt -l .; \
+		echo "Run 'make fmt' to fix formatting"; \
+		exit 1; \
+	fi
+	@echo "✅ All code is properly formatted!"
+
+# Run all pre-commit checks (format, lint, tidy, test)
+pre-commit-check: fmt-check
+	@echo "Running linter..."
+	@golangci-lint run
+	@echo "Checking go.mod/go.sum..."
+	@go mod tidy && git diff --exit-code go.mod go.sum
+	@echo "Running tests..."
+	@go test -race ./...
+	@echo ""
+	@echo "✅ All pre-commit checks passed! Safe to commit."
+
 # Build binary
 build:
 	go build -o bunny-api-proxy ./cmd/bunny-api-proxy
@@ -27,5 +55,8 @@ setup: install-hooks
 
 # Install git hooks via lefthook
 install-hooks:
+	@echo "Installing lefthook..."
+	@go install github.com/evilmartians/lefthook@latest
 	@echo "Installing git hooks..."
-	@go tool lefthook install
+	@$(shell go env GOPATH)/bin/lefthook install
+	@echo "Git hooks installed successfully!"
