@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -1645,4 +1646,109 @@ func TestImportRecords(t *testing.T) {
 			t.Errorf("expected parse error message, got %v", err)
 		}
 	})
+}
+
+func TestExportRecords(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		zoneID     int64
+		handler    http.HandlerFunc
+		wantBody   string
+		wantErr    bool
+		wantErrMsg string
+	}{
+		{
+			name:   "successful export",
+			zoneID: 1,
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != http.MethodGet {
+					t.Errorf("expected GET, got %s", r.Method)
+				}
+				if r.Header.Get("AccessKey") != "test-key" {
+					t.Errorf("missing AccessKey header")
+				}
+				w.Header().Set("Content-Type", "text/plain")
+				w.WriteHeader(http.StatusOK)
+				w.Write([]byte(";; Zone: example.com\n@ 300 IN A 192.168.1.1\n"))
+			},
+			wantBody: ";; Zone: example.com\n@ 300 IN A 192.168.1.1\n",
+		},
+		{
+			name:   "zone not found",
+			zoneID: 999,
+			handler: func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(http.StatusNotFound)
+			},
+			wantErr:    true,
+			wantErrMsg: "not found",
+		},
+		{
+			name:   "unauthorized",
+			zoneID: 1,
+			handler: func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(http.StatusUnauthorized)
+			},
+			wantErr:    true,
+			wantErrMsg: "unauthorized",
+		},
+		{
+			name:   "server error",
+			zoneID: 1,
+			handler: func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(http.StatusBadRequest)
+				w.Write([]byte(`{"Message":"bad request"}`))
+			},
+			wantErr:    true,
+			wantErrMsg: "bad request",
+		},
+		{
+			name:   "context canceled",
+			zoneID: 1,
+			handler: func(w http.ResponseWriter, _ *http.Request) {
+				// Won't be reached because context is canceled
+				w.WriteHeader(http.StatusOK)
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ts := httptest.NewServer(tt.handler)
+			defer ts.Close()
+
+			client := NewClient("test-key", WithBaseURL(ts.URL))
+
+			ctx := context.Background()
+			if tt.name == "context canceled" {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithCancel(ctx)
+				cancel()
+			}
+
+			result, err := client.ExportRecords(ctx, tt.zoneID)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				if tt.wantErrMsg != "" && !strings.Contains(err.Error(), tt.wantErrMsg) {
+					t.Errorf("expected error containing %q, got %q", tt.wantErrMsg, err.Error())
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if result != tt.wantBody {
+				t.Errorf("expected body %q, got %q", tt.wantBody, result)
+			}
+		})
+	}
 }

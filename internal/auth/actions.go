@@ -21,6 +21,7 @@ var (
 	deleteRecordPattern      = regexp.MustCompile(`^/dnszone/(\d+)/records/(\d+)/?$`)
 	checkAvailabilityPattern = regexp.MustCompile(`^/dnszone/checkavailability/?$`)
 	importRecordsPattern     = regexp.MustCompile(`^/dnszone/(\d+)/import/?$`)
+	exportRecordsPattern     = regexp.MustCompile(`^/dnszone/(\d+)/export/?$`)
 )
 
 // ParseRequest extracts action, zone ID, and record type from HTTP request.
@@ -70,6 +71,14 @@ func ParseRequest(r *http.Request) (*Request, error) {
 				zoneID, _ := strconv.ParseInt(matches[1], 10, 64) //nolint:errcheck // regex ensures valid number
 				return &Request{Action: ActionUpdateZone, ZoneID: zoneID}, nil
 			}
+		}
+	}
+
+	// GET /dnszone/{id}/export - export records (admin only)
+	if r.Method == http.MethodGet {
+		if matches := exportRecordsPattern.FindStringSubmatch(path); matches != nil {
+			zoneID, _ := strconv.ParseInt(matches[1], 10, 64) //nolint:errcheck // regex ensures valid number
+			return &Request{Action: ActionExportRecords, ZoneID: zoneID}, nil
 		}
 	}
 

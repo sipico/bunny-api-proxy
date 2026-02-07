@@ -3,6 +3,7 @@ package mockbunny
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"testing"
@@ -1654,6 +1655,101 @@ func TestHandleImportRecords_InvalidZoneID(t *testing.T) {
 	resp, err := client.Do(req)
 	if err != nil {
 		t.Fatalf("failed to import records: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d", http.StatusBadRequest, resp.StatusCode)
+	}
+}
+
+func TestHandleExportRecords_Success(t *testing.T) {
+	t.Parallel()
+	s := New()
+	defer s.Close()
+
+	records := []Record{
+		{Type: 0, Name: "@", Value: "192.168.1.1", TTL: 300},
+		{Type: 3, Name: "test", Value: "hello world", TTL: 60},
+	}
+	id := s.AddZoneWithRecords("example.com", records)
+
+	resp, err := http.Get(fmt.Sprintf("%s/dnszone/%d/export", s.URL(), id))
+	if err != nil {
+		t.Fatalf("failed to export records: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected status %d, got %d", http.StatusOK, resp.StatusCode)
+	}
+
+	ct := resp.Header.Get("Content-Type")
+	if ct != "text/plain; charset=utf-8" {
+		t.Errorf("expected Content-Type text/plain; charset=utf-8, got %s", ct)
+	}
+
+	body, _ := io.ReadAll(resp.Body)
+	bodyStr := string(body)
+	if !strings.Contains(bodyStr, "example.com") {
+		t.Errorf("expected body to contain zone name, got: %s", bodyStr)
+	}
+	if !strings.Contains(bodyStr, "192.168.1.1") {
+		t.Errorf("expected body to contain A record value, got: %s", bodyStr)
+	}
+	if !strings.Contains(bodyStr, "hello world") {
+		t.Errorf("expected body to contain TXT record value, got: %s", bodyStr)
+	}
+}
+
+func TestHandleExportRecords_ZoneNotFound(t *testing.T) {
+	t.Parallel()
+	s := New()
+	defer s.Close()
+
+	resp, err := http.Get(fmt.Sprintf("%s/dnszone/%d/export", s.URL(), 99999))
+	if err != nil {
+		t.Fatalf("failed to export records: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("expected status %d, got %d", http.StatusNotFound, resp.StatusCode)
+	}
+}
+
+func TestHandleExportRecords_EmptyZone(t *testing.T) {
+	t.Parallel()
+	s := New()
+	defer s.Close()
+
+	id := s.AddZone("empty.com")
+
+	resp, err := http.Get(fmt.Sprintf("%s/dnszone/%d/export", s.URL(), id))
+	if err != nil {
+		t.Fatalf("failed to export records: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected status %d, got %d", http.StatusOK, resp.StatusCode)
+	}
+
+	body, _ := io.ReadAll(resp.Body)
+	bodyStr := string(body)
+	if !strings.Contains(bodyStr, "empty.com") {
+		t.Errorf("expected body to contain zone name, got: %s", bodyStr)
+	}
+}
+
+func TestHandleExportRecords_InvalidZoneID(t *testing.T) {
+	t.Parallel()
+	s := New()
+	defer s.Close()
+
+	resp, err := http.Get(fmt.Sprintf("%s/dnszone/abc/export", s.URL()))
+	if err != nil {
+		t.Fatalf("failed to export records: %v", err)
 	}
 	defer resp.Body.Close()
 

@@ -543,6 +543,75 @@ func (s *Server) handleImportRecords(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// handleExportRecords handles GET /dnszone/{id}/export to export DNS records.
+func (s *Server) handleExportRecords(w http.ResponseWriter, r *http.Request) {
+	idStr := chi.URLParam(r, "id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		http.Error(w, "invalid zone ID", http.StatusBadRequest)
+		return
+	}
+
+	s.state.mu.RLock()
+	zone, ok := s.state.zones[id]
+	s.state.mu.RUnlock()
+
+	if !ok {
+		s.writeError(w, http.StatusNotFound, "dnszone.zone.not_found", "Id", "The requested DNS zone was not found")
+		return
+	}
+
+	// Build BIND zone file format
+	s.state.mu.RLock()
+	defer s.state.mu.RUnlock()
+
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf(";; Zone: %s\n", zone.Domain))
+	for _, rec := range zone.Records {
+		typeName := recordTypeName(rec.Type)
+		sb.WriteString(fmt.Sprintf("%s\t%d\tIN\t%s\t%s\n", rec.Name, rec.TTL, typeName, rec.Value))
+	}
+
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	//nolint:errcheck
+	w.Write([]byte(sb.String()))
+}
+
+// recordTypeName converts a record type integer to its DNS name.
+func recordTypeName(t int) string {
+	switch t {
+	case 0:
+		return "A"
+	case 1:
+		return "AAAA"
+	case 2:
+		return "CNAME"
+	case 3:
+		return "TXT"
+	case 4:
+		return "MX"
+	case 5:
+		return "SPF"
+	case 6:
+		return "REDIRECT"
+	case 7:
+		return "PULLZONE"
+	case 8:
+		return "SRV"
+	case 9:
+		return "CAA"
+	case 10:
+		return "PTR"
+	case 11:
+		return "SCRIPT"
+	case 12:
+		return "NS"
+	default:
+		return "UNKNOWN"
+	}
+}
+
 // writeJSON writes a JSON response with correct Content-Type and no trailing newline.
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	//nolint:errcheck
