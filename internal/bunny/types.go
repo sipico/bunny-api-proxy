@@ -102,3 +102,15 @@ type ListZonesOptions struct {
 type CreateZoneRequest struct {
 	Domain string `json:"Domain"`
 }
+
+// UpdateZoneRequest represents the request body for updating a DNS zone.
+type UpdateZoneRequest struct {
+	CustomNameserversEnabled      *bool   `json:"CustomNameserversEnabled,omitempty"`
+	Nameserver1                   *string `json:"Nameserver1,omitempty"`
+	Nameserver2                   *string `json:"Nameserver2,omitempty"`
+	SoaEmail                      *string `json:"SoaEmail,omitempty"`
+	LoggingEnabled                *bool   `json:"LoggingEnabled,omitempty"`
+	LogAnonymizationType          *int    `json:"LogAnonymizationType,omitempty"`
+	CertificateKeyType            *int    `json:"CertificateKeyType,omitempty"`
+	LoggingIPAnonymizationEnabled *bool   `json:"LoggingIPAnonymizationEnabled,omitempty"`
+}

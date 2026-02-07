@@ -1303,3 +1303,161 @@ func TestCreateZone_NoVaryHeader(t *testing.T) {
 		t.Errorf("expected Vary header to be absent on POST, got '%s'", varyHeader)
 	}
 }
+
+// TestHandleUpdateZone_Success tests successful zone update
+func TestHandleUpdateZone_Success(t *testing.T) {
+	t.Parallel()
+	s := New()
+	defer s.Close()
+
+	// Create a zone first
+	zoneID := s.AddZone("example.com")
+
+	// Update the zone
+	reqBody := strings.NewReader(`{"Nameserver1":"new.ns1.bunny.net","LoggingEnabled":true}`)
+	req, _ := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/dnszone/%d", s.URL(), zoneID), reqBody)
+	req.Header.Set("Content-Type", "application/json")
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("failed to update zone: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// Verify 200 OK
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected status %d, got %d", http.StatusOK, resp.StatusCode)
+	}
+
+	// Parse response and verify updates
+	var zone Zone
+	if err := json.NewDecoder(resp.Body).Decode(&zone); err != nil {
+		t.Fatalf("failed to decode zone: %v", err)
+	}
+
+	if zone.ID != zoneID {
+		t.Errorf("expected zone ID %d, got %d", zoneID, zone.ID)
+	}
+
+	if zone.Nameserver1 != "new.ns1.bunny.net" {
+		t.Errorf("expected Nameserver1 to be updated, got %s", zone.Nameserver1)
+	}
+
+	if !zone.LoggingEnabled {
+		t.Error("expected LoggingEnabled to be true")
+	}
+}
+
+// TestHandleUpdateZone_NotFound tests updating non-existent zone
+func TestHandleUpdateZone_NotFound(t *testing.T) {
+	t.Parallel()
+	s := New()
+	defer s.Close()
+
+	// Try to update non-existent zone
+	reqBody := strings.NewReader(`{"LoggingEnabled":true}`)
+	req, _ := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/dnszone/999", s.URL()), reqBody)
+	req.Header.Set("Content-Type", "application/json")
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("failed to update zone: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("expected status %d, got %d", http.StatusNotFound, resp.StatusCode)
+	}
+}
+
+// TestHandleUpdateZone_InvalidID tests updating with invalid zone ID
+func TestHandleUpdateZone_InvalidID(t *testing.T) {
+	t.Parallel()
+	s := New()
+	defer s.Close()
+
+	// Try to update with invalid zone ID
+	reqBody := strings.NewReader(`{"LoggingEnabled":true}`)
+	req, _ := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/dnszone/invalid", s.URL()), reqBody)
+	req.Header.Set("Content-Type", "application/json")
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("failed to update zone: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d", http.StatusBadRequest, resp.StatusCode)
+	}
+}
+
+// TestHandleUpdateZone_InvalidBody tests updating with invalid JSON body
+func TestHandleUpdateZone_InvalidBody(t *testing.T) {
+	t.Parallel()
+	s := New()
+	defer s.Close()
+
+	// Create a zone first
+	zoneID := s.AddZone("example.com")
+
+	// Try to update with invalid JSON
+	reqBody := strings.NewReader(`invalid json`)
+	req, _ := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/dnszone/%d", s.URL(), zoneID), reqBody)
+	req.Header.Set("Content-Type", "application/json")
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("failed to update zone: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d", http.StatusBadRequest, resp.StatusCode)
+	}
+}
+
+// TestHandleUpdateZone_PartialUpdate tests that only specified fields are updated
+func TestHandleUpdateZone_PartialUpdate(t *testing.T) {
+	t.Parallel()
+	s := New()
+	defer s.Close()
+
+	// Create a zone
+	zoneID := s.AddZone("example.com")
+
+	// Get the original zone
+	resp, err := http.Get(fmt.Sprintf("%s/dnszone/%d", s.URL(), zoneID))
+	if err != nil {
+		t.Fatalf("failed to get zone: %v", err)
+	}
+	var originalZone Zone
+	json.NewDecoder(resp.Body).Decode(&originalZone)
+	resp.Body.Close()
+
+	originalNS2 := originalZone.Nameserver2
+
+	// Update only Nameserver1
+	reqBody := strings.NewReader(`{"Nameserver1":"updated.ns1.bunny.net"}`)
+	req, _ := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/dnszone/%d", s.URL(), zoneID), reqBody)
+	req.Header.Set("Content-Type", "application/json")
+	client := &http.Client{}
+	resp, err = client.Do(req)
+	if err != nil {
+		t.Fatalf("failed to update zone: %v", err)
+	}
+	defer resp.Body.Close()
+
+	var updatedZone Zone
+	json.NewDecoder(resp.Body).Decode(&updatedZone)
+
+	// Verify only Nameserver1 was updated
+	if updatedZone.Nameserver1 != "updated.ns1.bunny.net" {
+		t.Errorf("expected Nameserver1 to be updated, got %s", updatedZone.Nameserver1)
+	}
+
+	// Verify Nameserver2 was NOT changed
+	if updatedZone.Nameserver2 != originalNS2 {
+		t.Errorf("expected Nameserver2 to remain unchanged, got %s (expected %s)", updatedZone.Nameserver2, originalNS2)
+	}
+}

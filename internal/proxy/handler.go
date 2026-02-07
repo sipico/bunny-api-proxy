@@ -28,6 +28,8 @@ type BunnyClient interface {
 
 	// DeleteZone deletes a DNS zone by ID.
 	DeleteZone(ctx context.Context, id int64) error
+	// UpdateZone updates zone-level settings.
+	UpdateZone(ctx context.Context, id int64, req *bunny.UpdateZoneRequest) (*bunny.Zone, error)
 
 	// AddRecord creates a new DNS record in the specified zone.
 	AddRecord(ctx context.Context, zoneID int64, req *bunny.AddRecordRequest) (*bunny.Record, error)
@@ -273,6 +275,38 @@ func (h *Handler) HandleDeleteZone(w http.ResponseWriter, r *http.Request) {
 
 	// Return successful response (204 No Content)
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// HandleUpdateZone updates zone-level settings.
+// POST /dnszone/{zoneID}
+// Admin only — zone settings are sensitive operations.
+func (h *Handler) HandleUpdateZone(w http.ResponseWriter, r *http.Request) {
+	zoneIDStr := chi.URLParam(r, "zoneID")
+	if zoneIDStr == "" {
+		writeError(w, http.StatusBadRequest, "missing zone ID")
+		return
+	}
+
+	zoneID, err := strconv.ParseInt(zoneIDStr, 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid zone ID")
+		return
+	}
+
+	var req bunny.UpdateZoneRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	zone, err := h.client.UpdateZone(r.Context(), zoneID, &req)
+	if err != nil {
+		handleBunnyError(w, err)
+		return
+	}
+
+	h.logger.Info("update zone", "zone_id", zoneID)
+	writeJSON(w, http.StatusOK, zone)
 }
 
 // HandleListRecords lists all DNS records for a zone.

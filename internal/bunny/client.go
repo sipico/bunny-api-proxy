@@ -405,6 +405,52 @@ func (c *Client) DeleteZone(ctx context.Context, id int64) error {
 
 	// Use generic error parser for all other cases (including 401)
 	return parseError(resp.StatusCode, body)
+
+}
+
+// UpdateZone updates zone-level settings.
+func (c *Client) UpdateZone(ctx context.Context, id int64, req *UpdateZoneRequest) (*Zone, error) {
+	url := fmt.Sprintf("%s/dnszone/%d", c.baseURL, id)
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	httpReq.Header.Set("AccessKey", c.apiKey)
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update zone: %w", err)
+	}
+	defer func() {
+		//nolint:errcheck
+		resp.Body.Close()
+	}()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	if resp.StatusCode == http.StatusOK {
+		var zone Zone
+		if err := json.Unmarshal(respBody, &zone); err != nil {
+			return nil, fmt.Errorf("failed to parse zone: %w", err)
+		}
+		return &zone, nil
+	}
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, ErrNotFound
+	}
+
+	return nil, parseError(resp.StatusCode, respBody)
 }
 
 // parseError parses API error responses and returns an appropriate error.

@@ -3,6 +3,8 @@ package proxy
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -779,5 +781,173 @@ func TestIntegration_ListRecords_FilteredRecordTypes(t *testing.T) {
 		if record.Type != 0 && record.Type != 3 {
 			t.Errorf("unexpected record type %d in filtered records", record.Type)
 		}
+	}
+}
+
+// hashTokenForTest hashes a token using SHA256 (same as storage.hashToken)
+func hashTokenForTest(token string) string {
+	h := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(h[:])
+}
+
+// TestIntegration_UpdateZone_AdminOnly tests that UpdateZone endpoint requires admin token
+func TestIntegration_UpdateZone_AdminOnly(t *testing.T) {
+	t.Parallel()
+
+	// Setup bunny mock server
+	mockServer := mockbunny.New()
+	defer mockServer.Close()
+
+	zoneID := mockServer.AddZone("example.com")
+
+	// Setup proxy with mock bunny client
+	bunnyClient := bunny.NewClient("test-api-key", bunny.WithBaseURL(mockServer.URL()))
+	proxyHandler := NewHandler(bunnyClient, testLogger())
+
+	// Create storage
+	db, err := storage.New(":memory:")
+	if err != nil {
+		t.Fatalf("failed to create storage: %v", err)
+	}
+
+	// Initialize bootstrap service
+	bootstrapService := auth.NewBootstrapService(db, "master-key")
+
+	// Create admin token
+	_, err = db.CreateAdminToken(context.Background(), "Admin Key", "admin-test-key")
+	if err != nil {
+		t.Fatalf("failed to create admin token: %v", err)
+	}
+
+	// Create non-admin token for testing forbidden access
+	nonAdminHash := hashTokenForTest("non-admin-key")
+	_, err = db.CreateToken(context.Background(), "Non-Admin Key", false, nonAdminHash)
+	if err != nil {
+		t.Fatalf("failed to create non-admin token: %v", err)
+	}
+
+	// Create authenticator
+	authenticator := auth.NewAuthenticator(db, bootstrapService)
+	authMiddleware := func(next http.Handler) http.Handler {
+		return authenticator.Authenticate(authenticator.CheckPermissions(next))
+	}
+	proxyRouter := NewRouter(proxyHandler, authMiddleware, testLogger())
+
+	// Test 1: Update with admin token should succeed
+	updateBody := []byte(`{"LoggingEnabled":true}`)
+	req := httptest.NewRequest("POST", fmt.Sprintf("/dnszone/%d", zoneID), bytes.NewReader(updateBody))
+	req.Header.Set("AccessKey", "admin-test-key")
+	w := httptest.NewRecorder()
+
+	proxyRouter.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status 200 with admin token, got %d (body: %s)", w.Code, w.Body.String())
+	}
+
+	// Test 2: Update with non-admin token should fail with 403 admin_required
+	req = httptest.NewRequest("POST", fmt.Sprintf("/dnszone/%d", zoneID), bytes.NewReader(updateBody))
+	req.Header.Set("AccessKey", "non-admin-key")
+	w = httptest.NewRecorder()
+
+	proxyRouter.ServeHTTP(w, req)
+
+	if w.Code != http.StatusForbidden {
+		t.Errorf("expected status 403 with non-admin token, got %d (body: %s)", w.Code, w.Body.String())
+	}
+
+	// Verify error response
+	var errorResp map[string]string
+	if err := json.NewDecoder(w.Body).Decode(&errorResp); err == nil {
+		if errorResp["error"] != "admin_required" {
+			t.Errorf("expected error 'admin_required', got %q", errorResp["error"])
+		}
+	}
+
+	// Test 3: Update with invalid token should fail with 401
+	req = httptest.NewRequest("POST", fmt.Sprintf("/dnszone/%d", zoneID), bytes.NewReader(updateBody))
+	req.Header.Set("AccessKey", "invalid-token")
+	w = httptest.NewRecorder()
+
+	proxyRouter.ServeHTTP(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("expected status 401 with invalid token, got %d", w.Code)
+	}
+}
+
+// TestIntegration_UpdateZone_Success tests successful zone update
+func TestIntegration_UpdateZone_Success(t *testing.T) {
+	t.Parallel()
+
+	// Setup bunny mock server
+	mockServer := mockbunny.New()
+	defer mockServer.Close()
+
+	zoneID := mockServer.AddZone("example.com")
+
+	// Setup proxy with mock bunny client
+	bunnyClient := bunny.NewClient("test-api-key", bunny.WithBaseURL(mockServer.URL()))
+	proxyHandler := NewHandler(bunnyClient, testLogger())
+
+	// Create storage with admin token
+	db, err := storage.New(":memory:")
+	if err != nil {
+		t.Fatalf("failed to create storage: %v", err)
+	}
+
+	// Initialize bootstrap service
+	bootstrapService := auth.NewBootstrapService(db, "master-key")
+
+	// Create admin token
+	_, err = db.CreateAdminToken(context.Background(), "Admin Key", "admin-test-key")
+	if err != nil {
+		t.Fatalf("failed to create admin token: %v", err)
+	}
+
+	// Create authenticator
+	authenticator := auth.NewAuthenticator(db, bootstrapService)
+	authMiddleware := func(next http.Handler) http.Handler {
+		return authenticator.Authenticate(authenticator.CheckPermissions(next))
+	}
+	proxyRouter := NewRouter(proxyHandler, authMiddleware, testLogger())
+
+	// Update zone settings
+	updateBody := []byte(`{
+		"LoggingEnabled": true,
+		"SoaEmail": "admin@example.com",
+		"Nameserver1": "updated.ns1.bunny.net"
+	}`)
+	req := httptest.NewRequest("POST", fmt.Sprintf("/dnszone/%d", zoneID), bytes.NewReader(updateBody))
+	req.Header.Set("AccessKey", "admin-test-key")
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	proxyRouter.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status 200, got %d (body: %s)", w.Code, w.Body.String())
+	}
+
+	// Verify response
+	var zone bunny.Zone
+	if err := json.NewDecoder(w.Body).Decode(&zone); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if zone.ID != zoneID {
+		t.Errorf("expected zone ID %d, got %d", zoneID, zone.ID)
+	}
+
+	if !zone.LoggingEnabled {
+		t.Error("expected LoggingEnabled to be true")
+	}
+
+	if zone.SoaEmail != "admin@example.com" {
+		t.Errorf("expected SoaEmail 'admin@example.com', got %q", zone.SoaEmail)
+	}
+
+	if zone.Nameserver1 != "updated.ns1.bunny.net" {
+		t.Errorf("expected Nameserver1 'updated.ns1.bunny.net', got %q", zone.Nameserver1)
 	}
 }

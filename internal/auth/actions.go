@@ -15,6 +15,7 @@ import (
 var (
 	listZonesPattern    = regexp.MustCompile(`^/dnszone/?$`)
 	getZonePattern      = regexp.MustCompile(`^/dnszone/(\d+)/?$`)
+	updateZonePattern   = regexp.MustCompile(`^/dnszone/(\d+)/?$`)
 	recordsPattern      = regexp.MustCompile(`^/dnszone/(\d+)/records/?$`)
 	updateRecordPattern = regexp.MustCompile(`^/dnszone/(\d+)/records/(\d+)/?$`)
 	deleteRecordPattern = regexp.MustCompile(`^/dnszone/(\d+)/records/(\d+)/?$`)
@@ -42,6 +43,22 @@ func ParseRequest(r *http.Request) (*Request, error) {
 		matches := recordsPattern.FindStringSubmatch(path)
 		zoneID, _ := strconv.ParseInt(matches[1], 10, 64) //nolint:errcheck // regex ensures valid number
 		return &Request{Action: ActionListRecords, ZoneID: zoneID}, nil
+	}
+
+	// POST /dnszone - create zone
+	if r.Method == http.MethodPost && listZonesPattern.MatchString(path) {
+		return &Request{Action: ActionCreateZone}, nil
+	}
+
+	// POST /dnszone/{id} - update zone (admin only, no permission checking needed)
+	if r.Method == http.MethodPost {
+		if matches := updateZonePattern.FindStringSubmatch(path); matches != nil {
+			// Check if this is the update zone pattern (not followed by /records)
+			if !recordsPattern.MatchString(path) {
+				zoneID, _ := strconv.ParseInt(matches[1], 10, 64) //nolint:errcheck // regex ensures valid number
+				return &Request{Action: ActionUpdateZone, ZoneID: zoneID}, nil
+			}
+		}
 	}
 
 	// POST /dnszone/{id}/records - add record

@@ -394,6 +394,76 @@ func (s *Server) handleDeleteZone(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// handleUpdateZone handles POST /dnszone/{id} to update zone-level settings.
+// Returns 200 OK with updated zone, 404 if zone not found, 400 for invalid zone ID.
+func (s *Server) handleUpdateZone(w http.ResponseWriter, r *http.Request) {
+	// Parse zone ID from URL
+	idStr := chi.URLParam(r, "id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		http.Error(w, "invalid zone ID", http.StatusBadRequest)
+		return
+	}
+
+	// Parse request body
+	var req struct {
+		CustomNameserversEnabled      *bool   `json:"CustomNameserversEnabled,omitempty"`
+		Nameserver1                   *string `json:"Nameserver1,omitempty"`
+		Nameserver2                   *string `json:"Nameserver2,omitempty"`
+		SoaEmail                      *string `json:"SoaEmail,omitempty"`
+		LoggingEnabled                *bool   `json:"LoggingEnabled,omitempty"`
+		LogAnonymizationType          *int    `json:"LogAnonymizationType,omitempty"`
+		CertificateKeyType            *int    `json:"CertificateKeyType,omitempty"`
+		LoggingIPAnonymizationEnabled *bool   `json:"LoggingIPAnonymizationEnabled,omitempty"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	s.state.mu.Lock()
+	defer s.state.mu.Unlock()
+
+	// Find zone
+	zone, ok := s.state.zones[id]
+	if !ok {
+		s.writeError(w, http.StatusNotFound, "dnszone.zone.not_found", "Id", "The requested DNS zone was not found")
+		return
+	}
+
+	// Apply updates to non-nil fields
+	if req.CustomNameserversEnabled != nil {
+		zone.CustomNameserversEnabled = *req.CustomNameserversEnabled
+	}
+	if req.Nameserver1 != nil {
+		zone.Nameserver1 = *req.Nameserver1
+	}
+	if req.Nameserver2 != nil {
+		zone.Nameserver2 = *req.Nameserver2
+	}
+	if req.SoaEmail != nil {
+		zone.SoaEmail = *req.SoaEmail
+	}
+	if req.LoggingEnabled != nil {
+		zone.LoggingEnabled = *req.LoggingEnabled
+	}
+	if req.LogAnonymizationType != nil {
+		zone.LogAnonymizationType = *req.LogAnonymizationType
+	}
+	if req.CertificateKeyType != nil {
+		zone.CertificateKeyType = *req.CertificateKeyType
+	}
+	if req.LoggingIPAnonymizationEnabled != nil {
+		zone.LoggingIPAnonymization = *req.LoggingIPAnonymizationEnabled
+	}
+
+	// Update modification time
+	zone.DateModified = MockBunnyTime{Time: time.Now().UTC()}
+
+	// Return updated zone
+	writeJSON(w, http.StatusOK, zone)
+}
+
 // writeJSON writes a JSON response with correct Content-Type and no trailing newline.
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	//nolint:errcheck
