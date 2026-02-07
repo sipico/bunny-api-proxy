@@ -1361,3 +1361,144 @@ func TestUpdateZone(t *testing.T) {
 		}
 	})
 }
+
+// TestCheckZoneAvailability tests the CheckZoneAvailability method with various scenarios.
+func TestCheckZoneAvailability(t *testing.T) {
+	t.Parallel()
+	t.Run("available domain", func(t *testing.T) {
+		t.Parallel()
+		server := mockbunny.New()
+		defer server.Close()
+
+		client := NewClient("test-key", WithBaseURL(server.URL()))
+		result, err := client.CheckZoneAvailability(context.Background(), "available.com")
+
+		if err != nil {
+			t.Fatalf("CheckZoneAvailability failed: %v", err)
+		}
+
+		if result == nil {
+			t.Fatal("expected non-nil result")
+		}
+
+		if !result.Available {
+			t.Error("expected Available to be true for non-existing domain")
+		}
+	})
+
+	t.Run("unavailable domain", func(t *testing.T) {
+		t.Parallel()
+		server := mockbunny.New()
+		defer server.Close()
+
+		server.AddZone("existing.com")
+
+		client := NewClient("test-key", WithBaseURL(server.URL()))
+		result, err := client.CheckZoneAvailability(context.Background(), "existing.com")
+
+		if err != nil {
+			t.Fatalf("CheckZoneAvailability failed: %v", err)
+		}
+
+		if result == nil {
+			t.Fatal("expected non-nil result")
+		}
+
+		if result.Available {
+			t.Error("expected Available to be false for existing domain")
+		}
+	})
+
+	t.Run("unauthorized error (401)", func(t *testing.T) {
+		t.Parallel()
+		transport := &mockTransport{
+			statusCode: http.StatusUnauthorized,
+			body:       []byte(""),
+		}
+		httpClient := &http.Client{Transport: transport}
+
+		client := NewClient("test-key", WithHTTPClient(httpClient))
+		result, err := client.CheckZoneAvailability(context.Background(), "example.com")
+
+		if err != ErrUnauthorized {
+			t.Errorf("expected ErrUnauthorized, got %v", err)
+		}
+
+		if result != nil {
+			t.Errorf("expected nil result, got %v", result)
+		}
+	})
+
+	t.Run("bad request error (400)", func(t *testing.T) {
+		t.Parallel()
+		transport := &mockTransport{
+			statusCode: http.StatusBadRequest,
+			body:       []byte(`{"ErrorKey":"BadRequest","Message":"Invalid domain"}`),
+		}
+		httpClient := &http.Client{Transport: transport}
+
+		client := NewClient("test-key", WithHTTPClient(httpClient))
+		result, err := client.CheckZoneAvailability(context.Background(), "invalid")
+
+		if err == nil {
+			t.Fatal("expected error for 400 response")
+		}
+
+		if result != nil {
+			t.Errorf("expected nil result, got %v", result)
+		}
+
+		apiErr, ok := err.(*APIError)
+		if !ok {
+			t.Fatalf("expected *APIError, got %T", err)
+		}
+
+		if apiErr.StatusCode != http.StatusBadRequest {
+			t.Errorf("expected status 400, got %d", apiErr.StatusCode)
+		}
+	})
+
+	t.Run("context cancellation", func(t *testing.T) {
+		t.Parallel()
+		server := mockbunny.New()
+		defer server.Close()
+
+		client := NewClient("test-key", WithBaseURL(server.URL()))
+
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		result, err := client.CheckZoneAvailability(ctx, "example.com")
+
+		if err == nil {
+			t.Error("expected error with cancelled context")
+		}
+		if result != nil {
+			t.Error("expected nil result on error")
+		}
+	})
+
+	t.Run("malformed response body", func(t *testing.T) {
+		t.Parallel()
+		transport := &mockTransport{
+			statusCode: http.StatusOK,
+			body:       []byte("not valid json"),
+		}
+		httpClient := &http.Client{Transport: transport}
+
+		client := NewClient("test-key", WithHTTPClient(httpClient))
+		result, err := client.CheckZoneAvailability(context.Background(), "example.com")
+
+		if err == nil {
+			t.Fatal("expected error for malformed JSON")
+		}
+
+		if result != nil {
+			t.Errorf("expected nil result, got %v", result)
+		}
+
+		if !strings.Contains(err.Error(), "parse") {
+			t.Errorf("expected parse error message, got %v", err)
+		}
+	})
+}

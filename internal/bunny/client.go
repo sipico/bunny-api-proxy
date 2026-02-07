@@ -453,6 +453,48 @@ func (c *Client) UpdateZone(ctx context.Context, id int64, req *UpdateZoneReques
 	return nil, parseError(resp.StatusCode, respBody)
 }
 
+// CheckZoneAvailability checks if a domain name is available to be added as a DNS zone.
+func (c *Client) CheckZoneAvailability(ctx context.Context, name string) (*CheckAvailabilityResponse, error) {
+	url := fmt.Sprintf("%s/dnszone/checkavailability", c.baseURL)
+
+	reqBody := &CheckAvailabilityRequest{Name: name}
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	httpReq.Header.Set("AccessKey", c.apiKey)
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check availability: %w", err)
+	}
+	defer func() {
+		//nolint:errcheck
+		resp.Body.Close()
+	}()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	if resp.StatusCode == http.StatusOK {
+		var result CheckAvailabilityResponse
+		if err := json.Unmarshal(respBody, &result); err != nil {
+			return nil, fmt.Errorf("failed to parse response: %w", err)
+		}
+		return &result, nil
+	}
+
+	return nil, parseError(resp.StatusCode, respBody)
+}
+
 // parseError parses API error responses and returns an appropriate error.
 func parseError(statusCode int, body []byte) error {
 	switch statusCode {

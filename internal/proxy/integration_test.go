@@ -951,3 +951,134 @@ func TestIntegration_UpdateZone_Success(t *testing.T) {
 		t.Errorf("expected Nameserver1 'updated.ns1.bunny.net', got %q", zone.Nameserver1)
 	}
 }
+
+// TestIntegration_CheckAvailability_AdminOnly tests that CheckAvailability requires admin token
+func TestIntegration_CheckAvailability_AdminOnly(t *testing.T) {
+	t.Parallel()
+
+	mockServer := mockbunny.New()
+	defer mockServer.Close()
+
+	bunnyClient := bunny.NewClient("test-api-key", bunny.WithBaseURL(mockServer.URL()))
+	proxyHandler := NewHandler(bunnyClient, testLogger())
+
+	db, err := storage.New(":memory:")
+	if err != nil {
+		t.Fatalf("failed to create storage: %v", err)
+	}
+
+	bootstrapService := auth.NewBootstrapService(db, "master-key")
+
+	_, err = db.CreateAdminToken(context.Background(), "Admin Key", "admin-test-key")
+	if err != nil {
+		t.Fatalf("failed to create admin token: %v", err)
+	}
+
+	nonAdminHash := hashTokenForTest("non-admin-key")
+	_, err = db.CreateToken(context.Background(), "Non-Admin Key", false, nonAdminHash)
+	if err != nil {
+		t.Fatalf("failed to create non-admin token: %v", err)
+	}
+
+	authenticator := auth.NewAuthenticator(db, bootstrapService)
+	authMiddleware := func(next http.Handler) http.Handler {
+		return authenticator.Authenticate(authenticator.CheckPermissions(next))
+	}
+	proxyRouter := NewRouter(proxyHandler, authMiddleware, testLogger())
+
+	// Test 1: Admin token should succeed
+	reqBody := []byte(`{"Name":"available-domain.com"}`)
+	req := httptest.NewRequest("POST", "/dnszone/checkavailability", bytes.NewReader(reqBody))
+	req.Header.Set("AccessKey", "admin-test-key")
+	w := httptest.NewRecorder()
+
+	proxyRouter.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status 200 with admin token, got %d (body: %s)", w.Code, w.Body.String())
+	}
+
+	// Verify response
+	var result bunny.CheckAvailabilityResponse
+	if err := json.NewDecoder(w.Body).Decode(&result); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if !result.Available {
+		t.Error("expected domain to be available")
+	}
+
+	// Test 2: Non-admin token should fail with 403
+	req = httptest.NewRequest("POST", "/dnszone/checkavailability", bytes.NewReader(reqBody))
+	req.Header.Set("AccessKey", "non-admin-key")
+	w = httptest.NewRecorder()
+
+	proxyRouter.ServeHTTP(w, req)
+
+	if w.Code != http.StatusForbidden {
+		t.Errorf("expected status 403 with non-admin token, got %d (body: %s)", w.Code, w.Body.String())
+	}
+
+	// Test 3: Invalid token should fail with 401
+	req = httptest.NewRequest("POST", "/dnszone/checkavailability", bytes.NewReader(reqBody))
+	req.Header.Set("AccessKey", "invalid-token")
+	w = httptest.NewRecorder()
+
+	proxyRouter.ServeHTTP(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("expected status 401 with invalid token, got %d", w.Code)
+	}
+}
+
+// TestIntegration_CheckAvailability_ExistingZone tests checking availability for existing zone
+func TestIntegration_CheckAvailability_ExistingZone(t *testing.T) {
+	t.Parallel()
+
+	mockServer := mockbunny.New()
+	defer mockServer.Close()
+
+	// Add an existing zone
+	mockServer.AddZone("existing.com")
+
+	bunnyClient := bunny.NewClient("test-api-key", bunny.WithBaseURL(mockServer.URL()))
+	proxyHandler := NewHandler(bunnyClient, testLogger())
+
+	db, err := storage.New(":memory:")
+	if err != nil {
+		t.Fatalf("failed to create storage: %v", err)
+	}
+
+	bootstrapService := auth.NewBootstrapService(db, "master-key")
+
+	_, err = db.CreateAdminToken(context.Background(), "Admin Key", "admin-test-key")
+	if err != nil {
+		t.Fatalf("failed to create admin token: %v", err)
+	}
+
+	authenticator := auth.NewAuthenticator(db, bootstrapService)
+	authMiddleware := func(next http.Handler) http.Handler {
+		return authenticator.Authenticate(authenticator.CheckPermissions(next))
+	}
+	proxyRouter := NewRouter(proxyHandler, authMiddleware, testLogger())
+
+	// Check existing domain - should NOT be available
+	reqBody := []byte(`{"Name":"existing.com"}`)
+	req := httptest.NewRequest("POST", "/dnszone/checkavailability", bytes.NewReader(reqBody))
+	req.Header.Set("AccessKey", "admin-test-key")
+	w := httptest.NewRecorder()
+
+	proxyRouter.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status 200, got %d (body: %s)", w.Code, w.Body.String())
+	}
+
+	var result bunny.CheckAvailabilityResponse
+	if err := json.NewDecoder(w.Body).Decode(&result); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if result.Available {
+		t.Error("expected domain to NOT be available since it already exists")
+	}
+}

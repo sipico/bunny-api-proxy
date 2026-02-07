@@ -36,6 +36,8 @@ const (
 	ActionCreateZone Action = "create_zone"
 	// ActionUpdateZone updates zone-level settings (admin only).
 	ActionUpdateZone Action = "update_zone"
+	// ActionCheckAvailability checks DNS zone availability (admin only).
+	ActionCheckAvailability Action = "check_availability"
 )
 
 // Errors for authentication and authorization failures.

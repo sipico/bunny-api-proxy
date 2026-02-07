@@ -464,6 +464,38 @@ func (s *Server) handleUpdateZone(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, zone)
 }
 
+// handleCheckAvailability handles POST /dnszone/checkavailability to check domain availability.
+func (s *Server) handleCheckAvailability(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Name string `json:"Name"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.Name == "" {
+		s.writeError(w, http.StatusBadRequest, "validation_error", "Name", "Name is required")
+		return
+	}
+
+	s.state.mu.RLock()
+	defer s.state.mu.RUnlock()
+
+	// Check if any zone already has this domain
+	available := true
+	for _, zone := range s.state.zones {
+		if zone.Domain == req.Name {
+			available = false
+			break
+		}
+	}
+
+	writeJSON(w, http.StatusOK, struct {
+		Available bool `json:"Available"`
+	}{Available: available})
+}
+
 // writeJSON writes a JSON response with correct Content-Type and no trailing newline.
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	//nolint:errcheck

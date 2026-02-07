@@ -30,6 +30,8 @@ type BunnyClient interface {
 	DeleteZone(ctx context.Context, id int64) error
 	// UpdateZone updates zone-level settings.
 	UpdateZone(ctx context.Context, id int64, req *bunny.UpdateZoneRequest) (*bunny.Zone, error)
+	// CheckZoneAvailability checks if a domain name is available to be added as a zone.
+	CheckZoneAvailability(ctx context.Context, name string) (*bunny.CheckAvailabilityResponse, error)
 
 	// AddRecord creates a new DNS record in the specified zone.
 	AddRecord(ctx context.Context, zoneID int64, req *bunny.AddRecordRequest) (*bunny.Record, error)
@@ -307,6 +309,34 @@ func (h *Handler) HandleUpdateZone(w http.ResponseWriter, r *http.Request) {
 
 	h.logger.Info("update zone", "zone_id", zoneID)
 	writeJSON(w, http.StatusOK, zone)
+}
+
+// HandleCheckAvailability checks if a domain name is available to be added as a DNS zone.
+// POST /dnszone/checkavailability
+// Admin only — zone-less operation for zone creation workflows.
+func (h *Handler) HandleCheckAvailability(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Name string `json:"Name"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if req.Name == "" {
+		writeError(w, http.StatusBadRequest, "missing domain name")
+		return
+	}
+
+	result, err := h.client.CheckZoneAvailability(r.Context(), req.Name)
+	if err != nil {
+		handleBunnyError(w, err)
+		return
+	}
+
+	h.logger.Info("check zone availability", "name", req.Name, "available", result.Available)
+
+	writeJSON(w, http.StatusOK, result)
 }
 
 // HandleListRecords lists all DNS records for a zone.

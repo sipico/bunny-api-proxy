@@ -19,14 +19,15 @@ import (
 
 // mockBunnyClient implements BunnyClient for testing with customizable behavior
 type mockBunnyClient struct {
-	listZonesFunc    func(context.Context, *bunny.ListZonesOptions) (*bunny.ListZonesResponse, error)
-	createZoneFunc   func(context.Context, string) (*bunny.Zone, error)
-	getZoneFunc      func(context.Context, int64) (*bunny.Zone, error)
-	deleteZoneFunc   func(context.Context, int64) error
-	updateZoneFunc   func(context.Context, int64, *bunny.UpdateZoneRequest) (*bunny.Zone, error)
-	addRecordFunc    func(context.Context, int64, *bunny.AddRecordRequest) (*bunny.Record, error)
-	updateRecordFunc func(context.Context, int64, int64, *bunny.AddRecordRequest) (*bunny.Record, error)
-	deleteRecordFunc func(context.Context, int64, int64) error
+	listZonesFunc             func(context.Context, *bunny.ListZonesOptions) (*bunny.ListZonesResponse, error)
+	createZoneFunc            func(context.Context, string) (*bunny.Zone, error)
+	getZoneFunc               func(context.Context, int64) (*bunny.Zone, error)
+	deleteZoneFunc            func(context.Context, int64) error
+	updateZoneFunc            func(context.Context, int64, *bunny.UpdateZoneRequest) (*bunny.Zone, error)
+	addRecordFunc             func(context.Context, int64, *bunny.AddRecordRequest) (*bunny.Record, error)
+	updateRecordFunc          func(context.Context, int64, int64, *bunny.AddRecordRequest) (*bunny.Record, error)
+	deleteRecordFunc          func(context.Context, int64, int64) error
+	checkZoneAvailabilityFunc func(context.Context, string) (*bunny.CheckAvailabilityResponse, error)
 }
 
 func (m *mockBunnyClient) ListZones(ctx context.Context, opts *bunny.ListZonesOptions) (*bunny.ListZonesResponse, error) {
@@ -83,6 +84,13 @@ func (m *mockBunnyClient) DeleteRecord(ctx context.Context, zoneID, recordID int
 		return m.deleteRecordFunc(ctx, zoneID, recordID)
 	}
 	return nil
+}
+
+func (m *mockBunnyClient) CheckZoneAvailability(ctx context.Context, name string) (*bunny.CheckAvailabilityResponse, error) {
+	if m.checkZoneAvailabilityFunc != nil {
+		return m.checkZoneAvailabilityFunc(ctx, name)
+	}
+	return nil, nil
 }
 
 // newTestRequest creates a test request with Chi URL parameters
@@ -1926,5 +1934,121 @@ func TestHandleDeleteRecord_MissingRecordID(t *testing.T) {
 	}
 	if result["error"] != "missing record ID" {
 		t.Errorf("expected error message 'missing record ID', got %q", result["error"])
+	}
+}
+
+// TestHandleCheckAvailability_Success tests successful availability check
+func TestHandleCheckAvailability_Success(t *testing.T) {
+	t.Parallel()
+	client := &mockBunnyClient{
+		checkZoneAvailabilityFunc: func(ctx context.Context, name string) (*bunny.CheckAvailabilityResponse, error) {
+			if name != "example.com" {
+				t.Errorf("expected name example.com, got %s", name)
+			}
+			return &bunny.CheckAvailabilityResponse{Available: true}, nil
+		},
+	}
+
+	handler := NewHandler(client, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	w := httptest.NewRecorder()
+	body := bytes.NewBufferString(`{"Name":"example.com"}`)
+	r := httptest.NewRequest(http.MethodPost, "/dnszone/checkavailability", body)
+
+	handler.HandleCheckAvailability(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status %d, got %d", http.StatusOK, w.Code)
+	}
+
+	var result bunny.CheckAvailabilityResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+
+	if !result.Available {
+		t.Error("expected Available to be true")
+	}
+}
+
+// TestHandleCheckAvailability_NotAvailable tests domain not available
+func TestHandleCheckAvailability_NotAvailable(t *testing.T) {
+	t.Parallel()
+	client := &mockBunnyClient{
+		checkZoneAvailabilityFunc: func(ctx context.Context, name string) (*bunny.CheckAvailabilityResponse, error) {
+			return &bunny.CheckAvailabilityResponse{Available: false}, nil
+		},
+	}
+
+	handler := NewHandler(client, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	w := httptest.NewRecorder()
+	body := bytes.NewBufferString(`{"Name":"taken.com"}`)
+	r := httptest.NewRequest(http.MethodPost, "/dnszone/checkavailability", body)
+
+	handler.HandleCheckAvailability(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status %d, got %d", http.StatusOK, w.Code)
+	}
+
+	var result bunny.CheckAvailabilityResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+
+	if result.Available {
+		t.Error("expected Available to be false")
+	}
+}
+
+// TestHandleCheckAvailability_InvalidBody tests invalid JSON body
+func TestHandleCheckAvailability_InvalidBody(t *testing.T) {
+	t.Parallel()
+	client := &mockBunnyClient{}
+	handler := NewHandler(client, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	w := httptest.NewRecorder()
+	body := bytes.NewBufferString(`invalid json`)
+	r := httptest.NewRequest(http.MethodPost, "/dnszone/checkavailability", body)
+
+	handler.HandleCheckAvailability(w, r)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d", http.StatusBadRequest, w.Code)
+	}
+}
+
+// TestHandleCheckAvailability_MissingName tests missing Name field
+func TestHandleCheckAvailability_MissingName(t *testing.T) {
+	t.Parallel()
+	client := &mockBunnyClient{}
+	handler := NewHandler(client, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	w := httptest.NewRecorder()
+	body := bytes.NewBufferString(`{"Name":""}`)
+	r := httptest.NewRequest(http.MethodPost, "/dnszone/checkavailability", body)
+
+	handler.HandleCheckAvailability(w, r)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d", http.StatusBadRequest, w.Code)
+	}
+}
+
+// TestHandleCheckAvailability_ClientError tests client error handling
+func TestHandleCheckAvailability_ClientError(t *testing.T) {
+	t.Parallel()
+	client := &mockBunnyClient{
+		checkZoneAvailabilityFunc: func(ctx context.Context, name string) (*bunny.CheckAvailabilityResponse, error) {
+			return nil, fmt.Errorf("network error")
+		},
+	}
+
+	handler := NewHandler(client, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	w := httptest.NewRecorder()
+	body := bytes.NewBufferString(`{"Name":"example.com"}`)
+	r := httptest.NewRequest(http.MethodPost, "/dnszone/checkavailability", body)
+
+	handler.HandleCheckAvailability(w, r)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("expected status %d, got %d", http.StatusInternalServerError, w.Code)
 	}
 }
