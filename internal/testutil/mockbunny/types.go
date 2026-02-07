@@ -19,7 +19,7 @@ type MockBunnyTime struct {
 
 // MarshalJSON implements json.Marshaler for MockBunnyTime.
 // It returns timestamps in "2006-01-02T15:04:05.0000000Z" format (with sub-second precision and Z suffix),
-// matching bunny.net's actual API behavior.
+// matching bunny.net's actual API creation endpoint.
 func (t MockBunnyTime) MarshalJSON() ([]byte, error) {
 	if t.IsZero() {
 		return []byte("null"), nil
@@ -27,6 +27,49 @@ func (t MockBunnyTime) MarshalJSON() ([]byte, error) {
 	// Format with sub-second precision and Z suffix to match real bunny.net API creation endpoint
 	formatted := `"` + t.UTC().Format("2006-01-02T15:04:05.0000000") + `Z"`
 	return []byte(formatted), nil
+}
+
+// MockBunnyTimeShort wraps time.Time to serialize in bunny.net's short format
+// (without sub-second precision, no Z suffix, matching list/get endpoints).
+//
+//nolint:revive // MockBunnyTimeShort is descriptive and distinguishes from MockBunnyTime
+type MockBunnyTimeShort struct {
+	time.Time
+}
+
+// MarshalJSON implements json.Marshaler for MockBunnyTimeShort.
+// It returns timestamps in "2006-01-02T15:04:05" format (without sub-second precision or Z suffix),
+// matching bunny.net's actual API behavior on GET/list endpoints.
+func (t MockBunnyTimeShort) MarshalJSON() ([]byte, error) {
+	if t.IsZero() {
+		return []byte("null"), nil
+	}
+	// Format without sub-second precision or Z suffix to match real bunny.net API GET/list endpoints
+	formatted := `"` + t.UTC().Format("2006-01-02T15:04:05") + `"`
+	return []byte(formatted), nil
+}
+
+// UnmarshalJSON implements json.Unmarshaler for MockBunnyTimeShort.
+// It handles both RFC3339 format (with timezone) and bunny.net's format without timezone.
+func (t *MockBunnyTimeShort) UnmarshalJSON(b []byte) error {
+	s := strings.Trim(string(b), `"`)
+	if s == "null" || s == "" {
+		return nil
+	}
+
+	// Try RFC3339 first (with timezone like "2006-01-02T15:04:05Z")
+	if parsed, err := time.Parse(time.RFC3339, s); err == nil {
+		t.Time = parsed
+		return nil
+	}
+
+	// No timezone suffix - treat as UTC by appending "Z"
+	if parsed, err := time.Parse(time.RFC3339, s+"Z"); err == nil {
+		t.Time = parsed
+		return nil
+	}
+
+	return fmt.Errorf("invalid timestamp format: %s", s)
 }
 
 // UnmarshalJSON implements json.Unmarshaler for MockBunnyTime.
@@ -97,6 +140,51 @@ type Zone struct {
 	CertificateKeyType       int           `json:"CertificateKeyType"` // 0 = Ecdsa, 1 = Rsa
 }
 
+// ZoneShortTime returns a copy of the zone with timestamps formatted using MockBunnyTimeShort
+// (no sub-second precision, no Z suffix). Used for GET/list endpoint responses to match
+// the real bunny.net API behavior.
+func (z *Zone) ZoneShortTime() *ZoneShortTime {
+	return &ZoneShortTime{
+		ID:                       z.ID,
+		Domain:                   z.Domain,
+		Records:                  z.Records,
+		DateModified:             MockBunnyTimeShort{Time: z.DateModified.Time},
+		DateCreated:              MockBunnyTimeShort{Time: z.DateCreated.Time},
+		NameserversDetected:      z.NameserversDetected,
+		CustomNameserversEnabled: z.CustomNameserversEnabled,
+		Nameserver1:              z.Nameserver1,
+		Nameserver2:              z.Nameserver2,
+		SoaEmail:                 z.SoaEmail,
+		NameserversNextCheck:     MockBunnyTimeShort{Time: z.NameserversNextCheck.Time},
+		LoggingEnabled:           z.LoggingEnabled,
+		LoggingIPAnonymization:   z.LoggingIPAnonymization,
+		LogAnonymizationType:     z.LogAnonymizationType,
+		DnsSecEnabled:            z.DnsSecEnabled,
+		CertificateKeyType:       z.CertificateKeyType,
+	}
+}
+
+// ZoneShortTime is a variant of Zone that uses MockBunnyTimeShort for timestamps.
+// Used for GET/list endpoint responses to match the real bunny.net API behavior.
+type ZoneShortTime struct {
+	ID                       int64              `json:"Id"`
+	Domain                   string             `json:"Domain"`
+	Records                  []Record           `json:"Records"`
+	DateModified             MockBunnyTimeShort `json:"DateModified"`
+	DateCreated              MockBunnyTimeShort `json:"DateCreated"`
+	NameserversDetected      bool               `json:"NameserversDetected"`
+	CustomNameserversEnabled bool               `json:"CustomNameserversEnabled"`
+	Nameserver1              string             `json:"Nameserver1"`
+	Nameserver2              string             `json:"Nameserver2"`
+	SoaEmail                 string             `json:"SoaEmail"`
+	NameserversNextCheck     MockBunnyTimeShort `json:"NameserversNextCheck,omitempty"`
+	LoggingEnabled           bool               `json:"LoggingEnabled"`
+	LoggingIPAnonymization   bool               `json:"LoggingIPAnonymizationEnabled"`
+	LogAnonymizationType     int                `json:"LogAnonymizationType"` // 0 = OneDigit, 1 = Drop
+	DnsSecEnabled            bool               `json:"DnsSecEnabled"`
+	CertificateKeyType       int                `json:"CertificateKeyType"` // 0 = Ecdsa, 1 = Rsa
+}
+
 // State holds the internal mock server state.
 type State struct {
 	mu           sync.RWMutex
@@ -118,10 +206,10 @@ func NewState() *State {
 
 // ListZonesResponse is a paginated response for the List Zones endpoint.
 type ListZonesResponse struct {
-	Items        []Zone `json:"Items"`
-	CurrentPage  int    `json:"CurrentPage"`
-	TotalItems   int    `json:"TotalItems"`
-	HasMoreItems bool   `json:"HasMoreItems"`
+	Items        []ZoneShortTime `json:"Items"`
+	CurrentPage  int             `json:"CurrentPage"`
+	TotalItems   int             `json:"TotalItems"`
+	HasMoreItems bool            `json:"HasMoreItems"`
 }
 
 // ErrorResponse represents an error response from the API.
