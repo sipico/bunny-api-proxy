@@ -182,7 +182,7 @@ func TestNewDisablesMmapSize(t *testing.T) {
 	// don't support PRAGMA mmap_size
 	tmpfile := t.TempDir()
 	dbPath := tmpfile + "/test.db"
-	
+
 	storage, err := New(dbPath)
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
