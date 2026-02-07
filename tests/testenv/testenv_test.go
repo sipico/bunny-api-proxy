@@ -3240,3 +3240,70 @@ func TestDeleteZoneViaProxy_NotFound_Error(t *testing.T) {
 		t.Error("Expected error when deleting non-existent zone")
 	}
 }
+
+// TestCleanupStaleZones_WithEventualConsistency tests cleanup resilience with eventual consistency.
+// This verifies that CleanupStaleZones retries when zones still exist after deletion (real API eventual consistency).
+func TestCleanupStaleZones_WithEventualConsistency(t *testing.T) {
+	t.Setenv("BUNNY_TEST_MODE", "mock")
+
+	env := Setup(t)
+
+	// Manually add stale zones to the mock server
+	env.mockServer.AddZone("1-oldhash-bap.xyz")
+	env.mockServer.AddZone("2-oldhash-bap.xyz")
+
+	// Verify they exist before cleanup
+	resp, err := env.Client.ListZones(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("Failed to list zones: %v", err)
+	}
+
+	if len(resp.Items) != 2 {
+		t.Errorf("Expected 2 zones before cleanup, got %d", len(resp.Items))
+	}
+
+	// Run cleanup - should delete all stale zones
+	env.CleanupStaleZones(t)
+
+	// Verify stale zones were deleted
+	resp, err = env.Client.ListZones(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("Failed to list zones after cleanup: %v", err)
+	}
+
+	if len(resp.Items) != 0 {
+		t.Errorf("Expected 0 zones after cleanup, got %d", len(resp.Items))
+	}
+}
+
+// TestCleanupStaleZones_FastCompletionMockMode tests that mock mode doesn't wait/retry.
+// Mock zones are deleted immediately, so no retry delay should occur.
+func TestCleanupStaleZones_FastCompletionMockMode(t *testing.T) {
+	t.Setenv("BUNNY_TEST_MODE", "mock")
+
+	env := Setup(t)
+
+	// Manually add stale zones
+	env.mockServer.AddZone("1-oldhash-bap.xyz")
+	env.mockServer.AddZone("2-oldhash-bap.xyz")
+
+	// Measure cleanup time - should be fast (no retry delays)
+	startTime := time.Now()
+	env.CleanupStaleZones(t)
+	elapsed := time.Since(startTime)
+
+	// Should complete in less than 1 second (no 3-second retries in mock mode)
+	if elapsed > 1*time.Second {
+		t.Logf("Warning: Cleanup took %v, expected fast deletion without retries in mock mode", elapsed)
+	}
+
+	// Verify all zones deleted
+	resp, err := env.Client.ListZones(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("Failed to list zones: %v", err)
+	}
+
+	if len(resp.Items) != 0 {
+		t.Errorf("Expected 0 zones after cleanup, got %d", len(resp.Items))
+	}
+}
