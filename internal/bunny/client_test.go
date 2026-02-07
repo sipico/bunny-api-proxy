@@ -1142,3 +1142,222 @@ func TestDeleteZone(t *testing.T) {
 		}
 	})
 }
+
+// TestUpdateZone tests the UpdateZone method with various scenarios.
+func TestUpdateZone(t *testing.T) {
+	t.Parallel()
+	t.Run("success updating zone", func(t *testing.T) {
+		t.Parallel()
+		server := mockbunny.New()
+		defer server.Close()
+
+		// Add a zone
+		zoneID := server.AddZone("example.com")
+
+		client := NewClient("test-key", WithBaseURL(server.URL()))
+		customNSEnabled := true
+		req := &UpdateZoneRequest{
+			CustomNameserversEnabled: &customNSEnabled,
+		}
+
+		zone, err := client.UpdateZone(context.Background(), zoneID, req)
+
+		if err != nil {
+			t.Fatalf("UpdateZone failed: %v", err)
+		}
+
+		if zone == nil {
+			t.Fatal("expected non-nil zone")
+			return
+		}
+
+		if zone.ID != zoneID {
+			t.Errorf("expected zone ID %d, got %d", zoneID, zone.ID)
+		}
+
+		if zone.Domain != "example.com" {
+			t.Errorf("expected domain example.com, got %s", zone.Domain)
+		}
+
+		if !zone.CustomNameserversEnabled {
+			t.Error("expected CustomNameserversEnabled to be true after update")
+		}
+	})
+
+	t.Run("not found error (404)", func(t *testing.T) {
+		t.Parallel()
+		server := mockbunny.New()
+		defer server.Close()
+
+		client := NewClient("test-key", WithBaseURL(server.URL()))
+		customNSEnabled := true
+		req := &UpdateZoneRequest{
+			CustomNameserversEnabled: &customNSEnabled,
+		}
+
+		zone, err := client.UpdateZone(context.Background(), 999, req)
+
+		if err != ErrNotFound {
+			t.Errorf("expected ErrNotFound, got %v", err)
+		}
+
+		if zone != nil {
+			t.Errorf("expected nil zone, got %v", zone)
+		}
+	})
+
+	t.Run("unauthorized error (401)", func(t *testing.T) {
+		t.Parallel()
+		transport := &mockTransport{
+			statusCode: http.StatusUnauthorized,
+			body:       []byte(""),
+		}
+		httpClient := &http.Client{Transport: transport}
+
+		client := NewClient("test-key", WithHTTPClient(httpClient))
+		customNSEnabled := true
+		req := &UpdateZoneRequest{
+			CustomNameserversEnabled: &customNSEnabled,
+		}
+
+		zone, err := client.UpdateZone(context.Background(), 1, req)
+
+		if err != ErrUnauthorized {
+			t.Errorf("expected ErrUnauthorized, got %v", err)
+		}
+
+		if zone != nil {
+			t.Errorf("expected nil zone, got %v", zone)
+		}
+	})
+
+	t.Run("server error (500)", func(t *testing.T) {
+		t.Parallel()
+		transport := &mockTransport{
+			statusCode: http.StatusInternalServerError,
+			body:       []byte(`{"ErrorKey":"ServerError","Message":"Internal server error"}`),
+		}
+		httpClient := &http.Client{Transport: transport}
+
+		client := NewClient("test-key", WithHTTPClient(httpClient))
+		customNSEnabled := true
+		req := &UpdateZoneRequest{
+			CustomNameserversEnabled: &customNSEnabled,
+		}
+
+		zone, err := client.UpdateZone(context.Background(), 1, req)
+
+		if err == nil {
+			t.Fatal("expected error for 500 response")
+		}
+
+		if zone != nil {
+			t.Errorf("expected nil zone, got %v", zone)
+		}
+
+		// Verify it's an APIError
+		apiErr, ok := err.(*APIError)
+		if !ok {
+			t.Fatalf("expected *APIError, got %T", err)
+		}
+
+		if apiErr.StatusCode != http.StatusInternalServerError {
+			t.Errorf("expected status 500, got %d", apiErr.StatusCode)
+		}
+
+		if apiErr.Message != "Internal server error" {
+			t.Errorf("expected message 'Internal server error', got %s", apiErr.Message)
+		}
+	})
+
+	t.Run("context cancellation", func(t *testing.T) {
+		t.Parallel()
+		server := mockbunny.New()
+		defer server.Close()
+
+		server.AddZone("example.com")
+		client := NewClient("test-key", WithBaseURL(server.URL()))
+
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		customNSEnabled := true
+		req := &UpdateZoneRequest{
+			CustomNameserversEnabled: &customNSEnabled,
+		}
+
+		zone, err := client.UpdateZone(ctx, 1, req)
+
+		if err == nil {
+			t.Error("expected error with cancelled context")
+		}
+		if zone != nil {
+			t.Error("expected nil zone on error")
+		}
+	})
+
+	t.Run("malformed response body", func(t *testing.T) {
+		t.Parallel()
+		transport := &mockTransport{
+			statusCode: http.StatusOK,
+			body:       []byte("not valid json"),
+		}
+		httpClient := &http.Client{Transport: transport}
+
+		client := NewClient("test-key", WithHTTPClient(httpClient))
+		customNSEnabled := true
+		req := &UpdateZoneRequest{
+			CustomNameserversEnabled: &customNSEnabled,
+		}
+
+		zone, err := client.UpdateZone(context.Background(), 1, req)
+
+		if err == nil {
+			t.Fatal("expected error for malformed JSON")
+		}
+
+		if zone != nil {
+			t.Errorf("expected nil zone, got %v", zone)
+		}
+
+		// Error should mention parsing
+		if !strings.Contains(err.Error(), "parse") {
+			t.Errorf("expected parse error message, got %v", err)
+		}
+	})
+
+	t.Run("bad request error (400)", func(t *testing.T) {
+		t.Parallel()
+		transport := &mockTransport{
+			statusCode: http.StatusBadRequest,
+			body:       []byte(`{"ErrorKey":"BadRequest","Message":"Invalid request data"}`),
+		}
+		httpClient := &http.Client{Transport: transport}
+
+		client := NewClient("test-key", WithHTTPClient(httpClient))
+		customNSEnabled := true
+		req := &UpdateZoneRequest{
+			CustomNameserversEnabled: &customNSEnabled,
+		}
+
+		zone, err := client.UpdateZone(context.Background(), 1, req)
+
+		if err == nil {
+			t.Fatal("expected error for 400 response")
+		}
+
+		if zone != nil {
+			t.Errorf("expected nil zone, got %v", zone)
+		}
+
+		// Verify it's an APIError
+		apiErr, ok := err.(*APIError)
+		if !ok {
+			t.Fatalf("expected *APIError, got %T", err)
+		}
+
+		if apiErr.StatusCode != http.StatusBadRequest {
+			t.Errorf("expected status 400, got %d", apiErr.StatusCode)
+		}
+	})
+}
