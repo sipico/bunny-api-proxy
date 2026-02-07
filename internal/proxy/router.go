@@ -26,6 +26,7 @@ func NewRouter(handler *Handler, authMiddleware func(http.Handler) http.Handler,
 	r.Post("/dnszone", handler.HandleCreateZone)
 	r.With(requireAdmin).Post("/dnszone/checkavailability", handler.HandleCheckAvailability)
 	r.With(requireAdmin).Post("/dnszone/{zoneID}/import", handler.HandleImportRecords)
+	r.With(requireAdmin).Get("/dnszone/{zoneID}/export", handler.HandleExportRecords)
 	r.With(requireAdmin).Post("/dnszone/{zoneID}", handler.HandleUpdateZone)
 	r.Get("/dnszone/{zoneID}", handler.HandleGetZone)
 	r.Delete("/dnszone/{zoneID}", handler.HandleDeleteZone)

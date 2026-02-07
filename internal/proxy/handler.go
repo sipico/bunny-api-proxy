@@ -36,6 +36,9 @@ type BunnyClient interface {
 
 	// ImportRecords imports DNS records from BIND zone file format.
 	ImportRecords(ctx context.Context, zoneID int64, body io.Reader, contentType string) (*bunny.ImportRecordsResponse, error)
+
+	// ExportRecords exports DNS records in BIND zone file format.
+	ExportRecords(ctx context.Context, zoneID int64) (string, error)
 	// AddRecord creates a new DNS record in the specified zone.
 	AddRecord(ctx context.Context, zoneID int64, req *bunny.AddRecordRequest) (*bunny.Record, error)
 
@@ -367,6 +370,36 @@ func (h *Handler) HandleImportRecords(w http.ResponseWriter, r *http.Request) {
 	h.logger.Info("import records", "zone_id", zoneID, "successful", result.RecordsSuccessful, "failed", result.RecordsFailed, "skipped", result.RecordsSkipped)
 
 	writeJSON(w, http.StatusOK, result)
+}
+
+// HandleExportRecords exports DNS records in BIND zone file format.
+// GET /dnszone/{zoneID}/export
+// Admin only — exports all records as raw text.
+func (h *Handler) HandleExportRecords(w http.ResponseWriter, r *http.Request) {
+	zoneIDStr := chi.URLParam(r, "zoneID")
+	if zoneIDStr == "" {
+		writeError(w, http.StatusBadRequest, "missing zone ID")
+		return
+	}
+
+	zoneID, err := strconv.ParseInt(zoneIDStr, 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid zone ID")
+		return
+	}
+
+	result, err := h.client.ExportRecords(r.Context(), zoneID)
+	if err != nil {
+		handleBunnyError(w, err)
+		return
+	}
+
+	h.logger.Info("export records", "zone_id", zoneID)
+
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	//nolint:errcheck
+	w.Write([]byte(result))
 }
 
 // HandleListRecords lists all DNS records for a zone.

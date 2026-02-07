@@ -29,6 +29,7 @@ type mockBunnyClient struct {
 	deleteRecordFunc          func(context.Context, int64, int64) error
 	checkZoneAvailabilityFunc func(context.Context, string) (*bunny.CheckAvailabilityResponse, error)
 	importRecordsFunc         func(context.Context, int64, io.Reader, string) (*bunny.ImportRecordsResponse, error)
+	exportRecordsFunc         func(context.Context, int64) (string, error)
 }
 
 func (m *mockBunnyClient) ListZones(ctx context.Context, opts *bunny.ListZonesOptions) (*bunny.ListZonesResponse, error) {
@@ -99,6 +100,13 @@ func (m *mockBunnyClient) ImportRecords(ctx context.Context, zoneID int64, body 
 		return m.importRecordsFunc(ctx, zoneID, body, contentType)
 	}
 	return nil, nil
+}
+
+func (m *mockBunnyClient) ExportRecords(ctx context.Context, zoneID int64) (string, error) {
+	if m.exportRecordsFunc != nil {
+		return m.exportRecordsFunc(ctx, zoneID)
+	}
+	return "", nil
 }
 
 // newTestRequest creates a test request with Chi URL parameters
@@ -2149,6 +2157,95 @@ func TestHandleImportRecords_ClientError(t *testing.T) {
 	r := newTestRequest(http.MethodPost, "/dnszone/123/import", body, map[string]string{"zoneID": "123"})
 
 	handler.HandleImportRecords(w, r)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("expected status %d, got %d", http.StatusInternalServerError, w.Code)
+	}
+}
+
+func TestHandleExportRecords_Success(t *testing.T) {
+	t.Parallel()
+	mockClient := &mockBunnyClient{
+		exportRecordsFunc: func(_ context.Context, id int64) (string, error) {
+			return ";; Zone: example.com\n@ 300 IN A 192.168.1.1\n", nil
+		},
+	}
+	handler := NewHandler(mockClient, slog.Default())
+
+	r := chi.NewRouter()
+	r.Get("/dnszone/{zoneID}/export", handler.HandleExportRecords)
+
+	req := httptest.NewRequest(http.MethodGet, "/dnszone/1/export", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status %d, got %d", http.StatusOK, w.Code)
+	}
+
+	contentType := w.Header().Get("Content-Type")
+	if contentType != "text/plain; charset=utf-8" {
+		t.Errorf("expected Content-Type text/plain; charset=utf-8, got %s", contentType)
+	}
+
+	body := w.Body.String()
+	if body != ";; Zone: example.com\n@ 300 IN A 192.168.1.1\n" {
+		t.Errorf("unexpected body: %s", body)
+	}
+}
+
+func TestHandleExportRecords_InvalidZoneID(t *testing.T) {
+	t.Parallel()
+	handler := NewHandler(&mockBunnyClient{}, slog.Default())
+
+	r := chi.NewRouter()
+	r.Get("/dnszone/{zoneID}/export", handler.HandleExportRecords)
+
+	req := httptest.NewRequest(http.MethodGet, "/dnszone/abc/export", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d", http.StatusBadRequest, w.Code)
+	}
+}
+
+func TestHandleExportRecords_NotFound(t *testing.T) {
+	t.Parallel()
+	mockClient := &mockBunnyClient{
+		exportRecordsFunc: func(_ context.Context, _ int64) (string, error) {
+			return "", bunny.ErrNotFound
+		},
+	}
+	handler := NewHandler(mockClient, slog.Default())
+
+	r := chi.NewRouter()
+	r.Get("/dnszone/{zoneID}/export", handler.HandleExportRecords)
+
+	req := httptest.NewRequest(http.MethodGet, "/dnszone/999/export", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusNotFound {
+		t.Errorf("expected status %d, got %d", http.StatusNotFound, w.Code)
+	}
+}
+
+func TestHandleExportRecords_BunnyError(t *testing.T) {
+	t.Parallel()
+	mockClient := &mockBunnyClient{
+		exportRecordsFunc: func(_ context.Context, _ int64) (string, error) {
+			return "", fmt.Errorf("connection failed")
+		},
+	}
+	handler := NewHandler(mockClient, slog.Default())
+
+	r := chi.NewRouter()
+	r.Get("/dnszone/{zoneID}/export", handler.HandleExportRecords)
+
+	req := httptest.NewRequest(http.MethodGet, "/dnszone/1/export", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
 
 	if w.Code != http.StatusInternalServerError {
 		t.Errorf("expected status %d, got %d", http.StatusInternalServerError, w.Code)

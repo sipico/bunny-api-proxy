@@ -40,6 +40,8 @@ const (
 	ActionCheckAvailability Action = "check_availability"
 	// ActionImportRecords imports DNS records (admin only).
 	ActionImportRecords Action = "import_records"
+	// ActionExportRecords exports DNS records (admin only).
+	ActionExportRecords Action = "export_records"
 )
 
 // Errors for authentication and authorization failures.

@@ -1163,3 +1163,62 @@ func TestIntegration_ImportRecords_AdminOnly(t *testing.T) {
 		t.Errorf("expected status 401 with invalid token, got %d", w.Code)
 	}
 }
+
+func TestIntegration_ExportRecords_AdminOnly(t *testing.T) {
+	t.Parallel()
+	mockServer := mockbunny.New()
+	defer mockServer.Close()
+
+	zoneID := mockServer.AddZoneWithRecords("example.com", []mockbunny.Record{
+		{Type: 0, Name: "@", Value: "192.168.1.1", TTL: 300},
+	})
+
+	// Create storage with admin and scoped tokens
+	db, err := storage.New(":memory:")
+	if err != nil {
+		t.Fatalf("failed to create storage: %v", err)
+	}
+
+	// Create admin token
+	_, err = db.CreateAdminToken(context.Background(), "admin-export", "admin-export-test-token")
+	if err != nil {
+		t.Fatalf("failed to create admin token: %v", err)
+	}
+
+	// Create scoped token
+	scopedToken := "scoped-export-test-token"
+	scopedHash := sha256.Sum256([]byte(scopedToken))
+	_, err = db.CreateToken(context.Background(), "scoped-export", false, hex.EncodeToString(scopedHash[:]))
+	if err != nil {
+		t.Fatalf("failed to create scoped token: %v", err)
+	}
+
+	client := bunny.NewClient("test-key", bunny.WithBaseURL(mockServer.URL()))
+	handler := NewHandler(client, testLogger())
+	bootstrapService := auth.NewBootstrapService(db, "master-key")
+	authenticator := auth.NewAuthenticator(db, bootstrapService)
+	router := NewRouter(handler, authenticator.Authenticate, testLogger())
+
+	tests := []struct {
+		name       string
+		token      string
+		wantStatus int
+	}{
+		{"admin token succeeds", "admin-export-test-token", http.StatusOK},
+		{"scoped token gets 403", scopedToken, http.StatusForbidden},
+		{"invalid token gets 401", "invalid-token", http.StatusUnauthorized},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/dnszone/%d/export", zoneID), nil)
+			req.Header.Set("AccessKey", tt.token)
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, req)
+
+			if w.Code != tt.wantStatus {
+				t.Errorf("expected status %d, got %d (body: %s)", tt.wantStatus, w.Code, w.Body.String())
+			}
+		})
+	}
+}
