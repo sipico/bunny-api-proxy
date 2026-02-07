@@ -138,7 +138,7 @@ func TestErrorResponse(t *testing.T) {
 	errResp := ErrorResponse{
 		ErrorKey: "ValidationError",
 		Field:    "Domain",
-		Message:  "Invalid domain",
+		Message:  "Invalid domain\r",
 	}
 
 	if errResp.ErrorKey != "ValidationError" {
@@ -149,7 +149,7 @@ func TestErrorResponse(t *testing.T) {
 		t.Errorf("Field = %s, want Domain", errResp.Field)
 	}
 
-	if errResp.Message != "Invalid domain" {
+	if errResp.Message != "Invalid domain\r" {
 		t.Errorf("Message = %s, want Invalid domain", errResp.Message)
 	}
 }

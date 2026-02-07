@@ -79,7 +79,7 @@ func TestGetZone_NotFound(t *testing.T) {
 	if errResp.Field != "Id" {
 		t.Errorf("expected field Id, got %s", errResp.Field)
 	}
-	if errResp.Message != "The requested DNS zone was not found" {
+	if errResp.Message != "The requested DNS zone was not found\r" {
 		t.Errorf("expected message 'The requested DNS zone was not found', got %s", errResp.Message)
 	}
 }
@@ -651,7 +651,7 @@ func TestHandleCreateZone_EmptyDomain(t *testing.T) {
 	if errResp.Field != "Domain" {
 		t.Errorf("expected field Domain, got %s", errResp.Field)
 	}
-	if errResp.Message != "Domain is required" {
+	if errResp.Message != "Domain is required\r" {
 		t.Errorf("expected message 'Domain is required', got %s", errResp.Message)
 	}
 }
@@ -694,7 +694,7 @@ func TestHandleCreateZone_DuplicateDomain(t *testing.T) {
 	if errResp.ErrorKey != "conflict" {
 		t.Errorf("expected error key conflict, got %s", errResp.ErrorKey)
 	}
-	if errResp.Message != "Zone already exists" {
+	if errResp.Message != "Zone already exists\r" {
 		t.Errorf("expected message 'Zone already exists', got %s", errResp.Message)
 	}
 }
@@ -1162,5 +1162,66 @@ func TestUpdateRecord_TypeImmutable(t *testing.T) {
 	}
 	if updated.Value != "1.2.3.4" {
 		t.Errorf("expected updated value 1.2.3.4, got %s", updated.Value)
+	}
+}
+
+// TestErrorResponsesHaveTrailingCR verifies that all error responses include
+// a trailing carriage return (\r) in the Message field, matching the real bunny.net API.
+func TestErrorResponsesHaveTrailingCR(t *testing.T) {
+	t.Parallel()
+	s := New()
+	defer s.Close()
+
+	// Test 1: GetZone with non-existent zone should include \r in error message
+	resp, err := http.Get(s.URL() + "/dnszone/9999")
+	if err != nil {
+		t.Fatalf("failed to get zone: %v", err)
+	}
+	defer resp.Body.Close()
+
+	var errResp ErrorResponse
+	if err := json.NewDecoder(resp.Body).Decode(&errResp); err != nil {
+		t.Fatalf("failed to decode error response: %v", err)
+	}
+
+	if !strings.HasSuffix(errResp.Message, "\r") {
+		t.Errorf("expected Message to end with \\r, got: %q", errResp.Message)
+	}
+
+	// Test 2: AddZone without domain should include \r in error message
+	reqBody := `{}`
+	req, _ := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/dnszone", s.URL()), strings.NewReader(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("failed to send request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if err := json.NewDecoder(resp.Body).Decode(&errResp); err != nil {
+		t.Fatalf("failed to decode error response: %v", err)
+	}
+
+	if !strings.HasSuffix(errResp.Message, "\r") {
+		t.Errorf("expected Message to end with \\r, got: %q", errResp.Message)
+	}
+
+	// Test 3: AddZone with duplicate should include \r in error message
+	s.AddZone("example.com")
+	reqBody = `{"Domain":"example.com"}`
+	req, _ = http.NewRequest(http.MethodPost, fmt.Sprintf("%s/dnszone", s.URL()), strings.NewReader(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("failed to send request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if err := json.NewDecoder(resp.Body).Decode(&errResp); err != nil {
+		t.Fatalf("failed to decode error response: %v", err)
+	}
+
+	if !strings.HasSuffix(errResp.Message, "\r") {
+		t.Errorf("expected Message to end with \\r, got: %q", errResp.Message)
 	}
 }
