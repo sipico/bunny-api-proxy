@@ -326,7 +326,7 @@ func TestInitializeComponentsWithInvalidDataPath(t *testing.T) {
 
 	_, err = initializeComponents(cfg)
 	if err == nil {
-		t.Error("expected error with invalid data path")
+		t.Fatal("expected error with invalid data path")
 	}
 
 	if !strings.Contains(err.Error(), "storage initialization failed") {
@@ -1026,7 +1026,6 @@ func TestInitializeComponentsLogLevelVariantWorks(t *testing.T) {
 
 // TestRunConfigLoadErrorHandling tests that run() handles config load errors
 func TestRunWithInvalidDatabasePath(t *testing.T) {
-	t.Parallel()
 	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
 	oldBunnyAPIKey := os.Getenv("BUNNY_API_KEY")
@@ -1055,7 +1054,7 @@ func TestRunWithInvalidDatabasePath(t *testing.T) {
 
 	err := run()
 	if err == nil {
-		t.Error("run() should return error with invalid database path")
+		t.Fatal("run() should return error with invalid database path")
 	}
 	if !strings.Contains(err.Error(), "storage initialization failed") {
 		t.Errorf("error should mention storage initialization failure, got: %v", err)
@@ -1108,8 +1107,6 @@ func TestInitializeComponentsWithInfoLogLevel(t *testing.T) {
 
 // TestInitializeComponentsErrorDoesNotLeakResources tests that failed initialization cleans up
 func TestInitializeComponentsErrorHandling(t *testing.T) {
-	t.Parallel()
-
 	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
 
@@ -1136,7 +1133,7 @@ func TestInitializeComponentsErrorHandling(t *testing.T) {
 
 	_, err = initializeComponents(cfg)
 	if err == nil {
-		t.Error("initializeComponents should fail with invalid data path")
+		t.Fatal("initializeComponents should fail with invalid data path")
 	}
 
 	// Verify the error message is informative
