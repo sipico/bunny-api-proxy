@@ -3,6 +3,7 @@ package mockbunny
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"sort"
 	"strconv"
@@ -494,6 +495,52 @@ func (s *Server) handleCheckAvailability(w http.ResponseWriter, r *http.Request)
 	writeJSON(w, http.StatusOK, struct {
 		Available bool `json:"Available"`
 	}{Available: available})
+}
+
+// handleImportRecords handles POST /dnszone/{id}/import to import DNS records.
+func (s *Server) handleImportRecords(w http.ResponseWriter, r *http.Request) {
+	idStr := chi.URLParam(r, "id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		http.Error(w, "invalid zone ID", http.StatusBadRequest)
+		return
+	}
+
+	s.state.mu.RLock()
+	_, ok := s.state.zones[id]
+	s.state.mu.RUnlock()
+
+	if !ok {
+		s.writeError(w, http.StatusNotFound, "dnszone.zone.not_found", "Id", "The requested DNS zone was not found")
+		return
+	}
+
+	// Read and discard body (simulating import processing)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "failed to read body", http.StatusBadRequest)
+		return
+	}
+
+	// Simulate import: count lines that look like DNS records
+	// For mock purposes, count non-empty, non-comment lines as "successful"
+	successful := 0
+	for _, line := range strings.Split(string(body), "\n") {
+		line = strings.TrimSpace(line)
+		if line != "" && !strings.HasPrefix(line, ";") {
+			successful++
+		}
+	}
+
+	writeJSON(w, http.StatusOK, struct {
+		RecordsSuccessful int `json:"RecordsSuccessful"`
+		RecordsFailed     int `json:"RecordsFailed"`
+		RecordsSkipped    int `json:"RecordsSkipped"`
+	}{
+		RecordsSuccessful: successful,
+		RecordsFailed:     0,
+		RecordsSkipped:    0,
+	})
 }
 
 // writeJSON writes a JSON response with correct Content-Type and no trailing newline.

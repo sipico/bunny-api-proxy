@@ -1082,3 +1082,84 @@ func TestIntegration_CheckAvailability_ExistingZone(t *testing.T) {
 		t.Error("expected domain to NOT be available since it already exists")
 	}
 }
+
+// TestIntegration_ImportRecords_AdminOnly tests that ImportRecords requires admin token
+func TestIntegration_ImportRecords_AdminOnly(t *testing.T) {
+	t.Parallel()
+
+	mockServer := mockbunny.New()
+	defer mockServer.Close()
+
+	zoneID := mockServer.AddZone("example.com")
+
+	bunnyClient := bunny.NewClient("test-api-key", bunny.WithBaseURL(mockServer.URL()))
+	proxyHandler := NewHandler(bunnyClient, testLogger())
+
+	db, err := storage.New(":memory:")
+	if err != nil {
+		t.Fatalf("failed to create storage: %v", err)
+	}
+
+	bootstrapService := auth.NewBootstrapService(db, "master-key")
+
+	_, err = db.CreateAdminToken(context.Background(), "Admin Key", "admin-test-key")
+	if err != nil {
+		t.Fatalf("failed to create admin token: %v", err)
+	}
+
+	nonAdminHash := hashTokenForTest("non-admin-key")
+	_, err = db.CreateToken(context.Background(), "Non-Admin Key", false, nonAdminHash)
+	if err != nil {
+		t.Fatalf("failed to create non-admin token: %v", err)
+	}
+
+	authenticator := auth.NewAuthenticator(db, bootstrapService)
+	authMiddleware := func(next http.Handler) http.Handler {
+		return authenticator.Authenticate(authenticator.CheckPermissions(next))
+	}
+	proxyRouter := NewRouter(proxyHandler, authMiddleware, testLogger())
+
+	importBody := "example.com. 300 IN A 1.2.3.4\nexample.com. 300 IN TXT \"test\""
+
+	// Test 1: Admin token should succeed
+	req := httptest.NewRequest("POST", fmt.Sprintf("/dnszone/%d/import", zoneID), bytes.NewReader([]byte(importBody)))
+	req.Header.Set("AccessKey", "admin-test-key")
+	w := httptest.NewRecorder()
+
+	proxyRouter.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status 200 with admin token, got %d (body: %s)", w.Code, w.Body.String())
+	}
+
+	// Verify response
+	var result bunny.ImportRecordsResponse
+	if err := json.NewDecoder(w.Body).Decode(&result); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if result.RecordsSuccessful != 2 {
+		t.Errorf("expected 2 successful records, got %d", result.RecordsSuccessful)
+	}
+
+	// Test 2: Non-admin token should fail with 403
+	req = httptest.NewRequest("POST", fmt.Sprintf("/dnszone/%d/import", zoneID), bytes.NewReader([]byte(importBody)))
+	req.Header.Set("AccessKey", "non-admin-key")
+	w = httptest.NewRecorder()
+
+	proxyRouter.ServeHTTP(w, req)
+
+	if w.Code != http.StatusForbidden {
+		t.Errorf("expected status 403 with non-admin token, got %d (body: %s)", w.Code, w.Body.String())
+	}
+
+	// Test 3: Invalid token should fail with 401
+	req = httptest.NewRequest("POST", fmt.Sprintf("/dnszone/%d/import", zoneID), bytes.NewReader([]byte(importBody)))
+	req.Header.Set("AccessKey", "invalid-token")
+	w = httptest.NewRecorder()
+
+	proxyRouter.ServeHTTP(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("expected status 401 with invalid token, got %d", w.Code)
+	}
+}

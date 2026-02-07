@@ -38,6 +38,8 @@ const (
 	ActionUpdateZone Action = "update_zone"
 	// ActionCheckAvailability checks DNS zone availability (admin only).
 	ActionCheckAvailability Action = "check_availability"
+	// ActionImportRecords imports DNS records (admin only).
+	ActionImportRecords Action = "import_records"
 )
 
 // Errors for authentication and authorization failures.

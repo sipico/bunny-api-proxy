@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -33,6 +34,8 @@ type BunnyClient interface {
 	// CheckZoneAvailability checks if a domain name is available to be added as a zone.
 	CheckZoneAvailability(ctx context.Context, name string) (*bunny.CheckAvailabilityResponse, error)
 
+	// ImportRecords imports DNS records from BIND zone file format.
+	ImportRecords(ctx context.Context, zoneID int64, body io.Reader, contentType string) (*bunny.ImportRecordsResponse, error)
 	// AddRecord creates a new DNS record in the specified zone.
 	AddRecord(ctx context.Context, zoneID int64, req *bunny.AddRecordRequest) (*bunny.Record, error)
 
@@ -335,6 +338,33 @@ func (h *Handler) HandleCheckAvailability(w http.ResponseWriter, r *http.Request
 	}
 
 	h.logger.Info("check zone availability", "name", req.Name, "available", result.Available)
+
+	writeJSON(w, http.StatusOK, result)
+}
+
+// HandleImportRecords imports DNS records from BIND zone file format.
+// POST /dnszone/{zoneID}/import
+// Admin only — bulk import operation.
+func (h *Handler) HandleImportRecords(w http.ResponseWriter, r *http.Request) {
+	zoneIDStr := chi.URLParam(r, "zoneID")
+	if zoneIDStr == "" {
+		writeError(w, http.StatusBadRequest, "missing zone ID")
+		return
+	}
+
+	zoneID, err := strconv.ParseInt(zoneIDStr, 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid zone ID")
+		return
+	}
+
+	result, err := h.client.ImportRecords(r.Context(), zoneID, r.Body, r.Header.Get("Content-Type"))
+	if err != nil {
+		handleBunnyError(w, err)
+		return
+	}
+
+	h.logger.Info("import records", "zone_id", zoneID, "successful", result.RecordsSuccessful, "failed", result.RecordsFailed, "skipped", result.RecordsSkipped)
 
 	writeJSON(w, http.StatusOK, result)
 }
