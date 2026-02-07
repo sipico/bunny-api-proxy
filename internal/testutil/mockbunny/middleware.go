@@ -107,3 +107,16 @@ func redactAPIKey(key string) string {
 	}
 	return key[:4] + "..." + key[len(key)-4:]
 }
+
+// VaryAcceptEncodingMiddleware adds the Vary: Accept-Encoding header to GET responses.
+// This header indicates that the response content may vary based on the Accept-Encoding header.
+// It mimics the behavior of the real bunny.net API which includes this header on GET responses.
+func VaryAcceptEncodingMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Only add Vary header for GET requests
+		if r.Method == http.MethodGet {
+			w.Header().Set("Vary", "Accept-Encoding")
+		}
+		next.ServeHTTP(w, r)
+	})
+}
