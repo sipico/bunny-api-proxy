@@ -369,7 +369,7 @@ func skipJSONValue(decoder *json.Decoder) error {
 
 func TestRecordJSONFieldOrder(t *testing.T) {
 	t.Parallel()
-	
+
 	// Create a Record with test values
 	record := Record{
 		ID:                    1,
@@ -399,13 +399,13 @@ func TestRecordJSONFieldOrder(t *testing.T) {
 		AutoSslIssuance:       true,
 		AccelerationStatus:    0,
 	}
-	
+
 	// Marshal to JSON
 	jsonBytes, err := json.Marshal(record)
 	if err != nil {
 		t.Fatalf("Marshal error: %v", err)
 	}
-	
+
 	// Expected field order (from real API)
 	expectedOrder := []string{
 		"Id", "Type", "Ttl", "Value", "Name", "Weight", "Priority", "Port",
@@ -415,11 +415,11 @@ func TestRecordJSONFieldOrder(t *testing.T) {
 		"LatencyZone", "SmartRoutingType", "Disabled", "Comment",
 		"AutoSslIssuance", "AccelerationStatus",
 	}
-	
+
 	// Decode JSON and extract field names in order
 	decoder := json.NewDecoder(strings.NewReader(string(jsonBytes)))
 	var actualOrder []string
-	
+
 	// Get the opening brace
 	tok, err := decoder.Token()
 	if err != nil {
@@ -428,7 +428,7 @@ func TestRecordJSONFieldOrder(t *testing.T) {
 	if tok != json.Delim('{') {
 		t.Fatalf("Expected opening brace, got %v", tok)
 	}
-	
+
 	// Extract all keys in order
 	for decoder.More() {
 		key, err := decoder.Token()
@@ -436,13 +436,13 @@ func TestRecordJSONFieldOrder(t *testing.T) {
 			t.Fatalf("Token error: %v", err)
 		}
 		actualOrder = append(actualOrder, key.(string))
-		
+
 		// Skip the value properly
 		if err := skipJSONValue(decoder); err != nil {
 			t.Fatalf("Error skipping value: %v", err)
 		}
 	}
-	
+
 	// Verify the order matches
 	if len(actualOrder) != len(expectedOrder) {
 		t.Errorf("Field count mismatch: got %d fields, want %d fields", len(actualOrder), len(expectedOrder))
@@ -450,7 +450,7 @@ func TestRecordJSONFieldOrder(t *testing.T) {
 		t.Logf("Expected order: %v", expectedOrder)
 		return
 	}
-	
+
 	for i, expected := range expectedOrder {
 		if i >= len(actualOrder) {
 			t.Errorf("Missing field at position %d: %s", i, expected)
