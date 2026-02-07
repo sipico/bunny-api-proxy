@@ -1225,3 +1225,81 @@ func TestErrorResponsesHaveTrailingCR(t *testing.T) {
 		t.Errorf("expected Message to end with \\r, got: %q", errResp.Message)
 	}
 }
+
+// TestListZones_VaryHeader verifies GET /dnszone includes Vary: Accept-Encoding header
+func TestListZones_VaryHeader(t *testing.T) {
+	t.Parallel()
+	s := New()
+	defer s.Close()
+
+	// Add a zone so we have a non-empty response
+	s.AddZone("example.com")
+
+	resp, err := http.Get(s.URL() + "/dnszone")
+	if err != nil {
+		t.Fatalf("failed to list zones: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected status %d, got %d", http.StatusOK, resp.StatusCode)
+	}
+
+	// Check for Vary: Accept-Encoding header
+	varyHeader := resp.Header.Get("Vary")
+	if varyHeader != "Accept-Encoding" {
+		t.Errorf("expected Vary header to be 'Accept-Encoding', got '%s'", varyHeader)
+	}
+}
+
+// TestGetZone_VaryHeader verifies GET /dnszone/{id} includes Vary: Accept-Encoding header
+func TestGetZone_VaryHeader(t *testing.T) {
+	t.Parallel()
+	s := New()
+	defer s.Close()
+
+	records := []Record{
+		{Type: 0, Name: "@", Value: "192.168.1.1", TTL: 300}, // A record
+	}
+	id := s.AddZoneWithRecords("example.com", records)
+
+	resp, err := http.Get(fmt.Sprintf("%s/dnszone/%d", s.URL(), id))
+	if err != nil {
+		t.Fatalf("failed to get zone: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected status %d, got %d", http.StatusOK, resp.StatusCode)
+	}
+
+	// Check for Vary: Accept-Encoding header
+	varyHeader := resp.Header.Get("Vary")
+	if varyHeader != "Accept-Encoding" {
+		t.Errorf("expected Vary header to be 'Accept-Encoding', got '%s'", varyHeader)
+	}
+}
+
+// TestCreateZone_NoVaryHeader verifies POST /dnszone does NOT include Vary: Accept-Encoding header
+func TestCreateZone_NoVaryHeader(t *testing.T) {
+	t.Parallel()
+	s := New()
+	defer s.Close()
+
+	reqBody := strings.NewReader(`{"Domain":"test.example.com"}`)
+	resp, err := http.Post(s.URL()+"/dnszone", "application/json", reqBody)
+	if err != nil {
+		t.Fatalf("failed to create zone: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		t.Errorf("expected status %d, got %d", http.StatusCreated, resp.StatusCode)
+	}
+
+	// Check that Vary header is NOT present on POST responses
+	varyHeader := resp.Header.Get("Vary")
+	if varyHeader != "" {
+		t.Errorf("expected Vary header to be absent on POST, got '%s'", varyHeader)
+	}
+}

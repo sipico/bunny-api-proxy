@@ -59,6 +59,9 @@ func New() *Server {
 		r.Use(LoggingMiddleware(logger))
 	}
 
+	// Apply Vary: Accept-Encoding header middleware to GET responses
+	r.Use(VaryAcceptEncodingMiddleware)
+
 	// Wire up DNS API handlers with authentication (if API key is configured)
 	r.Group(func(r chi.Router) {
 		if apiKey != "" {
