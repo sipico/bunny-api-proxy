@@ -23,7 +23,7 @@ type mockBunnyClient struct {
 	createZoneFunc   func(context.Context, string) (*bunny.Zone, error)
 	getZoneFunc      func(context.Context, int64) (*bunny.Zone, error)
 	deleteZoneFunc   func(context.Context, int64) error
-	updateZoneFunc  func(context.Context, int64, *bunny.UpdateZoneRequest) (*bunny.Zone, error)
+	updateZoneFunc   func(context.Context, int64, *bunny.UpdateZoneRequest) (*bunny.Zone, error)
 	addRecordFunc    func(context.Context, int64, *bunny.AddRecordRequest) (*bunny.Record, error)
 	updateRecordFunc func(context.Context, int64, int64, *bunny.AddRecordRequest) (*bunny.Record, error)
 	deleteRecordFunc func(context.Context, int64, int64) error
@@ -722,7 +722,6 @@ func TestHandleDeleteZone_NotFound(t *testing.T) {
 	}
 }
 
-
 // TestHandleUpdateZone_Success tests successful zone update
 func TestHandleUpdateZone_Success(t *testing.T) {
 	t.Parallel()
@@ -854,6 +853,7 @@ func TestHandleUpdateZone_ClientError(t *testing.T) {
 		t.Errorf("expected status %d, got %d", http.StatusInternalServerError, w.Code)
 	}
 }
+
 // TestHandleListRecords_Success tests successful records listing
 func TestHandleListRecords_Success(t *testing.T) {
 	t.Parallel()

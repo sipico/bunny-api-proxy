@@ -407,6 +407,7 @@ func (c *Client) DeleteZone(ctx context.Context, id int64) error {
 	return parseError(resp.StatusCode, body)
 
 }
+
 // UpdateZone updates zone-level settings.
 func (c *Client) UpdateZone(ctx context.Context, id int64, req *UpdateZoneRequest) (*Zone, error) {
 	url := fmt.Sprintf("%s/dnszone/%d", c.baseURL, id)

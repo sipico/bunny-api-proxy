@@ -130,10 +130,6 @@ func (m *Authenticator) RequireAdmin(next http.Handler) http.Handler {
 // It must be used after Authenticate middleware.
 // Admin tokens and master key bypass permission checks.
 // Scoped tokens are validated against their permissions.
-// CheckPermissions is middleware that validates token permissions for proxy requests.
-// It must be used after Authenticate middleware.
-// Admin tokens and master key bypass permission checks.
-// Scoped tokens are validated against their permissions.
 func (m *Authenticator) CheckPermissions(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -189,6 +185,7 @@ func (m *Authenticator) CheckPermissions(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 	})
 }
+
 // --- Legacy support for existing Validator-based middleware ---
 // The following functions maintain backward compatibility with existing code.
 

@@ -1,10 +1,10 @@
 package proxy
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log/slog"
