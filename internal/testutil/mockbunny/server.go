@@ -69,6 +69,7 @@ func New() *Server {
 		}
 		r.Get("/dnszone", server.handleListZones)
 		r.Post("/dnszone", server.handleCreateZone)
+		r.Post("/dnszone/checkavailability", server.handleCheckAvailability)
 		r.Get("/dnszone/{id}", server.handleGetZone)
 		r.Delete("/dnszone/{id}", server.handleDeleteZone)
 		r.Post("/dnszone/{id}", server.handleUpdateZone)

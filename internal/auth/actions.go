@@ -13,12 +13,13 @@ import (
 
 // URL patterns for DNS API endpoints (matching bunny.net API paths)
 var (
-	listZonesPattern    = regexp.MustCompile(`^/dnszone/?$`)
-	getZonePattern      = regexp.MustCompile(`^/dnszone/(\d+)/?$`)
-	updateZonePattern   = regexp.MustCompile(`^/dnszone/(\d+)/?$`)
-	recordsPattern      = regexp.MustCompile(`^/dnszone/(\d+)/records/?$`)
-	updateRecordPattern = regexp.MustCompile(`^/dnszone/(\d+)/records/(\d+)/?$`)
-	deleteRecordPattern = regexp.MustCompile(`^/dnszone/(\d+)/records/(\d+)/?$`)
+	listZonesPattern         = regexp.MustCompile(`^/dnszone/?$`)
+	getZonePattern           = regexp.MustCompile(`^/dnszone/(\d+)/?$`)
+	updateZonePattern        = regexp.MustCompile(`^/dnszone/(\d+)/?$`)
+	recordsPattern           = regexp.MustCompile(`^/dnszone/(\d+)/records/?$`)
+	updateRecordPattern      = regexp.MustCompile(`^/dnszone/(\d+)/records/(\d+)/?$`)
+	deleteRecordPattern      = regexp.MustCompile(`^/dnszone/(\d+)/records/(\d+)/?$`)
+	checkAvailabilityPattern = regexp.MustCompile(`^/dnszone/checkavailability/?$`)
 )
 
 // ParseRequest extracts action, zone ID, and record type from HTTP request.
@@ -45,6 +46,10 @@ func ParseRequest(r *http.Request) (*Request, error) {
 		return &Request{Action: ActionListRecords, ZoneID: zoneID}, nil
 	}
 
+	// POST /dnszone/checkavailability - check zone availability (admin only)
+	if r.Method == http.MethodPost && checkAvailabilityPattern.MatchString(path) {
+		return &Request{Action: ActionCheckAvailability}, nil
+	}
 	// POST /dnszone - create zone
 	if r.Method == http.MethodPost && listZonesPattern.MatchString(path) {
 		return &Request{Action: ActionCreateZone}, nil

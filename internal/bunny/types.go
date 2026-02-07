@@ -114,3 +114,13 @@ type UpdateZoneRequest struct {
 	CertificateKeyType            *int    `json:"CertificateKeyType,omitempty"`
 	LoggingIPAnonymizationEnabled *bool   `json:"LoggingIPAnonymizationEnabled,omitempty"`
 }
+
+// CheckAvailabilityRequest represents the request body for checking zone availability.
+type CheckAvailabilityRequest struct {
+	Name string `json:"Name"`
+}
+
+// CheckAvailabilityResponse represents the response from the check availability endpoint.
+type CheckAvailabilityResponse struct {
+	Available bool `json:"Available"`
+}
