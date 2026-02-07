@@ -93,7 +93,8 @@ func Setup(t *testing.T) *TestEnv {
 	// Verify account is completely empty before starting
 	// This ensures tests start with clean state and don't leave garbage
 	if env.ProxyURL != "" {
-		// E2E tests: Always verify empty state
+		// E2E tests: Clean up stale zones from previous failed runs, then verify empty
+		env.CleanupStaleZones(t)
 		env.VerifyEmptyState(t)
 	} else {
 		// Unit tests: Clean up stale zones if any exist
@@ -258,21 +259,62 @@ func (e *TestEnv) verifyCleanupComplete(t *testing.T) {
 // CleanupStaleZones removes orphaned zones from previous failed test runs.
 // It looks for zones matching the pattern "*-bap.xyz" and deletes them.
 // Failures are logged but do not cause test failure.
+//
+// For real API mode (E2E), adds resilience for eventual consistency:
+// - Waits briefly after initial cleanup
+// - Retries up to 3 times if stale zones remain after deletion
+// - Waits 3 seconds between retries
 func (e *TestEnv) CleanupStaleZones(t *testing.T) {
-	// List all zones
-	resp, err := e.Client.ListZones(e.ctx, nil)
-	if err != nil {
-		t.Logf("Warning: Failed to list zones for cleanup: %v", err)
-		return
-	}
+	const maxRetries = 3
+	const retryDelay = 3 * time.Second
 
-	// Delete zones matching our test pattern: *-*-bap.xyz
-	for _, zone := range resp.Items {
-		if strings.HasSuffix(zone.Domain, "-bap.xyz") {
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		// List all zones
+		resp, err := e.Client.ListZones(e.ctx, nil)
+		if err != nil {
+			t.Logf("Warning: Failed to list zones for cleanup: %v", err)
+			return
+		}
+
+		// Find stale zones matching our test pattern: *-bap.xyz
+		staleZones := make([]bunny.Zone, 0)
+		for _, zone := range resp.Items {
+			if strings.HasSuffix(zone.Domain, "-bap.xyz") {
+				staleZones = append(staleZones, zone)
+			}
+		}
+
+		if len(staleZones) == 0 {
+			if attempt > 0 {
+				t.Logf("✓ Stale zones cleanup completed after %d attempt(s)", attempt)
+			}
+			return
+		}
+
+		t.Logf("Cleanup attempt %d: Found %d stale zone(s) to delete", attempt+1, len(staleZones))
+
+		// Delete the stale zones
+		for _, zone := range staleZones {
 			if err := e.Client.DeleteZone(e.ctx, zone.ID); err != nil {
 				t.Logf("Warning: Failed to clean up stale zone %s (ID: %d): %v", zone.Domain, zone.ID, err)
 			} else {
 				t.Logf("Cleaned up stale zone: %s (ID: %d)", zone.Domain, zone.ID)
+			}
+		}
+
+		// If in real mode, wait for eventual consistency before retrying
+		if e.Mode == ModeReal && attempt < maxRetries-1 {
+			t.Logf("Waiting %v for eventual consistency before retry...", retryDelay)
+			time.Sleep(retryDelay)
+		}
+	}
+
+	// Final warning if we couldn't clean up all stale zones
+	resp, err := e.Client.ListZones(e.ctx, nil)
+	if err == nil {
+		for _, zone := range resp.Items {
+			if strings.HasSuffix(zone.Domain, "-bap.xyz") {
+				t.Logf("Warning: Failed to clean up stale zone after %d attempts: %s (ID: %d)", maxRetries, zone.Domain, zone.ID)
 			}
 		}
 	}
