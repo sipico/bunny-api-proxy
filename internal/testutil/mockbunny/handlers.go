@@ -36,10 +36,10 @@ func (s *Server) handleListZones(w http.ResponseWriter, r *http.Request) {
 	defer s.state.mu.RUnlock()
 
 	// Collect and filter zones
-	var zones []Zone
+	var zones []*Zone
 	for _, zone := range s.state.zones {
 		if search == "" || strings.Contains(zone.Domain, search) {
-			zones = append(zones, *zone)
+			zones = append(zones, zone)
 		}
 	}
 
@@ -53,17 +53,24 @@ func (s *Server) handleListZones(w http.ResponseWriter, r *http.Request) {
 	start := (page - 1) * perPage
 	end := start + perPage
 
+	var paginatedZones []*Zone
 	if start >= total {
-		zones = []Zone{}
+		paginatedZones = []*Zone{}
 	} else {
 		if end > total {
 			end = total
 		}
-		zones = zones[start:end]
+		paginatedZones = zones[start:end]
+	}
+
+	// Convert zones to short time format for GET response
+	shortZones := make([]ZoneShortTime, len(paginatedZones))
+	for i, zone := range paginatedZones {
+		shortZones[i] = *zone.ZoneShortTime()
 	}
 
 	resp := ListZonesResponse{
-		Items:        zones,
+		Items:        shortZones,
 		CurrentPage:  page,
 		TotalItems:   total,
 		HasMoreItems: end < total,
@@ -75,6 +82,7 @@ func (s *Server) handleListZones(w http.ResponseWriter, r *http.Request) {
 // handleGetZone handles GET /dnszone/{id} requests.
 // It returns the zone JSON if found, or 404 if not found.
 // Returns 400 for invalid (non-numeric) zone IDs.
+// Timestamps are formatted without sub-second precision or Z suffix to match real API.
 func (s *Server) handleGetZone(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
@@ -92,7 +100,9 @@ func (s *Server) handleGetZone(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, zone)
+	// Convert zone to short time format for GET response
+	shortZone := zone.ZoneShortTime()
+	writeJSON(w, http.StatusOK, shortZone)
 }
 
 // handleDeleteRecord handles DELETE /dnszone/{zoneId}/records/{id}

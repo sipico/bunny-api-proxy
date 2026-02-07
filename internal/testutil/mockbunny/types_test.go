@@ -111,7 +111,7 @@ func TestListZonesResponse(t *testing.T) {
 		CurrentPage:  1,
 		TotalItems:   10,
 		HasMoreItems: true,
-		Items:        []Zone{},
+		Items:        []ZoneShortTime{},
 	}
 
 	if response.CurrentPage != 1 {
@@ -263,5 +263,82 @@ func TestMockBunnyTime_RoundTrip(t *testing.T) {
 	// Should equal original
 	if !unmarshaled.Equal(original.Time) {
 		t.Errorf("Round trip failed: got %v, want %v", unmarshaled, original)
+	}
+}
+
+func TestMockBunnyTimeShort_MarshalJSON(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name     string
+		time     MockBunnyTimeShort
+		expected string
+	}{
+		{
+			name:     "zero time marshals to null",
+			time:     MockBunnyTimeShort{},
+			expected: `null`,
+		},
+		{
+			name:     "timestamp marshals without sub-second precision or Z",
+			time:     MockBunnyTimeShort{Time: time.Date(2026, 2, 3, 14, 7, 45, 0, time.UTC)},
+			expected: `"2026-02-03T14:07:45"`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := json.Marshal(tt.time)
+			if err != nil {
+				t.Fatalf("MarshalJSON() error = %v", err)
+			}
+			if string(got) != tt.expected {
+				t.Errorf("MarshalJSON() = %s, want %s", got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestMockBunnyTimeShort_UnmarshalJSON(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name    string
+		input   string
+		wantErr bool
+	}{
+		{
+			name:    "RFC3339 with Z timezone",
+			input:   `"2026-02-03T14:07:45Z"`,
+			wantErr: false,
+		},
+		{
+			name:    "bunny.net short format without timezone (treated as UTC)",
+			input:   `"2026-02-03T14:07:45"`,
+			wantErr: false,
+		},
+		{
+			name:    "null value",
+			input:   `null`,
+			wantErr: false,
+		},
+		{
+			name:    "empty string",
+			input:   `""`,
+			wantErr: false,
+		},
+		{
+			name:    "invalid format",
+			input:   `"invalid-timestamp"`,
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var mbt MockBunnyTimeShort
+			err := json.Unmarshal([]byte(tt.input), &mbt)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("UnmarshalJSON() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
 	}
 }
