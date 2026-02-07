@@ -2,6 +2,7 @@ package mockbunny
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 )
@@ -346,5 +347,117 @@ func TestMockBunnyTimeShort_UnmarshalJSON(t *testing.T) {
 				t.Errorf("UnmarshalJSON() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
+	}
+}
+
+func skipJSONValue(decoder *json.Decoder) error {
+	t, err := decoder.Token()
+	if err != nil {
+		return err
+	}
+	if t == json.Delim('[') || t == json.Delim('{') {
+		for decoder.More() {
+			if err := skipJSONValue(decoder); err != nil {
+				return err
+			}
+		}
+		_, err := decoder.Token() // consume the closing delimiter
+		return err
+	}
+	return nil
+}
+
+func TestRecordJSONFieldOrder(t *testing.T) {
+	t.Parallel()
+
+	// Create a Record with test values
+	record := Record{
+		ID:                    1,
+		Type:                  0, // A
+		TTL:                   3600,
+		Value:                 "192.0.2.1",
+		Name:                  "example.com",
+		Weight:                5,
+		Priority:              10,
+		Port:                  80,
+		Flags:                 0,
+		Tag:                   "test",
+		Accelerated:           false,
+		AcceleratedPullZoneID: 0,
+		LinkName:              "",
+		IPGeoLocationInfo:     nil,
+		GeolocationInfo:       nil,
+		MonitorStatus:         1,
+		MonitorType:           2,
+		GeolocationLatitude:   0.0,
+		GeolocationLongitude:  0.0,
+		EnviromentalVariables: []interface{}{},
+		LatencyZone:           nil,
+		SmartRoutingType:      1,
+		Disabled:              false,
+		Comment:               "test record",
+		AutoSslIssuance:       true,
+		AccelerationStatus:    0,
+	}
+
+	// Marshal to JSON
+	jsonBytes, err := json.Marshal(record)
+	if err != nil {
+		t.Fatalf("Marshal error: %v", err)
+	}
+
+	// Expected field order (from real API)
+	expectedOrder := []string{
+		"Id", "Type", "Ttl", "Value", "Name", "Weight", "Priority", "Port",
+		"Flags", "Tag", "Accelerated", "AcceleratedPullZoneId", "LinkName",
+		"IPGeoLocationInfo", "GeolocationInfo", "MonitorStatus", "MonitorType",
+		"GeolocationLatitude", "GeolocationLongitude", "EnviromentalVariables",
+		"LatencyZone", "SmartRoutingType", "Disabled", "Comment",
+		"AutoSslIssuance", "AccelerationStatus",
+	}
+
+	// Decode JSON and extract field names in order
+	decoder := json.NewDecoder(strings.NewReader(string(jsonBytes)))
+	var actualOrder []string
+
+	// Get the opening brace
+	tok, err := decoder.Token()
+	if err != nil {
+		t.Fatalf("Token error: %v", err)
+	}
+	if tok != json.Delim('{') {
+		t.Fatalf("Expected opening brace, got %v", tok)
+	}
+
+	// Extract all keys in order
+	for decoder.More() {
+		key, err := decoder.Token()
+		if err != nil {
+			t.Fatalf("Token error: %v", err)
+		}
+		actualOrder = append(actualOrder, key.(string))
+
+		// Skip the value properly
+		if err := skipJSONValue(decoder); err != nil {
+			t.Fatalf("Error skipping value: %v", err)
+		}
+	}
+
+	// Verify the order matches
+	if len(actualOrder) != len(expectedOrder) {
+		t.Errorf("Field count mismatch: got %d fields, want %d fields", len(actualOrder), len(expectedOrder))
+		t.Logf("Actual order: %v", actualOrder)
+		t.Logf("Expected order: %v", expectedOrder)
+		return
+	}
+
+	for i, expected := range expectedOrder {
+		if i >= len(actualOrder) {
+			t.Errorf("Missing field at position %d: %s", i, expected)
+			break
+		}
+		if actualOrder[i] != expected {
+			t.Errorf("Field at position %d: got %s, want %s", i, actualOrder[i], expected)
+		}
 	}
 }

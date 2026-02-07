@@ -100,11 +100,11 @@ func (t *MockBunnyTime) UnmarshalJSON(b []byte) error {
 type Record struct {
 	ID                    int64         `json:"Id"`
 	Type                  int           `json:"Type"` // 0 = A, 1 = AAAA, 2 = CNAME, 3 = TXT, 4 = MX, 5 = SPF, 6 = Flatten, 7 = PullZone, 8 = SRV, 9 = CAA, 10 = PTR, 11 = Script, 12 = NS
-	Name                  string        `json:"Name"`
-	Value                 string        `json:"Value"`
 	TTL                   int32         `json:"Ttl"`
-	Priority              int32         `json:"Priority"`
+	Value                 string        `json:"Value"`
+	Name                  string        `json:"Name"`
 	Weight                int32         `json:"Weight"`
+	Priority              int32         `json:"Priority"`
 	Port                  int32         `json:"Port"`
 	Flags                 int           `json:"Flags"`
 	Tag                   string        `json:"Tag"`
