@@ -73,6 +73,31 @@ gh run list --repo sipico/bunny-api-proxy
 gh run view <run-id> --repo sipico/bunny-api-proxy --log-failed
 ```
 
+**Creating Pull Requests:**
+
+Use `--base` and `--head` flags to explicitly specify the branches:
+
+```bash
+gh pr create --repo sipico/bunny-api-proxy \
+  --base main \
+  --head <your-branch-name> \
+  --title "Your PR Title" \
+  --body "$(cat <<'EOF'
+## Summary
+Your PR description here
+
+## Changes
+- Change 1
+- Change 2
+EOF
+)"
+```
+
+This is especially useful when:
+- Working with local git remotes that don't point to GitHub.com
+- The `--head` flag ensures your feature branch is used instead of relying on origin detection
+- Always use `--base main` for consistency, and replace `<your-branch-name>` with your actual branch name
+
 ## Project Structure
 
 ```
