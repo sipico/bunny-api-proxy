@@ -32,6 +32,10 @@ const (
 	ActionUpdateRecord Action = "update_record"
 	// ActionDeleteRecord deletes a record from a zone.
 	ActionDeleteRecord Action = "delete_record"
+	// ActionCreateZone creates a new DNS zone (admin only).
+	ActionCreateZone Action = "create_zone"
+	// ActionUpdateZone updates zone-level settings (admin only).
+	ActionUpdateZone Action = "update_zone"
 )
 
 // Errors for authentication and authorization failures.
