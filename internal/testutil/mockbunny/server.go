@@ -160,10 +160,12 @@ func (s *Server) AddZoneWithRecords(domain string, records []Record) int64 {
 	for i := range records {
 		records[i].ID = s.state.nextRecordID
 		s.state.nextRecordID++
-		// Set defaults for unset fields (0 values)
-		// MonitorStatus defaults to 0 (Unknown)
-		// MonitorType defaults to 0 (None)
-		// SmartRoutingType defaults to 0 (None)
+		// Set defaults for new fields added to match real API behavior
+		if records[i].EnviromentalVariables == nil {
+			records[i].EnviromentalVariables = []interface{}{}
+		}
+		// AutoSslIssuance always defaults to true in real API
+		records[i].AutoSslIssuance = true
 	}
 	zone.Records = records
 	zone.DateModified = MockBunnyTime{Time: time.Now().UTC()}
