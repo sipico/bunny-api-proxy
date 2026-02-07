@@ -409,6 +409,6 @@ func (s *Server) writeError(w http.ResponseWriter, status int, errorKey, field, 
 	writeJSON(w, status, ErrorResponse{
 		ErrorKey: errorKey,
 		Field:    field,
-		Message:  message,
+		Message:  message + "\r",
 	})
 }
