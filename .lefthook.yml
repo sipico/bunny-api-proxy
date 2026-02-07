@@ -3,18 +3,41 @@
 # https://github.com/evilmartians/lefthook
 
 pre-commit:
-  parallel: true
+  parallel: false
   commands:
-    gofmt:
+    # Auto-format Go code before commit
+    gofmt-fix:
       glob: "*.go"
-      run: gofmt -l -d {staged_files} && test -z "$(gofmt -l {staged_files})"
-      fail_text: "gofmt found unformatted files - run 'gofmt -w .' to fix"
+      run: gofmt -w {staged_files} && git add {staged_files}
+      stage_fixed: true
 
+    # Run linter on staged files
     golangci-lint:
       glob: "*.go"
       run: golangci-lint run --new-from-rev=HEAD~1 {staged_files}
-      fail_text: "golangci-lint found issues"
+      fail_text: "golangci-lint found issues - fix them before committing"
 
+    # Ensure go.mod and go.sum are tidy
     go-mod-tidy:
       run: go mod tidy && git diff --exit-code go.mod go.sum
-      fail_text: "go.mod/go.sum not tidy - run 'go mod tidy'"
+      fail_text: "go.mod/go.sum not tidy - run 'go mod tidy' and stage the changes"
+
+# Pre-push hook as extra safety check
+pre-push:
+  parallel: true
+  commands:
+    # Final format check before push
+    gofmt-final:
+      glob: "*.go"
+      run: test -z "$(gofmt -l .)"
+      fail_text: "Unformatted code detected before push - run 'make fmt' to fix"
+
+    # Run full linter before push
+    golangci-lint-full:
+      run: golangci-lint run
+      fail_text: "Linter issues detected - fix before pushing"
+
+    # Ensure tests pass before push
+    tests:
+      run: go test -race ./...
+      fail_text: "Tests failed - fix before pushing"

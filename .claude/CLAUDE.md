@@ -37,10 +37,14 @@ Write tests first, then implementation. Tests are the safety net.
 - Prefer simplicity over cleverness
 
 ### Git workflow
+- **ALWAYS** run `make fmt` before committing (auto-formats all Go code)
+- Run `make pre-commit-check` before pushing to catch all issues
 - Commit messages should be clear and descriptive
 - Never commit secrets or API keys
+- Never use `--no-verify` to skip git hooks
 - CI validates all changes via GitHub Actions
-- Pre-commit hooks enforce formatting and linting locally
+- Pre-commit hooks auto-format code and enforce linting
+- Pre-push hooks run final tests and validation
 
 ### Development Setup
 
@@ -50,17 +54,53 @@ Run once after cloning to install Git pre-commit hooks:
 make setup
 ```
 
-This installs [lefthook](https://github.com/evilmartians/lefthook) hooks that automatically run `gofmt`, `golangci-lint`, and `go mod tidy` checks before each commit.
+This installs [lefthook](https://github.com/evilmartians/lefthook) hooks that automatically:
+- Format Go code with `gofmt` before each commit
+- Run `golangci-lint` on staged files
+- Validate `go.mod` and `go.sum` are tidy
+- Run full tests and linting before push
+
+### Code Formatting (CRITICAL FOR AI AGENTS)
+
+**ALWAYS format code before committing.** Git hooks will auto-format, but agents should be explicit:
+
+```bash
+# Format all Go code (run BEFORE staging/committing)
+make fmt
+
+# Check if code is formatted without changing files
+make fmt-check
+
+# Run ALL pre-commit checks (format + lint + tidy + test)
+make pre-commit-check
+```
+
+**Workflow for AI agents:**
+1. Write/modify code
+2. Run `make fmt` to format
+3. Run `make pre-commit-check` to validate
+4. Stage files with `git add`
+5. Commit (hooks will run automatically)
+6. Push (pre-push hooks will validate again)
+
+**NEVER skip formatting.** Unformatted code will be rejected by CI.
 
 ### Local Validation
 
 Run before pushing to catch issues early:
 
 ```bash
-make lint tidy test
+# Full validation (recommended before push)
+make pre-commit-check
+
+# Individual checks
+make fmt-check    # Check formatting only
+make lint         # Run golangci-lint
+make tidy         # Check go.mod/go.sum
+make test         # Run tests with coverage
 ```
 
-Pre-commit hooks catch formatting issues automatically, but run full validation before pushing.
+Pre-commit hooks will auto-format and validate, but pre-push hooks provide final safety checks.
 
 ### GitHub CLI
 
