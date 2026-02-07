@@ -174,3 +174,28 @@ func TestNewWithInvalidDatabasePath(t *testing.T) {
 		}
 	}
 }
+
+// TestNewDisablesMmapSize tests that New() disables memory-mapped I/O.
+func TestNewDisablesMmapSize(t *testing.T) {
+	t.Parallel()
+	// Use a temporary file instead of :memory: because memory databases
+	// don't support PRAGMA mmap_size
+	tmpfile := t.TempDir()
+	dbPath := tmpfile + "/test.db"
+	
+	storage, err := New(dbPath)
+	if err != nil {
+		t.Fatalf("failed to create storage: %v", err)
+	}
+	defer func() { _ = storage.Close() }()
+
+	// Verify mmap_size is disabled (set to 0)
+	var mmapSize int
+	err = storage.db.QueryRow("PRAGMA mmap_size").Scan(&mmapSize)
+	if err != nil {
+		t.Fatalf("failed to check mmap_size: %v", err)
+	}
+	if mmapSize != 0 {
+		t.Errorf("expected mmap_size 0, got %d", mmapSize)
+	}
+}
