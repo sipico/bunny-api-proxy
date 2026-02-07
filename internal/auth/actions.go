@@ -20,6 +20,7 @@ var (
 	updateRecordPattern      = regexp.MustCompile(`^/dnszone/(\d+)/records/(\d+)/?$`)
 	deleteRecordPattern      = regexp.MustCompile(`^/dnszone/(\d+)/records/(\d+)/?$`)
 	checkAvailabilityPattern = regexp.MustCompile(`^/dnszone/checkavailability/?$`)
+	importRecordsPattern     = regexp.MustCompile(`^/dnszone/(\d+)/import/?$`)
 )
 
 // ParseRequest extracts action, zone ID, and record type from HTTP request.
@@ -45,8 +46,14 @@ func ParseRequest(r *http.Request) (*Request, error) {
 		zoneID, _ := strconv.ParseInt(matches[1], 10, 64) //nolint:errcheck // regex ensures valid number
 		return &Request{Action: ActionListRecords, ZoneID: zoneID}, nil
 	}
-
 	// POST /dnszone/checkavailability - check zone availability (admin only)
+	// POST /dnszone/{id}/import - import records (admin only)
+	if r.Method == http.MethodPost {
+		if matches := importRecordsPattern.FindStringSubmatch(path); matches != nil {
+			zoneID, _ := strconv.ParseInt(matches[1], 10, 64) //nolint:errcheck // regex ensures valid number
+			return &Request{Action: ActionImportRecords, ZoneID: zoneID}, nil
+		}
+	}
 	if r.Method == http.MethodPost && checkAvailabilityPattern.MatchString(path) {
 		return &Request{Action: ActionCheckAvailability}, nil
 	}

@@ -28,6 +28,7 @@ type mockBunnyClient struct {
 	updateRecordFunc          func(context.Context, int64, int64, *bunny.AddRecordRequest) (*bunny.Record, error)
 	deleteRecordFunc          func(context.Context, int64, int64) error
 	checkZoneAvailabilityFunc func(context.Context, string) (*bunny.CheckAvailabilityResponse, error)
+	importRecordsFunc         func(context.Context, int64, io.Reader, string) (*bunny.ImportRecordsResponse, error)
 }
 
 func (m *mockBunnyClient) ListZones(ctx context.Context, opts *bunny.ListZonesOptions) (*bunny.ListZonesResponse, error) {
@@ -89,6 +90,13 @@ func (m *mockBunnyClient) DeleteRecord(ctx context.Context, zoneID, recordID int
 func (m *mockBunnyClient) CheckZoneAvailability(ctx context.Context, name string) (*bunny.CheckAvailabilityResponse, error) {
 	if m.checkZoneAvailabilityFunc != nil {
 		return m.checkZoneAvailabilityFunc(ctx, name)
+	}
+	return nil, nil
+}
+
+func (m *mockBunnyClient) ImportRecords(ctx context.Context, zoneID int64, body io.Reader, contentType string) (*bunny.ImportRecordsResponse, error) {
+	if m.importRecordsFunc != nil {
+		return m.importRecordsFunc(ctx, zoneID, body, contentType)
 	}
 	return nil, nil
 }
@@ -2047,6 +2055,100 @@ func TestHandleCheckAvailability_ClientError(t *testing.T) {
 	r := httptest.NewRequest(http.MethodPost, "/dnszone/checkavailability", body)
 
 	handler.HandleCheckAvailability(w, r)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("expected status %d, got %d", http.StatusInternalServerError, w.Code)
+	}
+}
+
+// TestHandleImportRecords_Success tests successful record import
+func TestHandleImportRecords_Success(t *testing.T) {
+	t.Parallel()
+	client := &mockBunnyClient{
+		importRecordsFunc: func(ctx context.Context, zoneID int64, body io.Reader, contentType string) (*bunny.ImportRecordsResponse, error) {
+			if zoneID != 123 {
+				t.Errorf("expected zoneID 123, got %d", zoneID)
+			}
+			return &bunny.ImportRecordsResponse{
+				RecordsSuccessful: 3,
+				RecordsFailed:     1,
+				RecordsSkipped:    0,
+			}, nil
+		},
+	}
+
+	handler := NewHandler(client, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	w := httptest.NewRecorder()
+	body := bytes.NewBufferString("example.com. 300 IN A 1.2.3.4\nexample.com. 300 IN TXT \"test\"")
+	r := newTestRequest(http.MethodPost, "/dnszone/123/import", body, map[string]string{"zoneID": "123"})
+
+	handler.HandleImportRecords(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status %d, got %d", http.StatusOK, w.Code)
+	}
+
+	var result bunny.ImportRecordsResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+
+	if result.RecordsSuccessful != 3 {
+		t.Errorf("expected 3 successful records, got %d", result.RecordsSuccessful)
+	}
+}
+
+// TestHandleImportRecords_InvalidZoneID tests invalid zone ID
+func TestHandleImportRecords_InvalidZoneID(t *testing.T) {
+	t.Parallel()
+	client := &mockBunnyClient{}
+	handler := NewHandler(client, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	w := httptest.NewRecorder()
+	r := newTestRequest(http.MethodPost, "/dnszone/abc/import", nil, map[string]string{"zoneID": "abc"})
+
+	handler.HandleImportRecords(w, r)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d", http.StatusBadRequest, w.Code)
+	}
+}
+
+// TestHandleImportRecords_NotFound tests zone not found
+func TestHandleImportRecords_NotFound(t *testing.T) {
+	t.Parallel()
+	client := &mockBunnyClient{
+		importRecordsFunc: func(ctx context.Context, zoneID int64, body io.Reader, contentType string) (*bunny.ImportRecordsResponse, error) {
+			return nil, bunny.ErrNotFound
+		},
+	}
+
+	handler := NewHandler(client, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	w := httptest.NewRecorder()
+	body := bytes.NewBufferString("example.com. 300 IN A 1.2.3.4")
+	r := newTestRequest(http.MethodPost, "/dnszone/999/import", body, map[string]string{"zoneID": "999"})
+
+	handler.HandleImportRecords(w, r)
+
+	if w.Code != http.StatusNotFound {
+		t.Errorf("expected status %d, got %d", http.StatusNotFound, w.Code)
+	}
+}
+
+// TestHandleImportRecords_ClientError tests client error handling
+func TestHandleImportRecords_ClientError(t *testing.T) {
+	t.Parallel()
+	client := &mockBunnyClient{
+		importRecordsFunc: func(ctx context.Context, zoneID int64, body io.Reader, contentType string) (*bunny.ImportRecordsResponse, error) {
+			return nil, fmt.Errorf("network error")
+		},
+	}
+
+	handler := NewHandler(client, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	w := httptest.NewRecorder()
+	body := bytes.NewBufferString("example.com. 300 IN A 1.2.3.4")
+	r := newTestRequest(http.MethodPost, "/dnszone/123/import", body, map[string]string{"zoneID": "123"})
+
+	handler.HandleImportRecords(w, r)
 
 	if w.Code != http.StatusInternalServerError {
 		t.Errorf("expected status %d, got %d", http.StatusInternalServerError, w.Code)

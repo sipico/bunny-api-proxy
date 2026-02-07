@@ -1461,3 +1461,203 @@ func TestHandleUpdateZone_PartialUpdate(t *testing.T) {
 		t.Errorf("expected Nameserver2 to remain unchanged, got %s (expected %s)", updatedZone.Nameserver2, originalNS2)
 	}
 }
+
+// Tests for handleCheckAvailability
+func TestHandleCheckAvailability_Available(t *testing.T) {
+	t.Parallel()
+	s := New()
+	defer s.Close()
+
+	reqBody := strings.NewReader(`{"Name":"available.com"}`)
+	resp, err := http.Post(s.URL()+"/dnszone/checkavailability", "application/json", reqBody)
+	if err != nil {
+		t.Fatalf("failed to check availability: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected status %d, got %d", http.StatusOK, resp.StatusCode)
+	}
+
+	var result struct {
+		Available bool `json:"Available"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if !result.Available {
+		t.Error("expected domain to be available")
+	}
+}
+
+func TestHandleCheckAvailability_Unavailable(t *testing.T) {
+	t.Parallel()
+	s := New()
+	defer s.Close()
+
+	s.AddZone("taken.com")
+
+	reqBody := strings.NewReader(`{"Name":"taken.com"}`)
+	resp, err := http.Post(s.URL()+"/dnszone/checkavailability", "application/json", reqBody)
+	if err != nil {
+		t.Fatalf("failed to check availability: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected status %d, got %d", http.StatusOK, resp.StatusCode)
+	}
+
+	var result struct {
+		Available bool `json:"Available"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if result.Available {
+		t.Error("expected domain to NOT be available")
+	}
+}
+
+func TestHandleCheckAvailability_EmptyName(t *testing.T) {
+	t.Parallel()
+	s := New()
+	defer s.Close()
+
+	reqBody := strings.NewReader(`{"Name":""}`)
+	resp, err := http.Post(s.URL()+"/dnszone/checkavailability", "application/json", reqBody)
+	if err != nil {
+		t.Fatalf("failed to check availability: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d", http.StatusBadRequest, resp.StatusCode)
+	}
+}
+
+func TestHandleCheckAvailability_InvalidJSON(t *testing.T) {
+	t.Parallel()
+	s := New()
+	defer s.Close()
+
+	reqBody := strings.NewReader(`{invalid json}`)
+	resp, err := http.Post(s.URL()+"/dnszone/checkavailability", "application/json", reqBody)
+	if err != nil {
+		t.Fatalf("failed to check availability: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d", http.StatusBadRequest, resp.StatusCode)
+	}
+}
+
+// Tests for handleImportRecords
+func TestHandleImportRecords_Success(t *testing.T) {
+	t.Parallel()
+	s := New()
+	defer s.Close()
+
+	zoneID := s.AddZone("example.com")
+
+	importData := "example.com. 300 IN A 1.2.3.4\nexample.com. 300 IN TXT \"test\""
+	req, _ := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/dnszone/%d/import", s.URL(), zoneID), strings.NewReader(importData))
+	req.Header.Set("Content-Type", "text/plain")
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("failed to import records: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected status %d, got %d", http.StatusOK, resp.StatusCode)
+	}
+
+	var result struct {
+		RecordsSuccessful int `json:"RecordsSuccessful"`
+		RecordsFailed     int `json:"RecordsFailed"`
+		RecordsSkipped    int `json:"RecordsSkipped"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if result.RecordsSuccessful != 2 {
+		t.Errorf("expected 2 successful records, got %d", result.RecordsSuccessful)
+	}
+}
+
+func TestHandleImportRecords_ZoneNotFound(t *testing.T) {
+	t.Parallel()
+	s := New()
+	defer s.Close()
+
+	importData := "example.com. 300 IN A 1.2.3.4"
+	req, _ := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/dnszone/999/import", s.URL()), strings.NewReader(importData))
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("failed to import records: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("expected status %d, got %d", http.StatusNotFound, resp.StatusCode)
+	}
+}
+
+func TestHandleImportRecords_SkipsComments(t *testing.T) {
+	t.Parallel()
+	s := New()
+	defer s.Close()
+
+	zoneID := s.AddZone("example.com")
+
+	importData := "; This is a comment\nexample.com. 300 IN A 1.2.3.4\n; Another comment\n\n"
+	req, _ := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/dnszone/%d/import", s.URL(), zoneID), strings.NewReader(importData))
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("failed to import records: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected status %d, got %d", http.StatusOK, resp.StatusCode)
+	}
+
+	var result struct {
+		RecordsSuccessful int `json:"RecordsSuccessful"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	// Only the A record line should count, not comments or blank lines
+	if result.RecordsSuccessful != 1 {
+		t.Errorf("expected 1 successful record (comments skipped), got %d", result.RecordsSuccessful)
+	}
+}
+
+func TestHandleImportRecords_InvalidZoneID(t *testing.T) {
+	t.Parallel()
+	s := New()
+	defer s.Close()
+
+	importData := "example.com. 300 IN A 1.2.3.4"
+	req, _ := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/dnszone/invalid/import", s.URL()), strings.NewReader(importData))
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("failed to import records: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d", http.StatusBadRequest, resp.StatusCode)
+	}
+}

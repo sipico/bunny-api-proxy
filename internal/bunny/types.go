@@ -124,3 +124,10 @@ type CheckAvailabilityRequest struct {
 type CheckAvailabilityResponse struct {
 	Available bool `json:"Available"`
 }
+
+// ImportRecordsResponse represents the response from the import DNS records endpoint.
+type ImportRecordsResponse struct {
+	RecordsSuccessful int `json:"RecordsSuccessful"`
+	RecordsFailed     int `json:"RecordsFailed"`
+	RecordsSkipped    int `json:"RecordsSkipped"`
+}

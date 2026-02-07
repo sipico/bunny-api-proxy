@@ -495,6 +495,49 @@ func (c *Client) CheckZoneAvailability(ctx context.Context, name string) (*Check
 	return nil, parseError(resp.StatusCode, respBody)
 }
 
+// ImportRecords imports DNS records from BIND zone file format.
+// The body is forwarded as-is to the bunny.net API.
+func (c *Client) ImportRecords(ctx context.Context, zoneID int64, body io.Reader, contentType string) (*ImportRecordsResponse, error) {
+	url := fmt.Sprintf("%s/dnszone/%d/import", c.baseURL, zoneID)
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	httpReq.Header.Set("AccessKey", c.apiKey)
+	if contentType != "" {
+		httpReq.Header.Set("Content-Type", contentType)
+	}
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to import records: %w", err)
+	}
+	defer func() {
+		//nolint:errcheck
+		resp.Body.Close()
+	}()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	if resp.StatusCode == http.StatusOK {
+		var result ImportRecordsResponse
+		if err := json.Unmarshal(respBody, &result); err != nil {
+			return nil, fmt.Errorf("failed to parse response: %w", err)
+		}
+		return &result, nil
+	}
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, ErrNotFound
+	}
+
+	return nil, parseError(resp.StatusCode, respBody)
+}
+
 // parseError parses API error responses and returns an appropriate error.
 func parseError(statusCode int, body []byte) error {
 	switch statusCode {
