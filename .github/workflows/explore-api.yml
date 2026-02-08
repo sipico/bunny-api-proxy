@@ -804,14 +804,15 @@ jobs:
       # =================================================================
       # STEP 4b1: EXPLORE - Record Operations (Add/Update/Delete)
       # =================================================================
-      - name: Step 4b1 - Test Record Operations
+      # =================================================================
+      # STEP 4b1a: EXPLORE - Record Operations (Add)
+      # =================================================================
+      - name: Step 4b1a - Add DNS Records (All Types)
         run: |
           echo "=========================================="
-          echo "STEP 4b1: Test DNS Record Operations"
+          echo "STEP 4b1a: Add DNS Records"
           echo "=========================================="
           echo "Testing: PUT /dnszone/{id}/records (Add Record)"
-          echo "Testing: POST /dnszone/{id}/records/{recordId} (Update Record)"
-          echo "Testing: DELETE /dnszone/{id}/records/{recordId} (Delete Record)"
           echo ""
           echo "Record types: A (0), AAAA (1), CNAME (2), TXT (3), MX (4), SRV (8), CAA (9)"
           echo ""
@@ -821,7 +822,7 @@ jobs:
           for domain in "${DOMAINS[@]}"; do
             echo ""
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            echo "Testing record operations for: $domain"
+            echo "Adding records for: $domain"
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
             # Get zone ID from the import environment variable
@@ -835,7 +836,6 @@ jobs:
 
             echo "Zone ID: $ZONE_ID"
             echo ""
-
             # =========================================================
             # 1. Add CAA Record (Type 9)
             # =========================================================
@@ -1080,7 +1080,56 @@ jobs:
 
             sleep 1
 
-            # =========================================================
+
+            echo "✅ All records added for $domain"
+            sleep 2
+          done
+
+          echo ""
+          echo "=========================================="
+          echo "Summary: Add DNS Records"
+          echo "=========================================="
+
+      # =================================================================
+      # STEP 4b1b: EXPLORE - Record Operations (Update)
+      # =================================================================
+      - name: Step 4b1b - Update DNS Records (All Types)
+        run: |
+          echo "=========================================="
+          echo "STEP 4b1b: Update DNS Records"
+          echo "=========================================="
+          echo "Testing: POST /dnszone/{id}/records/{recordId} (Update Record)"
+          echo ""
+
+          DOMAINS=("siemens.com" "shell.com" "nestle.com")
+
+          for domain in "${DOMAINS[@]}"; do
+            echo ""
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "Updating records for: $domain"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+            # Get zone ID
+            ZONE_VAR="ZONE_IMPORT_${domain//./_}"
+            ZONE_ID=$(eval echo \$$ZONE_VAR)
+
+            if [ -z "$ZONE_ID" ]; then
+              echo "⚠️  Could not find zone ID for $domain"
+              continue
+            fi
+
+            # Extract record IDs from previous step's JSON files
+            CAA_RECORD_ID=$(jq -r '.Id // empty' "add-caa-${domain}.json" 2>/dev/null)
+            SRV_RECORD_ID=$(jq -r '.Id // empty' "add-srv-${domain}.json" 2>/dev/null)
+            A_RECORD_ID=$(jq -r '.Id // empty' "add-a-${domain}.json" 2>/dev/null)
+            AAAA_RECORD_ID=$(jq -r '.Id // empty' "add-aaaa-${domain}.json" 2>/dev/null)
+            CNAME_RECORD_ID=$(jq -r '.Id // empty' "add-cname-${domain}.json" 2>/dev/null)
+            TXT_RECORD_ID=$(jq -r '.Id // empty' "add-txt-${domain}.json" 2>/dev/null)
+            MX_RECORD_ID=$(jq -r '.Id // empty' "add-mx-${domain}.json" 2>/dev/null)
+
+            echo "Zone ID: $ZONE_ID"
+            echo ""
+
             # 8. Update CAA Record (change CA to digicert.com)
             # =========================================================
             if [ -n "$CAA_RECORD_ID" ]; then
@@ -1325,6 +1374,56 @@ jobs:
             fi
 
             # =========================================================
+
+            echo "✅ All records updated for $domain"
+            sleep 2
+          done
+
+          echo ""
+          echo "=========================================="
+          echo "Summary: Update DNS Records"
+          echo "=========================================="
+
+      # =================================================================
+      # STEP 4b1c: EXPLORE - Record Operations (Delete)
+      # =================================================================
+      - name: Step 4b1c - Delete DNS Records (All Types)
+        run: |
+          echo "=========================================="
+          echo "STEP 4b1c: Delete DNS Records"
+          echo "=========================================="
+          echo "Testing: DELETE /dnszone/{id}/records/{recordId} (Delete Record)"
+          echo ""
+
+          DOMAINS=("siemens.com" "shell.com" "nestle.com")
+
+          for domain in "${DOMAINS[@]}"; do
+            echo ""
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "Deleting records for: $domain"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+            # Get zone ID
+            ZONE_VAR="ZONE_IMPORT_${domain//./_}"
+            ZONE_ID=$(eval echo \$$ZONE_VAR)
+
+            if [ -z "$ZONE_ID" ]; then
+              echo "⚠️  Could not find zone ID for $domain"
+              continue
+            fi
+
+            # Extract record IDs from JSON files
+            CAA_RECORD_ID=$(jq -r '.Id // empty' "add-caa-${domain}.json" 2>/dev/null)
+            SRV_RECORD_ID=$(jq -r '.Id // empty' "add-srv-${domain}.json" 2>/dev/null)
+            A_RECORD_ID=$(jq -r '.Id // empty' "add-a-${domain}.json" 2>/dev/null)
+            AAAA_RECORD_ID=$(jq -r '.Id // empty' "add-aaaa-${domain}.json" 2>/dev/null)
+            CNAME_RECORD_ID=$(jq -r '.Id // empty' "add-cname-${domain}.json" 2>/dev/null)
+            TXT_RECORD_ID=$(jq -r '.Id // empty' "add-txt-${domain}.json" 2>/dev/null)
+            MX_RECORD_ID=$(jq -r '.Id // empty' "add-mx-${domain}.json" 2>/dev/null)
+
+            echo "Zone ID: $ZONE_ID"
+            echo ""
+
             # 15. Delete CAA Record
             # =========================================================
             if [ -n "$CAA_RECORD_ID" ]; then
@@ -1465,12 +1564,14 @@ jobs:
             fi
 
             echo "✅ All record operations completed for $domain"
+
+            echo "✅ All records deleted for $domain"
             sleep 2
           done
 
           echo ""
           echo "=========================================="
-          echo "Summary: DNS Record Operations Test"
+          echo "Summary: DNS Record Operations Complete"
           echo "=========================================="
           echo "✅ Add A Record (Type 0)"
           echo "✅ Add AAAA Record (Type 1)"
@@ -1494,9 +1595,6 @@ jobs:
           echo "✅ Delete SRV Record"
           echo "✅ Delete CAA Record"
 
-      # =================================================================
-      # STEP 4b2: EXPLORE - Statistics Endpoint
-      # =================================================================
       - name: Step 4b2 - Test DNS Query Statistics
         run: |
           echo "=========================================="
