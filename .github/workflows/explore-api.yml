@@ -188,6 +188,44 @@ jobs:
           echo "✓ Zone created successfully and visible in list"
 
       # =================================================================
+      # STEP 3b: EXPLORE - Try to add amazon.com
+      # =================================================================
+      - name: Step 3b - Try to create amazon.com zone
+        run: |
+          echo "=========================================="
+          echo "STEP 3b: Try to add amazon.com as a zone"
+          echo "=========================================="
+          echo "Question: Can we add a well-known domain we don't own?"
+          echo ""
+
+          curl -v -X POST \
+            -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{"Domain": "amazon.com"}' \
+            "$BUNNY_API_URL/dnszone" \
+            2>&1 | tee create-amazon-zone.log
+
+          echo ""
+          echo "Pretty-printed:"
+          curl -s -X POST \
+            -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{"Domain": "amazon.com"}' \
+            "$BUNNY_API_URL/dnszone" \
+            | jq '.' | tee amazon-zone.json || echo "Request failed or returned non-JSON"
+
+          # Check if it succeeded
+          AMAZON_ZONE_ID=$(jq -r '.Id // empty' amazon-zone.json 2>/dev/null)
+          if [ -n "$AMAZON_ZONE_ID" ]; then
+            echo ""
+            echo "🤯 SURPRISE: We CAN add amazon.com! Zone ID: $AMAZON_ZONE_ID"
+            echo "AMAZON_ZONE_ID=$AMAZON_ZONE_ID" >> $GITHUB_ENV
+          else
+            echo ""
+            echo "❌ As expected: Cannot add amazon.com (we don't own it)"
+          fi
+
+      # =================================================================
       # STEP 4: CLEANUP - Delete the test zone
       # =================================================================
       - name: Step 4 - Delete test zone
