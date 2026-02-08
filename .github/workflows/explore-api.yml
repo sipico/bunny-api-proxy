@@ -670,13 +670,145 @@ jobs:
           echo "=========================================="
 
       # =================================================================
-      # STEP 4: CLEANUP - Delete the test zone
+      # STEP 4a: EXPLORE - Test BIND zone import (delete zones first)
       # =================================================================
-      - name: Step 4 - Delete test zone
+      - name: Step 4a - Delete zones before import test
+        run: |
+          echo "=========================================="
+          echo "STEP 4a: Delete zones for import test"
+          echo "=========================================="
+          echo "Preparing for BIND import test by deleting existing zones"
+          echo ""
+
+          DOMAINS=("siemens.com" "shell.com" "nestle.com")
+
+          for domain in "${DOMAINS[@]}"; do
+            echo ""
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "Deleting zone: $domain"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+            # Get zone ID from environment (set in step 3h)
+            ZONE_VAR="ZONE_${domain//./_}"
+            ZONE_ID="${!ZONE_VAR}"
+
+            if [ -z "$ZONE_ID" ] || [ "$ZONE_ID" = "null" ]; then
+              echo "⚠️  Zone ID not found for $domain"
+              continue
+            fi
+
+            echo "Zone ID: $ZONE_ID"
+            echo "Deleting..."
+
+            curl -s -X DELETE \
+              -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+              "$BUNNY_API_URL/dnszone/$ZONE_ID" \
+              -o "delete-for-import-${domain}.json" \
+              2> "delete-for-import-${domain}-headers.log"
+
+            echo "✅ Zone deleted"
+            sleep 1
+          done
+
+          echo ""
+          echo "=========================================="
+          echo "Summary: Zones Deleted for Import Test"
+          echo "=========================================="
+
+      # =================================================================
+      # STEP 4b: EXPLORE - Import BIND zone files
+      # =================================================================
+      - name: Step 4b - Import BIND zone files
+        run: |
+          echo "=========================================="
+          echo "STEP 4b: Import BIND zone files"
+          echo "=========================================="
+          echo "Testing: POST /dnszone (create) + POST /dnszone/{id}/import"
+          echo ""
+
+          DOMAINS=("siemens.com" "shell.com" "nestle.com")
+
+          for domain in "${DOMAINS[@]}"; do
+            echo ""
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "Importing zone: $domain"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+            # Check if zone file exists
+            ZONE_FILE="export-${domain}.zone"
+            if [ ! -f "$ZONE_FILE" ]; then
+              echo "⚠️  Zone file not found: $ZONE_FILE"
+              continue
+            fi
+
+            FILE_SIZE=$(wc -c < "$ZONE_FILE")
+            LINE_COUNT=$(wc -l < "$ZONE_FILE")
+            echo "Zone file: $ZONE_FILE ($FILE_SIZE bytes, $LINE_COUNT lines)"
+            echo ""
+
+            # Step 1: Create empty zone
+            echo "Creating empty zone for $domain..."
+            CREATE_RESPONSE=$(curl -s -X POST \
+              -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+              -H "Content-Type: application/json" \
+              -d "{\"Domain\": \"$domain\"}" \
+              "$BUNNY_API_URL/dnszone" \
+              -o "create-for-import-${domain}.json" \
+              2> "create-for-import-${domain}-headers.log")
+
+            ZONE_ID=$(jq -r '.Id // empty' "create-for-import-${domain}.json" 2>/dev/null)
+            if [ -z "$ZONE_ID" ]; then
+              echo "❌ Failed to create zone"
+              cat "create-for-import-${domain}.json"
+              continue
+            fi
+
+            echo "✅ Created empty zone (ID: $ZONE_ID)"
+            echo ""
+
+            # Step 2: Import BIND zone file
+            echo "Importing BIND zone file..."
+            IMPORT_RESPONSE=$(curl -s -X POST \
+              -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+              -H "Content-Type: text/plain" \
+              --data-binary "@$ZONE_FILE" \
+              "$BUNNY_API_URL/dnszone/$ZONE_ID/import" \
+              -o "import-${domain}.json" \
+              2> "import-${domain}-headers.log")
+
+            echo "Import response:"
+            cat "import-${domain}.json" | jq '.' 2>/dev/null || cat "import-${domain}.json"
+            echo ""
+
+            # Check import results
+            SUCCESSFUL=$(jq -r '.RecordsSuccessful // 0' "import-${domain}.json" 2>/dev/null)
+            FAILED=$(jq -r '.RecordsFailed // 0' "import-${domain}.json" 2>/dev/null)
+            SKIPPED=$(jq -r '.RecordsSkipped // 0' "import-${domain}.json" 2>/dev/null)
+
+            echo "✅ Import completed for $domain"
+            echo "   Records successful: $SUCCESSFUL"
+            echo "   Records failed:     $FAILED"
+            echo "   Records skipped:    $SKIPPED"
+
+            # Save zone ID for cleanup
+            echo "ZONE_IMPORT_${domain//./_}=$ZONE_ID" >> $GITHUB_ENV
+
+            sleep 2
+          done
+
+          echo ""
+          echo "=========================================="
+          echo "Summary: BIND Zone Import Test"
+          echo "=========================================="
+
+      # =================================================================
+      # STEP 5: CLEANUP - Delete the test zone
+      # =================================================================
+      - name: Step 5 - Cleanup all test zones
         if: always()
         run: |
           echo "=========================================="
-          echo "STEP 4: Cleanup - Delete test zone"
+          echo "STEP 5: Cleanup - Delete all test zones"
           echo "=========================================="
 
           # Get all zone IDs
