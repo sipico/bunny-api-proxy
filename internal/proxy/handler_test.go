@@ -34,6 +34,8 @@ type mockBunnyClient struct {
 	disableDNSSECFunc         func(context.Context, int64) (*bunny.DNSSECResponse, error)
 	issueCertificateFunc      func(context.Context, int64, string) error
 	getZoneStatisticsFunc     func(context.Context, int64, string, string) (*bunny.ZoneStatisticsResponse, error)
+	triggerDNSScanFunc        func(context.Context, int64) error
+	getDNSScanResultFunc      func(context.Context, int64) (*bunny.DNSScanResult, error)
 }
 
 func (m *mockBunnyClient) ListZones(ctx context.Context, opts *bunny.ListZonesOptions) (*bunny.ListZonesResponse, error) {
@@ -161,6 +163,20 @@ func (m *mockBunnyClient) IssueCertificate(ctx context.Context, zoneID int64, do
 func (m *mockBunnyClient) GetZoneStatistics(ctx context.Context, zoneID int64, dateFrom, dateTo string) (*bunny.ZoneStatisticsResponse, error) {
 	if m.getZoneStatisticsFunc != nil {
 		return m.getZoneStatisticsFunc(ctx, zoneID, dateFrom, dateTo)
+	}
+	return nil, nil
+}
+
+func (m *mockBunnyClient) TriggerDNSScan(ctx context.Context, zoneID int64) error {
+	if m.triggerDNSScanFunc != nil {
+		return m.triggerDNSScanFunc(ctx, zoneID)
+	}
+	return nil
+}
+
+func (m *mockBunnyClient) GetDNSScanResult(ctx context.Context, zoneID int64) (*bunny.DNSScanResult, error) {
+	if m.getDNSScanResultFunc != nil {
+		return m.getDNSScanResultFunc(ctx, zoneID)
 	}
 	return nil, nil
 }
@@ -2645,6 +2661,176 @@ func TestHandleGetStatistics_BunnyError(t *testing.T) {
 	r.Get("/dnszone/{zoneID}/statistics", handler.HandleGetStatistics)
 
 	req := httptest.NewRequest(http.MethodGet, "/dnszone/1/statistics", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("expected status %d, got %d", http.StatusInternalServerError, w.Code)
+	}
+}
+
+func TestHandleTriggerScan_Success(t *testing.T) {
+	t.Parallel()
+	mockClient := &mockBunnyClient{
+		triggerDNSScanFunc: func(_ context.Context, _ int64) error {
+			return nil
+		},
+	}
+	handler := NewHandler(mockClient, slog.Default())
+
+	r := chi.NewRouter()
+	r.Post("/dnszone/{zoneID}/recheckdns", handler.HandleTriggerScan)
+
+	req := httptest.NewRequest(http.MethodPost, "/dnszone/1/recheckdns", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status %d, got %d", http.StatusOK, w.Code)
+	}
+}
+
+func TestHandleTriggerScan_InvalidZoneID(t *testing.T) {
+	t.Parallel()
+	handler := NewHandler(&mockBunnyClient{}, slog.Default())
+
+	r := chi.NewRouter()
+	r.Post("/dnszone/{zoneID}/recheckdns", handler.HandleTriggerScan)
+
+	req := httptest.NewRequest(http.MethodPost, "/dnszone/abc/recheckdns", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d", http.StatusBadRequest, w.Code)
+	}
+}
+
+func TestHandleTriggerScan_NotFound(t *testing.T) {
+	t.Parallel()
+	mockClient := &mockBunnyClient{
+		triggerDNSScanFunc: func(_ context.Context, _ int64) error {
+			return bunny.ErrNotFound
+		},
+	}
+	handler := NewHandler(mockClient, slog.Default())
+
+	r := chi.NewRouter()
+	r.Post("/dnszone/{zoneID}/recheckdns", handler.HandleTriggerScan)
+
+	req := httptest.NewRequest(http.MethodPost, "/dnszone/999/recheckdns", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusNotFound {
+		t.Errorf("expected status %d, got %d", http.StatusNotFound, w.Code)
+	}
+}
+
+func TestHandleTriggerScan_BunnyError(t *testing.T) {
+	t.Parallel()
+	mockClient := &mockBunnyClient{
+		triggerDNSScanFunc: func(_ context.Context, _ int64) error {
+			return fmt.Errorf("connection failed")
+		},
+	}
+	handler := NewHandler(mockClient, slog.Default())
+
+	r := chi.NewRouter()
+	r.Post("/dnszone/{zoneID}/recheckdns", handler.HandleTriggerScan)
+
+	req := httptest.NewRequest(http.MethodPost, "/dnszone/1/recheckdns", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("expected status %d, got %d", http.StatusInternalServerError, w.Code)
+	}
+}
+
+func TestHandleGetScanResult_Success(t *testing.T) {
+	t.Parallel()
+	mockClient := &mockBunnyClient{
+		getDNSScanResultFunc: func(_ context.Context, _ int64) (*bunny.DNSScanResult, error) {
+			return &bunny.DNSScanResult{
+				Records: []bunny.DNSScanRecord{
+					{Type: 0, Name: "@", Value: "192.168.1.1", TTL: 300},
+				},
+			}, nil
+		},
+	}
+	handler := NewHandler(mockClient, slog.Default())
+
+	r := chi.NewRouter()
+	r.Get("/dnszone/{zoneID}/recheckdns", handler.HandleGetScanResult)
+
+	req := httptest.NewRequest(http.MethodGet, "/dnszone/1/recheckdns", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status %d, got %d", http.StatusOK, w.Code)
+	}
+
+	var resp bunny.DNSScanResult
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if len(resp.Records) != 1 {
+		t.Errorf("expected 1 record, got %d", len(resp.Records))
+	}
+}
+
+func TestHandleGetScanResult_InvalidZoneID(t *testing.T) {
+	t.Parallel()
+	handler := NewHandler(&mockBunnyClient{}, slog.Default())
+
+	r := chi.NewRouter()
+	r.Get("/dnszone/{zoneID}/recheckdns", handler.HandleGetScanResult)
+
+	req := httptest.NewRequest(http.MethodGet, "/dnszone/abc/recheckdns", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d", http.StatusBadRequest, w.Code)
+	}
+}
+
+func TestHandleGetScanResult_NotFound(t *testing.T) {
+	t.Parallel()
+	mockClient := &mockBunnyClient{
+		getDNSScanResultFunc: func(_ context.Context, _ int64) (*bunny.DNSScanResult, error) {
+			return nil, bunny.ErrNotFound
+		},
+	}
+	handler := NewHandler(mockClient, slog.Default())
+
+	r := chi.NewRouter()
+	r.Get("/dnszone/{zoneID}/recheckdns", handler.HandleGetScanResult)
+
+	req := httptest.NewRequest(http.MethodGet, "/dnszone/999/recheckdns", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusNotFound {
+		t.Errorf("expected status %d, got %d", http.StatusNotFound, w.Code)
+	}
+}
+
+func TestHandleGetScanResult_BunnyError(t *testing.T) {
+	t.Parallel()
+	mockClient := &mockBunnyClient{
+		getDNSScanResultFunc: func(_ context.Context, _ int64) (*bunny.DNSScanResult, error) {
+			return nil, fmt.Errorf("connection failed")
+		},
+	}
+	handler := NewHandler(mockClient, slog.Default())
+
+	r := chi.NewRouter()
+	r.Get("/dnszone/{zoneID}/recheckdns", handler.HandleGetScanResult)
+
+	req := httptest.NewRequest(http.MethodGet, "/dnszone/1/recheckdns", nil)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 

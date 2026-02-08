@@ -1439,3 +1439,115 @@ func TestIntegration_GetStatistics_AdminOnly(t *testing.T) {
 		})
 	}
 }
+
+func TestIntegration_TriggerDNSScan_AdminOnly(t *testing.T) {
+	t.Parallel()
+	mockServer := mockbunny.New()
+	defer mockServer.Close()
+
+	zoneID := mockServer.AddZone("example.com")
+
+	db, err := storage.New(":memory:")
+	if err != nil {
+		t.Fatalf("failed to create storage: %v", err)
+	}
+
+	adminToken := "admin-scan-trigger-token"
+	adminHash := hashTokenForTest(adminToken)
+	_, err = db.CreateToken(context.Background(), "admin-scan-t", true, adminHash)
+	if err != nil {
+		t.Fatalf("failed to create admin token: %v", err)
+	}
+
+	scopedToken := "scoped-scan-trigger-token"
+	scopedHash := hashTokenForTest(scopedToken)
+	_, err = db.CreateToken(context.Background(), "scoped-scan-t", false, scopedHash)
+	if err != nil {
+		t.Fatalf("failed to create scoped token: %v", err)
+	}
+
+	client := bunny.NewClient("test-key", bunny.WithBaseURL(mockServer.URL()))
+	handler := NewHandler(client, testLogger())
+	bootstrap := auth.NewBootstrapService(db, "master-key")
+	authenticator := auth.NewAuthenticator(db, bootstrap)
+	router := NewRouter(handler, authenticator.Authenticate, testLogger())
+
+	tests := []struct {
+		name       string
+		token      string
+		wantStatus int
+	}{
+		{"admin token succeeds", adminToken, http.StatusOK},
+		{"scoped token gets 403", scopedToken, http.StatusForbidden},
+		{"invalid token gets 401", "invalid-token", http.StatusUnauthorized},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/dnszone/%d/recheckdns", zoneID), nil)
+			req.Header.Set("AccessKey", tt.token)
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, req)
+
+			if w.Code != tt.wantStatus {
+				t.Errorf("expected status %d, got %d (body: %s)", tt.wantStatus, w.Code, w.Body.String())
+			}
+		})
+	}
+}
+
+func TestIntegration_GetDNSScanResult_AdminOnly(t *testing.T) {
+	t.Parallel()
+	mockServer := mockbunny.New()
+	defer mockServer.Close()
+
+	zoneID := mockServer.AddZone("example.com")
+
+	db, err := storage.New(":memory:")
+	if err != nil {
+		t.Fatalf("failed to create storage: %v", err)
+	}
+
+	adminToken := "admin-scan-result-token"
+	adminHash := hashTokenForTest(adminToken)
+	_, err = db.CreateToken(context.Background(), "admin-scan-r", true, adminHash)
+	if err != nil {
+		t.Fatalf("failed to create admin token: %v", err)
+	}
+
+	scopedToken := "scoped-scan-result-token"
+	scopedHash := hashTokenForTest(scopedToken)
+	_, err = db.CreateToken(context.Background(), "scoped-scan-r", false, scopedHash)
+	if err != nil {
+		t.Fatalf("failed to create scoped token: %v", err)
+	}
+
+	client := bunny.NewClient("test-key", bunny.WithBaseURL(mockServer.URL()))
+	handler := NewHandler(client, testLogger())
+	bootstrap := auth.NewBootstrapService(db, "master-key")
+	authenticator := auth.NewAuthenticator(db, bootstrap)
+	router := NewRouter(handler, authenticator.Authenticate, testLogger())
+
+	tests := []struct {
+		name       string
+		token      string
+		wantStatus int
+	}{
+		{"admin token succeeds", adminToken, http.StatusOK},
+		{"scoped token gets 403", scopedToken, http.StatusForbidden},
+		{"invalid token gets 401", "invalid-token", http.StatusUnauthorized},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/dnszone/%d/recheckdns", zoneID), nil)
+			req.Header.Set("AccessKey", tt.token)
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, req)
+
+			if w.Code != tt.wantStatus {
+				t.Errorf("expected status %d, got %d (body: %s)", tt.wantStatus, w.Code, w.Body.String())
+			}
+		})
+	}
+}

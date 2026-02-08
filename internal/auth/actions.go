@@ -25,6 +25,7 @@ var (
 	dnssecPattern            = regexp.MustCompile(`^/dnszone/(\d+)/dnssec/?$`)
 	issueCertificatePattern  = regexp.MustCompile(`^/dnszone/(\d+)/certificate/issue/?$`)
 	statisticsPattern        = regexp.MustCompile(`^/dnszone/(\d+)/statistics/?$`)
+	recheckDNSPattern        = regexp.MustCompile(`^/dnszone/(\d+)/recheckdns/?$`)
 )
 
 // ParseRequest extracts action, zone ID, and record type from HTTP request.
@@ -88,6 +89,13 @@ func ParseRequest(r *http.Request) (*Request, error) {
 			return &Request{Action: ActionIssueCertificate, ZoneID: zoneID}, nil
 		}
 	}
+	// POST /dnszone/{id}/recheckdns - trigger DNS scan (admin only)
+	if r.Method == http.MethodPost {
+		if matches := recheckDNSPattern.FindStringSubmatch(path); matches != nil {
+			zoneID, _ := strconv.ParseInt(matches[1], 10, 64) //nolint:errcheck // regex ensures valid number
+			return &Request{Action: ActionTriggerDNSScan, ZoneID: zoneID}, nil
+		}
+	}
 
 	// POST /dnszone/{id} - update zone (admin only, no permission checking needed)
 	if r.Method == http.MethodPost {
@@ -112,6 +120,10 @@ func ParseRequest(r *http.Request) (*Request, error) {
 				zoneID, _ := strconv.ParseInt(matches[1], 10, 64) //nolint:errcheck // regex ensures valid number
 				return &Request{Action: ActionGetStatistics, ZoneID: zoneID}, nil
 			}
+		}
+		if matches := recheckDNSPattern.FindStringSubmatch(path); matches != nil {
+			zoneID, _ := strconv.ParseInt(matches[1], 10, 64) //nolint:errcheck // regex ensures valid number
+			return &Request{Action: ActionGetDNSScanResult, ZoneID: zoneID}, nil
 		}
 	}
 

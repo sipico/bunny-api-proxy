@@ -50,6 +50,10 @@ const (
 	ActionIssueCertificate Action = "issue_certificate"
 	// ActionGetStatistics retrieves DNS query statistics (admin only).
 	ActionGetStatistics Action = "get_statistics"
+	// ActionTriggerDNSScan triggers a DNS record scan (admin only).
+	ActionTriggerDNSScan Action = "trigger_dns_scan"
+	// ActionGetDNSScanResult retrieves DNS scan results (admin only).
+	ActionGetDNSScanResult Action = "get_dns_scan_result"
 )
 
 // Errors for authentication and authorization failures.

@@ -773,3 +773,77 @@ func parseError(statusCode int, body []byte) error {
 		return fmt.Errorf("bunny: request failed (status %d)", statusCode)
 	}
 }
+
+// TriggerDNSScan triggers a background DNS record scan for a zone.
+func (c *Client) TriggerDNSScan(ctx context.Context, zoneID int64) error {
+	url := fmt.Sprintf("%s/dnszone/%d/recheckdns", c.baseURL, zoneID)
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+	httpReq.Header.Set("AccessKey", c.apiKey)
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return fmt.Errorf("failed to trigger DNS scan: %w", err)
+	}
+	defer func() {
+		//nolint:errcheck
+		resp.Body.Close()
+	}()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read response: %w", err)
+	}
+
+	if resp.StatusCode == http.StatusOK {
+		return nil
+	}
+
+	if resp.StatusCode == http.StatusNotFound {
+		return ErrNotFound
+	}
+
+	return parseError(resp.StatusCode, body)
+}
+
+// GetDNSScanResult retrieves the latest DNS record scan result.
+func (c *Client) GetDNSScanResult(ctx context.Context, zoneID int64) (*DNSScanResult, error) {
+	url := fmt.Sprintf("%s/dnszone/%d/recheckdns", c.baseURL, zoneID)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("AccessKey", c.apiKey)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get scan result: %w", err)
+	}
+	defer func() {
+		//nolint:errcheck
+		resp.Body.Close()
+	}()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	if resp.StatusCode == http.StatusOK {
+		var result DNSScanResult
+		if err := json.Unmarshal(body, &result); err != nil {
+			return nil, fmt.Errorf("failed to parse response: %w", err)
+		}
+		return &result, nil
+	}
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, ErrNotFound
+	}
+
+	return nil, parseError(resp.StatusCode, body)
+}
