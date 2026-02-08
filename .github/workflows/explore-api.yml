@@ -813,7 +813,7 @@ jobs:
           echo "Testing: POST /dnszone/{id}/records/{recordId} (Update Record)"
           echo "Testing: DELETE /dnszone/{id}/records/{recordId} (Delete Record)"
           echo ""
-          echo "Record types: CAA (Type 9) and SRV (Type 8)"
+          echo "Record types: A (0), AAAA (1), CNAME (2), TXT (3), MX (4), SRV (8), CAA (9)"
           echo ""
 
           DOMAINS=("siemens.com" "shell.com" "nestle.com")
@@ -865,6 +865,11 @@ jobs:
             echo "  Record ID: $CAA_RECORD_ID"
             echo ""
 
+            # Query the CAA record to generate DNS traffic
+            echo "→ Querying CAA record to generate statistics..."
+            dig +short @kiki.bunny.net "$domain" CAA > /dev/null 2>&1 || true
+            dig +short @coco.bunny.net "$domain" CAA > /dev/null 2>&1 || true
+
             sleep 1
 
             # =========================================================
@@ -897,10 +902,186 @@ jobs:
             echo "  Record ID: $SRV_RECORD_ID"
             echo ""
 
+            # Query the SRV record to generate DNS traffic
+            echo "→ Querying SRV record to generate statistics..."
+            dig +short @kiki.bunny.net "_test._tcp.$domain" SRV > /dev/null 2>&1 || true
+            dig +short @coco.bunny.net "_test._tcp.$domain" SRV > /dev/null 2>&1 || true
+
             sleep 1
 
             # =========================================================
-            # 3. Update CAA Record (change CA to digicert.com)
+            # 3. Add A Record (Type 0)
+            # =========================================================
+            echo "→ Adding A record (PUT /dnszone/$ZONE_ID/records)..."
+            echo "   A: test-a -> 192.0.2.1"
+
+            curl -v -X PUT \
+              -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+              -H "Content-Type: application/json" \
+              -d '{
+                "Type": 0,
+                "Name": "test-a",
+                "Value": "192.0.2.1",
+                "Ttl": 300
+              }' \
+              "$BUNNY_API_URL/dnszone/$ZONE_ID/records" \
+              -o "add-a-${domain}.json" \
+              2> "add-a-${domain}-headers.log"
+
+            echo ""
+            echo "A Record Added:"
+            cat "add-a-${domain}.json" | jq '{Id, Type, Name, Value, Ttl}' 2>/dev/null || cat "add-a-${domain}.json"
+
+            A_RECORD_ID=$(jq -r '.Id // empty' "add-a-${domain}.json")
+            echo "  Record ID: $A_RECORD_ID"
+            echo ""
+
+            # Query the A record to generate DNS traffic
+            echo "→ Querying A record to generate statistics..."
+            dig +short @kiki.bunny.net "test-a.$domain" A > /dev/null 2>&1 || true
+            dig +short @coco.bunny.net "test-a.$domain" A > /dev/null 2>&1 || true
+
+            sleep 1
+
+            # =========================================================
+            # 4. Add AAAA Record (Type 1)
+            # =========================================================
+            echo "→ Adding AAAA record (PUT /dnszone/$ZONE_ID/records)..."
+            echo "   AAAA: test-aaaa -> 2001:db8::1"
+
+            curl -v -X PUT \
+              -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+              -H "Content-Type: application/json" \
+              -d '{
+                "Type": 1,
+                "Name": "test-aaaa",
+                "Value": "2001:db8::1",
+                "Ttl": 300
+              }' \
+              "$BUNNY_API_URL/dnszone/$ZONE_ID/records" \
+              -o "add-aaaa-${domain}.json" \
+              2> "add-aaaa-${domain}-headers.log"
+
+            echo ""
+            echo "AAAA Record Added:"
+            cat "add-aaaa-${domain}.json" | jq '{Id, Type, Name, Value, Ttl}' 2>/dev/null || cat "add-aaaa-${domain}.json"
+
+            AAAA_RECORD_ID=$(jq -r '.Id // empty' "add-aaaa-${domain}.json")
+            echo "  Record ID: $AAAA_RECORD_ID"
+            echo ""
+
+            # Query the AAAA record to generate DNS traffic
+            echo "→ Querying AAAA record to generate statistics..."
+            dig +short @kiki.bunny.net "test-aaaa.$domain" AAAA > /dev/null 2>&1 || true
+            dig +short @coco.bunny.net "test-aaaa.$domain" AAAA > /dev/null 2>&1 || true
+
+            sleep 1
+
+            # =========================================================
+            # 5. Add CNAME Record (Type 2)
+            # =========================================================
+            echo "→ Adding CNAME record (PUT /dnszone/$ZONE_ID/records)..."
+            echo "   CNAME: test-cname -> target.example.com"
+
+            curl -v -X PUT \
+              -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+              -H "Content-Type: application/json" \
+              -d '{
+                "Type": 2,
+                "Name": "test-cname",
+                "Value": "target.example.com",
+                "Ttl": 3600
+              }' \
+              "$BUNNY_API_URL/dnszone/$ZONE_ID/records" \
+              -o "add-cname-${domain}.json" \
+              2> "add-cname-${domain}-headers.log"
+
+            echo ""
+            echo "CNAME Record Added:"
+            cat "add-cname-${domain}.json" | jq '{Id, Type, Name, Value, Ttl}' 2>/dev/null || cat "add-cname-${domain}.json"
+
+            CNAME_RECORD_ID=$(jq -r '.Id // empty' "add-cname-${domain}.json")
+            echo "  Record ID: $CNAME_RECORD_ID"
+            echo ""
+
+            # Query the CNAME record to generate DNS traffic
+            echo "→ Querying CNAME record to generate statistics..."
+            dig +short @kiki.bunny.net "test-cname.$domain" CNAME > /dev/null 2>&1 || true
+            dig +short @coco.bunny.net "test-cname.$domain" CNAME > /dev/null 2>&1 || true
+
+            sleep 1
+
+            # =========================================================
+            # 6. Add TXT Record (Type 3)
+            # =========================================================
+            echo "→ Adding TXT record (PUT /dnszone/$ZONE_ID/records)..."
+            echo "   TXT: _acme-challenge -> test-validation-string"
+
+            curl -v -X PUT \
+              -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+              -H "Content-Type: application/json" \
+              -d '{
+                "Type": 3,
+                "Name": "_acme-challenge",
+                "Value": "test-validation-string",
+                "Ttl": 60
+              }' \
+              "$BUNNY_API_URL/dnszone/$ZONE_ID/records" \
+              -o "add-txt-${domain}.json" \
+              2> "add-txt-${domain}-headers.log"
+
+            echo ""
+            echo "TXT Record Added:"
+            cat "add-txt-${domain}.json" | jq '{Id, Type, Name, Value, Ttl}' 2>/dev/null || cat "add-txt-${domain}.json"
+
+            TXT_RECORD_ID=$(jq -r '.Id // empty' "add-txt-${domain}.json")
+            echo "  Record ID: $TXT_RECORD_ID"
+            echo ""
+
+            # Query the TXT record to generate DNS traffic
+            echo "→ Querying TXT record to generate statistics..."
+            dig +short @kiki.bunny.net "_acme-challenge.$domain" TXT > /dev/null 2>&1 || true
+            dig +short @coco.bunny.net "_acme-challenge.$domain" TXT > /dev/null 2>&1 || true
+
+            sleep 1
+
+            # =========================================================
+            # 7. Add MX Record (Type 4)
+            # =========================================================
+            echo "→ Adding MX record (PUT /dnszone/$ZONE_ID/records)..."
+            echo "   MX: @ -> mail.example.com (priority 10)"
+
+            curl -v -X PUT \
+              -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+              -H "Content-Type: application/json" \
+              -d '{
+                "Type": 4,
+                "Name": "",
+                "Value": "mail.example.com",
+                "Priority": 10,
+                "Ttl": 3600
+              }' \
+              "$BUNNY_API_URL/dnszone/$ZONE_ID/records" \
+              -o "add-mx-${domain}.json" \
+              2> "add-mx-${domain}-headers.log"
+
+            echo ""
+            echo "MX Record Added:"
+            cat "add-mx-${domain}.json" | jq '{Id, Type, Name, Value, Priority, Ttl}' 2>/dev/null || cat "add-mx-${domain}.json"
+
+            MX_RECORD_ID=$(jq -r '.Id // empty' "add-mx-${domain}.json")
+            echo "  Record ID: $MX_RECORD_ID"
+            echo ""
+
+            # Query the MX record to generate DNS traffic
+            echo "→ Querying MX record to generate statistics..."
+            dig +short @kiki.bunny.net "$domain" MX > /dev/null 2>&1 || true
+            dig +short @coco.bunny.net "$domain" MX > /dev/null 2>&1 || true
+
+            sleep 1
+
+            # =========================================================
+            # 8. Update CAA Record (change CA to digicert.com)
             # =========================================================
             if [ -n "$CAA_RECORD_ID" ]; then
               echo "→ Updating CAA record (POST /dnszone/$ZONE_ID/records/$CAA_RECORD_ID)..."
@@ -926,6 +1107,11 @@ jobs:
               echo "CAA Record Update Response (HTTP 204 expected):"
               cat "update-caa-${domain}.json" 2>/dev/null || echo "(empty response - 204 No Content)"
               echo ""
+
+              # Query the updated CAA record to generate DNS traffic
+              echo "→ Querying updated CAA record to generate statistics..."
+              dig +short @kiki.bunny.net "$domain" CAA > /dev/null 2>&1 || true
+              dig +short @coco.bunny.net "$domain" CAA > /dev/null 2>&1 || true
 
               sleep 1
             fi
@@ -959,11 +1145,187 @@ jobs:
               cat "update-srv-${domain}.json" 2>/dev/null || echo "(empty response - 204 No Content)"
               echo ""
 
+              # Query the updated SRV record to generate DNS traffic
+              echo "→ Querying updated SRV record to generate statistics..."
+              dig +short @kiki.bunny.net "_test._tcp.$domain" SRV > /dev/null 2>&1 || true
+              dig +short @coco.bunny.net "_test._tcp.$domain" SRV > /dev/null 2>&1 || true
+
               sleep 1
             fi
 
             # =========================================================
-            # 5. Delete CAA Record
+            # 10. Update A Record (change IP and TTL)
+            # =========================================================
+            if [ -n "$A_RECORD_ID" ]; then
+              echo "→ Updating A record (POST /dnszone/$ZONE_ID/records/$A_RECORD_ID)..."
+              echo "   Changing IP 192.0.2.1 -> 192.0.2.2, TTL 300 -> 600"
+
+              curl -v -X POST \
+                -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+                -H "Content-Type: application/json" \
+                -d "{
+                  \"Id\": $A_RECORD_ID,
+                  \"Type\": 0,
+                  \"Name\": \"test-a\",
+                  \"Value\": \"192.0.2.2\",
+                  \"Ttl\": 600
+                }" \
+                "$BUNNY_API_URL/dnszone/$ZONE_ID/records/$A_RECORD_ID" \
+                -o "update-a-${domain}.json" \
+                2> "update-a-${domain}-headers.log"
+
+              echo ""
+              echo "A Record Update Response (HTTP 204 expected):"
+              cat "update-a-${domain}.json" 2>/dev/null || echo "(empty response - 204 No Content)"
+              echo ""
+
+              # Query the updated A record to generate DNS traffic
+              echo "→ Querying updated A record to generate statistics..."
+              dig +short @kiki.bunny.net "test-a.$domain" A > /dev/null 2>&1 || true
+              dig +short @coco.bunny.net "test-a.$domain" A > /dev/null 2>&1 || true
+
+              sleep 1
+            fi
+
+            # =========================================================
+            # 11. Update AAAA Record (change IPv6 and TTL)
+            # =========================================================
+            if [ -n "$AAAA_RECORD_ID" ]; then
+              echo "→ Updating AAAA record (POST /dnszone/$ZONE_ID/records/$AAAA_RECORD_ID)..."
+              echo "   Changing IP 2001:db8::1 -> 2001:db8::2, TTL 300 -> 600"
+
+              curl -v -X POST \
+                -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+                -H "Content-Type: application/json" \
+                -d "{
+                  \"Id\": $AAAA_RECORD_ID,
+                  \"Type\": 1,
+                  \"Name\": \"test-aaaa\",
+                  \"Value\": \"2001:db8::2\",
+                  \"Ttl\": 600
+                }" \
+                "$BUNNY_API_URL/dnszone/$ZONE_ID/records/$AAAA_RECORD_ID" \
+                -o "update-aaaa-${domain}.json" \
+                2> "update-aaaa-${domain}-headers.log"
+
+              echo ""
+              echo "AAAA Record Update Response (HTTP 204 expected):"
+              cat "update-aaaa-${domain}.json" 2>/dev/null || echo "(empty response - 204 No Content)"
+              echo ""
+
+              # Query the updated AAAA record to generate DNS traffic
+              echo "→ Querying updated AAAA record to generate statistics..."
+              dig +short @kiki.bunny.net "test-aaaa.$domain" AAAA > /dev/null 2>&1 || true
+              dig +short @coco.bunny.net "test-aaaa.$domain" AAAA > /dev/null 2>&1 || true
+
+              sleep 1
+            fi
+
+            # =========================================================
+            # 12. Update CNAME Record (change target)
+            # =========================================================
+            if [ -n "$CNAME_RECORD_ID" ]; then
+              echo "→ Updating CNAME record (POST /dnszone/$ZONE_ID/records/$CNAME_RECORD_ID)..."
+              echo "   Changing target.example.com -> newtarget.example.com"
+
+              curl -v -X POST \
+                -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+                -H "Content-Type: application/json" \
+                -d "{
+                  \"Id\": $CNAME_RECORD_ID,
+                  \"Type\": 2,
+                  \"Name\": \"test-cname\",
+                  \"Value\": \"newtarget.example.com\",
+                  \"Ttl\": 3600
+                }" \
+                "$BUNNY_API_URL/dnszone/$ZONE_ID/records/$CNAME_RECORD_ID" \
+                -o "update-cname-${domain}.json" \
+                2> "update-cname-${domain}-headers.log"
+
+              echo ""
+              echo "CNAME Record Update Response (HTTP 204 expected):"
+              cat "update-cname-${domain}.json" 2>/dev/null || echo "(empty response - 204 No Content)"
+              echo ""
+
+              # Query the updated CNAME record to generate DNS traffic
+              echo "→ Querying updated CNAME record to generate statistics..."
+              dig +short @kiki.bunny.net "test-cname.$domain" CNAME > /dev/null 2>&1 || true
+              dig +short @coco.bunny.net "test-cname.$domain" CNAME > /dev/null 2>&1 || true
+
+              sleep 1
+            fi
+
+            # =========================================================
+            # 13. Update TXT Record (change value)
+            # =========================================================
+            if [ -n "$TXT_RECORD_ID" ]; then
+              echo "→ Updating TXT record (POST /dnszone/$ZONE_ID/records/$TXT_RECORD_ID)..."
+              echo "   Changing validation string"
+
+              curl -v -X POST \
+                -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+                -H "Content-Type: application/json" \
+                -d "{
+                  \"Id\": $TXT_RECORD_ID,
+                  \"Type\": 3,
+                  \"Name\": \"_acme-challenge\",
+                  \"Value\": \"updated-validation-string\",
+                  \"Ttl\": 60
+                }" \
+                "$BUNNY_API_URL/dnszone/$ZONE_ID/records/$TXT_RECORD_ID" \
+                -o "update-txt-${domain}.json" \
+                2> "update-txt-${domain}-headers.log"
+
+              echo ""
+              echo "TXT Record Update Response (HTTP 204 expected):"
+              cat "update-txt-${domain}.json" 2>/dev/null || echo "(empty response - 204 No Content)"
+              echo ""
+
+              # Query the updated TXT record to generate DNS traffic
+              echo "→ Querying updated TXT record to generate statistics..."
+              dig +short @kiki.bunny.net "_acme-challenge.$domain" TXT > /dev/null 2>&1 || true
+              dig +short @coco.bunny.net "_acme-challenge.$domain" TXT > /dev/null 2>&1 || true
+
+              sleep 1
+            fi
+
+            # =========================================================
+            # 14. Update MX Record (change priority)
+            # =========================================================
+            if [ -n "$MX_RECORD_ID" ]; then
+              echo "→ Updating MX record (POST /dnszone/$ZONE_ID/records/$MX_RECORD_ID)..."
+              echo "   Changing priority 10 -> 20"
+
+              curl -v -X POST \
+                -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+                -H "Content-Type: application/json" \
+                -d "{
+                  \"Id\": $MX_RECORD_ID,
+                  \"Type\": 4,
+                  \"Name\": \"\",
+                  \"Value\": \"mail.example.com\",
+                  \"Priority\": 20,
+                  \"Ttl\": 3600
+                }" \
+                "$BUNNY_API_URL/dnszone/$ZONE_ID/records/$MX_RECORD_ID" \
+                -o "update-mx-${domain}.json" \
+                2> "update-mx-${domain}-headers.log"
+
+              echo ""
+              echo "MX Record Update Response (HTTP 204 expected):"
+              cat "update-mx-${domain}.json" 2>/dev/null || echo "(empty response - 204 No Content)"
+              echo ""
+
+              # Query the updated MX record to generate DNS traffic
+              echo "→ Querying updated MX record to generate statistics..."
+              dig +short @kiki.bunny.net "$domain" MX > /dev/null 2>&1 || true
+              dig +short @coco.bunny.net "$domain" MX > /dev/null 2>&1 || true
+
+              sleep 1
+            fi
+
+            # =========================================================
+            # 15. Delete CAA Record
             # =========================================================
             if [ -n "$CAA_RECORD_ID" ]; then
               echo "→ Deleting CAA record (DELETE /dnszone/$ZONE_ID/records/$CAA_RECORD_ID)..."
@@ -1002,6 +1364,106 @@ jobs:
               sleep 1
             fi
 
+            # =========================================================
+            # 17. Delete A Record
+            # =========================================================
+            if [ -n "$A_RECORD_ID" ]; then
+              echo "→ Deleting A record (DELETE /dnszone/$ZONE_ID/records/$A_RECORD_ID)..."
+
+              curl -v -X DELETE \
+                -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+                "$BUNNY_API_URL/dnszone/$ZONE_ID/records/$A_RECORD_ID" \
+                -o "delete-a-${domain}.json" \
+                2> "delete-a-${domain}-headers.log"
+
+              echo ""
+              echo "A Record Delete Response (HTTP 204 expected):"
+              cat "delete-a-${domain}.json" 2>/dev/null || echo "(empty response - 204 No Content)"
+              echo ""
+
+              sleep 1
+            fi
+
+            # =========================================================
+            # 18. Delete AAAA Record
+            # =========================================================
+            if [ -n "$AAAA_RECORD_ID" ]; then
+              echo "→ Deleting AAAA record (DELETE /dnszone/$ZONE_ID/records/$AAAA_RECORD_ID)..."
+
+              curl -v -X DELETE \
+                -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+                "$BUNNY_API_URL/dnszone/$ZONE_ID/records/$AAAA_RECORD_ID" \
+                -o "delete-aaaa-${domain}.json" \
+                2> "delete-aaaa-${domain}-headers.log"
+
+              echo ""
+              echo "AAAA Record Delete Response (HTTP 204 expected):"
+              cat "delete-aaaa-${domain}.json" 2>/dev/null || echo "(empty response - 204 No Content)"
+              echo ""
+
+              sleep 1
+            fi
+
+            # =========================================================
+            # 19. Delete CNAME Record
+            # =========================================================
+            if [ -n "$CNAME_RECORD_ID" ]; then
+              echo "→ Deleting CNAME record (DELETE /dnszone/$ZONE_ID/records/$CNAME_RECORD_ID)..."
+
+              curl -v -X DELETE \
+                -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+                "$BUNNY_API_URL/dnszone/$ZONE_ID/records/$CNAME_RECORD_ID" \
+                -o "delete-cname-${domain}.json" \
+                2> "delete-cname-${domain}-headers.log"
+
+              echo ""
+              echo "CNAME Record Delete Response (HTTP 204 expected):"
+              cat "delete-cname-${domain}.json" 2>/dev/null || echo "(empty response - 204 No Content)"
+              echo ""
+
+              sleep 1
+            fi
+
+            # =========================================================
+            # 20. Delete TXT Record
+            # =========================================================
+            if [ -n "$TXT_RECORD_ID" ]; then
+              echo "→ Deleting TXT record (DELETE /dnszone/$ZONE_ID/records/$TXT_RECORD_ID)..."
+
+              curl -v -X DELETE \
+                -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+                "$BUNNY_API_URL/dnszone/$ZONE_ID/records/$TXT_RECORD_ID" \
+                -o "delete-txt-${domain}.json" \
+                2> "delete-txt-${domain}-headers.log"
+
+              echo ""
+              echo "TXT Record Delete Response (HTTP 204 expected):"
+              cat "delete-txt-${domain}.json" 2>/dev/null || echo "(empty response - 204 No Content)"
+              echo ""
+
+              sleep 1
+            fi
+
+            # =========================================================
+            # 21. Delete MX Record
+            # =========================================================
+            if [ -n "$MX_RECORD_ID" ]; then
+              echo "→ Deleting MX record (DELETE /dnszone/$ZONE_ID/records/$MX_RECORD_ID)..."
+
+              curl -v -X DELETE \
+                -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+                "$BUNNY_API_URL/dnszone/$ZONE_ID/records/$MX_RECORD_ID" \
+                -o "delete-mx-${domain}.json" \
+                2> "delete-mx-${domain}-headers.log"
+
+              echo ""
+              echo "MX Record Delete Response (HTTP 204 expected):"
+              cat "delete-mx-${domain}.json" 2>/dev/null || echo "(empty response - 204 No Content)"
+              echo ""
+
+              sleep 1
+            fi
+
             echo "✅ All record operations completed for $domain"
             sleep 2
           done
@@ -1010,12 +1472,27 @@ jobs:
           echo "=========================================="
           echo "Summary: DNS Record Operations Test"
           echo "=========================================="
-          echo "✅ Add CAA Record (Type 9)"
+          echo "✅ Add A Record (Type 0)"
+          echo "✅ Add AAAA Record (Type 1)"
+          echo "✅ Add CNAME Record (Type 2)"
+          echo "✅ Add TXT Record (Type 3)"
+          echo "✅ Add MX Record (Type 4)"
           echo "✅ Add SRV Record (Type 8)"
-          echo "✅ Update CAA Record"
+          echo "✅ Add CAA Record (Type 9)"
+          echo "✅ Update A Record"
+          echo "✅ Update AAAA Record"
+          echo "✅ Update CNAME Record"
+          echo "✅ Update TXT Record"
+          echo "✅ Update MX Record"
           echo "✅ Update SRV Record"
-          echo "✅ Delete CAA Record"
+          echo "✅ Update CAA Record"
+          echo "✅ Delete A Record"
+          echo "✅ Delete AAAA Record"
+          echo "✅ Delete CNAME Record"
+          echo "✅ Delete TXT Record"
+          echo "✅ Delete MX Record"
           echo "✅ Delete SRV Record"
+          echo "✅ Delete CAA Record"
 
       # =================================================================
       # STEP 4b2: EXPLORE - Statistics Endpoint
