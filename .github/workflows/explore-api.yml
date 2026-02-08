@@ -188,12 +188,42 @@ jobs:
           echo "✓ Zone created successfully and visible in list"
 
       # =================================================================
-      # STEP 3b: EXPLORE - Try to add amazon.com
+      # STEP 3b: DNS QUERY - Check if amazon.com exists on bunny.net nameservers
       # =================================================================
-      - name: Step 3b - Try to create amazon.com zone
+      - name: Step 3b - Query amazon.com via DNS
         run: |
           echo "=========================================="
-          echo "STEP 3b: Try to add amazon.com as a zone"
+          echo "STEP 3b: DNS queries for amazon.com"
+          echo "=========================================="
+          echo "Question: Is amazon.com actually hosted on bunny.net nameservers?"
+          echo ""
+
+          echo "--- Query via Bunny.net nameserver (kiki.bunny.net) ---"
+          dig @kiki.bunny.net amazon.com A +short || echo "Query failed"
+          echo ""
+
+          echo "--- Query via Bunny.net nameserver (coco.bunny.net) ---"
+          dig @coco.bunny.net amazon.com A +short || echo "Query failed"
+          echo ""
+
+          echo "--- Query via Cloudflare (1.1.1.1) ---"
+          dig @1.1.1.1 amazon.com A +short || echo "Query failed"
+          echo ""
+
+          echo "--- Query via Quad9 (9.9.9.9) ---"
+          dig @9.9.9.9 amazon.com A +short || echo "Query failed"
+          echo ""
+
+          echo "--- Check amazon.com nameservers ---"
+          dig amazon.com NS +short || echo "Query failed"
+
+      # =================================================================
+      # STEP 3c: EXPLORE - Try to add amazon.com
+      # =================================================================
+      - name: Step 3c - Try to create amazon.com zone
+        run: |
+          echo "=========================================="
+          echo "STEP 3c: Try to add amazon.com as a zone"
           echo "=========================================="
           echo "Question: Can we add a well-known domain we don't own?"
           echo ""
