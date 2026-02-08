@@ -5,7 +5,7 @@
 *.so
 *.dylib
 bunny-api-proxy
-mockbunny
+/mockbunny
 
 # Test binary, built with `go test -c`
 *.test
