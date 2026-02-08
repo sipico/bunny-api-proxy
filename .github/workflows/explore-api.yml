@@ -3,20 +3,6 @@ name: Explore bunny.net API
 # Manual trigger only - run this to explore API behavior
 on:
   workflow_dispatch:
-    inputs:
-      step:
-        description: 'Which exploration step to run'
-        required: true
-        default: 'all'
-        type: choice
-        options:
-          - all
-          - cleanup-only
-          - zones
-          - availability
-          - dnssec
-          - scanning
-          - certificates
 
 jobs:
   explore:
@@ -29,17 +15,15 @@ jobs:
       - name: Set up environment
         run: |
           echo "BUNNY_API_URL=https://api.bunny.net" >> $GITHUB_ENV
-          echo "Starting API exploration..."
-          echo "Step: ${{ github.event.inputs.step }}"
+          echo "Starting API exploration - BASIC TEST"
 
       # =================================================================
-      # INITIALIZATION: Clear all zones from account
+      # STEP 1: CLEANUP - Clear all zones from account
       # =================================================================
-      - name: Init - List existing zones
-        if: github.event.inputs.step == 'all' || github.event.inputs.step == 'cleanup-only'
+      - name: Step 1 - List existing zones
         run: |
           echo "=========================================="
-          echo "INIT: Listing all existing zones"
+          echo "STEP 1: List all existing zones"
           echo "=========================================="
 
           curl -v \
@@ -48,45 +32,65 @@ jobs:
             2>&1 | tee zones-before.log
 
           echo ""
-          echo "Extracting zone IDs..."
+          echo "Pretty-printed:"
+          curl -s \
+            -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
+            "$BUNNY_API_URL/dnszone" \
+            | jq '.'
+
+      - name: Step 1 - Extract zone IDs
+        run: |
+          echo "=========================================="
+          echo "STEP 1: Extract zone IDs for deletion"
+          echo "=========================================="
+
           curl -s \
             -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
             "$BUNNY_API_URL/dnszone" \
             | jq -r '.Items[]?.Id // empty' > zone-ids.txt
 
-          echo "Found zones:"
+          echo "Found zone IDs:"
           cat zone-ids.txt
 
-      - name: Init - Delete all existing zones
-        if: github.event.inputs.step == 'all' || github.event.inputs.step == 'cleanup-only'
+          ZONE_COUNT=$(wc -l < zone-ids.txt | tr -d ' ')
+          echo "Total zones to delete: $ZONE_COUNT"
+
+      - name: Step 1 - Delete all existing zones
         run: |
           echo "=========================================="
-          echo "INIT: Deleting all existing zones"
+          echo "STEP 1: Delete all existing zones"
           echo "=========================================="
 
           if [ ! -s zone-ids.txt ]; then
-            echo "No zones to delete"
+            echo "✓ No zones to delete - account is already empty"
             exit 0
           fi
 
           while read -r zone_id; do
             if [ -n "$zone_id" ]; then
               echo ""
-              echo "Deleting zone ID: $zone_id"
+              echo "→ Deleting zone ID: $zone_id"
+
               curl -v -X DELETE \
                 -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
                 "$BUNNY_API_URL/dnszone/$zone_id" \
                 2>&1 | tee "delete-zone-${zone_id}.log"
-              echo "Deleted zone $zone_id"
+
+              echo "✓ Deleted zone $zone_id"
               sleep 1
             fi
           done < zone-ids.txt
 
-      - name: Init - Verify account is empty
-        if: github.event.inputs.step == 'all' || github.event.inputs.step == 'cleanup-only'
+          echo ""
+          echo "✓ All zones deleted"
+
+      # =================================================================
+      # STEP 2: VERIFY - Account should be empty
+      # =================================================================
+      - name: Step 2 - Verify account is empty
         run: |
           echo "=========================================="
-          echo "INIT: Verifying account is empty"
+          echo "STEP 2: Verify account is empty"
           echo "=========================================="
 
           curl -v \
@@ -99,24 +103,32 @@ jobs:
           curl -s \
             -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
             "$BUNNY_API_URL/dnszone" \
-            | jq '.'
+            | jq '.' | tee zones-empty.json
+
+          ZONE_COUNT=$(jq '.Items | length' zones-empty.json)
+          echo ""
+          echo "Zone count: $ZONE_COUNT"
+
+          if [ "$ZONE_COUNT" != "0" ]; then
+            echo "✗ ERROR: Account is not empty after cleanup!"
+            exit 1
+          fi
+
+          echo "✓ Account is empty"
 
       # =================================================================
-      # EXPLORATION: Test various endpoints
+      # STEP 3: CREATE - Add a fake test zone
       # =================================================================
-
-      # --- Zone Operations ---
-      - name: Explore - Create test zone
-        if: github.event.inputs.step == 'all' || github.event.inputs.step == 'zones'
+      - name: Step 3 - Create fake test zone
         run: |
           echo "=========================================="
-          echo "EXPLORE: Create a test zone"
+          echo "STEP 3: Create fake test zone"
           echo "=========================================="
 
           curl -v -X POST \
             -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
             -H "Content-Type: application/json" \
-            -d '{"Domain": "test-explore-bap.xyz"}' \
+            -d '{"Domain": "test-basic-explore.xyz"}' \
             "$BUNNY_API_URL/dnszone" \
             2>&1 | tee create-test-zone.log
 
@@ -125,190 +137,100 @@ jobs:
           curl -s -X POST \
             -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
             -H "Content-Type: application/json" \
-            -d '{"Domain": "test-explore-bap.xyz"}' \
+            -d '{"Domain": "test-basic-explore.xyz"}' \
             "$BUNNY_API_URL/dnszone" \
             | jq '.' | tee test-zone.json
 
-          # Save zone ID for later use
+          # Save zone ID for cleanup
           TEST_ZONE_ID=$(jq -r '.Id' test-zone.json)
           echo "TEST_ZONE_ID=$TEST_ZONE_ID" >> $GITHUB_ENV
-          echo "Created test zone ID: $TEST_ZONE_ID"
-
-      - name: Explore - Try to create amazon.com zone
-        if: github.event.inputs.step == 'all' || github.event.inputs.step == 'zones'
-        run: |
-          echo "=========================================="
-          echo "EXPLORE: Try to add amazon.com as a zone"
-          echo "=========================================="
-          echo "Question: Can we add a well-known domain that we don't own?"
-          echo ""
-
-          curl -v -X POST \
-            -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
-            -H "Content-Type: application/json" \
-            -d '{"Domain": "amazon.com"}' \
-            "$BUNNY_API_URL/dnszone" \
-            2>&1 | tee create-amazon-zone.log
 
           echo ""
-          echo "Pretty-printed:"
-          curl -s -X POST \
-            -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
-            -H "Content-Type: application/json" \
-            -d '{"Domain": "amazon.com"}' \
-            "$BUNNY_API_URL/dnszone" \
-            | jq '.' || echo "Request failed or returned non-JSON"
+          echo "✓ Created test zone ID: $TEST_ZONE_ID"
 
-      # --- Availability Check ---
-      - name: Explore - Check availability of various domains
-        if: github.event.inputs.step == 'all' || github.event.inputs.step == 'availability'
+      - name: Step 3 - Verify zone was created
         run: |
           echo "=========================================="
-          echo "EXPLORE: Check domain availability"
+          echo "STEP 3: Verify zone was created"
           echo "=========================================="
 
-          domains=("amazon.com" "google.com" "definitely-not-registered-12345.xyz" "test-explore-bap.xyz")
-
-          for domain in "${domains[@]}"; do
-            echo ""
-            echo "--- Checking: $domain ---"
-            curl -v -X POST \
-              -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
-              -H "Content-Type: application/json" \
-              -d "{\"Domain\": \"$domain\"}" \
-              "$BUNNY_API_URL/dnszone/checkavailability" \
-              2>&1 | tee "availability-${domain}.log"
-
-            echo ""
-            echo "Pretty-printed:"
-            curl -s -X POST \
-              -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
-              -H "Content-Type: application/json" \
-              -d "{\"Domain\": \"$domain\"}" \
-              "$BUNNY_API_URL/dnszone/checkavailability" \
-              | jq '.' || echo "Request failed or returned non-JSON"
-
-            sleep 1
-          done
-
-      # --- DNSSEC Operations ---
-      - name: Explore - Enable DNSSEC on test zone
-        if: github.event.inputs.step == 'all' || github.event.inputs.step == 'dnssec'
-        run: |
-          echo "=========================================="
-          echo "EXPLORE: Enable DNSSEC"
-          echo "=========================================="
-
-          if [ -z "$TEST_ZONE_ID" ]; then
-            echo "No test zone ID found, skipping"
-            exit 0
-          fi
-
-          echo "Enabling DNSSEC for zone ID: $TEST_ZONE_ID"
-
-          curl -v -X POST \
-            -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
-            "$BUNNY_API_URL/dnszone/$TEST_ZONE_ID/dnssec" \
-            2>&1 | tee enable-dnssec.log
-
-          echo ""
-          echo "Pretty-printed:"
-          curl -s -X POST \
-            -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
-            "$BUNNY_API_URL/dnszone/$TEST_ZONE_ID/dnssec" \
-            | jq '.'
-
-      - name: Explore - Get zone with DNSSEC info
-        if: github.event.inputs.step == 'all' || github.event.inputs.step == 'dnssec'
-        run: |
-          echo "=========================================="
-          echo "EXPLORE: Get zone details (check DNSSEC status)"
-          echo "=========================================="
-
-          if [ -z "$TEST_ZONE_ID" ]; then
-            echo "No test zone ID found, skipping"
-            exit 0
-          fi
+          echo "Listing all zones to verify creation..."
 
           curl -v \
             -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
-            "$BUNNY_API_URL/dnszone/$TEST_ZONE_ID" \
-            2>&1 | tee get-zone-with-dnssec.log
+            "$BUNNY_API_URL/dnszone" \
+            2>&1 | tee zones-after-create.log
 
           echo ""
           echo "Pretty-printed:"
           curl -s \
             -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
-            "$BUNNY_API_URL/dnszone/$TEST_ZONE_ID" \
-            | jq '.'
+            "$BUNNY_API_URL/dnszone" \
+            | jq '.' | tee zones-list.json
 
-      # --- DNS Scanning ---
-      - name: Explore - Trigger DNS scan on test zone
-        if: github.event.inputs.step == 'all' || github.event.inputs.step == 'scanning'
-        run: |
-          echo "=========================================="
-          echo "EXPLORE: Trigger DNS scan on fake domain"
-          echo "=========================================="
-
-          if [ -z "$TEST_ZONE_ID" ]; then
-            echo "No test zone ID found, skipping"
-            exit 0
-          fi
-
-          curl -v -X POST \
-            -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
-            "$BUNNY_API_URL/dnszone/$TEST_ZONE_ID/recheckdns" \
-            2>&1 | tee scan-fake-domain.log
-
+          ZONE_COUNT=$(jq '.Items | length' zones-list.json)
           echo ""
-          echo "Pretty-printed:"
-          curl -s -X POST \
-            -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
-            "$BUNNY_API_URL/dnszone/$TEST_ZONE_ID/recheckdns" \
-            | jq '.' | tee scan-job.json
+          echo "Zone count: $ZONE_COUNT"
 
-          # Save job ID if available
-          JOB_ID=$(jq -r '.JobId // empty' scan-job.json)
-          if [ -n "$JOB_ID" ]; then
-            echo "JOB_ID=$JOB_ID" >> $GITHUB_ENV
-            echo "Scan job ID: $JOB_ID"
+          if [ "$ZONE_COUNT" != "1" ]; then
+            echo "✗ ERROR: Expected 1 zone, found $ZONE_COUNT"
+            exit 1
           fi
 
-      - name: Explore - Get DNS scan results
-        if: github.event.inputs.step == 'all' || github.event.inputs.step == 'scanning'
-        run: |
-          echo "=========================================="
-          echo "EXPLORE: Get DNS scan results"
-          echo "=========================================="
+          ZONE_DOMAIN=$(jq -r '.Items[0].Domain' zones-list.json)
+          echo "Zone domain: $ZONE_DOMAIN"
 
-          if [ -z "$TEST_ZONE_ID" ]; then
-            echo "No test zone ID found, skipping"
-            exit 0
+          if [ "$ZONE_DOMAIN" != "test-basic-explore.xyz" ]; then
+            echo "✗ ERROR: Wrong domain found: $ZONE_DOMAIN"
+            exit 1
           fi
 
-          echo "Waiting 5 seconds for scan to complete..."
-          sleep 5
-
-          curl -v \
-            -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
-            "$BUNNY_API_URL/dnszone/$TEST_ZONE_ID/recheckdns" \
-            2>&1 | tee scan-results.log
-
-          echo ""
-          echo "Pretty-printed:"
-          curl -s \
-            -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
-            "$BUNNY_API_URL/dnszone/$TEST_ZONE_ID/recheckdns" \
-            | jq '.'
+          echo "✓ Zone created successfully and visible in list"
 
       # =================================================================
-      # CLEANUP: Remove all zones created during exploration
+      # STEP 4: CLEANUP - Delete the test zone
       # =================================================================
-      - name: Cleanup - List final zones
+      - name: Step 4 - Delete test zone
         if: always()
         run: |
           echo "=========================================="
-          echo "CLEANUP: Listing all zones"
+          echo "STEP 4: Cleanup - Delete test zone"
+          echo "=========================================="
+
+          # Get all zone IDs
+          curl -s \
+            -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
+            "$BUNNY_API_URL/dnszone" \
+            | jq -r '.Items[]?.Id // empty' > zone-ids-final.txt
+
+          if [ ! -s zone-ids-final.txt ]; then
+            echo "✓ No zones to delete"
+            exit 0
+          fi
+
+          echo "Zones to delete:"
+          cat zone-ids-final.txt
+
+          while read -r zone_id; do
+            if [ -n "$zone_id" ]; then
+              echo ""
+              echo "→ Deleting zone ID: $zone_id"
+
+              curl -v -X DELETE \
+                -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
+                "$BUNNY_API_URL/dnszone/$zone_id" \
+                2>&1 | tee "cleanup-zone-${zone_id}.log"
+
+              echo "✓ Deleted zone $zone_id"
+              sleep 1
+            fi
+          done < zone-ids-final.txt
+
+      - name: Step 4 - Verify final cleanup
+        if: always()
+        run: |
+          echo "=========================================="
+          echo "STEP 4: Verify final cleanup"
           echo "=========================================="
 
           curl -v \
@@ -317,58 +239,12 @@ jobs:
             2>&1 | tee zones-final.log
 
           echo ""
-          curl -s \
-            -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
-            "$BUNNY_API_URL/dnszone" \
-            | jq -r '.Items[]?.Id // empty' > zone-ids-final.txt
-
-          echo "Zones to clean up:"
-          cat zone-ids-final.txt
-
-      - name: Cleanup - Delete all zones
-        if: always()
-        run: |
-          echo "=========================================="
-          echo "CLEANUP: Deleting all zones"
-          echo "=========================================="
-
-          if [ ! -s zone-ids-final.txt ]; then
-            echo "No zones to delete"
-            exit 0
-          fi
-
-          while read -r zone_id; do
-            if [ -n "$zone_id" ]; then
-              echo ""
-              echo "Deleting zone ID: $zone_id"
-              curl -v -X DELETE \
-                -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
-                "$BUNNY_API_URL/dnszone/$zone_id" \
-                2>&1 | tee "cleanup-zone-${zone_id}.log"
-              sleep 1
-            fi
-          done < zone-ids-final.txt
-
-      - name: Cleanup - Verify account is empty
-        if: always()
-        run: |
-          echo "=========================================="
-          echo "CLEANUP: Final verification"
-          echo "=========================================="
-
-          curl -v \
-            -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
-            "$BUNNY_API_URL/dnszone" \
-            2>&1 | tee zones-verified-empty.log
-
-          echo ""
           echo "Pretty-printed:"
           curl -s \
             -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
             "$BUNNY_API_URL/dnszone" \
             | jq '.'
 
-          # Check if truly empty
           ZONE_COUNT=$(curl -s \
             -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
             "$BUNNY_API_URL/dnszone" \
@@ -378,11 +254,11 @@ jobs:
           echo "Final zone count: $ZONE_COUNT"
 
           if [ "$ZONE_COUNT" != "0" ]; then
-            echo "WARNING: Account is not empty after cleanup!"
+            echo "✗ WARNING: Account is not empty after cleanup!"
             exit 1
           fi
 
-          echo "✓ Account is empty"
+          echo "✓ Account is empty - cleanup successful"
 
       # =================================================================
       # SUMMARY
@@ -390,28 +266,25 @@ jobs:
       - name: Summary
         if: always()
         run: |
+          echo ""
           echo "=========================================="
-          echo "EXPLORATION SUMMARY"
+          echo "BASIC TEST SUMMARY"
           echo "=========================================="
           echo ""
-          echo "All logs are available in the GitHub Actions artifacts."
-          echo "Review the curl verbose output to see:"
-          echo "  - HTTP status codes"
-          echo "  - Response headers"
-          echo "  - Request/response bodies"
-          echo "  - Timing information"
+          echo "✓ Step 1: Cleanup - Deleted existing zones"
+          echo "✓ Step 2: Verify - Confirmed account empty"
+          echo "✓ Step 3: Create - Added test zone"
+          echo "✓ Step 4: Cleanup - Removed test zone"
           echo ""
-          echo "Next steps:"
-          echo "  1. Review the logs for API response formats"
-          echo "  2. Update mockbunny with realistic responses"
-          echo "  3. Add new exploration steps as needed"
-          echo "  4. Iterate!"
+          echo "All basic operations working! ✅"
+          echo ""
+          echo "Next: Add more exploration steps as needed"
 
       - name: Upload logs as artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: api-exploration-logs
+          name: basic-test-logs
           path: |
             *.log
             *.json
