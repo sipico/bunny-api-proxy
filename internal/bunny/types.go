@@ -153,3 +153,16 @@ type ZoneStatisticsResponse struct {
 	SmartQueriesServedChart  map[string]int64 `json:"SmartQueriesServedChart"`
 	QueriesByTypeChart       map[string]int64 `json:"QueriesByTypeChart"`
 }
+
+// DNSScanResult represents the result of a DNS record scan.
+type DNSScanResult struct {
+	Records []DNSScanRecord `json:"Records"`
+}
+
+// DNSScanRecord represents a single record found during a DNS scan.
+type DNSScanRecord struct {
+	Type  int    `json:"Type"`
+	Name  string `json:"Name"`
+	Value string `json:"Value"`
+	TTL   int32  `json:"Ttl"`
+}

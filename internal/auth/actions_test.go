@@ -144,6 +144,20 @@ func TestParseRequest(t *testing.T) {
 			wantZoneID: 123,
 		},
 		{
+			name:       "trigger DNS scan",
+			method:     "POST",
+			path:       "/dnszone/123/recheckdns",
+			wantAction: ActionTriggerDNSScan,
+			wantZoneID: 123,
+		},
+		{
+			name:       "get DNS scan result",
+			method:     "GET",
+			path:       "/dnszone/123/recheckdns",
+			wantAction: ActionGetDNSScanResult,
+			wantZoneID: 123,
+		},
+		{
 			name:    "invalid path",
 			method:  "GET",
 			path:    "/invalid",

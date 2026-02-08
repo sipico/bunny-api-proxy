@@ -1986,3 +1986,123 @@ func TestHandleGetStatistics_InvalidZoneID(t *testing.T) {
 		t.Errorf("expected status %d, got %d", http.StatusBadRequest, resp.StatusCode)
 	}
 }
+
+func TestHandleTriggerScan_Success(t *testing.T) {
+	t.Parallel()
+	s := New()
+	defer s.Close()
+
+	id := s.AddZone("example.com")
+
+	req, _ := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/dnszone/%d/recheckdns", s.URL(), id), nil)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("failed to trigger scan: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected status %d, got %d", http.StatusOK, resp.StatusCode)
+	}
+}
+
+func TestHandleTriggerScan_ZoneNotFound(t *testing.T) {
+	t.Parallel()
+	s := New()
+	defer s.Close()
+
+	req, _ := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/dnszone/%d/recheckdns", s.URL(), 99999), nil)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("failed to trigger scan: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("expected status %d, got %d", http.StatusNotFound, resp.StatusCode)
+	}
+}
+
+func TestHandleTriggerScan_InvalidZoneID(t *testing.T) {
+	t.Parallel()
+	s := New()
+	defer s.Close()
+
+	req, _ := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/dnszone/abc/recheckdns", s.URL()), nil)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("failed to trigger scan: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d", http.StatusBadRequest, resp.StatusCode)
+	}
+}
+
+func TestHandleGetScanResult_Success(t *testing.T) {
+	t.Parallel()
+	s := New()
+	defer s.Close()
+
+	records := []Record{
+		{Type: 0, Name: "@", Value: "192.168.1.1", TTL: 300},
+	}
+	id := s.AddZoneWithRecords("example.com", records)
+
+	resp, err := http.Get(fmt.Sprintf("%s/dnszone/%d/recheckdns", s.URL(), id))
+	if err != nil {
+		t.Fatalf("failed to get scan result: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected status %d, got %d", http.StatusOK, resp.StatusCode)
+	}
+
+	var result struct {
+		Records []struct {
+			Type  int    `json:"Type"`
+			Name  string `json:"Name"`
+			Value string `json:"Value"`
+		} `json:"Records"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if len(result.Records) != 1 {
+		t.Errorf("expected 1 record, got %d", len(result.Records))
+	}
+}
+
+func TestHandleGetScanResult_ZoneNotFound(t *testing.T) {
+	t.Parallel()
+	s := New()
+	defer s.Close()
+
+	resp, err := http.Get(fmt.Sprintf("%s/dnszone/%d/recheckdns", s.URL(), 99999))
+	if err != nil {
+		t.Fatalf("failed to get scan result: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("expected status %d, got %d", http.StatusNotFound, resp.StatusCode)
+	}
+}
+
+func TestHandleGetScanResult_InvalidZoneID(t *testing.T) {
+	t.Parallel()
+	s := New()
+	defer s.Close()
+
+	resp, err := http.Get(fmt.Sprintf("%s/dnszone/abc/recheckdns", s.URL()))
+	if err != nil {
+		t.Fatalf("failed to get scan result: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d", http.StatusBadRequest, resp.StatusCode)
+	}
+}

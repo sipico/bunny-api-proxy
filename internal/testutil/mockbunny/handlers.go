@@ -722,6 +722,70 @@ func (s *Server) handleGetStatistics(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// handleTriggerScan handles POST /dnszone/{id}/recheckdns to trigger a DNS scan.
+func (s *Server) handleTriggerScan(w http.ResponseWriter, r *http.Request) {
+	idStr := chi.URLParam(r, "id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		http.Error(w, "invalid zone ID", http.StatusBadRequest)
+		return
+	}
+
+	s.state.mu.RLock()
+	_, ok := s.state.zones[id]
+	s.state.mu.RUnlock()
+
+	if !ok {
+		s.writeError(w, http.StatusNotFound, "dnszone.zone.not_found", "Id", "The requested DNS zone was not found")
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+// handleGetScanResult handles GET /dnszone/{id}/recheckdns to get scan results.
+func (s *Server) handleGetScanResult(w http.ResponseWriter, r *http.Request) {
+	idStr := chi.URLParam(r, "id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		http.Error(w, "invalid zone ID", http.StatusBadRequest)
+		return
+	}
+
+	s.state.mu.RLock()
+	zone, ok := s.state.zones[id]
+	s.state.mu.RUnlock()
+
+	if !ok {
+		s.writeError(w, http.StatusNotFound, "dnszone.zone.not_found", "Id", "The requested DNS zone was not found")
+		return
+	}
+
+	// Build mock scan results from existing records
+	s.state.mu.RLock()
+	defer s.state.mu.RUnlock()
+
+	type scanRecord struct {
+		Type  int    `json:"Type"`
+		Name  string `json:"Name"`
+		Value string `json:"Value"`
+		TTL   int32  `json:"Ttl"`
+	}
+	records := make([]scanRecord, len(zone.Records))
+	for i, rec := range zone.Records {
+		records[i] = scanRecord{
+			Type:  rec.Type,
+			Name:  rec.Name,
+			Value: rec.Value,
+			TTL:   rec.TTL,
+		}
+	}
+
+	writeJSON(w, http.StatusOK, struct {
+		Records []scanRecord `json:"Records"`
+	}{Records: records})
+}
+
 // recordTypeName converts a record type integer to its DNS name.
 func recordTypeName(t int) string {
 	switch t {

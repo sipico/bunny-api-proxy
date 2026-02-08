@@ -153,7 +153,7 @@ func (m *Authenticator) CheckPermissions(next http.Handler) http.Handler {
 			return
 		}
 
-		if req.Action == ActionUpdateZone || req.Action == ActionCreateZone || req.Action == ActionCheckAvailability || req.Action == ActionImportRecords || req.Action == ActionExportRecords || req.Action == ActionEnableDNSSEC || req.Action == ActionDisableDNSSEC || req.Action == ActionIssueCertificate || req.Action == ActionGetStatistics {
+		if req.Action == ActionUpdateZone || req.Action == ActionCreateZone || req.Action == ActionCheckAvailability || req.Action == ActionImportRecords || req.Action == ActionExportRecords || req.Action == ActionEnableDNSSEC || req.Action == ActionDisableDNSSEC || req.Action == ActionIssueCertificate || req.Action == ActionGetStatistics || req.Action == ActionTriggerDNSScan || req.Action == ActionGetDNSScanResult {
 			writeJSONErrorWithCode(w, http.StatusForbidden, "admin_required", "This endpoint requires an admin token.")
 			return
 		}

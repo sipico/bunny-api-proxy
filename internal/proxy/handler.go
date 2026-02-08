@@ -47,6 +47,11 @@ type BunnyClient interface {
 	IssueCertificate(ctx context.Context, zoneID int64, domain string) error
 	// GetZoneStatistics retrieves DNS query statistics for a zone.
 	GetZoneStatistics(ctx context.Context, zoneID int64, dateFrom, dateTo string) (*bunny.ZoneStatisticsResponse, error)
+	// TriggerDNSScan triggers a background DNS record scan for a zone.
+	TriggerDNSScan(ctx context.Context, zoneID int64) error
+
+	// GetDNSScanResult retrieves the latest DNS record scan result.
+	GetDNSScanResult(ctx context.Context, zoneID int64) (*bunny.DNSScanResult, error)
 	// AddRecord creates a new DNS record in the specified zone.
 	AddRecord(ctx context.Context, zoneID int64, req *bunny.AddRecordRequest) (*bunny.Record, error)
 
@@ -524,6 +529,59 @@ func (h *Handler) HandleGetStatistics(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.logger.Info("get statistics", "zone_id", zoneID)
+
+	writeJSON(w, http.StatusOK, result)
+}
+
+// HandleTriggerScan triggers a background DNS record scan for a zone.
+// POST /dnszone/{zoneID}/recheckdns
+// Admin only — operational/maintenance action.
+func (h *Handler) HandleTriggerScan(w http.ResponseWriter, r *http.Request) {
+	zoneIDStr := chi.URLParam(r, "zoneID")
+	if zoneIDStr == "" {
+		writeError(w, http.StatusBadRequest, "missing zone ID")
+		return
+	}
+
+	zoneID, err := strconv.ParseInt(zoneIDStr, 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid zone ID")
+		return
+	}
+
+	if err := h.client.TriggerDNSScan(r.Context(), zoneID); err != nil {
+		handleBunnyError(w, err)
+		return
+	}
+
+	h.logger.Info("trigger DNS scan", "zone_id", zoneID)
+
+	w.WriteHeader(http.StatusOK)
+}
+
+// HandleGetScanResult retrieves the latest DNS record scan result.
+// GET /dnszone/{zoneID}/recheckdns
+// Admin only — operational/maintenance action.
+func (h *Handler) HandleGetScanResult(w http.ResponseWriter, r *http.Request) {
+	zoneIDStr := chi.URLParam(r, "zoneID")
+	if zoneIDStr == "" {
+		writeError(w, http.StatusBadRequest, "missing zone ID")
+		return
+	}
+
+	zoneID, err := strconv.ParseInt(zoneIDStr, 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid zone ID")
+		return
+	}
+
+	result, err := h.client.GetDNSScanResult(r.Context(), zoneID)
+	if err != nil {
+		handleBunnyError(w, err)
+		return
+	}
+
+	h.logger.Info("get DNS scan result", "zone_id", zoneID)
 
 	writeJSON(w, http.StatusOK, result)
 }
