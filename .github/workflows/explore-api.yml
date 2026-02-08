@@ -1,0 +1,292 @@
+name: Explore bunny.net API
+
+# Manual trigger only - run this to explore API behavior
+on:
+  workflow_dispatch:
+
+jobs:
+  explore:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up environment
+        run: |
+          echo "BUNNY_API_URL=https://api.bunny.net" >> $GITHUB_ENV
+          echo "Starting API exploration - BASIC TEST"
+
+      # =================================================================
+      # STEP 1: CLEANUP - Clear all zones from account
+      # =================================================================
+      - name: Step 1 - List existing zones
+        run: |
+          echo "=========================================="
+          echo "STEP 1: List all existing zones"
+          echo "=========================================="
+
+          curl -v \
+            -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
+            "$BUNNY_API_URL/dnszone" \
+            2>&1 | tee zones-before.log
+
+          echo ""
+          echo "Pretty-printed:"
+          curl -s \
+            -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
+            "$BUNNY_API_URL/dnszone" \
+            | jq '.'
+
+      - name: Step 1 - Extract zone IDs
+        run: |
+          echo "=========================================="
+          echo "STEP 1: Extract zone IDs for deletion"
+          echo "=========================================="
+
+          curl -s \
+            -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
+            "$BUNNY_API_URL/dnszone" \
+            | jq -r '.Items[]?.Id // empty' > zone-ids.txt
+
+          echo "Found zone IDs:"
+          cat zone-ids.txt
+
+          ZONE_COUNT=$(wc -l < zone-ids.txt | tr -d ' ')
+          echo "Total zones to delete: $ZONE_COUNT"
+
+      - name: Step 1 - Delete all existing zones
+        run: |
+          echo "=========================================="
+          echo "STEP 1: Delete all existing zones"
+          echo "=========================================="
+
+          if [ ! -s zone-ids.txt ]; then
+            echo "✓ No zones to delete - account is already empty"
+            exit 0
+          fi
+
+          while read -r zone_id; do
+            if [ -n "$zone_id" ]; then
+              echo ""
+              echo "→ Deleting zone ID: $zone_id"
+
+              curl -v -X DELETE \
+                -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
+                "$BUNNY_API_URL/dnszone/$zone_id" \
+                2>&1 | tee "delete-zone-${zone_id}.log"
+
+              echo "✓ Deleted zone $zone_id"
+              sleep 1
+            fi
+          done < zone-ids.txt
+
+          echo ""
+          echo "✓ All zones deleted"
+
+      # =================================================================
+      # STEP 2: VERIFY - Account should be empty
+      # =================================================================
+      - name: Step 2 - Verify account is empty
+        run: |
+          echo "=========================================="
+          echo "STEP 2: Verify account is empty"
+          echo "=========================================="
+
+          curl -v \
+            -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
+            "$BUNNY_API_URL/dnszone" \
+            2>&1 | tee zones-after-cleanup.log
+
+          echo ""
+          echo "Pretty-printed:"
+          curl -s \
+            -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
+            "$BUNNY_API_URL/dnszone" \
+            | jq '.' | tee zones-empty.json
+
+          ZONE_COUNT=$(jq '.Items | length' zones-empty.json)
+          echo ""
+          echo "Zone count: $ZONE_COUNT"
+
+          if [ "$ZONE_COUNT" != "0" ]; then
+            echo "✗ ERROR: Account is not empty after cleanup!"
+            exit 1
+          fi
+
+          echo "✓ Account is empty"
+
+      # =================================================================
+      # STEP 3: CREATE - Add a fake test zone
+      # =================================================================
+      - name: Step 3 - Create fake test zone
+        run: |
+          echo "=========================================="
+          echo "STEP 3: Create fake test zone"
+          echo "=========================================="
+
+          curl -v -X POST \
+            -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{"Domain": "test-basic-explore.xyz"}' \
+            "$BUNNY_API_URL/dnszone" \
+            2>&1 | tee create-test-zone.log
+
+          echo ""
+          echo "Pretty-printed:"
+          curl -s -X POST \
+            -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{"Domain": "test-basic-explore.xyz"}' \
+            "$BUNNY_API_URL/dnszone" \
+            | jq '.' | tee test-zone.json
+
+          # Save zone ID for cleanup
+          TEST_ZONE_ID=$(jq -r '.Id' test-zone.json)
+          echo "TEST_ZONE_ID=$TEST_ZONE_ID" >> $GITHUB_ENV
+
+          echo ""
+          echo "✓ Created test zone ID: $TEST_ZONE_ID"
+
+      - name: Step 3 - Verify zone was created
+        run: |
+          echo "=========================================="
+          echo "STEP 3: Verify zone was created"
+          echo "=========================================="
+
+          echo "Listing all zones to verify creation..."
+
+          curl -v \
+            -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
+            "$BUNNY_API_URL/dnszone" \
+            2>&1 | tee zones-after-create.log
+
+          echo ""
+          echo "Pretty-printed:"
+          curl -s \
+            -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
+            "$BUNNY_API_URL/dnszone" \
+            | jq '.' | tee zones-list.json
+
+          ZONE_COUNT=$(jq '.Items | length' zones-list.json)
+          echo ""
+          echo "Zone count: $ZONE_COUNT"
+
+          if [ "$ZONE_COUNT" != "1" ]; then
+            echo "✗ ERROR: Expected 1 zone, found $ZONE_COUNT"
+            exit 1
+          fi
+
+          ZONE_DOMAIN=$(jq -r '.Items[0].Domain' zones-list.json)
+          echo "Zone domain: $ZONE_DOMAIN"
+
+          if [ "$ZONE_DOMAIN" != "test-basic-explore.xyz" ]; then
+            echo "✗ ERROR: Wrong domain found: $ZONE_DOMAIN"
+            exit 1
+          fi
+
+          echo "✓ Zone created successfully and visible in list"
+
+      # =================================================================
+      # STEP 4: CLEANUP - Delete the test zone
+      # =================================================================
+      - name: Step 4 - Delete test zone
+        if: always()
+        run: |
+          echo "=========================================="
+          echo "STEP 4: Cleanup - Delete test zone"
+          echo "=========================================="
+
+          # Get all zone IDs
+          curl -s \
+            -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
+            "$BUNNY_API_URL/dnszone" \
+            | jq -r '.Items[]?.Id // empty' > zone-ids-final.txt
+
+          if [ ! -s zone-ids-final.txt ]; then
+            echo "✓ No zones to delete"
+            exit 0
+          fi
+
+          echo "Zones to delete:"
+          cat zone-ids-final.txt
+
+          while read -r zone_id; do
+            if [ -n "$zone_id" ]; then
+              echo ""
+              echo "→ Deleting zone ID: $zone_id"
+
+              curl -v -X DELETE \
+                -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
+                "$BUNNY_API_URL/dnszone/$zone_id" \
+                2>&1 | tee "cleanup-zone-${zone_id}.log"
+
+              echo "✓ Deleted zone $zone_id"
+              sleep 1
+            fi
+          done < zone-ids-final.txt
+
+      - name: Step 4 - Verify final cleanup
+        if: always()
+        run: |
+          echo "=========================================="
+          echo "STEP 4: Verify final cleanup"
+          echo "=========================================="
+
+          curl -v \
+            -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
+            "$BUNNY_API_URL/dnszone" \
+            2>&1 | tee zones-final.log
+
+          echo ""
+          echo "Pretty-printed:"
+          curl -s \
+            -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
+            "$BUNNY_API_URL/dnszone" \
+            | jq '.'
+
+          ZONE_COUNT=$(curl -s \
+            -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
+            "$BUNNY_API_URL/dnszone" \
+            | jq '.Items | length')
+
+          echo ""
+          echo "Final zone count: $ZONE_COUNT"
+
+          if [ "$ZONE_COUNT" != "0" ]; then
+            echo "✗ WARNING: Account is not empty after cleanup!"
+            exit 1
+          fi
+
+          echo "✓ Account is empty - cleanup successful"
+
+      # =================================================================
+      # SUMMARY
+      # =================================================================
+      - name: Summary
+        if: always()
+        run: |
+          echo ""
+          echo "=========================================="
+          echo "BASIC TEST SUMMARY"
+          echo "=========================================="
+          echo ""
+          echo "✓ Step 1: Cleanup - Deleted existing zones"
+          echo "✓ Step 2: Verify - Confirmed account empty"
+          echo "✓ Step 3: Create - Added test zone"
+          echo "✓ Step 4: Cleanup - Removed test zone"
+          echo ""
+          echo "All basic operations working! ✅"
+          echo ""
+          echo "Next: Add more exploration steps as needed"
+
+      - name: Upload logs as artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: basic-test-logs
+          path: |
+            *.log
+            *.json
+            *.txt
+          retention-days: 30
