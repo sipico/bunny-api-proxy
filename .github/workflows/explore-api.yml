@@ -490,17 +490,55 @@ jobs:
           echo "=========================================="
 
       # =================================================================
-      # STEP 3h: EXPLORE - Add records from scan results (SKIPPED)
+      # STEP 3h: EXPLORE - Add records from scan results
       # =================================================================
-      - name: Step 3h - Add records from scan results (skipped for now)
+      - name: Step 3h - Add records from scan results
         run: |
           echo "=========================================="
           echo "STEP 3h: Add records from scan results"
           echo "=========================================="
-          echo "⚠️  SKIPPED: Python heredoc causes YAML parsing issues"
-          echo "Will implement in separate script file later"
+          echo "Testing: PUT /dnszone/{id}/records"
           echo ""
-          echo "Scan results are saved in artifacts for manual testing"
+
+          DOMAINS=("siemens.com" "shell.com" "nestle.com")
+
+          for domain in "${DOMAINS[@]}"; do
+            echo ""
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "Adding records for: $domain"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+            # Get zone ID
+            ZONE_ID=$(curl -s -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" "$BUNNY_API_URL/dnszone" | jq -r ".Items[] | select(.Domain == \"$domain\") | .Id")
+
+            if [ -z "$ZONE_ID" ] || [ "$ZONE_ID" = "null" ]; then
+              echo "⚠️  Zone not found for $domain, skipping"
+              continue
+            fi
+
+            # Find the latest scan result file
+            SCAN_FILE=$(ls -t scan-result-${domain}-attempt*.log 2>/dev/null | head -1)
+
+            if [ ! -f "$SCAN_FILE" ]; then
+              echo "⚠️  No scan results found for $domain"
+              continue
+            fi
+
+            # Run the Python script to add records
+            python3 .github/scripts/add-records-from-scan.py \
+              "$domain" \
+              "$ZONE_ID" \
+              "$SCAN_FILE" \
+              "${{ secrets.BUNNY_API_TEST_KEY }}" \
+              "$BUNNY_API_URL" \
+              5
+
+            sleep 1
+          done
+
+          echo ""
+          echo "=========================================="
+          echo "Summary: Records Added"
           echo "=========================================="
 
       # =================================================================
