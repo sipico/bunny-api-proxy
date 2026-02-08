@@ -1870,3 +1870,59 @@ func TestHandleDisableDNSSEC_ZoneNotFound(t *testing.T) {
 		t.Errorf("expected status %d, got %d", http.StatusNotFound, resp.StatusCode)
 	}
 }
+
+func TestHandleIssueCertificate_Success(t *testing.T) {
+	t.Parallel()
+	s := New()
+	defer s.Close()
+
+	id := s.AddZone("example.com")
+
+	body := strings.NewReader(`{"Domain":"*.example.com"}`)
+	req, _ := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/dnszone/%d/certificate/issue", s.URL(), id), body)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("failed to issue certificate: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected status %d, got %d", http.StatusOK, resp.StatusCode)
+	}
+}
+
+func TestHandleIssueCertificate_ZoneNotFound(t *testing.T) {
+	t.Parallel()
+	s := New()
+	defer s.Close()
+
+	body := strings.NewReader(`{"Domain":"*.test.com"}`)
+	req, _ := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/dnszone/%d/certificate/issue", s.URL(), 99999), body)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("failed to issue certificate: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("expected status %d, got %d", http.StatusNotFound, resp.StatusCode)
+	}
+}
+
+func TestHandleIssueCertificate_InvalidZoneID(t *testing.T) {
+	t.Parallel()
+	s := New()
+	defer s.Close()
+
+	body := strings.NewReader(`{"Domain":"*.test.com"}`)
+	req, _ := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/dnszone/abc/certificate/issue", s.URL()), body)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("failed to issue certificate: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d", http.StatusBadRequest, resp.StatusCode)
+	}
+}

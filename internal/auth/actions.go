@@ -23,6 +23,7 @@ var (
 	importRecordsPattern     = regexp.MustCompile(`^/dnszone/(\d+)/import/?$`)
 	exportRecordsPattern     = regexp.MustCompile(`^/dnszone/(\d+)/export/?$`)
 	dnssecPattern            = regexp.MustCompile(`^/dnszone/(\d+)/dnssec/?$`)
+	issueCertificatePattern  = regexp.MustCompile(`^/dnszone/(\d+)/certificate/issue/?$`)
 )
 
 // ParseRequest extracts action, zone ID, and record type from HTTP request.
@@ -79,6 +80,14 @@ func ParseRequest(r *http.Request) (*Request, error) {
 			return &Request{Action: ActionDisableDNSSEC, ZoneID: zoneID}, nil
 		}
 	}
+	// POST /dnszone/{id}/certificate/issue - issue wildcard certificate (admin only)
+	if r.Method == http.MethodPost {
+		if matches := issueCertificatePattern.FindStringSubmatch(path); matches != nil {
+			zoneID, _ := strconv.ParseInt(matches[1], 10, 64) //nolint:errcheck // regex ensures valid number
+			return &Request{Action: ActionIssueCertificate, ZoneID: zoneID}, nil
+		}
+	}
+
 	// POST /dnszone/{id} - update zone (admin only, no permission checking needed)
 	if r.Method == http.MethodPost {
 		if matches := updateZonePattern.FindStringSubmatch(path); matches != nil {
