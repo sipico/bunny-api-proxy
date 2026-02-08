@@ -490,6 +490,219 @@ jobs:
           echo "=========================================="
 
       # =================================================================
+      # STEP 3h: EXPLORE - Add records from scan results
+      # =================================================================
+      - name: Step 3h - Add records from scan results
+        run: |
+          echo "=========================================="
+          echo "STEP 3h: Add records from scan results"
+          echo "=========================================="
+          echo "Testing: PUT /dnszone/{id}/records"
+          echo ""
+
+          # Test with first 3 domains
+          DOMAINS=("siemens.com" "shell.com" "nestle.com")
+
+          for domain in "${DOMAINS[@]}"; do
+            echo ""
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "Adding records for: $domain"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+            # Get zone ID
+            ZONE_ID=$(curl -s -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" "$BUNNY_API_URL/dnszone" | jq -r ".Items[] | select(.Domain == \"$domain\") | .Id")
+
+            if [ -z "$ZONE_ID" ] || [ "$ZONE_ID" = "null" ]; then
+              echo "⚠️  Zone not found for $domain, skipping"
+              continue
+            fi
+
+            echo "Zone ID: $ZONE_ID"
+
+            # Find the latest scan result file
+            SCAN_FILE=$(ls -t scan-result-${domain}-attempt*.log 2>/dev/null | head -1)
+
+            if [ ! -f "$SCAN_FILE" ]; then
+              echo "⚠️  No scan results found for $domain"
+              continue
+            fi
+
+            echo "Using scan results from: $SCAN_FILE"
+
+            # Extract and parse scan results, then add first 5 records as test
+            python3 << 'PYTHON_EOF'
+import json
+import subprocess
+import sys
+import re
+
+domain = sys.argv[1]
+zone_id = sys.argv[2]
+scan_file = sys.argv[3]
+api_key = sys.argv[4]
+api_url = sys.argv[5]
+
+# Read scan results
+with open(scan_file, 'r') as f:
+    content = f.read()
+    match = re.search(r'(\{"JobId".*?\})(?:\s*\d+\s+\d+\s+\d+|$)', content, re.DOTALL)
+    if not match:
+        print(f"Could not find JSON in {scan_file}")
+        sys.exit(0)
+
+    # Clean control characters
+    json_str = match.group(1)
+    json_str = ''.join(c for c in json_str if ord(c) >= 32 or c in '\n\r\t')
+
+    try:
+        data = json.loads(json_str)
+        records = data.get('Records', [])
+
+        if not records:
+            print(f"No records found in scan results")
+            sys.exit(0)
+
+        print(f"Found {len(records)} records in scan")
+        print(f"Adding first 5 records as test...")
+
+        for i, record in enumerate(records[:5]):
+            # Convert scan record to AddRecordRequest format
+            add_req = {
+                "Type": record["Type"],
+                "Name": record["Name"],
+                "Value": record["Value"],
+                "Ttl": record["Ttl"],
+                "Priority": record.get("Priority") or 0,
+                "Weight": record.get("Weight") or 0,
+                "Port": record.get("Port") or 0,
+                "Flags": 0,
+                "Tag": "",
+                "Disabled": False,
+                "Comment": f"Added from scan result"
+            }
+
+            print(f"\n  Record {i+1}: Type={add_req['Type']} Name={add_req['Name']}")
+
+            # Add record via API
+            result = subprocess.run([
+                'curl', '-s', '-X', 'PUT',
+                '-H', f'AccessKey: {api_key}',
+                '-H', 'Content-Type: application/json',
+                '-d', json.dumps(add_req),
+                f'{api_url}/dnszone/{zone_id}/records'
+            ], capture_output=True, text=True)
+
+            if result.returncode == 0:
+                try:
+                    resp = json.loads(result.stdout)
+                    if resp.get('Id'):
+                        print(f"    ✅ Created record ID: {resp['Id']}")
+                    else:
+                        print(f"    ⚠️  Response: {result.stdout[:100]}")
+                except:
+                    print(f"    ⚠️  Could not parse response")
+            else:
+                print(f"    ❌ Failed: {result.stderr[:100]}")
+
+    except Exception as e:
+        print(f"Error processing scan results: {e}")
+        sys.exit(0)
+
+PYTHON_EOF
+            python3 -c "$(cat)" "$domain" "$ZONE_ID" "$SCAN_FILE" "${{ secrets.BUNNY_API_TEST_KEY }}" "$BUNNY_API_URL" << 'PYTHON_EOF'
+import json
+import subprocess
+import sys
+import re
+
+domain = sys.argv[1]
+zone_id = sys.argv[2]
+scan_file = sys.argv[3]
+api_key = sys.argv[4]
+api_url = sys.argv[5]
+
+with open(scan_file, 'r') as f:
+    content = f.read()
+    match = re.search(r'(\{"JobId".*?\})(?:\s*\d+|$)', content, re.DOTALL)
+    if match:
+        json_str = ''.join(c for c in match.group(1) if ord(c) >= 32 or c in '\n\r\t')
+        try:
+            data = json.loads(json_str)
+            records = data.get('Records', [])
+            print(f"Adding first 5 of {len(records)} records...")
+            for i, r in enumerate(records[:5]):
+                req = {"Type": r["Type"], "Name": r["Name"], "Value": r["Value"], "Ttl": r["Ttl"], "Priority": r.get("Priority") or 0, "Weight": r.get("Weight") or 0, "Port": r.get("Port") or 0}
+                result = subprocess.run(['curl', '-s', '-X', 'PUT', '-H', f'AccessKey: {api_key}', '-H', 'Content-Type: application/json', '-d', json.dumps(req), f'{api_url}/dnszone/{zone_id}/records'], capture_output=True, text=True)
+                resp = json.loads(result.stdout) if result.returncode == 0 else {}
+                print(f"  {i+1}. Type={r['Type']} {r['Name']}: {'✅ ID='+str(resp.get('Id')) if resp.get('Id') else '❌'}")
+        except Exception as e:
+            print(f"Error: {e}")
+PYTHON_EOF
+
+            sleep 1
+          done
+
+          echo ""
+          echo "=========================================="
+          echo "Summary: Records Added"
+          echo "=========================================="
+
+      # =================================================================
+      # STEP 3i: EXPLORE - Export zones
+      # =================================================================
+      - name: Step 3i - Export zones
+        run: |
+          echo "=========================================="
+          echo "STEP 3i: Export zones to BIND format"
+          echo "=========================================="
+          echo "Testing: GET /dnszone/{id}/export"
+          echo ""
+
+          DOMAINS=("siemens.com" "shell.com" "nestle.com")
+
+          for domain in "${DOMAINS[@]}"; do
+            echo ""
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "Exporting zone: $domain"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+            # Get zone ID
+            ZONE_ID=$(curl -s -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" "$BUNNY_API_URL/dnszone" | jq -r ".Items[] | select(.Domain == \"$domain\") | .Id")
+
+            if [ -z "$ZONE_ID" ] || [ "$ZONE_ID" = "null" ]; then
+              echo "⚠️  Zone not found for $domain"
+              continue
+            fi
+
+            echo "Zone ID: $ZONE_ID"
+            echo "Exporting..."
+
+            curl -v -X GET \
+              -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+              "$BUNNY_API_URL/dnszone/$ZONE_ID/export" \
+              2>&1 | tee "export-${domain}.log"
+
+            # Extract the zone file (non-curl output)
+            grep -v "^[\*<>]" "export-${domain}.log" | grep -v "^{" > "export-${domain}.zone" || true
+
+            if [ -s "export-${domain}.zone" ]; then
+              echo ""
+              echo "✅ Exported to export-${domain}.zone"
+              echo "Preview (first 10 lines):"
+              head -10 "export-${domain}.zone"
+            else
+              echo "⚠️  Export file is empty or failed"
+            fi
+
+            sleep 1
+          done
+
+          echo ""
+          echo "=========================================="
+          echo "Summary: Zone Exports"
+          echo "=========================================="
+
+      # =================================================================
       # STEP 4: CLEANUP - Delete the test zone
       # =================================================================
       - name: Step 4 - Delete test zone
