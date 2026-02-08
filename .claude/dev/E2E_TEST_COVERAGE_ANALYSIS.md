@@ -101,6 +101,546 @@
 - Disable DNSSEC: `DELETE /dnszone/{id}/dnssec` → Returns `DnsSecDsRecordModel` (all fields null)
 - Get DNSSEC details: No separate GET endpoint, use enable/disable responses
 
+---
+
+## 📋 Real API Request/Response Examples
+
+**Purpose:** These examples are from actual bunny.net API responses (workflow run 21799154043, 2026-02-08).
+Use these as reference for implementing mockbunny server responses.
+
+### 1. Record Operations - Add Records (PUT /dnszone/{id}/records)
+
+All record types return **HTTP 201 Created** with the record object.
+
+#### A Record (Type 0) - IPv4 Address
+**Request:**
+```json
+{
+  "Type": 0,
+  "Name": "test-a",
+  "Value": "192.0.2.1",
+  "Ttl": 300
+}
+```
+**Response:**
+```json
+{
+  "Id": 13711677,
+  "Type": 0,
+  "Name": "test-a",
+  "Value": "192.0.2.1",
+  "Ttl": 300,
+  "Accelerated": false,
+  "AcceleratedPullZoneId": 0,
+  "LinkName": null,
+  "MonitorType": 0,
+  "GeolocationLatitude": 0,
+  "GeolocationLongitude": 0,
+  "LatencyZone": null,
+  "SmartRoutingType": 0,
+  "Disabled": false,
+  "EnviromentalVariables": [],
+  "Weight": 100
+}
+```
+
+#### AAAA Record (Type 1) - IPv6 Address
+**Request:**
+```json
+{
+  "Type": 1,
+  "Name": "test-aaaa",
+  "Value": "2001:db8::1",
+  "Ttl": 300
+}
+```
+**Response:**
+```json
+{
+  "Id": 13711679,
+  "Type": 1,
+  "Name": "test-aaaa",
+  "Value": "2001:db8::1",
+  "Ttl": 300,
+  "Accelerated": false,
+  "AcceleratedPullZoneId": 0,
+  "LinkName": null,
+  "MonitorType": 0,
+  "GeolocationLatitude": 0,
+  "GeolocationLongitude": 0,
+  "LatencyZone": null,
+  "SmartRoutingType": 0,
+  "Disabled": false,
+  "EnviromentalVariables": [],
+  "Weight": 100
+}
+```
+
+#### CNAME Record (Type 2) - Alias
+**Request:**
+```json
+{
+  "Type": 2,
+  "Name": "test-cname",
+  "Value": "target.example.com",
+  "Ttl": 3600
+}
+```
+**Response:**
+```json
+{
+  "Id": 13711680,
+  "Type": 2,
+  "Name": "test-cname",
+  "Value": "target.example.com",
+  "Ttl": 3600,
+  "Accelerated": false,
+  "AcceleratedPullZoneId": 0,
+  "LinkName": null,
+  "MonitorType": 0,
+  "GeolocationLatitude": 0,
+  "GeolocationLongitude": 0,
+  "LatencyZone": null,
+  "SmartRoutingType": 0,
+  "Disabled": false,
+  "EnviromentalVariables": [],
+  "Weight": 100
+}
+```
+
+#### TXT Record (Type 3) - Text/ACME Challenge
+**Request:**
+```json
+{
+  "Type": 3,
+  "Name": "_acme-challenge",
+  "Value": "test-validation-string",
+  "Ttl": 60
+}
+```
+**Response:**
+```json
+{
+  "Id": 13711682,
+  "Type": 3,
+  "Name": "_acme-challenge",
+  "Value": "test-validation-string",
+  "Ttl": 60,
+  "Accelerated": false,
+  "AcceleratedPullZoneId": 0,
+  "LinkName": null,
+  "MonitorType": 0,
+  "GeolocationLatitude": 0,
+  "GeolocationLongitude": 0,
+  "LatencyZone": null,
+  "SmartRoutingType": 0,
+  "Disabled": false,
+  "EnviromentalVariables": [],
+  "Weight": 100
+}
+```
+
+#### MX Record (Type 4) - Mail Exchange
+**Request:**
+```json
+{
+  "Type": 4,
+  "Name": "",
+  "Value": "mail.example.com",
+  "Priority": 10,
+  "Ttl": 3600
+}
+```
+**Response:**
+```json
+{
+  "Id": 13711683,
+  "Type": 4,
+  "Name": "",
+  "Value": "mail.example.com",
+  "Priority": 10,
+  "Ttl": 3600,
+  "Accelerated": false,
+  "AcceleratedPullZoneId": 0,
+  "LinkName": null,
+  "MonitorType": 0,
+  "GeolocationLatitude": 0,
+  "GeolocationLongitude": 0,
+  "LatencyZone": null,
+  "SmartRoutingType": 0,
+  "Disabled": false,
+  "EnviromentalVariables": [],
+  "Weight": 100
+}
+```
+
+#### SRV Record (Type 8) - Service Record
+**Request:**
+```json
+{
+  "Type": 8,
+  "Name": "_test._tcp",
+  "Value": "test-target.example.com",
+  "Priority": 10,
+  "Weight": 20,
+  "Port": 8080,
+  "Ttl": 3600
+}
+```
+**Response:**
+```json
+{
+  "Id": 13711676,
+  "Type": 8,
+  "Name": "_test._tcp",
+  "Value": "test-target.example.com",
+  "Priority": 10,
+  "Weight": 20,
+  "Port": 8080,
+  "Ttl": 3600,
+  "Accelerated": false,
+  "AcceleratedPullZoneId": 0,
+  "LinkName": null,
+  "MonitorType": 0,
+  "GeolocationLatitude": 0,
+  "GeolocationLongitude": 0,
+  "LatencyZone": null,
+  "SmartRoutingType": 0,
+  "Disabled": false,
+  "EnviromentalVariables": []
+}
+```
+
+#### CAA Record (Type 9) - Certificate Authority Authorization
+**Request:**
+```json
+{
+  "Type": 9,
+  "Name": "",
+  "Value": "letsencrypt.org",
+  "Flags": 0,
+  "Tag": "issue",
+  "Ttl": 3600
+}
+```
+**Response:**
+```json
+{
+  "Id": 13711675,
+  "Type": 9,
+  "Name": "",
+  "Value": "letsencrypt.org",
+  "Flags": 0,
+  "Tag": "issue",
+  "Ttl": 3600,
+  "Accelerated": false,
+  "AcceleratedPullZoneId": 0,
+  "LinkName": null,
+  "MonitorType": 0,
+  "GeolocationLatitude": 0,
+  "GeolocationLongitude": 0,
+  "LatencyZone": null,
+  "SmartRoutingType": 0,
+  "Disabled": false,
+  "EnviromentalVariables": [],
+  "Weight": 100
+}
+```
+
+### 2. Record Operations - Update Records (POST /dnszone/{id}/records/{recordId})
+
+All update operations return **HTTP 204 No Content** (empty response body).
+
+**Example Request (Update A record):**
+```json
+{
+  "Id": 13711677,
+  "Type": 0,
+  "Name": "test-a",
+  "Value": "192.0.2.2",
+  "Ttl": 600
+}
+```
+**Response:** HTTP 204 (empty body)
+
+### 3. Record Operations - Delete Records (DELETE /dnszone/{id}/records/{recordId})
+
+All delete operations return **HTTP 204 No Content** (empty response body).
+
+**Example:** `DELETE /dnszone/719600/records/13711677`
+**Response:** HTTP 204 (empty body)
+
+### 4. Statistics Endpoint (GET /dnszone/{id}/statistics)
+
+**Response (with traffic):**
+```json
+{
+  "TotalQueriesServed": 28,
+  "NormalQueriesServed": null,
+  "SmartQueriesServed": null,
+  "QueriesByTypeChart": {
+    "1": 4,
+    "5": 4,
+    "15": 4,
+    "16": 4,
+    "28": 4,
+    "33": 4,
+    "257": 4
+  },
+  "QueriesServedChart": {
+    "2026-01-08T00:00:00Z": 0,
+    "2026-01-09T00:00:00Z": 0,
+    "2026-02-07T00:00:00Z": 0,
+    "2026-02-08T00:00:00Z": 28
+  },
+  "NormalQueriesServedChart": {},
+  "SmartQueriesServedChart": {}
+}
+```
+
+**Query Type Breakdown (QueriesByTypeChart):**
+- `1` = A (IPv4)
+- `5` = CNAME (Alias)
+- `15` = MX (Mail)
+- `16` = TXT (Text)
+- `28` = AAAA (IPv6)
+- `33` = SRV (Service)
+- `257` = CAA (Certificate Authority)
+
+**Note:** Each record type shows 4 queries = 2 operations (Add + Update) × 2 nameservers (kiki + coco)
+
+### 5. DNSSEC Operations
+
+#### Enable DNSSEC (POST /dnszone/{id}/dnssec)
+
+**Request:** (no body needed)
+**Response:** HTTP 200
+```json
+{
+  "DnsSecEnabled": true,
+  "DnsSecAlgorithm": 13,
+  "DsKeyTag": 12345,
+  "DsAlgorithm": 13,
+  "DsDigestType": 2,
+  "DsDigest": "ABC123...",
+  "DnsKeyFlags": 257,
+  "DnsKeyAlgorithm": 13,
+  "DnsKeyPublicKey": "XYZ789..."
+}
+```
+
+**Key Fields:**
+- `DnsSecAlgorithm`: 13 (ECDSAP256SHA256)
+- `DsKeyTag`: Unique key identifier
+- `DsDigest`: Hash for parent zone delegation
+
+#### Disable DNSSEC (DELETE /dnszone/{id}/dnssec)
+
+**Request:** (no body needed)
+**Response:** HTTP 200
+```json
+{
+  "DnsSecEnabled": false,
+  "DnsSecAlgorithm": 0,
+  "DsKeyTag": 0,
+  "DsAlgorithm": 0,
+  "DsDigestType": 0,
+  "DsDigest": null,
+  "DnsKeyFlags": 0,
+  "DnsKeyAlgorithm": 0,
+  "DnsKeyPublicKey": null
+}
+```
+
+### 6. Zone Management - GetZone (GET /dnszone/{id})
+
+**Response** (partial - showing DNSSEC and record count):
+```json
+{
+  "Id": 719600,
+  "Domain": "siemens.com",
+  "DnsSecEnabled": true,
+  "Records": [
+    {
+      "Id": 13711234,
+      "Type": 0,
+      "Name": "api",
+      "Value": "3.66.83.213",
+      "Ttl": 3600
+    }
+  ],
+  "NameServer1": "kiki.bunny.net",
+  "NameServer2": "coco.bunny.net",
+  "SoaEmail": "dns-admin@siemens.com",
+  "LoggingEnabled": true
+}
+```
+
+### 7. Zone Management - UpdateZone (POST /dnszone/{id})
+
+**Request:**
+```json
+{
+  "SoaEmail": "dns-admin@siemens.com",
+  "LoggingEnabled": true
+}
+```
+**Response:** HTTP 200 (returns updated zone object, same structure as GetZone)
+
+### 8. Import/Export Operations
+
+#### Export Zone (GET /dnszone/{id}/export)
+
+**Request:** (no body needed)
+**Response:** HTTP 200, Content-Type: `text/plain`
+
+**BIND Zone File Format:**
+```bind
+;A records
+siemens.com.	IN	5m	A	13.248.167.215
+siemens.com.	IN	5m	A	76.223.52.96
+api.siemens.com.	IN	5m	A	3.66.83.213
+auth.siemens.com.	IN	5m	A	194.138.21.47
+
+;TXT records
+siemens.com.	IN	5m	TXT	"00d300000006woeeaa"
+siemens.com.	IN	5m	TXT	"v=spf1 include:_spf.google.com ~all"
+
+;MX records
+siemens.com.	IN	5m	MX	10	mx1.siemens.com
+siemens.com.	IN	5m	MX	20	mx2.siemens.com
+
+;CNAME records
+www.siemens.com.	IN	5m	CNAME	siemens.com
+```
+
+**⚠️ Known Bug:** SRV records (Type 8) are NOT exported in BIND format. All other types export correctly.
+
+#### Import Zone (POST /dnszone/{id}/import)
+
+**Request:** Content-Type: `text/plain` (BIND zone file in request body)
+**Response:** HTTP 200
+
+```json
+{
+  "TotalRecordsParsed": 117,
+  "Created": 117,
+  "Failed": 0,
+  "Skipped": 0
+}
+```
+
+**Import Behavior:**
+- Parses BIND format records
+- Creates new DNS records in the zone
+- `TotalRecordsParsed`: Count of records in BIND file
+- `Created`: Successfully imported records
+- `Failed`: Records that failed validation
+- `Skipped`: Duplicate or existing records
+
+### 9. DNS Scanning Operations
+
+#### Trigger Scan (POST /dnszone/{id}/records/scan)
+
+**Request:** (no body needed)
+**Response:** HTTP 200
+
+```json
+{
+  "Status": 1,
+  "Records": []
+}
+```
+
+**Status Values:**
+- `0` = Not Started
+- `1` = In Progress
+- `2` = Completed
+- `3` = Failed
+
+#### Get Scan Results (GET /dnszone/{id}/records/scan)
+
+**Response (In Progress):**
+```json
+{
+  "Status": 1,
+  "Records": []
+}
+```
+
+**Response (Completed):**
+```json
+{
+  "Status": 2,
+  "Records": [
+    {
+      "Name": "@",
+      "Type": 0,
+      "Ttl": 3600,
+      "Value": "75.2.65.169",
+      "Priority": null,
+      "Weight": null,
+      "Port": null,
+      "IsProxied": false
+    },
+    {
+      "Name": "www",
+      "Type": 2,
+      "Ttl": 3600,
+      "Value": "example.com",
+      "Priority": null,
+      "Weight": null,
+      "Port": null,
+      "IsProxied": false
+    },
+    {
+      "Name": "",
+      "Type": 4,
+      "Ttl": 3600,
+      "Value": "mail.example.com",
+      "Priority": 10,
+      "Weight": null,
+      "Port": null,
+      "IsProxied": false
+    }
+  ]
+}
+```
+
+**Scan Output Notes:**
+- Queries real DNS for published records
+- Returns records in bunny.net format (ready for zone creation)
+- `IsProxied` field is silently ignored when creating zones
+- **CAA records** from scan have Flags/Tag in `Value` string - need manual reformatting for zone creation
+
+### 10. Common Response Patterns
+
+#### Success Responses
+- **GET operations**: HTTP 200 with JSON body
+- **POST create operations**: HTTP 201 with created object
+- **POST update operations**: HTTP 200 or HTTP 204 (no content)
+- **DELETE operations**: HTTP 204 (no content)
+
+#### Standard Record Fields
+All record responses include these common fields:
+```json
+{
+  "Accelerated": false,
+  "AcceleratedPullZoneId": 0,
+  "LinkName": null,
+  "MonitorType": 0,
+  "GeolocationLatitude": 0,
+  "GeolocationLongitude": 0,
+  "LatencyZone": null,
+  "SmartRoutingType": 0,
+  "Disabled": false,
+  "EnviromentalVariables": [],
+  "Weight": 100
+}
+```
+
+**Note:** These fields are for advanced bunny.net features (CDN acceleration, geo-routing, monitoring). For basic DNS operations, they can be ignored/defaulted.
+
 ### Test Coverage Impact
 
 **Previous Assumptions:**
