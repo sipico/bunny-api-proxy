@@ -2254,7 +2254,9 @@ func TestCreateServerAddrFormatting(t *testing.T) {
 
 // TestServerStartAndHealthCheck starts an actual HTTP server and verifies health endpoints
 func TestStartActualServer(t *testing.T) {
-	t.Parallel()
+	// Note: t.Parallel() removed - this test starts an actual HTTP server
+	// and creates real database connections, should not run concurrently
+	// with 570+ other parallel tests to avoid resource exhaustion.
 	oldDatabasePath := os.Getenv("DATABASE_PATH")
 	oldLogLevel := os.Getenv("LOG_LEVEL")
 	oldListenAddr := os.Getenv("LISTEN_ADDR")
