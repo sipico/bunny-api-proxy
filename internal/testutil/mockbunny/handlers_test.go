@@ -2018,11 +2018,12 @@ func TestHandleTriggerScan_Success(t *testing.T) {
 	}
 }
 
-func TestHandleTriggerScan_ZoneNotFound(t *testing.T) {
+func TestHandleTriggerScan_UnknownDomain(t *testing.T) {
 	t.Parallel()
 	s := New()
 	defer s.Close()
 
+	// Real API accepts any domain and returns 200 with Status 1
 	reqBody := strings.NewReader(`{"Domain":"nonexistent.com"}`)
 	resp, err := http.Post(s.URL()+"/dnszone/records/scan", "application/json", reqBody)
 	if err != nil {
@@ -2030,8 +2031,18 @@ func TestHandleTriggerScan_ZoneNotFound(t *testing.T) {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusNotFound {
-		t.Errorf("expected status %d, got %d", http.StatusNotFound, resp.StatusCode)
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected status %d, got %d", http.StatusOK, resp.StatusCode)
+	}
+
+	var result struct {
+		Status int `json:"Status"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if result.Status != 1 {
+		t.Errorf("expected Status 1, got %d", result.Status)
 	}
 }
 

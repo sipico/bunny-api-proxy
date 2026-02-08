@@ -756,7 +756,8 @@ func (s *Server) handleGetStatistics(w http.ResponseWriter, r *http.Request) {
 
 // handleTriggerScan handles POST /dnszone/records/scan to trigger a DNS scan.
 // Takes {"Domain": "..."} in body. Returns Status: 1 (InProgress) immediately.
-// Matches real bunny.net API behavior observed in the explore workflow.
+// Matches real bunny.net API behavior: accepts any domain (not just account zones),
+// returns 200 OK with Status 1 and empty Records.
 func (s *Server) handleTriggerScan(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Domain string `json:"Domain"`
@@ -774,27 +775,16 @@ func (s *Server) handleTriggerScan(w http.ResponseWriter, r *http.Request) {
 	s.state.mu.Lock()
 	defer s.state.mu.Unlock()
 
-	// Find zone by domain
-	var zoneID int64
-	found := false
+	// Find zone by domain (if it exists in our state, track scan for GET result polling)
 	for id, zone := range s.state.zones {
 		if zone.Domain == req.Domain {
-			zoneID = id
-			found = true
+			s.state.scanTriggered[id] = true
+			s.state.scanCallCount[id] = 0
 			break
 		}
 	}
 
-	if !found {
-		s.writeError(w, http.StatusNotFound, "dnszone.zone.not_found", "Domain", "The requested DNS zone was not found")
-		return
-	}
-
-	// Mark scan as triggered and reset poll count
-	s.state.scanTriggered[zoneID] = true
-	s.state.scanCallCount[zoneID] = 0
-
-	// Return Status: 1 (InProgress) with empty records — matches real API
+	// Real API accepts any domain and returns 200 with Status 1 (InProgress)
 	writeJSON(w, http.StatusOK, struct {
 		Status  int           `json:"Status"`
 		Records []interface{} `json:"Records"`

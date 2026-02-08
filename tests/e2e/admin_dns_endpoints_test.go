@@ -525,8 +525,8 @@ func TestE2E_TriggerScan_Success(t *testing.T) {
 }
 
 // TestE2E_TriggerScan_UnknownDomain verifies triggering scan for a domain not in the account.
-// The real bunny.net API accepts any domain (returns 200 with Status 0); the mock returns 404.
-// Both behaviors are valid — the key assertion is that no server error occurs.
+// The real bunny.net API accepts any domain and returns 200 with Status 1.
+// The mock now matches this behavior (any domain accepted).
 func TestE2E_TriggerScan_UnknownDomain(t *testing.T) {
 	env := testenv.Setup(t)
 
@@ -534,9 +534,8 @@ func TestE2E_TriggerScan_UnknownDomain(t *testing.T) {
 	resp := proxyRequest(t, "POST", "/dnszone/records/scan", env.AdminToken, body)
 	defer resp.Body.Close()
 
-	// Mock returns 404 (zone not found); real API returns 200 (accepts any domain).
-	require.Less(t, resp.StatusCode, 500,
-		"scan trigger should not cause server error (got %d)", resp.StatusCode)
+	// Both mock and real API return 200 for any domain
+	require.Equal(t, http.StatusOK, resp.StatusCode)
 }
 
 // TestE2E_GetScanResult_Success verifies the full scan lifecycle through the proxy.
