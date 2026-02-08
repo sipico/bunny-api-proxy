@@ -835,49 +835,42 @@ jobs:
             echo ""
 
             # Step 1: Enable DNSSEC
-            echo "→ Enabling DNSSEC..."
+            echo "→ Enabling DNSSEC (POST /dnszone/$ZONE_ID/dnssec)..."
             curl -v -X POST \
               -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
-              "$BUNNY_API_URL/dnszone/$ZONE_ID/dnssec/enable" \
+              "$BUNNY_API_URL/dnszone/$ZONE_ID/dnssec" \
               -o "dnssec-enable-${domain}.json" \
               2> "dnssec-enable-${domain}-headers.log"
 
             echo ""
-            echo "Enable response:"
+            echo "✅ DNSSEC Enable Response (includes DS/DNSKEY records):"
             cat "dnssec-enable-${domain}.json" | jq '.' 2>/dev/null || cat "dnssec-enable-${domain}.json"
             echo ""
 
-            # Small delay to let DNSSEC provision
-            echo "Waiting 3 seconds for DNSSEC to provision..."
-            sleep 3
+            # Extract and display DS and DNSKEY information
+            if [ -f "dnssec-enable-${domain}.json" ]; then
+              echo "DNSSEC Details:"
+              echo "  Enabled: $(jq -r '.Enabled // "unknown"' "dnssec-enable-${domain}.json")"
+              echo "  DS Record: $(jq -r '.DsRecord // "None"' "dnssec-enable-${domain}.json")"
+              echo "  Algorithm: $(jq -r '.Algorithm // "unknown"' "dnssec-enable-${domain}.json")"
+              echo "  KeyTag: $(jq -r '.KeyTag // "unknown"' "dnssec-enable-${domain}.json")"
+              echo "  Digest: $(jq -r '.Digest // "None"' "dnssec-enable-${domain}.json" | head -c 50)..."
+              echo "  DigestType: $(jq -r '.DigestType // "unknown"' "dnssec-enable-${domain}.json")"
+              echo "  PublicKey: $(jq -r '.PublicKey // "None"' "dnssec-enable-${domain}.json" | head -c 50)..."
+              echo "  Flags: $(jq -r '.Flags // "unknown"' "dnssec-enable-${domain}.json")"
+              echo "  DsConfigured: $(jq -r '.DsConfigured // "unknown"' "dnssec-enable-${domain}.json")"
+            fi
+            echo ""
 
-            # Step 2: Get DNSSEC details (DS and DNSKEY records)
-            echo "→ Retrieving DNSSEC details (DS and DNSKEY records)..."
-            curl -v -X GET \
+            # Small delay before disabling
+            echo "Waiting 2 seconds before disabling..."
+            sleep 2
+
+            # Step 2: Disable DNSSEC
+            echo "→ Disabling DNSSEC (DELETE /dnszone/$ZONE_ID/dnssec)..."
+            curl -v -X DELETE \
               -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
               "$BUNNY_API_URL/dnszone/$ZONE_ID/dnssec" \
-              -o "dnssec-details-${domain}.json" \
-              2> "dnssec-details-${domain}-headers.log"
-
-            echo ""
-            echo "DNSSEC details:"
-            cat "dnssec-details-${domain}.json" | jq '.' 2>/dev/null || cat "dnssec-details-${domain}.json"
-            echo ""
-
-            # Extract and display DS and DNSKEY records
-            echo "DS Records:"
-            jq -r '.DsRecords[]? // "None"' "dnssec-details-${domain}.json" 2>/dev/null || echo "No DS records or parsing error"
-            echo ""
-
-            echo "DNSKEY Records:"
-            jq -r '.DnskeyRecords[]? // "None"' "dnssec-details-${domain}.json" 2>/dev/null || echo "No DNSKEY records or parsing error"
-            echo ""
-
-            # Step 3: Disable DNSSEC
-            echo "→ Disabling DNSSEC..."
-            curl -v -X POST \
-              -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
-              "$BUNNY_API_URL/dnszone/$ZONE_ID/dnssec/disable" \
               -o "dnssec-disable-${domain}.json" \
               2> "dnssec-disable-${domain}-headers.log"
 
