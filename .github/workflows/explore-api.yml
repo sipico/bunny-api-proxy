@@ -27,14 +27,14 @@ jobs:
           echo "=========================================="
 
           curl -v \
-            -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
+            -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
             "$BUNNY_API_URL/dnszone" \
             2>&1 | tee zones-before.log
 
           echo ""
           echo "Pretty-printed:"
           curl -s \
-            -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
+            -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
             "$BUNNY_API_URL/dnszone" \
             | jq '.'
 
@@ -45,7 +45,7 @@ jobs:
           echo "=========================================="
 
           curl -s \
-            -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
+            -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
             "$BUNNY_API_URL/dnszone" \
             | jq -r '.Items[]?.Id // empty' > zone-ids.txt
 
@@ -72,7 +72,7 @@ jobs:
               echo "→ Deleting zone ID: $zone_id"
 
               curl -v -X DELETE \
-                -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
+                -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
                 "$BUNNY_API_URL/dnszone/$zone_id" \
                 2>&1 | tee "delete-zone-${zone_id}.log"
 
@@ -94,14 +94,14 @@ jobs:
           echo "=========================================="
 
           curl -v \
-            -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
+            -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
             "$BUNNY_API_URL/dnszone" \
             2>&1 | tee zones-after-cleanup.log
 
           echo ""
           echo "Pretty-printed:"
           curl -s \
-            -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
+            -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
             "$BUNNY_API_URL/dnszone" \
             | jq '.' | tee zones-empty.json
 
@@ -126,7 +126,7 @@ jobs:
           echo "=========================================="
 
           curl -v -X POST \
-            -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
+            -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
             -H "Content-Type: application/json" \
             -d '{"Domain": "test-basic-explore.xyz"}' \
             "$BUNNY_API_URL/dnszone" \
@@ -135,7 +135,7 @@ jobs:
           echo ""
           echo "Pretty-printed:"
           curl -s -X POST \
-            -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
+            -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
             -H "Content-Type: application/json" \
             -d '{"Domain": "test-basic-explore.xyz"}' \
             "$BUNNY_API_URL/dnszone" \
@@ -157,14 +157,14 @@ jobs:
           echo "Listing all zones to verify creation..."
 
           curl -v \
-            -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
+            -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
             "$BUNNY_API_URL/dnszone" \
             2>&1 | tee zones-after-create.log
 
           echo ""
           echo "Pretty-printed:"
           curl -s \
-            -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
+            -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
             "$BUNNY_API_URL/dnszone" \
             | jq '.' | tee zones-list.json
 
@@ -199,7 +199,7 @@ jobs:
 
           # Get all zone IDs
           curl -s \
-            -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
+            -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
             "$BUNNY_API_URL/dnszone" \
             | jq -r '.Items[]?.Id // empty' > zone-ids-final.txt
 
@@ -217,7 +217,7 @@ jobs:
               echo "→ Deleting zone ID: $zone_id"
 
               curl -v -X DELETE \
-                -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
+                -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
                 "$BUNNY_API_URL/dnszone/$zone_id" \
                 2>&1 | tee "cleanup-zone-${zone_id}.log"
 
@@ -234,19 +234,19 @@ jobs:
           echo "=========================================="
 
           curl -v \
-            -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
+            -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
             "$BUNNY_API_URL/dnszone" \
             2>&1 | tee zones-final.log
 
           echo ""
           echo "Pretty-printed:"
           curl -s \
-            -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
+            -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
             "$BUNNY_API_URL/dnszone" \
             | jq '.'
 
           ZONE_COUNT=$(curl -s \
-            -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
+            -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
             "$BUNNY_API_URL/dnszone" \
             | jq '.Items | length')
 
