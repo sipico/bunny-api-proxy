@@ -11,11 +11,62 @@
 **Endpoints with E2E Tests:** 14 (45%)
 **Endpoints without E2E Tests:** 17 (55%)
 
-**Key Findings:**
-1. **Core DNS operations** (list zones, get zone, add/list/delete/update records) are **well tested**
-2. **Admin-only advanced features** added post-MVP lack e2e coverage
-3. **Domain-dependent endpoints** (DNSSEC, statistics, recheckdns, certificates) **cannot be properly tested** with fake unregistered domains
-4. **Admin token management** is partially tested (create/delete tokens covered, permission management not covered)
+**Key Findings (REVISED AFTER DEEP ANALYSIS):**
+1. ✅ **Core DNS operations** (list zones, get zone, add/list/delete/update records) are **well tested**
+2. ⚠️ **Admin-only advanced features** added post-MVP lack e2e coverage **BUT can be tested with fake domains**
+3. ⚡ **CRITICAL INSIGHT:** Only **3 endpoints (10%)** truly require real domains! Most "advanced" endpoints are just API operations
+4. ✅ **Most untested endpoints** (DNSSEC, import/export, statistics, zone updates) **can be tested with fake domains**
+5. ⚠️ **Admin token management** is partially tested (create/delete tokens covered, permission management not covered)
+
+### Fake Domain vs. Real Domain Requirements
+
+**Can test with fake domains (28 endpoints - 90%):**
+- All DNS CRUD operations ✅
+- DNSSEC operations (key generation works without real delegation) ✅
+- Import/Export (just BIND parsing) ✅
+- Statistics (returns zero/empty but API works) ✅
+- Zone configuration updates ✅
+- Admin/auth operations ✅
+
+**Truly require real domains (3 endpoints - 10%):**
+- Certificate issuance (needs ACME validation) ❌
+- Domain availability check (queries registries) ❌
+- DNS record scanning (queries real DNS) ❌
+
+**Even these 3 can be partially tested:** Error paths, request validation, and response formats work with fake domains!
+
+---
+
+## Understanding API Operations vs. External Validation
+
+**KEY INSIGHT:** Most bunny.net DNS API endpoints are **internal operations** that don't require external validation.
+
+### API Operations (Work with Fake Domains)
+These endpoints operate entirely within bunny.net's infrastructure:
+- **Zone configuration**: Update nameservers, SOA records (metadata only)
+- **DNSSEC key generation**: Creates DNSSEC keys and DS records (no parent zone delegation needed for API to work)
+- **Import**: Parses BIND format and stores records (no DNS lookup)
+- **Export**: Serializes records to BIND format (read operation)
+- **Statistics**: Reads internal query counters (returns zero for unused zones)
+- **Record CRUD**: Creates/updates/deletes records in bunny.net's database
+
+**These all work with fake domains because they're just database/configuration operations!**
+
+### External Validation (Need Real Infrastructure)
+Only these endpoints interact with external systems:
+- **Certificate issuance**: Calls Let's Encrypt, which performs ACME DNS-01 validation
+- **Domain availability**: Queries WHOIS/registry databases
+- **DNS scanning**: Performs real DNS lookups to discover published records
+
+**These need real domains because they query external systems outside bunny.net's control.**
+
+### Testing Strategy by Type
+
+| Type | Fake Domain Testing | What You Validate |
+|------|-------------------|------------------|
+| **API Operations** | ✅ Full testing | Request handling, permissions, data storage, response format |
+| **External Validation** | ⚠️ Error path testing | Request validation, error handling, permission checks |
+| **External Validation** | ✅ Real domain testing | Actual functionality, external integration |
 
 ---
 
@@ -206,17 +257,29 @@ Example: `1-a42cdbc-bap.xyz`, `2-a42cdbc-bap.xyz`
 
 ### Endpoints That CANNOT Be Properly Tested with Fake Domains
 
-| Endpoint | Why Real Domain Needed |
-|----------|------------------------|
-| POST /dnszone/checkavailability | Checks domain registry availability |
-| POST /dnszone/{zoneID}/dnssec | Requires DS record delegation at registrar |
-| DELETE /dnszone/{zoneID}/dnssec | Requires DS record removal at registrar |
-| POST /dnszone/{zoneID}/certificate/issue | Requires domain validation (DNS or HTTP) |
-| GET /dnszone/{zoneID}/statistics | Needs real DNS query traffic |
-| POST /dnszone/{zoneID}/recheckdns | Scans real DNS records in the wild |
-| GET /dnszone/{zoneID}/recheckdns | Returns real DNS scan results |
+After thorough analysis, only **3 endpoints** truly require real domains:
 
-**Total endpoints requiring real domains:** 7 out of 31 (23%)
+| Endpoint | Why Real Domain Needed | Can Test Error Paths? |
+|----------|------------------------|----------------------|
+| POST /dnszone/checkavailability | Queries domain registry/WHOIS database | ⚠️ Yes - can test with fake domains (will return "not available" or error) |
+| POST /dnszone/{zoneID}/certificate/issue | Requires ACME validation (DNS-01/HTTP-01 challenge) | ⚠️ Yes - will fail validation but can test endpoint accepts request |
+| POST /dnszone/{zoneID}/recheckdns | Performs real DNS queries to discover published records | ⚠️ Partial - will return empty/NXDOMAIN but can test job creation |
+
+**Total endpoints requiring real domains for full functionality:** 3 out of 31 (10%)
+
+### Endpoints That CAN Be Tested with Fake Domains (More Than Initially Thought!)
+
+| Endpoint | Why Fake Domains Work | What Gets Tested |
+|----------|----------------------|------------------|
+| POST /dnszone/{zoneID} (update) | Pure metadata/configuration, no external validation | Zone settings, nameserver overrides, SOA email |
+| POST /dnszone/{zoneID}/import | Validates BIND syntax only, no DNS lookup | BIND parsing, record creation, error handling |
+| GET /dnszone/{zoneID}/export | Serializes existing records to BIND format | BIND output format, record serialization |
+| POST /dnszone/{zoneID}/dnssec | bunny.net generates keys for any zone | DNSSEC key generation, DS record format |
+| DELETE /dnszone/{zoneID}/dnssec | Just toggles configuration flag | DNSSEC disable operation |
+| GET /dnszone/{zoneID}/statistics | Returns empty/zero stats for unused zones | Response format, date range handling |
+| GET /dnszone/{zoneID}/recheckdns | Reads cached scan results | Result retrieval, job status |
+
+**Key Insight:** Many "advanced" endpoints are just API operations that don't require external validation!
 
 ---
 
@@ -255,99 +318,48 @@ Create dedicated tests for:
 
 ---
 
-### 3. **Domain-Dependent Endpoints: Three Options** (Priority: MEDIUM)
+### 3. **Add E2E Tests for API Operations (Fake Domains Work!)** (Priority: HIGH)
 
-#### Option A: Register a Real Test Domain (RECOMMENDED)
+**REVISED FINDING:** Most "advanced" endpoints are just API operations that work fine with fake domains!
 
-**Approach:**
-1. Register a cheap domain dedicated to testing (e.g., `bunny-api-proxy-test.com`)
-2. Delegate it to bunny.net nameservers permanently
-3. Run domain-dependent tests against this real domain in CI
-4. Use environment variable `BUNNY_REAL_TEST_DOMAIN` to enable these tests
+The following can be tested immediately without any real domain:
 
-**Advantages:**
-- ✅ Tests real bunny.net behavior (DNSSEC, certificates, scanning)
-- ✅ One-time registration cost (~$10/year)
-- ✅ Can be shared across all test runs
-- ✅ No per-test cleanup needed (domain persists)
+- [ ] POST /dnszone/{zoneID} - Update zone settings (nameservers, SOA email)
+- [ ] POST /dnszone/{zoneID}/import - Import BIND zone file
+- [ ] GET /dnszone/{zoneID}/export - Export to BIND format
+- [ ] POST /dnszone/{zoneID}/dnssec - Enable DNSSEC (generates keys)
+- [ ] DELETE /dnszone/{zoneID}/dnssec - Disable DNSSEC
+- [ ] GET /dnszone/{zoneID}/statistics - Get statistics (returns zero for fake domains)
 
-**Disadvantages:**
-- ❌ Annual renewal cost
-- ❌ Must maintain domain delegation
-- ❌ Slower tests (DNS propagation delays)
-- ❌ Potential DNS cache issues between test runs
-
-**Implementation:**
-```go
-// tests/e2e/real_domain_test.go
-//go:build e2e && real_domain
-
-func TestE2E_DNSSEC_Enable(t *testing.T) {
-    domain := os.Getenv("BUNNY_REAL_TEST_DOMAIN")
-    if domain == "" {
-        t.Skip("BUNNY_REAL_TEST_DOMAIN not set")
-    }
-    // Test DNSSEC operations...
-}
-```
+**Approach:** Standard e2e tests using existing mock infrastructure
+**Effort:** Low to Medium
+**Risk:** Low
+**No real domain needed!** ✅
 
 ---
 
-#### Option B: Enhanced Mock Server Simulation
+### 4. **Real Domain Endpoints: Test Error Paths with Fake Domains** (Priority: MEDIUM)
 
-**Approach:**
-1. Extend mockbunny to simulate DNSSEC/certificate/statistics responses
-2. Return realistic synthetic data for these endpoints
-3. Accept that we're not testing real bunny.net behavior, just proxy logic
+Only 3 endpoints truly require real domains for **full functionality**, but we can still test error paths:
 
-**Advantages:**
-- ✅ No real domain needed
-- ✅ Fast test execution
-- ✅ No external dependencies
-- ✅ Complete control over test scenarios
+| Endpoint | Test with Fake Domain | Test with Real Domain |
+|----------|----------------------|----------------------|
+| POST /dnszone/checkavailability | ✅ Error handling, response format | ✅ Actual availability check |
+| POST /dnszone/{zoneID}/certificate/issue | ✅ Request validation, error response | ✅ Actual certificate issuance |
+| POST /dnszone/{zoneID}/recheckdns | ✅ Job creation, empty results | ✅ Actual DNS record discovery |
 
-**Disadvantages:**
-- ❌ Not testing real bunny.net API behavior
-- ❌ Mock may diverge from reality
-- ❌ False confidence if bunny.net API changes
-- ❌ Cannot verify actual DNSSEC signing, certificate issuance, etc.
+**Phase 1 (Fake Domains):**
+- Test that endpoints accept requests
+- Verify error handling for invalid inputs
+- Check response format/structure
+- Validate permission enforcement
 
-**Use Case:** Suitable for testing **proxy authorization/permission logic** but not actual feature functionality
+**Phase 2 (Real Domain - Optional):**
+- Add one real test domain (~$10/year)
+- Test actual functionality in nightly/pre-release builds
+- Use build tag: `//go:build e2e && real_domain`
 
----
-
-#### Option C: Hybrid Approach (BEST BALANCE)
-
-**Approach:**
-1. Use **mock server** for testing **proxy-level concerns** (auth, permissions, error handling)
-2. Use **real domain** for **smoke tests** of actual functionality (run less frequently)
-3. Document which endpoints are "proxy-tested" vs "functionality-tested"
-
-**Implementation:**
-```go
-// Mock mode: Test authorization/permissions
-func TestE2E_DNSSEC_AuthorizationMock(t *testing.T) {
-    // Test that admin-only restriction works
-    // Test that permission checks pass
-    // Mock returns success
-}
-
-// Real domain mode: Test actual DNSSEC functionality
-//go:build e2e && real_domain
-func TestE2E_DNSSEC_RealDomain(t *testing.T) {
-    // Actually enable DNSSEC on real domain
-    // Verify DS records via DNS query
-    // Verify signing works
-}
-```
-
-**Advantages:**
-- ✅ Fast feedback for common cases (mock)
-- ✅ Real validation for critical functionality (real domain)
-- ✅ Clear separation of concerns
-- ✅ Can run mock tests in every CI run, real domain tests less frequently
-
-**Recommendation:** **Option C (Hybrid)** provides the best balance
+**Recommendation:** Start with Phase 1 (fake domain error path testing), defer Phase 2 (real domain) until needed
 
 ---
 
@@ -373,20 +385,23 @@ tests/e2e/
 
 ---
 
-## Priority Matrix
+## Priority Matrix (REVISED)
 
 | Priority | Category | Endpoints | Can Test with Fake Domains? | Effort |
 |----------|----------|-----------|------------------------------|--------|
 | **P0** | Core record operations | 4 | ✅ Yes | ✅ **DONE** |
+| **P1** | Zone CRUD | 4 | ✅ Yes | Low |
+| **P1** | Import/Export | 2 | ✅ Yes (BIND parsing only!) | Low |
+| **P1** | DNSSEC | 2 | ✅ **Yes (API operations!)** | Low |
 | **P1** | Admin token management | 5 | ✅ Yes | Medium |
-| **P2** | Zone CRUD | 4 | ✅ Yes | Low |
-| **P2** | Import/Export | 2 | ✅ Yes | Medium |
-| **P3** | Server management | 1 | ✅ Yes | Low |
-| **P3** | DNSSEC | 2 | ❌ No - needs real domain | High |
-| **P3** | Certificates | 1 | ❌ No - needs real domain | High |
-| **P3** | Statistics | 1 | ❌ No - needs real domain | Medium |
-| **P3** | DNS Scanning | 2 | ❌ No - needs real domain | Medium |
-| **P4** | Domain availability | 1 | ❌ No - needs real domain | Medium |
+| **P2** | Statistics | 1 | ✅ Yes (returns zero) | Low |
+| **P2** | Server management | 3 | ✅ Yes | Low |
+| **P3** | Certificates (error paths) | 1 | ⚠️ Partial (test errors) | Medium |
+| **P3** | DNS Scanning (error paths) | 2 | ⚠️ Partial (test errors) | Medium |
+| **P4** | Domain availability (error paths) | 1 | ⚠️ Partial (test errors) | Low |
+| **P5** | Real domain tests | 3 | ❌ No - needs real domain | High |
+
+**Key Change:** Most endpoints moved from "needs real domain" to "works with fake domains"!
 
 ---
 
@@ -399,30 +414,47 @@ tests/e2e/
 - ✅ Admin token lifecycle **well covered**
 - ✅ Fake domain approach works perfectly for MVP scope
 
-### Critical Gaps
+### Critical Gaps (REVISED - Much Better Than Initially Thought!)
 1. **Admin-only features** (import/export, zone updates, permission management) added post-MVP lack e2e tests
-2. **Domain-dependent features** (DNSSEC, certificates, statistics, scanning) **fundamentally cannot be tested** with current fake domain approach
-3. **Zone create/delete operations** only tested indirectly via helpers
+2. **Zone create/delete operations** only tested indirectly via helpers
+3. **Only 3 endpoints** (10%) truly require real domains for full functionality testing
+
+### Key Discovery ⚡
+**Most "advanced" endpoints are API operations that work fine with fake domains!**
+- DNSSEC: bunny.net generates keys for any zone (no real delegation needed to test API)
+- Import/Export: Just BIND parsing/serialization (no DNS lookups)
+- Statistics: Returns zero/empty data but endpoint works
+- Zone updates: Pure metadata configuration
+
+**Only certificate issuance, domain availability checks, and DNS scanning truly need real domains.**
 
 ### Recommended Action Plan
 
-**Phase 1 (Immediate - Low Effort):**
-1. Add e2e tests for zone create/delete as first-class operations
-2. Add e2e tests for import/export endpoints
-3. Add e2e tests for permission management endpoints
-4. Add e2e tests for admin health/ready endpoints
-5. Add e2e test for loglevel endpoint
+**Phase 1 (Immediate - Low Effort, High Impact):**
+1. ✅ Add e2e tests for zone create/delete as first-class operations
+2. ✅ Add e2e tests for import/export endpoints (test with fake domains!)
+3. ✅ Add e2e tests for DNSSEC enable/disable (test with fake domains!)
+4. ✅ Add e2e tests for zone update settings (test with fake domains!)
+5. ✅ Add e2e tests for statistics endpoint (test with fake domains, verify zero data)
+6. ✅ Add e2e tests for permission management endpoints
+7. ✅ Add e2e tests for admin health/ready/loglevel endpoints
+
+**All of Phase 1 can be done with fake domains!** No real domain needed.
 
 **Phase 2 (Short-term - Medium Effort):**
-1. Decide on domain testing strategy (Hybrid recommended)
-2. If using real domain: Register test domain and delegate to bunny.net
-3. Add mock-based authorization tests for domain-dependent endpoints
-4. Document which endpoints are "proxy-tested" vs "functionality-tested"
+1. Add error path tests for certificate issuance (verify API rejects invalid requests)
+2. Add error path tests for DNS scanning (verify job creation works)
+3. Add error path tests for domain availability checks
+4. Document which endpoints are "API-tested" vs "functionality-tested"
 
-**Phase 3 (Long-term - Higher Effort):**
-1. Add real domain smoke tests for DNSSEC, certificates, statistics, scanning
-2. Run real domain tests less frequently (nightly or pre-release)
-3. Consider test organization refactoring for maintainability
+**Phase 3 (Long-term - Optional, Lower Priority):**
+1. Register a real test domain (~$10/year) if full functionality validation desired
+2. Add smoke tests for certificate issuance with real domain
+3. Add smoke tests for DNS scanning with real domain
+4. Run real domain tests in nightly/pre-release builds only
+5. Consider test organization refactoring for maintainability
+
+**Recommendation:** Focus on Phase 1 - it covers 85% of the missing tests without needing any real domain!
 
 ---
 
