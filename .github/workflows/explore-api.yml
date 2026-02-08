@@ -1018,6 +1018,81 @@ jobs:
           echo "✅ Delete SRV Record"
 
       # =================================================================
+      # STEP 4b2: EXPLORE - Statistics Endpoint
+      # =================================================================
+      - name: Step 4b2 - Test DNS Query Statistics
+        run: |
+          echo "=========================================="
+          echo "STEP 4b2: Test DNS Query Statistics"
+          echo "=========================================="
+          echo "Testing: GET /dnszone/{id}/statistics"
+          echo ""
+
+          DOMAINS=("siemens.com" "shell.com" "nestle.com")
+
+          for domain in "${DOMAINS[@]}"; do
+            echo ""
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "Getting statistics for: $domain"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+            # Get zone ID from the import environment variable
+            ZONE_VAR="ZONE_IMPORT_${domain//./_}"
+            ZONE_ID=$(eval echo \$$ZONE_VAR)
+
+            if [ -z "$ZONE_ID" ]; then
+              echo "⚠️  Could not find zone ID for $domain"
+              continue
+            fi
+
+            echo "Zone ID: $ZONE_ID"
+            echo ""
+
+            # Get statistics (may be empty/zero for newly created zones)
+            echo "→ Getting DNS query statistics (GET /dnszone/$ZONE_ID/statistics)..."
+            curl -v -X GET \
+              -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+              "$BUNNY_API_URL/dnszone/$ZONE_ID/statistics" \
+              -o "statistics-${domain}.json" \
+              2> "statistics-${domain}-headers.log"
+
+            echo ""
+            echo "Statistics Response:"
+            cat "statistics-${domain}.json" | jq '.' 2>/dev/null || cat "statistics-${domain}.json"
+            echo ""
+
+            # Try with date range parameters (last 24 hours)
+            echo "→ Getting statistics with date range (last 24 hours)..."
+            DATE_FROM=$(date -u -d '24 hours ago' '+%Y-%m-%dT%H:%M:%S' 2>/dev/null || date -u -v-24H '+%Y-%m-%dT%H:%M:%S')
+            DATE_TO=$(date -u '+%Y-%m-%dT%H:%M:%S')
+
+            echo "   From: $DATE_FROM"
+            echo "   To:   $DATE_TO"
+            echo ""
+
+            curl -v -X GET \
+              -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+              "$BUNNY_API_URL/dnszone/$ZONE_ID/statistics?dateFrom=${DATE_FROM}&dateTo=${DATE_TO}" \
+              -o "statistics-range-${domain}.json" \
+              2> "statistics-range-${domain}-headers.log"
+
+            echo ""
+            echo "Statistics with Date Range:"
+            cat "statistics-range-${domain}.json" | jq '.' 2>/dev/null || cat "statistics-range-${domain}.json"
+            echo ""
+
+            echo "✅ Statistics retrieved for $domain"
+            sleep 1
+          done
+
+          echo ""
+          echo "=========================================="
+          echo "Summary: DNS Statistics Test"
+          echo "=========================================="
+          echo "Note: Statistics may be zero/empty for newly created zones"
+          echo "      that haven't received real DNS queries yet."
+
+      # =================================================================
       # STEP 4c: EXPLORE - DNSSEC Operations
       # =================================================================
       - name: Step 4c - Test DNSSEC Enable/Disable
