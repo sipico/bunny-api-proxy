@@ -25,7 +25,8 @@ var (
 	dnssecPattern            = regexp.MustCompile(`^/dnszone/(\d+)/dnssec/?$`)
 	issueCertificatePattern  = regexp.MustCompile(`^/dnszone/(\d+)/certificate/issue/?$`)
 	statisticsPattern        = regexp.MustCompile(`^/dnszone/(\d+)/statistics/?$`)
-	recheckDNSPattern        = regexp.MustCompile(`^/dnszone/(\d+)/recheckdns/?$`)
+	scanTriggerPattern       = regexp.MustCompile(`^/dnszone/records/scan/?$`)
+	scanResultPattern        = regexp.MustCompile(`^/dnszone/(\d+)/records/scan/?$`)
 )
 
 // ParseRequest extracts action, zone ID, and record type from HTTP request.
@@ -45,6 +46,14 @@ func ParseRequest(r *http.Request) (*Request, error) {
 		}
 	}
 
+	// GET /dnszone/{id}/records/scan - get DNS scan result (admin only)
+	if r.Method == http.MethodGet {
+		if matches := scanResultPattern.FindStringSubmatch(path); matches != nil {
+			zoneID, _ := strconv.ParseInt(matches[1], 10, 64) //nolint:errcheck // regex ensures valid number
+			return &Request{Action: ActionGetDNSScanResult, ZoneID: zoneID}, nil
+		}
+	}
+
 	// GET /dnszone/{id}/records - list records
 	if r.Method == http.MethodGet && recordsPattern.MatchString(path) {
 		matches := recordsPattern.FindStringSubmatch(path)
@@ -61,6 +70,12 @@ func ParseRequest(r *http.Request) (*Request, error) {
 	}
 	if r.Method == http.MethodPost && checkAvailabilityPattern.MatchString(path) {
 		return &Request{Action: ActionCheckAvailability}, nil
+	}
+	// POST /dnszone/records/scan - trigger DNS scan (admin only)
+	if r.Method == http.MethodPost {
+		if scanTriggerPattern.MatchString(path) {
+			return &Request{Action: ActionTriggerDNSScan, ZoneID: 0}, nil
+		}
 	}
 	// POST /dnszone - create zone
 	if r.Method == http.MethodPost && listZonesPattern.MatchString(path) {
@@ -89,14 +104,6 @@ func ParseRequest(r *http.Request) (*Request, error) {
 			return &Request{Action: ActionIssueCertificate, ZoneID: zoneID}, nil
 		}
 	}
-	// POST /dnszone/{id}/recheckdns - trigger DNS scan (admin only)
-	if r.Method == http.MethodPost {
-		if matches := recheckDNSPattern.FindStringSubmatch(path); matches != nil {
-			zoneID, _ := strconv.ParseInt(matches[1], 10, 64) //nolint:errcheck // regex ensures valid number
-			return &Request{Action: ActionTriggerDNSScan, ZoneID: zoneID}, nil
-		}
-	}
-
 	// POST /dnszone/{id} - update zone (admin only, no permission checking needed)
 	if r.Method == http.MethodPost {
 		if matches := updateZonePattern.FindStringSubmatch(path); matches != nil {
@@ -120,10 +127,6 @@ func ParseRequest(r *http.Request) (*Request, error) {
 				zoneID, _ := strconv.ParseInt(matches[1], 10, 64) //nolint:errcheck // regex ensures valid number
 				return &Request{Action: ActionGetStatistics, ZoneID: zoneID}, nil
 			}
-		}
-		if matches := recheckDNSPattern.FindStringSubmatch(path); matches != nil {
-			zoneID, _ := strconv.ParseInt(matches[1], 10, 64) //nolint:errcheck // regex ensures valid number
-			return &Request{Action: ActionGetDNSScanResult, ZoneID: zoneID}, nil
 		}
 	}
 

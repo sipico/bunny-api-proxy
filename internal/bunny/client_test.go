@@ -1526,8 +1526,8 @@ func TestImportRecords(t *testing.T) {
 			t.Fatal("expected non-nil result")
 		}
 
-		if result.RecordsSuccessful != 2 {
-			t.Errorf("expected 2 successful records, got %d", result.RecordsSuccessful)
+		if result.Created != 2 {
+			t.Errorf("expected 2 created records, got %d", result.Created)
 		}
 	})
 
@@ -2171,14 +2171,14 @@ func TestTriggerDNSScan(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		zoneID     int64
+		domain     string
 		handler    http.HandlerFunc
 		wantErr    bool
 		wantErrMsg string
 	}{
 		{
 			name:   "successful trigger",
-			zoneID: 1,
+			domain: "test.com",
 			handler: func(w http.ResponseWriter, r *http.Request) {
 				if r.Method != http.MethodPost {
 					t.Errorf("expected POST, got %s", r.Method)
@@ -2186,12 +2186,17 @@ func TestTriggerDNSScan(t *testing.T) {
 				if r.Header.Get("AccessKey") != "test-key" {
 					t.Errorf("missing AccessKey header")
 				}
+				if r.Header.Get("Content-Type") != "application/json" {
+					t.Errorf("missing Content-Type header")
+				}
+				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusOK)
+				w.Write([]byte(`{"Status":1,"Records":[]}`))
 			},
 		},
 		{
 			name:   "zone not found",
-			zoneID: 999,
+			domain: "nonexistent.com",
 			handler: func(w http.ResponseWriter, _ *http.Request) {
 				w.WriteHeader(http.StatusNotFound)
 			},
@@ -2200,7 +2205,7 @@ func TestTriggerDNSScan(t *testing.T) {
 		},
 		{
 			name:   "unauthorized",
-			zoneID: 1,
+			domain: "test.com",
 			handler: func(w http.ResponseWriter, _ *http.Request) {
 				w.WriteHeader(http.StatusUnauthorized)
 			},
@@ -2209,7 +2214,7 @@ func TestTriggerDNSScan(t *testing.T) {
 		},
 		{
 			name:   "context canceled",
-			zoneID: 1,
+			domain: "test.com",
 			handler: func(w http.ResponseWriter, _ *http.Request) {
 				w.WriteHeader(http.StatusOK)
 			},
@@ -2233,7 +2238,7 @@ func TestTriggerDNSScan(t *testing.T) {
 				cancel()
 			}
 
-			err := client.TriggerDNSScan(ctx, tt.zoneID)
+			result, err := client.TriggerDNSScan(ctx, tt.domain)
 
 			if tt.wantErr {
 				if err == nil {
@@ -2247,6 +2252,13 @@ func TestTriggerDNSScan(t *testing.T) {
 
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if result == nil {
+				t.Fatal("expected non-nil result")
+			}
+			if result.Status != 1 {
+				t.Errorf("expected Status 1, got %d", result.Status)
 			}
 		})
 	}

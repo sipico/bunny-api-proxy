@@ -1137,8 +1137,8 @@ func TestIntegration_ImportRecords_AdminOnly(t *testing.T) {
 	if err := json.NewDecoder(w.Body).Decode(&result); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
-	if result.RecordsSuccessful != 2 {
-		t.Errorf("expected 2 successful records, got %d", result.RecordsSuccessful)
+	if result.Created != 2 {
+		t.Errorf("expected 2 created records, got %d", result.Created)
 	}
 
 	// Test 2: Non-admin token should fail with 403
@@ -1445,7 +1445,7 @@ func TestIntegration_TriggerDNSScan_AdminOnly(t *testing.T) {
 	mockServer := mockbunny.New()
 	defer mockServer.Close()
 
-	zoneID := mockServer.AddZone("example.com")
+	mockServer.AddZone("example.com")
 
 	db, err := storage.New(":memory:")
 	if err != nil {
@@ -1484,7 +1484,8 @@ func TestIntegration_TriggerDNSScan_AdminOnly(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/dnszone/%d/recheckdns", zoneID), nil)
+			body := `{"Domain":"example.com"}`
+			req := httptest.NewRequest(http.MethodPost, "/dnszone/records/scan", bytes.NewBufferString(body))
 			req.Header.Set("AccessKey", tt.token)
 			w := httptest.NewRecorder()
 			router.ServeHTTP(w, req)
@@ -1540,7 +1541,7 @@ func TestIntegration_GetDNSScanResult_AdminOnly(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/dnszone/%d/recheckdns", zoneID), nil)
+			req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/dnszone/%d/records/scan", zoneID), nil)
 			req.Header.Set("AccessKey", tt.token)
 			w := httptest.NewRecorder()
 			router.ServeHTTP(w, req)

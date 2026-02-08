@@ -47,8 +47,8 @@ type BunnyClient interface {
 	IssueCertificate(ctx context.Context, zoneID int64, domain string) error
 	// GetZoneStatistics retrieves DNS query statistics for a zone.
 	GetZoneStatistics(ctx context.Context, zoneID int64, dateFrom, dateTo string) (*bunny.ZoneStatisticsResponse, error)
-	// TriggerDNSScan triggers a background DNS record scan for a zone.
-	TriggerDNSScan(ctx context.Context, zoneID int64) error
+	// TriggerDNSScan triggers a background DNS record scan for a domain.
+	TriggerDNSScan(ctx context.Context, domain string) (*bunny.DNSScanResult, error)
 
 	// GetDNSScanResult retrieves the latest DNS record scan result.
 	GetDNSScanResult(ctx context.Context, zoneID int64) (*bunny.DNSScanResult, error)
@@ -380,7 +380,7 @@ func (h *Handler) HandleImportRecords(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.logger.Info("import records", "zone_id", zoneID, "successful", result.RecordsSuccessful, "failed", result.RecordsFailed, "skipped", result.RecordsSkipped)
+	h.logger.Info("import records", "zone_id", zoneID, "created", result.Created, "failed", result.Failed, "skipped", result.Skipped)
 
 	writeJSON(w, http.StatusOK, result)
 }
@@ -533,34 +533,36 @@ func (h *Handler) HandleGetStatistics(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, result)
 }
 
-// HandleTriggerScan triggers a background DNS record scan for a zone.
-// POST /dnszone/{zoneID}/recheckdns
+// HandleTriggerScan triggers a background DNS record scan for a domain.
+// POST /dnszone/records/scan
 // Admin only — operational/maintenance action.
 func (h *Handler) HandleTriggerScan(w http.ResponseWriter, r *http.Request) {
-	zoneIDStr := chi.URLParam(r, "zoneID")
-	if zoneIDStr == "" {
-		writeError(w, http.StatusBadRequest, "missing zone ID")
+	var req struct {
+		Domain string `json:"Domain"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 
-	zoneID, err := strconv.ParseInt(zoneIDStr, 10, 64)
+	if req.Domain == "" {
+		writeError(w, http.StatusBadRequest, "missing domain")
+		return
+	}
+
+	result, err := h.client.TriggerDNSScan(r.Context(), req.Domain)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid zone ID")
-		return
-	}
-
-	if err := h.client.TriggerDNSScan(r.Context(), zoneID); err != nil {
 		handleBunnyError(w, err)
 		return
 	}
 
-	h.logger.Info("trigger DNS scan", "zone_id", zoneID)
+	h.logger.Info("trigger DNS scan", "domain", req.Domain)
 
-	w.WriteHeader(http.StatusOK)
+	writeJSON(w, http.StatusOK, result)
 }
 
 // HandleGetScanResult retrieves the latest DNS record scan result.
-// GET /dnszone/{zoneID}/recheckdns
+// GET /dnszone/{zoneID}/records/scan
 // Admin only — operational/maintenance action.
 func (h *Handler) HandleGetScanResult(w http.ResponseWriter, r *http.Request) {
 	zoneIDStr := chi.URLParam(r, "zoneID")
