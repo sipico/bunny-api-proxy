@@ -256,6 +256,68 @@ jobs:
           fi
 
       # =================================================================
+      # STEP 3d: EXPLORE - Try several large EU companies
+      # =================================================================
+      - name: Step 3d - Try to create zones for EU companies
+        run: |
+          echo "=========================================="
+          echo "STEP 3d: Try large EU company domains"
+          echo "=========================================="
+          echo "Question: Are all well-known domains blocked, or just some?"
+          echo ""
+
+          # List of large EU companies to test
+          DOMAINS=(
+            "siemens.com"
+            "shell.com"
+            "nestle.com"
+            "sap.com"
+            "lvmh.com"
+            "unilever.com"
+          )
+
+          for domain in "${DOMAINS[@]}"; do
+            echo ""
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "Testing: $domain"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+            curl -v -X POST \
+              -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+              -H "Content-Type: application/json" \
+              -d "{\"Domain\": \"$domain\"}" \
+              "$BUNNY_API_URL/dnszone" \
+              2>&1 | tee "create-${domain}.log"
+
+            echo ""
+            echo "Pretty-printed:"
+            RESPONSE=$(curl -s -X POST \
+              -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+              -H "Content-Type: application/json" \
+              -d "{\"Domain\": \"$domain\"}" \
+              "$BUNNY_API_URL/dnszone")
+
+            echo "$RESPONSE" | jq '.' 2>/dev/null || echo "$RESPONSE"
+
+            # Check if it succeeded
+            ZONE_ID=$(echo "$RESPONSE" | jq -r '.Id // empty' 2>/dev/null)
+            if [ -n "$ZONE_ID" ] && [ "$ZONE_ID" != "null" ]; then
+              echo "✅ SUCCESS: Created zone for $domain (ID: $ZONE_ID)"
+              echo "ZONE_${domain/./_}=$ZONE_ID" >> $GITHUB_ENV
+            else
+              echo "❌ BLOCKED: Cannot add $domain"
+            fi
+
+            # Small delay between requests
+            sleep 1
+          done
+
+          echo ""
+          echo "=========================================="
+          echo "Summary: EU Company Domain Tests"
+          echo "=========================================="
+
+      # =================================================================
       # STEP 4: CLEANUP - Delete the test zone
       # =================================================================
       - name: Step 4 - Delete test zone
