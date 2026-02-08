@@ -486,11 +486,11 @@ jobs:
               if [ "$STATUS" = "2" ] || [ "$STATUS" = "Completed" ]; then
                 echo "✅ Scan completed for $domain"
 
-                # Show discovered records
-                if [ "$RECORD_COUNT" -gt "0" ]; then
+                # Show discovered records (first 10)
+                if [ -n "$RECORD_COUNT" ] && [ "$RECORD_COUNT" != "0" ] && [ "$RECORD_COUNT" != "null" ]; then
                   echo ""
-                  echo "Discovered records:"
-                  echo "$RESPONSE" | jq -r '.Records[] | "\(.Type) \(.Name) = \(.Value)"' 2>/dev/null || echo "Could not parse records"
+                  echo "Sample of discovered records (first 10):"
+                  echo "$RESPONSE" | jq -r '.Records[0:10][] | "\(.Type) \(.Name) -> \(.Value)"' 2>/dev/null || echo "Could not parse records"
                 fi
                 break
               elif [ "$STATUS" = "3" ] || [ "$STATUS" = "Failed" ]; then
