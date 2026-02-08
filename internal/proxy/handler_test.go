@@ -2126,9 +2126,10 @@ func TestHandleImportRecords_Success(t *testing.T) {
 				t.Errorf("expected zoneID 123, got %d", zoneID)
 			}
 			return &bunny.ImportRecordsResponse{
-				RecordsSuccessful: 3,
-				RecordsFailed:     1,
-				RecordsSkipped:    0,
+				TotalRecordsParsed: 4,
+				Created:            3,
+				Failed:             1,
+				Skipped:            0,
 			}, nil
 		},
 	}
@@ -2149,8 +2150,8 @@ func TestHandleImportRecords_Success(t *testing.T) {
 		t.Fatalf("failed to unmarshal response: %v", err)
 	}
 
-	if result.RecordsSuccessful != 3 {
-		t.Errorf("expected 3 successful records, got %d", result.RecordsSuccessful)
+	if result.Created != 3 {
+		t.Errorf("expected 3 created records, got %d", result.Created)
 	}
 }
 
@@ -2304,7 +2305,7 @@ func TestHandleEnableDNSSEC_Success(t *testing.T) {
 	t.Parallel()
 	mockClient := &mockBunnyClient{
 		enableDNSSECFunc: func(_ context.Context, id int64) (*bunny.DNSSECResponse, error) {
-			return &bunny.DNSSECResponse{Enabled: true, Algorithm: 13, KeyTag: 12345}, nil
+			return &bunny.DNSSECResponse{DnsSecEnabled: true, DnsSecAlgorithm: 13, DsKeyTag: 12345}, nil
 		},
 	}
 	handler := NewHandler(mockClient, slog.Default())
@@ -2324,7 +2325,7 @@ func TestHandleEnableDNSSEC_Success(t *testing.T) {
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
-	if !resp.Enabled {
+	if !resp.DnsSecEnabled {
 		t.Error("expected DNSSEC to be enabled")
 	}
 }
@@ -2391,7 +2392,7 @@ func TestHandleDisableDNSSEC_Success(t *testing.T) {
 	t.Parallel()
 	mockClient := &mockBunnyClient{
 		disableDNSSECFunc: func(_ context.Context, id int64) (*bunny.DNSSECResponse, error) {
-			return &bunny.DNSSECResponse{Enabled: false}, nil
+			return &bunny.DNSSECResponse{DnsSecEnabled: false}, nil
 		},
 	}
 	handler := NewHandler(mockClient, slog.Default())
@@ -2411,7 +2412,7 @@ func TestHandleDisableDNSSEC_Success(t *testing.T) {
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
-	if resp.Enabled {
+	if resp.DnsSecEnabled {
 		t.Error("expected DNSSEC to be disabled")
 	}
 }

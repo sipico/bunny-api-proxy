@@ -1579,16 +1579,17 @@ func TestHandleImportRecords_Success(t *testing.T) {
 	}
 
 	var result struct {
-		RecordsSuccessful int `json:"RecordsSuccessful"`
-		RecordsFailed     int `json:"RecordsFailed"`
-		RecordsSkipped    int `json:"RecordsSkipped"`
+		TotalRecordsParsed int `json:"TotalRecordsParsed"`
+		Created            int `json:"Created"`
+		Failed             int `json:"Failed"`
+		Skipped            int `json:"Skipped"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
 
-	if result.RecordsSuccessful != 2 {
-		t.Errorf("expected 2 successful records, got %d", result.RecordsSuccessful)
+	if result.Created != 2 {
+		t.Errorf("expected 2 created records, got %d", result.Created)
 	}
 }
 
@@ -1632,15 +1633,15 @@ func TestHandleImportRecords_SkipsComments(t *testing.T) {
 	}
 
 	var result struct {
-		RecordsSuccessful int `json:"RecordsSuccessful"`
+		Created int `json:"Created"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
 
 	// Only the A record line should count, not comments or blank lines
-	if result.RecordsSuccessful != 1 {
-		t.Errorf("expected 1 successful record (comments skipped), got %d", result.RecordsSuccessful)
+	if result.Created != 1 {
+		t.Errorf("expected 1 created record (comments skipped), got %d", result.Created)
 	}
 }
 
@@ -1777,17 +1778,17 @@ func TestHandleEnableDNSSEC_Success(t *testing.T) {
 	}
 
 	var result struct {
-		Enabled   bool `json:"Enabled"`
-		Algorithm int  `json:"Algorithm"`
+		DnsSecEnabled   bool `json:"DnsSecEnabled"`
+		DnsSecAlgorithm int  `json:"DnsSecAlgorithm"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
-	if !result.Enabled {
+	if !result.DnsSecEnabled {
 		t.Error("expected DNSSEC to be enabled")
 	}
-	if result.Algorithm != 13 {
-		t.Errorf("expected algorithm 13, got %d", result.Algorithm)
+	if result.DnsSecAlgorithm != 13 {
+		t.Errorf("expected algorithm 13, got %d", result.DnsSecAlgorithm)
 	}
 }
 
@@ -1844,12 +1845,12 @@ func TestHandleDisableDNSSEC_Success(t *testing.T) {
 	}
 
 	var result struct {
-		Enabled bool `json:"Enabled"`
+		DnsSecEnabled bool `json:"DnsSecEnabled"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
-	if result.Enabled {
+	if result.DnsSecEnabled {
 		t.Error("expected DNSSEC to be disabled")
 	}
 }

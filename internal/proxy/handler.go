@@ -380,7 +380,7 @@ func (h *Handler) HandleImportRecords(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.logger.Info("import records", "zone_id", zoneID, "successful", result.RecordsSuccessful, "failed", result.RecordsFailed, "skipped", result.RecordsSkipped)
+	h.logger.Info("import records", "zone_id", zoneID, "created", result.Created, "failed", result.Failed, "skipped", result.Skipped)
 
 	writeJSON(w, http.StatusOK, result)
 }

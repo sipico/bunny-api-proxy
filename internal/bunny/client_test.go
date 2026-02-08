@@ -1526,8 +1526,8 @@ func TestImportRecords(t *testing.T) {
 			t.Fatal("expected non-nil result")
 		}
 
-		if result.RecordsSuccessful != 2 {
-			t.Errorf("expected 2 successful records, got %d", result.RecordsSuccessful)
+		if result.Created != 2 {
+			t.Errorf("expected 2 created records, got %d", result.Created)
 		}
 	})
 
@@ -1775,7 +1775,7 @@ func TestEnableDNSSEC(t *testing.T) {
 				}
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusOK)
-				w.Write([]byte(`{"Enabled":true,"Algorithm":13,"KeyTag":12345}`))
+				w.Write([]byte(`{"DnsSecEnabled":true,"DnsSecAlgorithm":13,"DsKeyTag":12345}`))
 			},
 		},
 		{
@@ -1848,7 +1848,7 @@ func TestEnableDNSSEC(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
-			if !result.Enabled {
+			if !result.DnsSecEnabled {
 				t.Error("expected DNSSEC to be enabled")
 			}
 		})
@@ -1940,7 +1940,7 @@ func TestDisableDNSSEC(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
-			if result.Enabled {
+			if result.DnsSecEnabled {
 				t.Error("expected DNSSEC to be disabled")
 			}
 		})

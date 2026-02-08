@@ -1137,8 +1137,8 @@ func TestIntegration_ImportRecords_AdminOnly(t *testing.T) {
 	if err := json.NewDecoder(w.Body).Decode(&result); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
-	if result.RecordsSuccessful != 2 {
-		t.Errorf("expected 2 successful records, got %d", result.RecordsSuccessful)
+	if result.Created != 2 {
+		t.Errorf("expected 2 created records, got %d", result.Created)
 	}
 
 	// Test 2: Non-admin token should fail with 403

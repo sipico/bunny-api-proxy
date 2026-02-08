@@ -262,7 +262,8 @@ func (s *Server) handleAddRecord(w http.ResponseWriter, r *http.Request) {
 		s.writeError(w, http.StatusBadRequest, "validation_error", "Value", "Value is required")
 		return
 	}
-	if req.Name == "" {
+	// The real bunny.net API allows empty Name for MX (4) and CAA (9) records
+	if req.Name == "" && req.Type != 4 && req.Type != 9 {
 		s.writeError(w, http.StatusBadRequest, "validation_error", "Name", "Name is required")
 		return
 	}
@@ -533,13 +534,15 @@ func (s *Server) handleImportRecords(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, struct {
-		RecordsSuccessful int `json:"RecordsSuccessful"`
-		RecordsFailed     int `json:"RecordsFailed"`
-		RecordsSkipped    int `json:"RecordsSkipped"`
+		TotalRecordsParsed int `json:"TotalRecordsParsed"`
+		Created            int `json:"Created"`
+		Failed             int `json:"Failed"`
+		Skipped            int `json:"Skipped"`
 	}{
-		RecordsSuccessful: successful,
-		RecordsFailed:     0,
-		RecordsSkipped:    0,
+		TotalRecordsParsed: successful,
+		Created:            successful,
+		Failed:             0,
+		Skipped:            0,
 	})
 }
 
@@ -598,26 +601,28 @@ func (s *Server) handleEnableDNSSEC(w http.ResponseWriter, r *http.Request) {
 
 	zone.DnsSecEnabled = true
 
+	dsDigest := "AABBCCDD"
+	dnsKeyPublicKey := "mockpublickey123"
 	writeJSON(w, http.StatusOK, struct {
-		Enabled      bool   `json:"Enabled"`
-		Algorithm    int    `json:"Algorithm"`
-		KeyTag       int    `json:"KeyTag"`
-		Flags        int    `json:"Flags"`
-		DsConfigured bool   `json:"DsConfigured"`
-		DsRecord     string `json:"DsRecord"`
-		Digest       string `json:"Digest"`
-		DigestType   string `json:"DigestType"`
-		PublicKey    string `json:"PublicKey"`
+		DnsSecEnabled   bool    `json:"DnsSecEnabled"`
+		DnsSecAlgorithm int     `json:"DnsSecAlgorithm"`
+		DsKeyTag        int     `json:"DsKeyTag"`
+		DsAlgorithm     int     `json:"DsAlgorithm"`
+		DsDigestType    int     `json:"DsDigestType"`
+		DsDigest        *string `json:"DsDigest"`
+		DnsKeyFlags     int     `json:"DnsKeyFlags"`
+		DnsKeyAlgorithm int     `json:"DnsKeyAlgorithm"`
+		DnsKeyPublicKey *string `json:"DnsKeyPublicKey"`
 	}{
-		Enabled:      true,
-		Algorithm:    13,
-		KeyTag:       12345,
-		Flags:        257,
-		DsConfigured: false,
-		DsRecord:     "12345 13 2 AABBCCDD",
-		Digest:       "AABBCCDD",
-		DigestType:   "SHA-256",
-		PublicKey:    "mockpublickey123",
+		DnsSecEnabled:   true,
+		DnsSecAlgorithm: 13,
+		DsKeyTag:        12345,
+		DsAlgorithm:     13,
+		DsDigestType:    2,
+		DsDigest:        &dsDigest,
+		DnsKeyFlags:     257,
+		DnsKeyAlgorithm: 13,
+		DnsKeyPublicKey: &dnsKeyPublicKey,
 	})
 }
 
@@ -642,25 +647,25 @@ func (s *Server) handleDisableDNSSEC(w http.ResponseWriter, r *http.Request) {
 	zone.DnsSecEnabled = false
 
 	writeJSON(w, http.StatusOK, struct {
-		Enabled      bool   `json:"Enabled"`
-		Algorithm    int    `json:"Algorithm"`
-		KeyTag       int    `json:"KeyTag"`
-		Flags        int    `json:"Flags"`
-		DsConfigured bool   `json:"DsConfigured"`
-		DsRecord     string `json:"DsRecord"`
-		Digest       string `json:"Digest"`
-		DigestType   string `json:"DigestType"`
-		PublicKey    string `json:"PublicKey"`
+		DnsSecEnabled   bool    `json:"DnsSecEnabled"`
+		DnsSecAlgorithm int     `json:"DnsSecAlgorithm"`
+		DsKeyTag        int     `json:"DsKeyTag"`
+		DsAlgorithm     int     `json:"DsAlgorithm"`
+		DsDigestType    int     `json:"DsDigestType"`
+		DsDigest        *string `json:"DsDigest"`
+		DnsKeyFlags     int     `json:"DnsKeyFlags"`
+		DnsKeyAlgorithm int     `json:"DnsKeyAlgorithm"`
+		DnsKeyPublicKey *string `json:"DnsKeyPublicKey"`
 	}{
-		Enabled:      false,
-		Algorithm:    0,
-		KeyTag:       0,
-		Flags:        0,
-		DsConfigured: false,
-		DsRecord:     "",
-		Digest:       "",
-		DigestType:   "",
-		PublicKey:    "",
+		DnsSecEnabled:   false,
+		DnsSecAlgorithm: 0,
+		DsKeyTag:        0,
+		DsAlgorithm:     0,
+		DsDigestType:    0,
+		DsDigest:        nil,
+		DnsKeyFlags:     0,
+		DnsKeyAlgorithm: 0,
+		DnsKeyPublicKey: nil,
 	})
 }
 
@@ -782,8 +787,9 @@ func (s *Server) handleGetScanResult(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, struct {
+		Status  int          `json:"Status"`
 		Records []scanRecord `json:"Records"`
-	}{Records: records})
+	}{Status: 2, Records: records})
 }
 
 // recordTypeName converts a record type integer to its DNS name.
