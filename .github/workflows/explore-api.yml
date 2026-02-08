@@ -282,6 +282,7 @@ jobs:
             echo "Testing: $domain"
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
+            # Make single request, save verbose output and JSON response
             curl -v -X POST \
               -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
               -H "Content-Type: application/json" \
@@ -291,12 +292,8 @@ jobs:
 
             echo ""
             echo "Pretty-printed:"
-            RESPONSE=$(curl -s -X POST \
-              -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
-              -H "Content-Type: application/json" \
-              -d "{\"Domain\": \"$domain\"}" \
-              "$BUNNY_API_URL/dnszone")
-
+            # Extract just the JSON body from the log (last line)
+            RESPONSE=$(tail -1 "create-${domain}.log")
             echo "$RESPONSE" | jq '.' 2>/dev/null || echo "$RESPONSE"
 
             # Check if it succeeded
