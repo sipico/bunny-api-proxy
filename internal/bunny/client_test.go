@@ -1752,3 +1752,197 @@ func TestExportRecords(t *testing.T) {
 		})
 	}
 }
+
+func TestEnableDNSSEC(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		zoneID     int64
+		handler    http.HandlerFunc
+		wantErr    bool
+		wantErrMsg string
+	}{
+		{
+			name:   "successful enable",
+			zoneID: 1,
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != http.MethodPost {
+					t.Errorf("expected POST, got %s", r.Method)
+				}
+				if r.Header.Get("AccessKey") != "test-key" {
+					t.Errorf("missing AccessKey header")
+				}
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusOK)
+				w.Write([]byte(`{"Enabled":true,"Algorithm":13,"KeyTag":12345}`))
+			},
+		},
+		{
+			name:   "zone not found",
+			zoneID: 999,
+			handler: func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(http.StatusNotFound)
+			},
+			wantErr:    true,
+			wantErrMsg: "not found",
+		},
+		{
+			name:   "unauthorized",
+			zoneID: 1,
+			handler: func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(http.StatusUnauthorized)
+			},
+			wantErr:    true,
+			wantErrMsg: "unauthorized",
+		},
+		{
+			name:   "server error",
+			zoneID: 1,
+			handler: func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(http.StatusBadRequest)
+				w.Write([]byte(`{"Message":"bad request"}`))
+			},
+			wantErr:    true,
+			wantErrMsg: "bad request",
+		},
+		{
+			name:   "context canceled",
+			zoneID: 1,
+			handler: func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ts := httptest.NewServer(tt.handler)
+			defer ts.Close()
+
+			client := NewClient("test-key", WithBaseURL(ts.URL))
+
+			ctx := context.Background()
+			if tt.name == "context canceled" {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithCancel(ctx)
+				cancel()
+			}
+
+			result, err := client.EnableDNSSEC(ctx, tt.zoneID)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				if tt.wantErrMsg != "" && !strings.Contains(err.Error(), tt.wantErrMsg) {
+					t.Errorf("expected error containing %q, got %q", tt.wantErrMsg, err.Error())
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if !result.Enabled {
+				t.Error("expected DNSSEC to be enabled")
+			}
+		})
+	}
+}
+
+func TestDisableDNSSEC(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		zoneID     int64
+		handler    http.HandlerFunc
+		wantErr    bool
+		wantErrMsg string
+	}{
+		{
+			name:   "successful disable",
+			zoneID: 1,
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != http.MethodDelete {
+					t.Errorf("expected DELETE, got %s", r.Method)
+				}
+				if r.Header.Get("AccessKey") != "test-key" {
+					t.Errorf("missing AccessKey header")
+				}
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusOK)
+				w.Write([]byte(`{"Enabled":false,"Algorithm":0}`))
+			},
+		},
+		{
+			name:   "zone not found",
+			zoneID: 999,
+			handler: func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(http.StatusNotFound)
+			},
+			wantErr:    true,
+			wantErrMsg: "not found",
+		},
+		{
+			name:   "unauthorized",
+			zoneID: 1,
+			handler: func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(http.StatusUnauthorized)
+			},
+			wantErr:    true,
+			wantErrMsg: "unauthorized",
+		},
+		{
+			name:   "context canceled",
+			zoneID: 1,
+			handler: func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ts := httptest.NewServer(tt.handler)
+			defer ts.Close()
+
+			client := NewClient("test-key", WithBaseURL(ts.URL))
+
+			ctx := context.Background()
+			if tt.name == "context canceled" {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithCancel(ctx)
+				cancel()
+			}
+
+			result, err := client.DisableDNSSEC(ctx, tt.zoneID)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				if tt.wantErrMsg != "" && !strings.Contains(err.Error(), tt.wantErrMsg) {
+					t.Errorf("expected error containing %q, got %q", tt.wantErrMsg, err.Error())
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if result.Enabled {
+				t.Error("expected DNSSEC to be disabled")
+			}
+		})
+	}
+}

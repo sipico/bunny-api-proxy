@@ -153,7 +153,6 @@ func (m *Authenticator) CheckPermissions(next http.Handler) http.Handler {
 			return
 		}
 
-		// Check if this is an admin-only action
 		if req.Action == ActionUpdateZone || req.Action == ActionCreateZone || req.Action == ActionCheckAvailability || req.Action == ActionImportRecords || req.Action == ActionExportRecords {
 			writeJSONErrorWithCode(w, http.StatusForbidden, "admin_required", "This endpoint requires an admin token.")
 			return

@@ -1757,3 +1757,116 @@ func TestHandleExportRecords_InvalidZoneID(t *testing.T) {
 		t.Errorf("expected status %d, got %d", http.StatusBadRequest, resp.StatusCode)
 	}
 }
+
+func TestHandleEnableDNSSEC_Success(t *testing.T) {
+	t.Parallel()
+	s := New()
+	defer s.Close()
+
+	id := s.AddZone("example.com")
+
+	req, _ := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/dnszone/%d/dnssec", s.URL(), id), nil)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("failed to enable DNSSEC: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected status %d, got %d", http.StatusOK, resp.StatusCode)
+	}
+
+	var result struct {
+		Enabled   bool `json:"Enabled"`
+		Algorithm int  `json:"Algorithm"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if !result.Enabled {
+		t.Error("expected DNSSEC to be enabled")
+	}
+	if result.Algorithm != 13 {
+		t.Errorf("expected algorithm 13, got %d", result.Algorithm)
+	}
+}
+
+func TestHandleEnableDNSSEC_ZoneNotFound(t *testing.T) {
+	t.Parallel()
+	s := New()
+	defer s.Close()
+
+	req, _ := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/dnszone/%d/dnssec", s.URL(), 99999), nil)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("failed to enable DNSSEC: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("expected status %d, got %d", http.StatusNotFound, resp.StatusCode)
+	}
+}
+
+func TestHandleEnableDNSSEC_InvalidZoneID(t *testing.T) {
+	t.Parallel()
+	s := New()
+	defer s.Close()
+
+	req, _ := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/dnszone/abc/dnssec", s.URL()), nil)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("failed to enable DNSSEC: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d", http.StatusBadRequest, resp.StatusCode)
+	}
+}
+
+func TestHandleDisableDNSSEC_Success(t *testing.T) {
+	t.Parallel()
+	s := New()
+	defer s.Close()
+
+	id := s.AddZone("example.com")
+
+	req, _ := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/dnszone/%d/dnssec", s.URL(), id), nil)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("failed to disable DNSSEC: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected status %d, got %d", http.StatusOK, resp.StatusCode)
+	}
+
+	var result struct {
+		Enabled bool `json:"Enabled"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if result.Enabled {
+		t.Error("expected DNSSEC to be disabled")
+	}
+}
+
+func TestHandleDisableDNSSEC_ZoneNotFound(t *testing.T) {
+	t.Parallel()
+	s := New()
+	defer s.Close()
+
+	req, _ := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/dnszone/%d/dnssec", s.URL(), 99999), nil)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("failed to disable DNSSEC: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("expected status %d, got %d", http.StatusNotFound, resp.StatusCode)
+	}
+}

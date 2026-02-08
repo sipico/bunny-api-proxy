@@ -578,6 +578,92 @@ func (s *Server) handleExportRecords(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(sb.String()))
 }
 
+// handleEnableDNSSEC handles POST /dnszone/{id}/dnssec to enable DNSSEC.
+func (s *Server) handleEnableDNSSEC(w http.ResponseWriter, r *http.Request) {
+	idStr := chi.URLParam(r, "id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		http.Error(w, "invalid zone ID", http.StatusBadRequest)
+		return
+	}
+
+	s.state.mu.Lock()
+	defer s.state.mu.Unlock()
+
+	zone, ok := s.state.zones[id]
+	if !ok {
+		s.writeError(w, http.StatusNotFound, "dnszone.zone.not_found", "Id", "The requested DNS zone was not found")
+		return
+	}
+
+	zone.DnsSecEnabled = true
+
+	writeJSON(w, http.StatusOK, struct {
+		Enabled      bool   `json:"Enabled"`
+		Algorithm    int    `json:"Algorithm"`
+		KeyTag       int    `json:"KeyTag"`
+		Flags        int    `json:"Flags"`
+		DsConfigured bool   `json:"DsConfigured"`
+		DsRecord     string `json:"DsRecord"`
+		Digest       string `json:"Digest"`
+		DigestType   string `json:"DigestType"`
+		PublicKey    string `json:"PublicKey"`
+	}{
+		Enabled:      true,
+		Algorithm:    13,
+		KeyTag:       12345,
+		Flags:        257,
+		DsConfigured: false,
+		DsRecord:     "12345 13 2 AABBCCDD",
+		Digest:       "AABBCCDD",
+		DigestType:   "SHA-256",
+		PublicKey:    "mockpublickey123",
+	})
+}
+
+// handleDisableDNSSEC handles DELETE /dnszone/{id}/dnssec to disable DNSSEC.
+func (s *Server) handleDisableDNSSEC(w http.ResponseWriter, r *http.Request) {
+	idStr := chi.URLParam(r, "id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		http.Error(w, "invalid zone ID", http.StatusBadRequest)
+		return
+	}
+
+	s.state.mu.Lock()
+	defer s.state.mu.Unlock()
+
+	zone, ok := s.state.zones[id]
+	if !ok {
+		s.writeError(w, http.StatusNotFound, "dnszone.zone.not_found", "Id", "The requested DNS zone was not found")
+		return
+	}
+
+	zone.DnsSecEnabled = false
+
+	writeJSON(w, http.StatusOK, struct {
+		Enabled      bool   `json:"Enabled"`
+		Algorithm    int    `json:"Algorithm"`
+		KeyTag       int    `json:"KeyTag"`
+		Flags        int    `json:"Flags"`
+		DsConfigured bool   `json:"DsConfigured"`
+		DsRecord     string `json:"DsRecord"`
+		Digest       string `json:"Digest"`
+		DigestType   string `json:"DigestType"`
+		PublicKey    string `json:"PublicKey"`
+	}{
+		Enabled:      false,
+		Algorithm:    0,
+		KeyTag:       0,
+		Flags:        0,
+		DsConfigured: false,
+		DsRecord:     "",
+		Digest:       "",
+		DigestType:   "",
+		PublicKey:    "",
+	})
+}
+
 // recordTypeName converts a record type integer to its DNS name.
 func recordTypeName(t int) string {
 	switch t {

@@ -574,6 +574,84 @@ func (c *Client) ExportRecords(ctx context.Context, zoneID int64) (string, error
 	return "", parseError(resp.StatusCode, body)
 }
 
+// EnableDNSSEC enables DNSSEC for a DNS zone.
+func (c *Client) EnableDNSSEC(ctx context.Context, zoneID int64) (*DNSSECResponse, error) {
+	url := fmt.Sprintf("%s/dnszone/%d/dnssec", c.baseURL, zoneID)
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	httpReq.Header.Set("AccessKey", c.apiKey)
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to enable DNSSEC: %w", err)
+	}
+	defer func() {
+		//nolint:errcheck
+		resp.Body.Close()
+	}()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	if resp.StatusCode == http.StatusOK {
+		var result DNSSECResponse
+		if err := json.Unmarshal(body, &result); err != nil {
+			return nil, fmt.Errorf("failed to parse response: %w", err)
+		}
+		return &result, nil
+	}
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, ErrNotFound
+	}
+
+	return nil, parseError(resp.StatusCode, body)
+}
+
+// DisableDNSSEC disables DNSSEC for a DNS zone.
+func (c *Client) DisableDNSSEC(ctx context.Context, zoneID int64) (*DNSSECResponse, error) {
+	url := fmt.Sprintf("%s/dnszone/%d/dnssec", c.baseURL, zoneID)
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	httpReq.Header.Set("AccessKey", c.apiKey)
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to disable DNSSEC: %w", err)
+	}
+	defer func() {
+		//nolint:errcheck
+		resp.Body.Close()
+	}()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	if resp.StatusCode == http.StatusOK {
+		var result DNSSECResponse
+		if err := json.Unmarshal(body, &result); err != nil {
+			return nil, fmt.Errorf("failed to parse response: %w", err)
+		}
+		return &result, nil
+	}
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, ErrNotFound
+	}
+
+	return nil, parseError(resp.StatusCode, body)
+}
+
 // parseError parses API error responses and returns an appropriate error.
 func parseError(statusCode int, body []byte) error {
 	switch statusCode {

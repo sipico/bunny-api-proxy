@@ -131,3 +131,16 @@ type ImportRecordsResponse struct {
 	RecordsFailed     int `json:"RecordsFailed"`
 	RecordsSkipped    int `json:"RecordsSkipped"`
 }
+
+// DNSSECResponse represents the DNSSEC configuration for a DNS zone.
+type DNSSECResponse struct {
+	Enabled      bool   `json:"Enabled"`
+	Algorithm    int    `json:"Algorithm"`
+	KeyTag       int    `json:"KeyTag"`
+	Flags        int    `json:"Flags"`
+	DsConfigured bool   `json:"DsConfigured"`
+	DsRecord     string `json:"DsRecord"`
+	Digest       string `json:"Digest"`
+	DigestType   string `json:"DigestType"`
+	PublicKey    string `json:"PublicKey"`
+}

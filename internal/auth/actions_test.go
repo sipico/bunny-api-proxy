@@ -115,6 +115,20 @@ func TestParseRequest(t *testing.T) {
 			wantZoneID: 456,
 		},
 		{
+			name:       "enable DNSSEC",
+			method:     "POST",
+			path:       "/dnszone/123/dnssec",
+			wantAction: ActionEnableDNSSEC,
+			wantZoneID: 123,
+		},
+		{
+			name:       "disable DNSSEC",
+			method:     "DELETE",
+			path:       "/dnszone/123/dnssec",
+			wantAction: ActionDisableDNSSEC,
+			wantZoneID: 123,
+		},
+		{
 			name:    "invalid path",
 			method:  "GET",
 			path:    "/invalid",

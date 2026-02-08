@@ -74,6 +74,8 @@ func New() *Server {
 		r.Delete("/dnszone/{id}", server.handleDeleteZone)
 		r.Post("/dnszone/{id}/import", server.handleImportRecords)
 		r.Get("/dnszone/{id}/export", server.handleExportRecords)
+		r.Post("/dnszone/{id}/dnssec", server.handleEnableDNSSEC)
+		r.Delete("/dnszone/{id}/dnssec", server.handleDisableDNSSEC)
 		r.Post("/dnszone/{id}", server.handleUpdateZone)
 		r.Put("/dnszone/{zoneId}/records", server.handleAddRecord)
 		r.Post("/dnszone/{zoneId}/records/{id}", server.handleUpdateRecord)
