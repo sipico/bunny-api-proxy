@@ -9,8 +9,9 @@
 ## 🔍 Real API Exploration Results (February 2026)
 
 **Exploration Workflow:** `.github/workflows/explore-api.yml` (branch: `claude/exploration-api-SHP62`)
-**Status:** ✅ Completed - 15/19 bunny.net DNS endpoints validated
+**Status:** ✅ Completed - 16/17 bunny.net DNS endpoints validated (94%)
 **Artifacts:** All responses saved to GitHub Actions artifacts (30-day retention)
+**Coverage:** All 7 DNS record types tested with full CRUD operations + DNS traffic generation
 
 ### Endpoints Validated with Real bunny.net API
 
@@ -22,15 +23,16 @@
 | | `/dnszone/{id}` | POST | ✅ Works | Update SOA email, logging, nameservers |
 | | `/dnszone/{id}` | DELETE | ✅ Works | Returns 204 No Content |
 | | `/dnszone/checkavailability` | POST | ✅ Works | Queries domain registries |
-| **Records** | `/dnszone/{id}/records` | PUT | ✅ Works | Returns 201 with record object |
-| | `/dnszone/{id}/records/{recordId}` | POST | ✅ Works | Returns 204 No Content |
-| | `/dnszone/{id}/records/{recordId}` | DELETE | ✅ Works | Returns 204 No Content |
+| **Records** | `/dnszone/{id}/records` | PUT | ✅ Works | All 7 types tested (A, AAAA, CNAME, TXT, MX, SRV, CAA) |
+| | `/dnszone/{id}/records/{recordId}` | POST | ✅ Works | All 7 types: comprehensive field updates |
+| | `/dnszone/{id}/records/{recordId}` | DELETE | ✅ Works | All 7 types: clean deletion |
 | **Import/Export** | `/dnszone/{id}/export` | GET | ✅ Works | BIND format, **SRV records missing (bug)** |
 | | `/dnszone/{id}/import` | POST | ✅ Works | Accepts BIND format |
 | **Scanning** | `/dnszone/{id}/records/scan` | POST | ✅ Works | Triggers background scan job |
 | | `/dnszone/{id}/records/scan` | GET | ✅ Works | Returns scan results |
 | **DNSSEC** | `/dnszone/{id}/dnssec` | POST | ✅ Works | Returns DS/DNSKEY records |
 | | `/dnszone/{id}/dnssec` | DELETE | ✅ Works | Disables DNSSEC |
+| **Statistics** | `/dnszone/{id}/statistics` | GET | ✅ Works | Real-time query tracking (Normal vs Smart) |
 
 ### 🎯 Critical Discoveries
 
@@ -61,14 +63,29 @@
 - BIND format parsing works perfectly
 
 **6. Record Operations Fully Functional** ✅
-- CAA records (Type 9): Add/Update/Delete tested
-- SRV records (Type 8): Add/Update/Delete tested
+- **All 7 bunny.net DNS record types tested with full CRUD:**
+  - A records (Type 0): IPv4 addresses with IP/TTL updates ✅
+  - AAAA records (Type 1): IPv6 addresses with IP/TTL updates ✅
+  - CNAME records (Type 2): Aliases with target updates ✅
+  - TXT records (Type 3): Text records for ACME challenges ✅
+  - MX records (Type 4): Mail exchange with priority updates ✅
+  - SRV records (Type 8): Service records with port/priority/weight ✅
+  - CAA records (Type 9): Certificate authority authorization ✅
 - All operations return correct HTTP status codes (201, 204)
+- DNS queries (dig) after each Add/Update validate real-time propagation
+- Total 28 DNS queries per domain for statistics generation
 
 **7. Zone GetZone/UpdateZone Validated** ✅
 - GetZone includes DNSSEC status (`DnsSecEnabled: true/false`)
 - UpdateZone can modify SOA email, logging, nameservers
 - Changes persist correctly
+
+**8. Statistics Tracking Works in Real-Time** ✅
+- DNS queries tracked within seconds (no significant delay)
+- Distinguishes between Normal queries (non-CDN) and Smart queries (CDN)
+- Provides daily breakdown in `QueriesServedChart`
+- DNS traffic generation via dig validates real-time tracking
+- Test showed 10 queries for siemens.com (2 Normal, 8 Smart)
 
 ### API Documentation Corrections
 
