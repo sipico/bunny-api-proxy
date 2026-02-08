@@ -689,6 +689,39 @@ func (s *Server) handleIssueCertificate(w http.ResponseWriter, r *http.Request) 
 	w.WriteHeader(http.StatusOK)
 }
 
+// handleGetStatistics handles GET /dnszone/{id}/statistics.
+func (s *Server) handleGetStatistics(w http.ResponseWriter, r *http.Request) {
+	idStr := chi.URLParam(r, "id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		http.Error(w, "invalid zone ID", http.StatusBadRequest)
+		return
+	}
+
+	s.state.mu.RLock()
+	_, ok := s.state.zones[id]
+	s.state.mu.RUnlock()
+
+	if !ok {
+		s.writeError(w, http.StatusNotFound, "dnszone.zone.not_found", "Id", "The requested DNS zone was not found")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, struct {
+		TotalQueriesServed       int64            `json:"TotalQueriesServed"`
+		QueriesServedChart       map[string]int64 `json:"QueriesServedChart"`
+		NormalQueriesServedChart map[string]int64 `json:"NormalQueriesServedChart"`
+		SmartQueriesServedChart  map[string]int64 `json:"SmartQueriesServedChart"`
+		QueriesByTypeChart       map[string]int64 `json:"QueriesByTypeChart"`
+	}{
+		TotalQueriesServed:       1000,
+		QueriesServedChart:       map[string]int64{"2025-01-01": 500, "2025-01-02": 500},
+		NormalQueriesServedChart: map[string]int64{"2025-01-01": 400, "2025-01-02": 400},
+		SmartQueriesServedChart:  map[string]int64{"2025-01-01": 100, "2025-01-02": 100},
+		QueriesByTypeChart:       map[string]int64{"A": 600, "AAAA": 200, "TXT": 200},
+	})
+}
+
 // recordTypeName converts a record type integer to its DNS name.
 func recordTypeName(t int) string {
 	switch t {

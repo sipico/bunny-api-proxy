@@ -1926,3 +1926,63 @@ func TestHandleIssueCertificate_InvalidZoneID(t *testing.T) {
 		t.Errorf("expected status %d, got %d", http.StatusBadRequest, resp.StatusCode)
 	}
 }
+
+func TestHandleGetStatistics_Success(t *testing.T) {
+	t.Parallel()
+	s := New()
+	defer s.Close()
+
+	id := s.AddZone("example.com")
+
+	resp, err := http.Get(fmt.Sprintf("%s/dnszone/%d/statistics", s.URL(), id))
+	if err != nil {
+		t.Fatalf("failed to get statistics: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected status %d, got %d", http.StatusOK, resp.StatusCode)
+	}
+
+	var result struct {
+		TotalQueriesServed int64 `json:"TotalQueriesServed"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if result.TotalQueriesServed != 1000 {
+		t.Errorf("expected 1000 total queries, got %d", result.TotalQueriesServed)
+	}
+}
+
+func TestHandleGetStatistics_ZoneNotFound(t *testing.T) {
+	t.Parallel()
+	s := New()
+	defer s.Close()
+
+	resp, err := http.Get(fmt.Sprintf("%s/dnszone/%d/statistics", s.URL(), 99999))
+	if err != nil {
+		t.Fatalf("failed to get statistics: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("expected status %d, got %d", http.StatusNotFound, resp.StatusCode)
+	}
+}
+
+func TestHandleGetStatistics_InvalidZoneID(t *testing.T) {
+	t.Parallel()
+	s := New()
+	defer s.Close()
+
+	resp, err := http.Get(fmt.Sprintf("%s/dnszone/abc/statistics", s.URL()))
+	if err != nil {
+		t.Fatalf("failed to get statistics: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d", http.StatusBadRequest, resp.StatusCode)
+	}
+}

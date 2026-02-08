@@ -77,6 +77,7 @@ func New() *Server {
 		r.Post("/dnszone/{id}/dnssec", server.handleEnableDNSSEC)
 		r.Delete("/dnszone/{id}/dnssec", server.handleDisableDNSSEC)
 		r.Post("/dnszone/{id}/certificate/issue", server.handleIssueCertificate)
+		r.Get("/dnszone/{id}/statistics", server.handleGetStatistics)
 		r.Post("/dnszone/{id}", server.handleUpdateZone)
 		r.Put("/dnszone/{zoneId}/records", server.handleAddRecord)
 		r.Post("/dnszone/{zoneId}/records/{id}", server.handleUpdateRecord)

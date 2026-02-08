@@ -697,6 +697,57 @@ func (c *Client) IssueCertificate(ctx context.Context, zoneID int64, domain stri
 	return parseError(resp.StatusCode, respBody)
 }
 
+// GetZoneStatistics retrieves DNS query statistics for a zone.
+func (c *Client) GetZoneStatistics(ctx context.Context, zoneID int64, dateFrom, dateTo string) (*ZoneStatisticsResponse, error) {
+	endpoint := fmt.Sprintf("%s/dnszone/%d/statistics", c.baseURL, zoneID)
+
+	// Add query parameters if provided
+	query := url.Values{}
+	if dateFrom != "" {
+		query.Set("dateFrom", dateFrom)
+	}
+	if dateTo != "" {
+		query.Set("dateTo", dateTo)
+	}
+	if len(query) > 0 {
+		endpoint += "?" + query.Encode()
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("AccessKey", c.apiKey)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get statistics: %w", err)
+	}
+	defer func() {
+		//nolint:errcheck
+		resp.Body.Close()
+	}()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	if resp.StatusCode == http.StatusOK {
+		var result ZoneStatisticsResponse
+		if err := json.Unmarshal(body, &result); err != nil {
+			return nil, fmt.Errorf("failed to parse response: %w", err)
+		}
+		return &result, nil
+	}
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, ErrNotFound
+	}
+
+	return nil, parseError(resp.StatusCode, body)
+}
+
 // parseError parses API error responses and returns an appropriate error.
 func parseError(statusCode int, body []byte) error {
 	switch statusCode {

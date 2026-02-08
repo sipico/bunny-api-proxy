@@ -2051,3 +2051,117 @@ func TestIssueCertificate(t *testing.T) {
 		})
 	}
 }
+
+func TestGetZoneStatistics(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		zoneID     int64
+		dateFrom   string
+		dateTo     string
+		handler    http.HandlerFunc
+		wantErr    bool
+		wantErrMsg string
+	}{
+		{
+			name:     "successful request",
+			zoneID:   1,
+			dateFrom: "2025-01-01",
+			dateTo:   "2025-01-31",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != http.MethodGet {
+					t.Errorf("expected GET, got %s", r.Method)
+				}
+				if r.Header.Get("AccessKey") != "test-key" {
+					t.Errorf("missing AccessKey header")
+				}
+				if r.URL.Query().Get("dateFrom") != "2025-01-01" {
+					t.Errorf("expected dateFrom 2025-01-01, got %s", r.URL.Query().Get("dateFrom"))
+				}
+				if r.URL.Query().Get("dateTo") != "2025-01-31" {
+					t.Errorf("expected dateTo 2025-01-31, got %s", r.URL.Query().Get("dateTo"))
+				}
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusOK)
+				w.Write([]byte(`{"TotalQueriesServed":1000,"QueriesServedChart":{"2025-01-01":500}}`))
+			},
+		},
+		{
+			name:   "no query params",
+			zoneID: 1,
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Query().Get("dateFrom") != "" {
+					t.Errorf("expected no dateFrom, got %s", r.URL.Query().Get("dateFrom"))
+				}
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusOK)
+				w.Write([]byte(`{"TotalQueriesServed":0}`))
+			},
+		},
+		{
+			name:   "zone not found",
+			zoneID: 999,
+			handler: func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(http.StatusNotFound)
+			},
+			wantErr:    true,
+			wantErrMsg: "not found",
+		},
+		{
+			name:   "unauthorized",
+			zoneID: 1,
+			handler: func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(http.StatusUnauthorized)
+			},
+			wantErr:    true,
+			wantErrMsg: "unauthorized",
+		},
+		{
+			name:   "context canceled",
+			zoneID: 1,
+			handler: func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ts := httptest.NewServer(tt.handler)
+			defer ts.Close()
+
+			client := NewClient("test-key", WithBaseURL(ts.URL))
+
+			ctx := context.Background()
+			if tt.name == "context canceled" {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithCancel(ctx)
+				cancel()
+			}
+
+			result, err := client.GetZoneStatistics(ctx, tt.zoneID, tt.dateFrom, tt.dateTo)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				if tt.wantErrMsg != "" && !strings.Contains(err.Error(), tt.wantErrMsg) {
+					t.Errorf("expected error containing %q, got %q", tt.wantErrMsg, err.Error())
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if result == nil {
+				t.Fatal("expected non-nil result")
+			}
+		})
+	}
+}

@@ -33,6 +33,7 @@ type mockBunnyClient struct {
 	enableDNSSECFunc          func(context.Context, int64) (*bunny.DNSSECResponse, error)
 	disableDNSSECFunc         func(context.Context, int64) (*bunny.DNSSECResponse, error)
 	issueCertificateFunc      func(context.Context, int64, string) error
+	getZoneStatisticsFunc     func(context.Context, int64, string, string) (*bunny.ZoneStatisticsResponse, error)
 }
 
 func (m *mockBunnyClient) ListZones(ctx context.Context, opts *bunny.ListZonesOptions) (*bunny.ListZonesResponse, error) {
@@ -155,6 +156,13 @@ func (m *mockBunnyClient) IssueCertificate(ctx context.Context, zoneID int64, do
 		return m.issueCertificateFunc(ctx, zoneID, domain)
 	}
 	return nil
+}
+
+func (m *mockBunnyClient) GetZoneStatistics(ctx context.Context, zoneID int64, dateFrom, dateTo string) (*bunny.ZoneStatisticsResponse, error) {
+	if m.getZoneStatisticsFunc != nil {
+		return m.getZoneStatisticsFunc(ctx, zoneID, dateFrom, dateTo)
+	}
+	return nil, nil
 }
 
 func TestNewHandler_WithLogger(t *testing.T) {
@@ -2517,6 +2525,126 @@ func TestHandleIssueCertificate_BunnyError(t *testing.T) {
 	r.Post("/dnszone/{zoneID}/certificate/issue", handler.HandleIssueCertificate)
 
 	req := httptest.NewRequest(http.MethodPost, "/dnszone/1/certificate/issue", bytes.NewBufferString(`{"Domain":"test.com"}`))
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("expected status %d, got %d", http.StatusInternalServerError, w.Code)
+	}
+}
+
+func TestHandleGetStatistics_Success(t *testing.T) {
+	t.Parallel()
+	mockClient := &mockBunnyClient{
+		getZoneStatisticsFunc: func(_ context.Context, id int64, dateFrom, dateTo string) (*bunny.ZoneStatisticsResponse, error) {
+			return &bunny.ZoneStatisticsResponse{
+				TotalQueriesServed: 1000,
+				QueriesServedChart: map[string]int64{"2025-01-01": 500},
+			}, nil
+		},
+	}
+	handler := NewHandler(mockClient, slog.Default())
+
+	r := chi.NewRouter()
+	r.Get("/dnszone/{zoneID}/statistics", handler.HandleGetStatistics)
+
+	req := httptest.NewRequest(http.MethodGet, "/dnszone/1/statistics", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status %d, got %d", http.StatusOK, w.Code)
+	}
+
+	var resp bunny.ZoneStatisticsResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if resp.TotalQueriesServed != 1000 {
+		t.Errorf("expected 1000 total queries, got %d", resp.TotalQueriesServed)
+	}
+}
+
+func TestHandleGetStatistics_WithQueryParams(t *testing.T) {
+	t.Parallel()
+	var capturedFrom, capturedTo string
+	mockClient := &mockBunnyClient{
+		getZoneStatisticsFunc: func(_ context.Context, _ int64, dateFrom, dateTo string) (*bunny.ZoneStatisticsResponse, error) {
+			capturedFrom = dateFrom
+			capturedTo = dateTo
+			return &bunny.ZoneStatisticsResponse{TotalQueriesServed: 500}, nil
+		},
+	}
+	handler := NewHandler(mockClient, slog.Default())
+
+	r := chi.NewRouter()
+	r.Get("/dnszone/{zoneID}/statistics", handler.HandleGetStatistics)
+
+	req := httptest.NewRequest(http.MethodGet, "/dnszone/1/statistics?dateFrom=2025-01-01&dateTo=2025-01-31", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status %d, got %d", http.StatusOK, w.Code)
+	}
+	if capturedFrom != "2025-01-01" {
+		t.Errorf("expected dateFrom 2025-01-01, got %s", capturedFrom)
+	}
+	if capturedTo != "2025-01-31" {
+		t.Errorf("expected dateTo 2025-01-31, got %s", capturedTo)
+	}
+}
+
+func TestHandleGetStatistics_InvalidZoneID(t *testing.T) {
+	t.Parallel()
+	handler := NewHandler(&mockBunnyClient{}, slog.Default())
+
+	r := chi.NewRouter()
+	r.Get("/dnszone/{zoneID}/statistics", handler.HandleGetStatistics)
+
+	req := httptest.NewRequest(http.MethodGet, "/dnszone/abc/statistics", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d", http.StatusBadRequest, w.Code)
+	}
+}
+
+func TestHandleGetStatistics_NotFound(t *testing.T) {
+	t.Parallel()
+	mockClient := &mockBunnyClient{
+		getZoneStatisticsFunc: func(_ context.Context, _ int64, _, _ string) (*bunny.ZoneStatisticsResponse, error) {
+			return nil, bunny.ErrNotFound
+		},
+	}
+	handler := NewHandler(mockClient, slog.Default())
+
+	r := chi.NewRouter()
+	r.Get("/dnszone/{zoneID}/statistics", handler.HandleGetStatistics)
+
+	req := httptest.NewRequest(http.MethodGet, "/dnszone/999/statistics", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusNotFound {
+		t.Errorf("expected status %d, got %d", http.StatusNotFound, w.Code)
+	}
+}
+
+func TestHandleGetStatistics_BunnyError(t *testing.T) {
+	t.Parallel()
+	mockClient := &mockBunnyClient{
+		getZoneStatisticsFunc: func(_ context.Context, _ int64, _, _ string) (*bunny.ZoneStatisticsResponse, error) {
+			return nil, fmt.Errorf("connection failed")
+		},
+	}
+	handler := NewHandler(mockClient, slog.Default())
+
+	r := chi.NewRouter()
+	r.Get("/dnszone/{zoneID}/statistics", handler.HandleGetStatistics)
+
+	req := httptest.NewRequest(http.MethodGet, "/dnszone/1/statistics", nil)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 

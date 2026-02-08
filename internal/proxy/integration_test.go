@@ -1385,3 +1385,57 @@ func TestIntegration_IssueCertificate_AdminOnly(t *testing.T) {
 		})
 	}
 }
+
+func TestIntegration_GetStatistics_AdminOnly(t *testing.T) {
+	t.Parallel()
+	mockServer := mockbunny.New()
+	defer mockServer.Close()
+
+	zoneID := mockServer.AddZone("example.com")
+
+	db, err := storage.New(":memory:")
+	if err != nil {
+		t.Fatalf("failed to create storage: %v", err)
+	}
+
+	_, err = db.CreateAdminToken(context.Background(), "admin-stats", "admin-stats-token")
+	if err != nil {
+		t.Fatalf("failed to create admin token: %v", err)
+	}
+
+	scopedToken := "scoped-stats-token"
+	scopedHash := sha256.Sum256([]byte(scopedToken))
+	_, err = db.CreateToken(context.Background(), "scoped-stats", false, hex.EncodeToString(scopedHash[:]))
+	if err != nil {
+		t.Fatalf("failed to create scoped token: %v", err)
+	}
+
+	client := bunny.NewClient("test-key", bunny.WithBaseURL(mockServer.URL()))
+	handler := NewHandler(client, testLogger())
+	bootstrapService := auth.NewBootstrapService(db, "master-key")
+	authenticator := auth.NewAuthenticator(db, bootstrapService)
+	router := NewRouter(handler, authenticator.Authenticate, testLogger())
+
+	tests := []struct {
+		name       string
+		token      string
+		wantStatus int
+	}{
+		{"admin token succeeds", "admin-stats-token", http.StatusOK},
+		{"scoped token gets 403", scopedToken, http.StatusForbidden},
+		{"invalid token gets 401", "invalid-token", http.StatusUnauthorized},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/dnszone/%d/statistics", zoneID), nil)
+			req.Header.Set("AccessKey", tt.token)
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, req)
+
+			if w.Code != tt.wantStatus {
+				t.Errorf("expected status %d, got %d (body: %s)", tt.wantStatus, w.Code, w.Body.String())
+			}
+		})
+	}
+}

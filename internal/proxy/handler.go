@@ -45,6 +45,8 @@ type BunnyClient interface {
 	DisableDNSSEC(ctx context.Context, zoneID int64) (*bunny.DNSSECResponse, error)
 	// IssueCertificate triggers issuance of a wildcard SSL certificate.
 	IssueCertificate(ctx context.Context, zoneID int64, domain string) error
+	// GetZoneStatistics retrieves DNS query statistics for a zone.
+	GetZoneStatistics(ctx context.Context, zoneID int64, dateFrom, dateTo string) (*bunny.ZoneStatisticsResponse, error)
 	// AddRecord creates a new DNS record in the specified zone.
 	AddRecord(ctx context.Context, zoneID int64, req *bunny.AddRecordRequest) (*bunny.Record, error)
 
@@ -494,6 +496,36 @@ func (h *Handler) HandleIssueCertificate(w http.ResponseWriter, r *http.Request)
 	h.logger.Info("issue certificate", "zone_id", zoneID, "domain", req.Domain)
 
 	w.WriteHeader(http.StatusOK)
+}
+
+// HandleGetStatistics retrieves DNS query statistics for a zone.
+// GET /dnszone/{zoneID}/statistics
+// Admin only — statistics are outside the record-level permission model.
+func (h *Handler) HandleGetStatistics(w http.ResponseWriter, r *http.Request) {
+	zoneIDStr := chi.URLParam(r, "zoneID")
+	if zoneIDStr == "" {
+		writeError(w, http.StatusBadRequest, "missing zone ID")
+		return
+	}
+
+	zoneID, err := strconv.ParseInt(zoneIDStr, 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid zone ID")
+		return
+	}
+
+	dateFrom := r.URL.Query().Get("dateFrom")
+	dateTo := r.URL.Query().Get("dateTo")
+
+	result, err := h.client.GetZoneStatistics(r.Context(), zoneID, dateFrom, dateTo)
+	if err != nil {
+		handleBunnyError(w, err)
+		return
+	}
+
+	h.logger.Info("get statistics", "zone_id", zoneID)
+
+	writeJSON(w, http.StatusOK, result)
 }
 
 // HandleListRecords lists all DNS records for a zone.

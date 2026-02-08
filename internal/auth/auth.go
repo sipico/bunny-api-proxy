@@ -48,6 +48,8 @@ const (
 	ActionDisableDNSSEC Action = "disable_dnssec"
 	// ActionIssueCertificate issues a wildcard SSL certificate (admin only).
 	ActionIssueCertificate Action = "issue_certificate"
+	// ActionGetStatistics retrieves DNS query statistics (admin only).
+	ActionGetStatistics Action = "get_statistics"
 )
 
 // Errors for authentication and authorization failures.
