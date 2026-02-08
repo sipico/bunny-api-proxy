@@ -7,12 +7,14 @@ on:
       - '**/*.md'
       - 'docs/**'
       - '.gitignore'
+      - '.github/workflows/explore-api.yml'
   pull_request:
     branches: [ main ]
     paths-ignore:
       - '**/*.md'
       - 'docs/**'
       - '.gitignore'
+      - '.github/workflows/explore-api.yml'
 
 jobs:
   test:
