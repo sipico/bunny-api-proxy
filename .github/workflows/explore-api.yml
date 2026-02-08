@@ -471,40 +471,12 @@ jobs:
                 2>&1 | tee "scan-result-${domain}-attempt${attempt}.log"
 
               echo ""
-              echo "Extracting response..."
-              # Extract just the JSON from the log (grep for lines starting with {)
-              grep "^{" "scan-result-${domain}-attempt${attempt}.log" > "scan-result-${domain}-attempt${attempt}.json" 2>/dev/null || true
+              echo "✅ Response saved to scan-result-${domain}-attempt${attempt}.log"
+              echo "(Raw output will be available in artifacts for offline analysis)"
 
-              # Check if we got valid JSON
-              if [ -s "scan-result-${domain}-attempt${attempt}.json" ]; then
-                echo "✅ Response received, checking status..."
-
-                # Parse with jq more carefully
-                STATUS=$(jq -r '.Status // "unknown"' "scan-result-${domain}-attempt${attempt}.json" 2>/dev/null || echo "unknown")
-                RECORD_COUNT=$(jq '.Records | length' "scan-result-${domain}-attempt${attempt}.json" 2>/dev/null || echo "0")
-
-                echo "Status: $STATUS"
-                echo "Records found: $RECORD_COUNT"
-
-                if [ "$STATUS" = "2" ] || [ "$STATUS" = "Completed" ]; then
-                  echo "✅ Scan completed for $domain!"
-
-                  # Show first 5 records as sample
-                  echo ""
-                  echo "Sample records (first 5):"
-                  jq -r '.Records[0:5][] | "  \(.Type) \(.Name) -> \(.Value)"' "scan-result-${domain}-attempt${attempt}.json" 2>/dev/null || echo "  (Could not parse records)"
-                  break
-                fi
-              else
-                echo "⚠️  No JSON response found"
-              fi
-              elif [ "$STATUS" = "3" ] || [ "$STATUS" = "Failed" ]; then
-                echo "❌ Scan failed for $domain"
-                ERROR=$(echo "$RESPONSE" | jq -r '.Error // "Unknown error"' 2>/dev/null)
-                echo "Error: $ERROR"
-                break
-              else
-                echo "⏳ Scan still in progress (Status: $STATUS), waiting 3 seconds..."
+              # Small delay before next attempt
+              if [ $attempt -lt 3 ]; then
+                echo "Waiting 3 seconds before next poll..."
                 sleep 3
               fi
             done
