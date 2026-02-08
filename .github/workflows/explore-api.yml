@@ -27,14 +27,14 @@ jobs:
           echo "=========================================="
 
           curl -v \
-            -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
+            -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
             "$BUNNY_API_URL/dnszone" \
             2>&1 | tee zones-before.log
 
           echo ""
           echo "Pretty-printed:"
           curl -s \
-            -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
+            -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
             "$BUNNY_API_URL/dnszone" \
             | jq '.'
 
@@ -45,7 +45,7 @@ jobs:
           echo "=========================================="
 
           curl -s \
-            -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
+            -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
             "$BUNNY_API_URL/dnszone" \
             | jq -r '.Items[]?.Id // empty' > zone-ids.txt
 
@@ -72,7 +72,7 @@ jobs:
               echo "→ Deleting zone ID: $zone_id"
 
               curl -v -X DELETE \
-                -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
+                -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
                 "$BUNNY_API_URL/dnszone/$zone_id" \
                 2>&1 | tee "delete-zone-${zone_id}.log"
 
@@ -94,14 +94,14 @@ jobs:
           echo "=========================================="
 
           curl -v \
-            -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
+            -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
             "$BUNNY_API_URL/dnszone" \
             2>&1 | tee zones-after-cleanup.log
 
           echo ""
           echo "Pretty-printed:"
           curl -s \
-            -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
+            -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
             "$BUNNY_API_URL/dnszone" \
             | jq '.' | tee zones-empty.json
 
@@ -126,7 +126,7 @@ jobs:
           echo "=========================================="
 
           curl -v -X POST \
-            -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
+            -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
             -H "Content-Type: application/json" \
             -d '{"Domain": "test-basic-explore.xyz"}' \
             "$BUNNY_API_URL/dnszone" \
@@ -135,7 +135,7 @@ jobs:
           echo ""
           echo "Pretty-printed:"
           curl -s -X POST \
-            -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
+            -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
             -H "Content-Type: application/json" \
             -d '{"Domain": "test-basic-explore.xyz"}' \
             "$BUNNY_API_URL/dnszone" \
@@ -157,14 +157,14 @@ jobs:
           echo "Listing all zones to verify creation..."
 
           curl -v \
-            -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
+            -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
             "$BUNNY_API_URL/dnszone" \
             2>&1 | tee zones-after-create.log
 
           echo ""
           echo "Pretty-printed:"
           curl -s \
-            -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
+            -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
             "$BUNNY_API_URL/dnszone" \
             | jq '.' | tee zones-list.json
 
@@ -188,18 +188,1690 @@ jobs:
           echo "✓ Zone created successfully and visible in list"
 
       # =================================================================
-      # STEP 4: CLEANUP - Delete the test zone
+      # STEP 3b: DNS QUERY - Check if amazon.com exists on bunny.net nameservers
       # =================================================================
-      - name: Step 4 - Delete test zone
+      - name: Step 3b - Query amazon.com via DNS
+        run: |
+          echo "=========================================="
+          echo "STEP 3b: DNS queries for amazon.com"
+          echo "=========================================="
+          echo "Question: Is amazon.com actually hosted on bunny.net nameservers?"
+          echo ""
+
+          echo "--- Query via Bunny.net nameserver (kiki.bunny.net) ---"
+          dig @kiki.bunny.net amazon.com A +short || echo "Query failed"
+          echo ""
+
+          echo "--- Query via Bunny.net nameserver (coco.bunny.net) ---"
+          dig @coco.bunny.net amazon.com A +short || echo "Query failed"
+          echo ""
+
+          echo "--- Query via Cloudflare (1.1.1.1) ---"
+          dig @1.1.1.1 amazon.com A +short || echo "Query failed"
+          echo ""
+
+          echo "--- Query via Quad9 (9.9.9.9) ---"
+          dig @9.9.9.9 amazon.com A +short || echo "Query failed"
+          echo ""
+
+          echo "--- Check amazon.com nameservers ---"
+          dig amazon.com NS +short || echo "Query failed"
+
+      # =================================================================
+      # STEP 3c: EXPLORE - Try to add amazon.com
+      # =================================================================
+      - name: Step 3c - Try to create amazon.com zone
+        run: |
+          echo "=========================================="
+          echo "STEP 3c: Try to add amazon.com as a zone"
+          echo "=========================================="
+          echo "Question: Can we add a well-known domain we don't own?"
+          echo ""
+
+          curl -v -X POST \
+            -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{"Domain": "amazon.com"}' \
+            "$BUNNY_API_URL/dnszone" \
+            2>&1 | tee create-amazon-zone.log
+
+          echo ""
+          echo "Pretty-printed:"
+          curl -s -X POST \
+            -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{"Domain": "amazon.com"}' \
+            "$BUNNY_API_URL/dnszone" \
+            | jq '.' | tee amazon-zone.json || echo "Request failed or returned non-JSON"
+
+          # Check if it succeeded
+          AMAZON_ZONE_ID=$(jq -r '.Id // empty' amazon-zone.json 2>/dev/null)
+          if [ -n "$AMAZON_ZONE_ID" ]; then
+            echo ""
+            echo "🤯 SURPRISE: We CAN add amazon.com! Zone ID: $AMAZON_ZONE_ID"
+            echo "AMAZON_ZONE_ID=$AMAZON_ZONE_ID" >> $GITHUB_ENV
+          else
+            echo ""
+            echo "❌ As expected: Cannot add amazon.com (we don't own it)"
+          fi
+
+      # =================================================================
+      # STEP 3d: EXPLORE - Try several large EU companies
+      # =================================================================
+      - name: Step 3d - Try to create zones for EU companies
+        run: |
+          echo "=========================================="
+          echo "STEP 3d: Try large EU company domains"
+          echo "=========================================="
+          echo "Question: Are all well-known domains blocked, or just some?"
+          echo ""
+
+          # List of large EU companies to test
+          DOMAINS=(
+            "siemens.com"
+            "shell.com"
+            "nestle.com"
+            "sap.com"
+            "lvmh.com"
+            "unilever.com"
+          )
+
+          for domain in "${DOMAINS[@]}"; do
+            echo ""
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "Testing: $domain"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+            # Make single request, save verbose output and JSON response
+            curl -v -X POST \
+              -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+              -H "Content-Type: application/json" \
+              -d "{\"Domain\": \"$domain\"}" \
+              "$BUNNY_API_URL/dnszone" \
+              2>&1 | tee "create-${domain}.log"
+
+            echo ""
+            echo "Pretty-printed:"
+            # Extract just the JSON body from the log (last line)
+            RESPONSE=$(tail -1 "create-${domain}.log")
+            echo "$RESPONSE" | jq '.' 2>/dev/null || echo "$RESPONSE"
+
+            # Check if it succeeded
+            ZONE_ID=$(echo "$RESPONSE" | jq -r '.Id // empty' 2>/dev/null)
+            if [ -n "$ZONE_ID" ] && [ "$ZONE_ID" != "null" ]; then
+              echo "✅ SUCCESS: Created zone for $domain (ID: $ZONE_ID)"
+              echo "ZONE_${domain/./_}=$ZONE_ID" >> $GITHUB_ENV
+            else
+              echo "❌ BLOCKED: Cannot add $domain"
+            fi
+
+            # Small delay between requests
+            sleep 1
+          done
+
+          echo ""
+          echo "=========================================="
+          echo "Summary: EU Company Domain Tests"
+          echo "=========================================="
+
+      # =================================================================
+      # STEP 3e: EXPLORE - Domain availability checks
+      # =================================================================
+      - name: Step 3e - Test domain availability endpoint
+        run: |
+          echo "=========================================="
+          echo "STEP 3e: Domain availability checks"
+          echo "=========================================="
+          echo "Testing: POST /dnszone/checkavailability"
+          echo ""
+
+          # Use EU company domains
+          DOMAINS=(
+            "siemens.com"
+            "shell.com"
+            "nestle.com"
+            "sap.com"
+            "lvmh.com"
+            "unilever.com"
+          )
+
+          for domain in "${DOMAINS[@]}"; do
+            echo ""
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "Checking availability: $domain"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+            curl -v -X POST \
+              -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+              -H "Content-Type: application/json" \
+              -d "{\"Name\": \"$domain\"}" \
+              "$BUNNY_API_URL/dnszone/checkavailability" \
+              2>&1 | tee "availability-${domain}.log"
+
+            echo ""
+            echo "Pretty-printed:"
+            RESPONSE=$(tail -1 "availability-${domain}.log")
+            echo "$RESPONSE" | jq '.' 2>/dev/null || echo "$RESPONSE"
+
+            # Small delay between requests
+            sleep 1
+          done
+
+          echo ""
+          echo "=========================================="
+          echo "Summary: Domain Availability Tests"
+          echo "=========================================="
+
+      # =================================================================
+      # STEP 3f: EXPLORE - DNS scanning
+      # =================================================================
+      - name: Step 3f - Test DNS scanning endpoint
+        run: |
+          echo "=========================================="
+          echo "STEP 3f: DNS scanning tests"
+          echo "=========================================="
+          echo "Testing: POST /dnszone/records/scan"
+          echo ""
+
+          # Use EU company domains (already created in Step 3d)
+          DOMAINS=(
+            "siemens.com"
+            "shell.com"
+            "nestle.com"
+          )
+
+          for domain in "${DOMAINS[@]}"; do
+            echo ""
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "Scanning DNS records: $domain"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+            # Trigger scan using Domain parameter
+            curl -v -X POST \
+              -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+              -H "Content-Type: application/json" \
+              -d "{\"Domain\": \"$domain\"}" \
+              "$BUNNY_API_URL/dnszone/records/scan" \
+              2>&1 | tee "scan-${domain}.log"
+
+            echo ""
+            echo "Pretty-printed:"
+            RESPONSE=$(tail -1 "scan-${domain}.log")
+            echo "$RESPONSE" | jq '.' 2>/dev/null || echo "$RESPONSE"
+
+            # Extract JobId if scan was triggered
+            JOB_ID=$(echo "$RESPONSE" | jq -r '.JobId // empty' 2>/dev/null)
+            if [ -n "$JOB_ID" ]; then
+              echo "✅ Scan triggered for $domain (JobId: $JOB_ID)"
+              echo "JOB_${domain/./_}=$JOB_ID" >> $GITHUB_ENV
+            fi
+
+            # Small delay between requests
+            sleep 1
+          done
+
+          echo ""
+          echo "=========================================="
+          echo "Summary: DNS Scanning Tests"
+          echo "=========================================="
+
+      # =================================================================
+      # STEP 3g: EXPLORE - Poll DNS scan results
+      # =================================================================
+      - name: Step 3g - Poll DNS scan results
+        run: |
+          echo "=========================================="
+          echo "STEP 3g: Poll DNS scan results"
+          echo "=========================================="
+          echo "Testing: GET /dnszone/{zoneId}/records/scan"
+          echo ""
+
+          # First, get zone IDs for the domains we scanned
+          echo "Getting zone IDs for scanned domains..."
+          curl -s \
+            -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+            "$BUNNY_API_URL/dnszone" \
+            | jq '.Items[] | select(.Domain == "siemens.com" or .Domain == "shell.com" or .Domain == "nestle.com") | {Domain, Id}' \
+            > scanned-zones.json
+
+          cat scanned-zones.json
+
+          # Wait a bit for scans to process
+          echo ""
+          echo "Waiting 5 seconds for scans to process..."
+          sleep 5
+
+          # Poll each zone's scan results
+          DOMAINS=("siemens.com" "shell.com" "nestle.com")
+
+          for domain in "${DOMAINS[@]}"; do
+            echo ""
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "Checking scan results: $domain"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+            # Get zone ID for this domain
+            ZONE_ID=$(jq -r "select(.Domain == \"$domain\") | .Id" scanned-zones.json)
+
+            if [ -z "$ZONE_ID" ] || [ "$ZONE_ID" = "null" ]; then
+              echo "⚠️  Could not find zone ID for $domain"
+              continue
+            fi
+
+            echo "Zone ID: $ZONE_ID"
+            echo ""
+
+            # Poll scan status (try 3 times with delays)
+            for attempt in 1 2 3; do
+              echo "Attempt $attempt - Fetching scan results..."
+
+              # Save clean JSON response to file, verbose output separate
+              curl -v -X GET \
+                -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+                "$BUNNY_API_URL/dnszone/$ZONE_ID/records/scan" \
+                -o "scan-result-${domain}-attempt${attempt}.json" \
+                2> "scan-result-${domain}-attempt${attempt}-headers.log"
+
+              echo ""
+              echo "✅ Clean JSON saved to: scan-result-${domain}-attempt${attempt}.json"
+              echo "   Verbose headers saved to: scan-result-${domain}-attempt${attempt}-headers.log"
+
+              # Show preview of results
+              if [ -f "scan-result-${domain}-attempt${attempt}.json" ]; then
+                RECORD_COUNT=$(jq -r '.Records | length // 0' "scan-result-${domain}-attempt${attempt}.json" 2>/dev/null || echo "0")
+                STATUS=$(jq -r '.Status // "unknown"' "scan-result-${domain}-attempt${attempt}.json" 2>/dev/null || echo "unknown")
+                echo "   Status: $STATUS, Records: $RECORD_COUNT"
+              fi
+
+              # Small delay before next attempt
+              if [ $attempt -lt 3 ]; then
+                echo "Waiting 3 seconds before next poll..."
+                sleep 3
+              fi
+            done
+
+            sleep 1
+          done
+
+          echo ""
+          echo "=========================================="
+          echo "Summary: DNS Scan Results"
+          echo "=========================================="
+
+      # =================================================================
+      # STEP 3h: EXPLORE - Register scanned domains with ALL scan records
+      # =================================================================
+      - name: Step 3h - Register zones with complete scan results
+        run: |
+          echo "=========================================="
+          echo "STEP 3h: Register zones with complete scan results"
+          echo "=========================================="
+          echo "Testing: POST /dnszone with ALL Records from scan (unaltered)"
+          echo "Hypothesis: Scan output is directly compatible with create zone API"
+          echo ""
+
+          DOMAINS=("siemens.com" "shell.com" "nestle.com")
+
+          for domain in "${DOMAINS[@]}"; do
+            echo ""
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "Registering domain: $domain"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+            # Find the latest clean scan result JSON file
+            SCAN_FILE=$(ls -t scan-result-${domain}-attempt*.json 2>/dev/null | head -1)
+
+            if [ ! -f "$SCAN_FILE" ]; then
+              echo "⚠️  No scan results found for $domain"
+              continue
+            fi
+
+            echo "Reading scan results from: $SCAN_FILE"
+
+            # Extract ALL records from clean JSON (UNALTERED - including IsProxied)
+            RECORDS=$(jq -c '.Records' "$SCAN_FILE" 2>/dev/null || echo "[]")
+
+            if [ "$RECORDS" = "[]" ] || [ -z "$RECORDS" ]; then
+              echo "⚠️  Could not extract records from scan results"
+              continue
+            fi
+
+            RECORD_COUNT=$(echo "$RECORDS" | jq 'length' 2>/dev/null || echo "0")
+            echo "Extracted ALL $RECORD_COUNT records from scan"
+            echo ""
+            echo "Sample records (first 2):"
+            echo "$RECORDS" | jq '.[0:2]' 2>/dev/null || echo "$RECORDS"
+            echo ""
+
+            # Check if zone already exists and delete it
+            echo "Checking if zone already exists for $domain..."
+            EXISTING_ZONE_ID=$(curl -s -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" "$BUNNY_API_URL/dnszone" | \
+              jq -r ".Items[] | select(.Domain == \"$domain\") | .Id" 2>/dev/null || echo "")
+
+            if [ -n "$EXISTING_ZONE_ID" ] && [ "$EXISTING_ZONE_ID" != "null" ]; then
+              echo "⚠️  Zone already exists (ID: $EXISTING_ZONE_ID), deleting..."
+              curl -s -X DELETE \
+                -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+                "$BUNNY_API_URL/dnszone/$EXISTING_ZONE_ID" \
+                -o "delete-${domain}.json" \
+                2> "delete-${domain}-headers.log"
+              echo "✅ Deleted existing zone"
+              sleep 1
+            else
+              echo "✅ No existing zone found"
+            fi
+            echo ""
+
+            # Create zone with ALL scan records (completely unaltered)
+            echo "Creating zone: $domain with ALL $RECORD_COUNT scan records..."
+            echo ""
+
+            # Save clean response to JSON file, verbose to separate log
+            curl -v -X POST \
+              -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+              -H "Content-Type: application/json" \
+              -d "{\"Domain\": \"$domain\", \"Records\": $RECORDS}" \
+              "$BUNNY_API_URL/dnszone" \
+              -o "create-with-records-${domain}.json" \
+              2> "create-with-records-${domain}-headers.log"
+
+            echo ""
+            echo "Response (pretty-printed):"
+            RESPONSE=$(cat "create-with-records-${domain}.json")
+            echo "$RESPONSE" | jq '.' 2>/dev/null || echo "$RESPONSE"
+            echo ""
+
+            # Check if zone was created
+            ZONE_ID=$(echo "$RESPONSE" | jq -r '.Id // empty' 2>/dev/null)
+            if [ -n "$ZONE_ID" ]; then
+              CREATED_COUNT=$(echo "$RESPONSE" | jq '.Records | length' 2>/dev/null || echo "0")
+              echo "✅ Zone created successfully: $domain (ID: $ZONE_ID)"
+              echo "   Records in scan:    $RECORD_COUNT"
+              echo "   Records created:    $CREATED_COUNT"
+
+              if [ "$CREATED_COUNT" = "$RECORD_COUNT" ]; then
+                echo "   ✅ ALL records transferred!"
+              else
+                echo "   ⚠️  Some records not created"
+              fi
+
+              # Save zone ID for export and cleanup
+              echo "ZONE_${domain//./_}=$ZONE_ID" >> $GITHUB_ENV
+            else
+              echo "❌ Failed to create zone"
+              ERROR_MSG=$(echo "$RESPONSE" | jq -r '.ErrorKey // .Message // "Unknown error"' 2>/dev/null)
+              echo "   Error: $ERROR_MSG"
+            fi
+
+            sleep 2
+          done
+
+          echo ""
+          echo "=========================================="
+          echo "Summary: Direct Scan-to-Zone Registration"
+          echo "=========================================="
+
+      # =================================================================
+      # STEP 3i: EXPLORE - Export zones
+      # =================================================================
+      - name: Step 3i - Export zones
+        run: |
+          echo "=========================================="
+          echo "STEP 3i: Export zones to BIND format"
+          echo "=========================================="
+          echo "Testing: GET /dnszone/{id}/export"
+          echo ""
+
+          DOMAINS=("siemens.com" "shell.com" "nestle.com")
+
+          for domain in "${DOMAINS[@]}"; do
+            echo ""
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "Exporting zone: $domain"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+            # Get zone ID from environment (set in step 3h)
+            ZONE_VAR="ZONE_${domain//./_}"
+            ZONE_ID="${!ZONE_VAR}"
+
+            if [ -z "$ZONE_ID" ] || [ "$ZONE_ID" = "null" ]; then
+              echo "⚠️  Zone not found for $domain"
+              continue
+            fi
+
+            echo "Zone ID: $ZONE_ID"
+            echo "Exporting..."
+
+            # Save clean BIND zone file directly, verbose headers separate
+            curl -v -X GET \
+              -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+              "$BUNNY_API_URL/dnszone/$ZONE_ID/export" \
+              -o "export-${domain}.zone" \
+              2> "export-${domain}-headers.log"
+
+            if [ -s "export-${domain}.zone" ]; then
+              FILE_SIZE=$(wc -c < "export-${domain}.zone")
+              echo ""
+              echo "✅ Clean BIND zone file saved: export-${domain}.zone ($FILE_SIZE bytes)"
+              echo "   Verbose headers saved: export-${domain}-headers.log"
+              echo ""
+              echo "Preview (first 10 lines):"
+              head -10 "export-${domain}.zone"
+            else
+              echo "⚠️  Export file is empty or failed"
+            fi
+
+            sleep 1
+          done
+
+          echo ""
+          echo "=========================================="
+          echo "Summary: Zone Exports"
+          echo "=========================================="
+
+      # =================================================================
+      # STEP 4a: EXPLORE - Test BIND zone import (delete zones first)
+      # =================================================================
+      - name: Step 4a - Delete zones before import test
+        run: |
+          echo "=========================================="
+          echo "STEP 4a: Delete zones for import test"
+          echo "=========================================="
+          echo "Preparing for BIND import test by deleting existing zones"
+          echo ""
+
+          DOMAINS=("siemens.com" "shell.com" "nestle.com")
+
+          for domain in "${DOMAINS[@]}"; do
+            echo ""
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "Deleting zone: $domain"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+            # Get zone ID from environment (set in step 3h)
+            ZONE_VAR="ZONE_${domain//./_}"
+            ZONE_ID="${!ZONE_VAR}"
+
+            if [ -z "$ZONE_ID" ] || [ "$ZONE_ID" = "null" ]; then
+              echo "⚠️  Zone ID not found for $domain"
+              continue
+            fi
+
+            echo "Zone ID: $ZONE_ID"
+            echo "Deleting..."
+
+            curl -s -X DELETE \
+              -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+              "$BUNNY_API_URL/dnszone/$ZONE_ID" \
+              -o "delete-for-import-${domain}.json" \
+              2> "delete-for-import-${domain}-headers.log"
+
+            echo "✅ Zone deleted"
+            sleep 1
+          done
+
+          echo ""
+          echo "=========================================="
+          echo "Summary: Zones Deleted for Import Test"
+          echo "=========================================="
+
+      # =================================================================
+      # STEP 4b: EXPLORE - Import BIND zone files
+      # =================================================================
+      - name: Step 4b - Import BIND zone files
+        run: |
+          echo "=========================================="
+          echo "STEP 4b: Import BIND zone files"
+          echo "=========================================="
+          echo "Testing: POST /dnszone (create) + POST /dnszone/{id}/import"
+          echo ""
+
+          DOMAINS=("siemens.com" "shell.com" "nestle.com")
+
+          for domain in "${DOMAINS[@]}"; do
+            echo ""
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "Importing zone: $domain"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+            # Check if zone file exists
+            ZONE_FILE="export-${domain}.zone"
+            if [ ! -f "$ZONE_FILE" ]; then
+              echo "⚠️  Zone file not found: $ZONE_FILE"
+              continue
+            fi
+
+            FILE_SIZE=$(wc -c < "$ZONE_FILE")
+            LINE_COUNT=$(wc -l < "$ZONE_FILE")
+            echo "Zone file: $ZONE_FILE ($FILE_SIZE bytes, $LINE_COUNT lines)"
+            echo ""
+
+            # Step 1: Create empty zone
+            echo "Creating empty zone for $domain..."
+            CREATE_RESPONSE=$(curl -s -X POST \
+              -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+              -H "Content-Type: application/json" \
+              -d "{\"Domain\": \"$domain\"}" \
+              "$BUNNY_API_URL/dnszone" \
+              -o "create-for-import-${domain}.json" \
+              2> "create-for-import-${domain}-headers.log")
+
+            ZONE_ID=$(jq -r '.Id // empty' "create-for-import-${domain}.json" 2>/dev/null)
+            if [ -z "$ZONE_ID" ]; then
+              echo "❌ Failed to create zone"
+              cat "create-for-import-${domain}.json"
+              continue
+            fi
+
+            echo "✅ Created empty zone (ID: $ZONE_ID)"
+            echo ""
+
+            # Step 2: Import BIND zone file
+            echo "Importing BIND zone file..."
+            IMPORT_RESPONSE=$(curl -s -X POST \
+              -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+              -H "Content-Type: text/plain" \
+              --data-binary "@$ZONE_FILE" \
+              "$BUNNY_API_URL/dnszone/$ZONE_ID/import" \
+              -o "import-${domain}.json" \
+              2> "import-${domain}-headers.log")
+
+            echo "Import response:"
+            cat "import-${domain}.json" | jq '.' 2>/dev/null || cat "import-${domain}.json"
+            echo ""
+
+            # Check import results
+            SUCCESSFUL=$(jq -r '.RecordsSuccessful // 0' "import-${domain}.json" 2>/dev/null)
+            FAILED=$(jq -r '.RecordsFailed // 0' "import-${domain}.json" 2>/dev/null)
+            SKIPPED=$(jq -r '.RecordsSkipped // 0' "import-${domain}.json" 2>/dev/null)
+
+            echo "✅ Import completed for $domain"
+            echo "   Records successful: $SUCCESSFUL"
+            echo "   Records failed:     $FAILED"
+            echo "   Records skipped:    $SKIPPED"
+
+            # Save zone ID for cleanup
+            echo "ZONE_IMPORT_${domain//./_}=$ZONE_ID" >> $GITHUB_ENV
+
+            sleep 2
+          done
+
+          echo ""
+          echo "=========================================="
+          echo "Summary: BIND Zone Import Test"
+          echo "=========================================="
+
+      # =================================================================
+      # STEP 4b1: EXPLORE - Record Operations (Add/Update/Delete)
+      # =================================================================
+      # =================================================================
+      # STEP 4b1a: EXPLORE - Record Operations (Add)
+      # =================================================================
+      - name: Step 4b1a - Add DNS Records (All Types)
+        run: |
+          echo "=========================================="
+          echo "STEP 4b1a: Add DNS Records"
+          echo "=========================================="
+          echo "Testing: PUT /dnszone/{id}/records (Add Record)"
+          echo ""
+          echo "Record types: A (0), AAAA (1), CNAME (2), TXT (3), MX (4), SRV (8), CAA (9)"
+          echo ""
+
+          DOMAINS=("siemens.com" "shell.com" "nestle.com")
+
+          for domain in "${DOMAINS[@]}"; do
+            echo ""
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "Adding records for: $domain"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+            # Get zone ID from the import environment variable
+            ZONE_VAR="ZONE_IMPORT_${domain//./_}"
+            ZONE_ID=$(eval echo \$$ZONE_VAR)
+
+            if [ -z "$ZONE_ID" ]; then
+              echo "⚠️  Could not find zone ID for $domain"
+              continue
+            fi
+
+            echo "Zone ID: $ZONE_ID"
+            echo ""
+            # =========================================================
+            # 1. Add CAA Record (Type 9)
+            # =========================================================
+            echo "→ Adding CAA record (PUT /dnszone/$ZONE_ID/records)..."
+            echo "   CAA: 0 issue \"letsencrypt.org\""
+
+            curl -v -X PUT \
+              -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+              -H "Content-Type: application/json" \
+              -d '{
+                "Type": 9,
+                "Name": "",
+                "Value": "letsencrypt.org",
+                "Ttl": 3600,
+                "Flags": 0,
+                "Tag": "issue"
+              }' \
+              "$BUNNY_API_URL/dnszone/$ZONE_ID/records" \
+              -o "add-caa-${domain}.json" \
+              2> "add-caa-${domain}-headers.log"
+
+            echo ""
+            echo "CAA Record Added:"
+            cat "add-caa-${domain}.json" | jq '{Id, Type, Name, Value, Flags, Tag, Ttl}' 2>/dev/null || cat "add-caa-${domain}.json"
+
+            CAA_RECORD_ID=$(jq -r '.Id // empty' "add-caa-${domain}.json")
+            echo "  Record ID: $CAA_RECORD_ID"
+            echo ""
+
+            # Query the CAA record to generate DNS traffic
+            echo "→ Querying CAA record to generate statistics..."
+            dig +short @kiki.bunny.net "$domain" CAA > /dev/null 2>&1 || true
+            dig +short @coco.bunny.net "$domain" CAA > /dev/null 2>&1 || true
+
+            sleep 1
+
+            # =========================================================
+            # 2. Add SRV Record (Type 8)
+            # =========================================================
+            echo "→ Adding SRV record (PUT /dnszone/$ZONE_ID/records)..."
+            echo "   SRV: _test._tcp -> test-target.example.com:8080 (priority 10, weight 20)"
+
+            curl -v -X PUT \
+              -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+              -H "Content-Type: application/json" \
+              -d '{
+                "Type": 8,
+                "Name": "_test._tcp",
+                "Value": "test-target.example.com",
+                "Ttl": 3600,
+                "Priority": 10,
+                "Weight": 20,
+                "Port": 8080
+              }' \
+              "$BUNNY_API_URL/dnszone/$ZONE_ID/records" \
+              -o "add-srv-${domain}.json" \
+              2> "add-srv-${domain}-headers.log"
+
+            echo ""
+            echo "SRV Record Added:"
+            cat "add-srv-${domain}.json" | jq '{Id, Type, Name, Value, Priority, Weight, Port, Ttl}' 2>/dev/null || cat "add-srv-${domain}.json"
+
+            SRV_RECORD_ID=$(jq -r '.Id // empty' "add-srv-${domain}.json")
+            echo "  Record ID: $SRV_RECORD_ID"
+            echo ""
+
+            # Query the SRV record to generate DNS traffic
+            echo "→ Querying SRV record to generate statistics..."
+            dig +short @kiki.bunny.net "_test._tcp.$domain" SRV > /dev/null 2>&1 || true
+            dig +short @coco.bunny.net "_test._tcp.$domain" SRV > /dev/null 2>&1 || true
+
+            sleep 1
+
+            # =========================================================
+            # 3. Add A Record (Type 0)
+            # =========================================================
+            echo "→ Adding A record (PUT /dnszone/$ZONE_ID/records)..."
+            echo "   A: test-a -> 192.0.2.1"
+
+            curl -v -X PUT \
+              -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+              -H "Content-Type: application/json" \
+              -d '{
+                "Type": 0,
+                "Name": "test-a",
+                "Value": "192.0.2.1",
+                "Ttl": 300
+              }' \
+              "$BUNNY_API_URL/dnszone/$ZONE_ID/records" \
+              -o "add-a-${domain}.json" \
+              2> "add-a-${domain}-headers.log"
+
+            echo ""
+            echo "A Record Added:"
+            cat "add-a-${domain}.json" | jq '{Id, Type, Name, Value, Ttl}' 2>/dev/null || cat "add-a-${domain}.json"
+
+            A_RECORD_ID=$(jq -r '.Id // empty' "add-a-${domain}.json")
+            echo "  Record ID: $A_RECORD_ID"
+            echo ""
+
+            # Query the A record to generate DNS traffic
+            echo "→ Querying A record to generate statistics..."
+            dig +short @kiki.bunny.net "test-a.$domain" A > /dev/null 2>&1 || true
+            dig +short @coco.bunny.net "test-a.$domain" A > /dev/null 2>&1 || true
+
+            sleep 1
+
+            # =========================================================
+            # 4. Add AAAA Record (Type 1)
+            # =========================================================
+            echo "→ Adding AAAA record (PUT /dnszone/$ZONE_ID/records)..."
+            echo "   AAAA: test-aaaa -> 2001:db8::1"
+
+            curl -v -X PUT \
+              -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+              -H "Content-Type: application/json" \
+              -d '{
+                "Type": 1,
+                "Name": "test-aaaa",
+                "Value": "2001:db8::1",
+                "Ttl": 300
+              }' \
+              "$BUNNY_API_URL/dnszone/$ZONE_ID/records" \
+              -o "add-aaaa-${domain}.json" \
+              2> "add-aaaa-${domain}-headers.log"
+
+            echo ""
+            echo "AAAA Record Added:"
+            cat "add-aaaa-${domain}.json" | jq '{Id, Type, Name, Value, Ttl}' 2>/dev/null || cat "add-aaaa-${domain}.json"
+
+            AAAA_RECORD_ID=$(jq -r '.Id // empty' "add-aaaa-${domain}.json")
+            echo "  Record ID: $AAAA_RECORD_ID"
+            echo ""
+
+            # Query the AAAA record to generate DNS traffic
+            echo "→ Querying AAAA record to generate statistics..."
+            dig +short @kiki.bunny.net "test-aaaa.$domain" AAAA > /dev/null 2>&1 || true
+            dig +short @coco.bunny.net "test-aaaa.$domain" AAAA > /dev/null 2>&1 || true
+
+            sleep 1
+
+            # =========================================================
+            # 5. Add CNAME Record (Type 2)
+            # =========================================================
+            echo "→ Adding CNAME record (PUT /dnszone/$ZONE_ID/records)..."
+            echo "   CNAME: test-cname -> target.example.com"
+
+            curl -v -X PUT \
+              -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+              -H "Content-Type: application/json" \
+              -d '{
+                "Type": 2,
+                "Name": "test-cname",
+                "Value": "target.example.com",
+                "Ttl": 3600
+              }' \
+              "$BUNNY_API_URL/dnszone/$ZONE_ID/records" \
+              -o "add-cname-${domain}.json" \
+              2> "add-cname-${domain}-headers.log"
+
+            echo ""
+            echo "CNAME Record Added:"
+            cat "add-cname-${domain}.json" | jq '{Id, Type, Name, Value, Ttl}' 2>/dev/null || cat "add-cname-${domain}.json"
+
+            CNAME_RECORD_ID=$(jq -r '.Id // empty' "add-cname-${domain}.json")
+            echo "  Record ID: $CNAME_RECORD_ID"
+            echo ""
+
+            # Query the CNAME record to generate DNS traffic
+            echo "→ Querying CNAME record to generate statistics..."
+            dig +short @kiki.bunny.net "test-cname.$domain" CNAME > /dev/null 2>&1 || true
+            dig +short @coco.bunny.net "test-cname.$domain" CNAME > /dev/null 2>&1 || true
+
+            sleep 1
+
+            # =========================================================
+            # 6. Add TXT Record (Type 3)
+            # =========================================================
+            echo "→ Adding TXT record (PUT /dnszone/$ZONE_ID/records)..."
+            echo "   TXT: _acme-challenge -> test-validation-string"
+
+            curl -v -X PUT \
+              -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+              -H "Content-Type: application/json" \
+              -d '{
+                "Type": 3,
+                "Name": "_acme-challenge",
+                "Value": "test-validation-string",
+                "Ttl": 60
+              }' \
+              "$BUNNY_API_URL/dnszone/$ZONE_ID/records" \
+              -o "add-txt-${domain}.json" \
+              2> "add-txt-${domain}-headers.log"
+
+            echo ""
+            echo "TXT Record Added:"
+            cat "add-txt-${domain}.json" | jq '{Id, Type, Name, Value, Ttl}' 2>/dev/null || cat "add-txt-${domain}.json"
+
+            TXT_RECORD_ID=$(jq -r '.Id // empty' "add-txt-${domain}.json")
+            echo "  Record ID: $TXT_RECORD_ID"
+            echo ""
+
+            # Query the TXT record to generate DNS traffic
+            echo "→ Querying TXT record to generate statistics..."
+            dig +short @kiki.bunny.net "_acme-challenge.$domain" TXT > /dev/null 2>&1 || true
+            dig +short @coco.bunny.net "_acme-challenge.$domain" TXT > /dev/null 2>&1 || true
+
+            sleep 1
+
+            # =========================================================
+            # 7. Add MX Record (Type 4)
+            # =========================================================
+            echo "→ Adding MX record (PUT /dnszone/$ZONE_ID/records)..."
+            echo "   MX: @ -> mail.example.com (priority 10)"
+
+            curl -v -X PUT \
+              -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+              -H "Content-Type: application/json" \
+              -d '{
+                "Type": 4,
+                "Name": "",
+                "Value": "mail.example.com",
+                "Priority": 10,
+                "Ttl": 3600
+              }' \
+              "$BUNNY_API_URL/dnszone/$ZONE_ID/records" \
+              -o "add-mx-${domain}.json" \
+              2> "add-mx-${domain}-headers.log"
+
+            echo ""
+            echo "MX Record Added:"
+            cat "add-mx-${domain}.json" | jq '{Id, Type, Name, Value, Priority, Ttl}' 2>/dev/null || cat "add-mx-${domain}.json"
+
+            MX_RECORD_ID=$(jq -r '.Id // empty' "add-mx-${domain}.json")
+            echo "  Record ID: $MX_RECORD_ID"
+            echo ""
+
+            # Query the MX record to generate DNS traffic
+            echo "→ Querying MX record to generate statistics..."
+            dig +short @kiki.bunny.net "$domain" MX > /dev/null 2>&1 || true
+            dig +short @coco.bunny.net "$domain" MX > /dev/null 2>&1 || true
+
+            sleep 1
+
+
+            echo "✅ All records added for $domain"
+            sleep 2
+          done
+
+          echo ""
+          echo "=========================================="
+          echo "Summary: Add DNS Records"
+          echo "=========================================="
+
+      # =================================================================
+      # STEP 4b1b: EXPLORE - Record Operations (Update)
+      # =================================================================
+      - name: Step 4b1b - Update DNS Records (All Types)
+        run: |
+          echo "=========================================="
+          echo "STEP 4b1b: Update DNS Records"
+          echo "=========================================="
+          echo "Testing: POST /dnszone/{id}/records/{recordId} (Update Record)"
+          echo ""
+
+          DOMAINS=("siemens.com" "shell.com" "nestle.com")
+
+          for domain in "${DOMAINS[@]}"; do
+            echo ""
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "Updating records for: $domain"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+            # Get zone ID
+            ZONE_VAR="ZONE_IMPORT_${domain//./_}"
+            ZONE_ID=$(eval echo \$$ZONE_VAR)
+
+            if [ -z "$ZONE_ID" ]; then
+              echo "⚠️  Could not find zone ID for $domain"
+              continue
+            fi
+
+            # Extract record IDs from previous step's JSON files
+            CAA_RECORD_ID=$(jq -r '.Id // empty' "add-caa-${domain}.json" 2>/dev/null)
+            SRV_RECORD_ID=$(jq -r '.Id // empty' "add-srv-${domain}.json" 2>/dev/null)
+            A_RECORD_ID=$(jq -r '.Id // empty' "add-a-${domain}.json" 2>/dev/null)
+            AAAA_RECORD_ID=$(jq -r '.Id // empty' "add-aaaa-${domain}.json" 2>/dev/null)
+            CNAME_RECORD_ID=$(jq -r '.Id // empty' "add-cname-${domain}.json" 2>/dev/null)
+            TXT_RECORD_ID=$(jq -r '.Id // empty' "add-txt-${domain}.json" 2>/dev/null)
+            MX_RECORD_ID=$(jq -r '.Id // empty' "add-mx-${domain}.json" 2>/dev/null)
+
+            echo "Zone ID: $ZONE_ID"
+            echo ""
+
+            # 8. Update CAA Record (change CA to digicert.com)
+            # =========================================================
+            if [ -n "$CAA_RECORD_ID" ]; then
+              echo "→ Updating CAA record (POST /dnszone/$ZONE_ID/records/$CAA_RECORD_ID)..."
+              echo "   Changing CA from letsencrypt.org -> digicert.com"
+
+              curl -v -X POST \
+                -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+                -H "Content-Type: application/json" \
+                -d "{
+                  \"Id\": $CAA_RECORD_ID,
+                  \"Type\": 9,
+                  \"Name\": \"\",
+                  \"Value\": \"digicert.com\",
+                  \"Ttl\": 3600,
+                  \"Flags\": 0,
+                  \"Tag\": \"issue\"
+                }" \
+                "$BUNNY_API_URL/dnszone/$ZONE_ID/records/$CAA_RECORD_ID" \
+                -o "update-caa-${domain}.json" \
+                2> "update-caa-${domain}-headers.log"
+
+              echo ""
+              echo "CAA Record Update Response (HTTP 204 expected):"
+              cat "update-caa-${domain}.json" 2>/dev/null || echo "(empty response - 204 No Content)"
+              echo ""
+
+              # Query the updated CAA record to generate DNS traffic
+              echo "→ Querying updated CAA record to generate statistics..."
+              dig +short @kiki.bunny.net "$domain" CAA > /dev/null 2>&1 || true
+              dig +short @coco.bunny.net "$domain" CAA > /dev/null 2>&1 || true
+
+              sleep 1
+            fi
+
+            # =========================================================
+            # 4. Update SRV Record (change port and priority)
+            # =========================================================
+            if [ -n "$SRV_RECORD_ID" ]; then
+              echo "→ Updating SRV record (POST /dnszone/$ZONE_ID/records/$SRV_RECORD_ID)..."
+              echo "   Changing port 8080 -> 9090, priority 10 -> 5"
+
+              curl -v -X POST \
+                -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+                -H "Content-Type: application/json" \
+                -d "{
+                  \"Id\": $SRV_RECORD_ID,
+                  \"Type\": 8,
+                  \"Name\": \"_test._tcp\",
+                  \"Value\": \"test-target.example.com\",
+                  \"Ttl\": 3600,
+                  \"Priority\": 5,
+                  \"Weight\": 20,
+                  \"Port\": 9090
+                }" \
+                "$BUNNY_API_URL/dnszone/$ZONE_ID/records/$SRV_RECORD_ID" \
+                -o "update-srv-${domain}.json" \
+                2> "update-srv-${domain}-headers.log"
+
+              echo ""
+              echo "SRV Record Update Response (HTTP 204 expected):"
+              cat "update-srv-${domain}.json" 2>/dev/null || echo "(empty response - 204 No Content)"
+              echo ""
+
+              # Query the updated SRV record to generate DNS traffic
+              echo "→ Querying updated SRV record to generate statistics..."
+              dig +short @kiki.bunny.net "_test._tcp.$domain" SRV > /dev/null 2>&1 || true
+              dig +short @coco.bunny.net "_test._tcp.$domain" SRV > /dev/null 2>&1 || true
+
+              sleep 1
+            fi
+
+            # =========================================================
+            # 10. Update A Record (change IP and TTL)
+            # =========================================================
+            if [ -n "$A_RECORD_ID" ]; then
+              echo "→ Updating A record (POST /dnszone/$ZONE_ID/records/$A_RECORD_ID)..."
+              echo "   Changing IP 192.0.2.1 -> 192.0.2.2, TTL 300 -> 600"
+
+              curl -v -X POST \
+                -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+                -H "Content-Type: application/json" \
+                -d "{
+                  \"Id\": $A_RECORD_ID,
+                  \"Type\": 0,
+                  \"Name\": \"test-a\",
+                  \"Value\": \"192.0.2.2\",
+                  \"Ttl\": 600
+                }" \
+                "$BUNNY_API_URL/dnszone/$ZONE_ID/records/$A_RECORD_ID" \
+                -o "update-a-${domain}.json" \
+                2> "update-a-${domain}-headers.log"
+
+              echo ""
+              echo "A Record Update Response (HTTP 204 expected):"
+              cat "update-a-${domain}.json" 2>/dev/null || echo "(empty response - 204 No Content)"
+              echo ""
+
+              # Query the updated A record to generate DNS traffic
+              echo "→ Querying updated A record to generate statistics..."
+              dig +short @kiki.bunny.net "test-a.$domain" A > /dev/null 2>&1 || true
+              dig +short @coco.bunny.net "test-a.$domain" A > /dev/null 2>&1 || true
+
+              sleep 1
+            fi
+
+            # =========================================================
+            # 11. Update AAAA Record (change IPv6 and TTL)
+            # =========================================================
+            if [ -n "$AAAA_RECORD_ID" ]; then
+              echo "→ Updating AAAA record (POST /dnszone/$ZONE_ID/records/$AAAA_RECORD_ID)..."
+              echo "   Changing IP 2001:db8::1 -> 2001:db8::2, TTL 300 -> 600"
+
+              curl -v -X POST \
+                -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+                -H "Content-Type: application/json" \
+                -d "{
+                  \"Id\": $AAAA_RECORD_ID,
+                  \"Type\": 1,
+                  \"Name\": \"test-aaaa\",
+                  \"Value\": \"2001:db8::2\",
+                  \"Ttl\": 600
+                }" \
+                "$BUNNY_API_URL/dnszone/$ZONE_ID/records/$AAAA_RECORD_ID" \
+                -o "update-aaaa-${domain}.json" \
+                2> "update-aaaa-${domain}-headers.log"
+
+              echo ""
+              echo "AAAA Record Update Response (HTTP 204 expected):"
+              cat "update-aaaa-${domain}.json" 2>/dev/null || echo "(empty response - 204 No Content)"
+              echo ""
+
+              # Query the updated AAAA record to generate DNS traffic
+              echo "→ Querying updated AAAA record to generate statistics..."
+              dig +short @kiki.bunny.net "test-aaaa.$domain" AAAA > /dev/null 2>&1 || true
+              dig +short @coco.bunny.net "test-aaaa.$domain" AAAA > /dev/null 2>&1 || true
+
+              sleep 1
+            fi
+
+            # =========================================================
+            # 12. Update CNAME Record (change target)
+            # =========================================================
+            if [ -n "$CNAME_RECORD_ID" ]; then
+              echo "→ Updating CNAME record (POST /dnszone/$ZONE_ID/records/$CNAME_RECORD_ID)..."
+              echo "   Changing target.example.com -> newtarget.example.com"
+
+              curl -v -X POST \
+                -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+                -H "Content-Type: application/json" \
+                -d "{
+                  \"Id\": $CNAME_RECORD_ID,
+                  \"Type\": 2,
+                  \"Name\": \"test-cname\",
+                  \"Value\": \"newtarget.example.com\",
+                  \"Ttl\": 3600
+                }" \
+                "$BUNNY_API_URL/dnszone/$ZONE_ID/records/$CNAME_RECORD_ID" \
+                -o "update-cname-${domain}.json" \
+                2> "update-cname-${domain}-headers.log"
+
+              echo ""
+              echo "CNAME Record Update Response (HTTP 204 expected):"
+              cat "update-cname-${domain}.json" 2>/dev/null || echo "(empty response - 204 No Content)"
+              echo ""
+
+              # Query the updated CNAME record to generate DNS traffic
+              echo "→ Querying updated CNAME record to generate statistics..."
+              dig +short @kiki.bunny.net "test-cname.$domain" CNAME > /dev/null 2>&1 || true
+              dig +short @coco.bunny.net "test-cname.$domain" CNAME > /dev/null 2>&1 || true
+
+              sleep 1
+            fi
+
+            # =========================================================
+            # 13. Update TXT Record (change value)
+            # =========================================================
+            if [ -n "$TXT_RECORD_ID" ]; then
+              echo "→ Updating TXT record (POST /dnszone/$ZONE_ID/records/$TXT_RECORD_ID)..."
+              echo "   Changing validation string"
+
+              curl -v -X POST \
+                -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+                -H "Content-Type: application/json" \
+                -d "{
+                  \"Id\": $TXT_RECORD_ID,
+                  \"Type\": 3,
+                  \"Name\": \"_acme-challenge\",
+                  \"Value\": \"updated-validation-string\",
+                  \"Ttl\": 60
+                }" \
+                "$BUNNY_API_URL/dnszone/$ZONE_ID/records/$TXT_RECORD_ID" \
+                -o "update-txt-${domain}.json" \
+                2> "update-txt-${domain}-headers.log"
+
+              echo ""
+              echo "TXT Record Update Response (HTTP 204 expected):"
+              cat "update-txt-${domain}.json" 2>/dev/null || echo "(empty response - 204 No Content)"
+              echo ""
+
+              # Query the updated TXT record to generate DNS traffic
+              echo "→ Querying updated TXT record to generate statistics..."
+              dig +short @kiki.bunny.net "_acme-challenge.$domain" TXT > /dev/null 2>&1 || true
+              dig +short @coco.bunny.net "_acme-challenge.$domain" TXT > /dev/null 2>&1 || true
+
+              sleep 1
+            fi
+
+            # =========================================================
+            # 14. Update MX Record (change priority)
+            # =========================================================
+            if [ -n "$MX_RECORD_ID" ]; then
+              echo "→ Updating MX record (POST /dnszone/$ZONE_ID/records/$MX_RECORD_ID)..."
+              echo "   Changing priority 10 -> 20"
+
+              curl -v -X POST \
+                -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+                -H "Content-Type: application/json" \
+                -d "{
+                  \"Id\": $MX_RECORD_ID,
+                  \"Type\": 4,
+                  \"Name\": \"\",
+                  \"Value\": \"mail.example.com\",
+                  \"Priority\": 20,
+                  \"Ttl\": 3600
+                }" \
+                "$BUNNY_API_URL/dnszone/$ZONE_ID/records/$MX_RECORD_ID" \
+                -o "update-mx-${domain}.json" \
+                2> "update-mx-${domain}-headers.log"
+
+              echo ""
+              echo "MX Record Update Response (HTTP 204 expected):"
+              cat "update-mx-${domain}.json" 2>/dev/null || echo "(empty response - 204 No Content)"
+              echo ""
+
+              # Query the updated MX record to generate DNS traffic
+              echo "→ Querying updated MX record to generate statistics..."
+              dig +short @kiki.bunny.net "$domain" MX > /dev/null 2>&1 || true
+              dig +short @coco.bunny.net "$domain" MX > /dev/null 2>&1 || true
+
+              sleep 1
+            fi
+
+            # =========================================================
+
+            echo "✅ All records updated for $domain"
+            sleep 2
+          done
+
+          echo ""
+          echo "=========================================="
+          echo "Summary: Update DNS Records"
+          echo "=========================================="
+
+      # =================================================================
+      # STEP 4b1c: EXPLORE - Record Operations (Delete)
+      # =================================================================
+      - name: Step 4b1c - Delete DNS Records (All Types)
+        run: |
+          echo "=========================================="
+          echo "STEP 4b1c: Delete DNS Records"
+          echo "=========================================="
+          echo "Testing: DELETE /dnszone/{id}/records/{recordId} (Delete Record)"
+          echo ""
+
+          DOMAINS=("siemens.com" "shell.com" "nestle.com")
+
+          for domain in "${DOMAINS[@]}"; do
+            echo ""
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "Deleting records for: $domain"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+            # Get zone ID
+            ZONE_VAR="ZONE_IMPORT_${domain//./_}"
+            ZONE_ID=$(eval echo \$$ZONE_VAR)
+
+            if [ -z "$ZONE_ID" ]; then
+              echo "⚠️  Could not find zone ID for $domain"
+              continue
+            fi
+
+            # Extract record IDs from JSON files
+            CAA_RECORD_ID=$(jq -r '.Id // empty' "add-caa-${domain}.json" 2>/dev/null)
+            SRV_RECORD_ID=$(jq -r '.Id // empty' "add-srv-${domain}.json" 2>/dev/null)
+            A_RECORD_ID=$(jq -r '.Id // empty' "add-a-${domain}.json" 2>/dev/null)
+            AAAA_RECORD_ID=$(jq -r '.Id // empty' "add-aaaa-${domain}.json" 2>/dev/null)
+            CNAME_RECORD_ID=$(jq -r '.Id // empty' "add-cname-${domain}.json" 2>/dev/null)
+            TXT_RECORD_ID=$(jq -r '.Id // empty' "add-txt-${domain}.json" 2>/dev/null)
+            MX_RECORD_ID=$(jq -r '.Id // empty' "add-mx-${domain}.json" 2>/dev/null)
+
+            echo "Zone ID: $ZONE_ID"
+            echo ""
+
+            # 15. Delete CAA Record
+            # =========================================================
+            if [ -n "$CAA_RECORD_ID" ]; then
+              echo "→ Deleting CAA record (DELETE /dnszone/$ZONE_ID/records/$CAA_RECORD_ID)..."
+
+              curl -v -X DELETE \
+                -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+                "$BUNNY_API_URL/dnszone/$ZONE_ID/records/$CAA_RECORD_ID" \
+                -o "delete-caa-${domain}.json" \
+                2> "delete-caa-${domain}-headers.log"
+
+              echo ""
+              echo "CAA Record Delete Response (HTTP 204 expected):"
+              cat "delete-caa-${domain}.json" 2>/dev/null || echo "(empty response - 204 No Content)"
+              echo ""
+
+              sleep 1
+            fi
+
+            # =========================================================
+            # 6. Delete SRV Record
+            # =========================================================
+            if [ -n "$SRV_RECORD_ID" ]; then
+              echo "→ Deleting SRV record (DELETE /dnszone/$ZONE_ID/records/$SRV_RECORD_ID)..."
+
+              curl -v -X DELETE \
+                -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+                "$BUNNY_API_URL/dnszone/$ZONE_ID/records/$SRV_RECORD_ID" \
+                -o "delete-srv-${domain}.json" \
+                2> "delete-srv-${domain}-headers.log"
+
+              echo ""
+              echo "SRV Record Delete Response (HTTP 204 expected):"
+              cat "delete-srv-${domain}.json" 2>/dev/null || echo "(empty response - 204 No Content)"
+              echo ""
+
+              sleep 1
+            fi
+
+            # =========================================================
+            # 17. Delete A Record
+            # =========================================================
+            if [ -n "$A_RECORD_ID" ]; then
+              echo "→ Deleting A record (DELETE /dnszone/$ZONE_ID/records/$A_RECORD_ID)..."
+
+              curl -v -X DELETE \
+                -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+                "$BUNNY_API_URL/dnszone/$ZONE_ID/records/$A_RECORD_ID" \
+                -o "delete-a-${domain}.json" \
+                2> "delete-a-${domain}-headers.log"
+
+              echo ""
+              echo "A Record Delete Response (HTTP 204 expected):"
+              cat "delete-a-${domain}.json" 2>/dev/null || echo "(empty response - 204 No Content)"
+              echo ""
+
+              sleep 1
+            fi
+
+            # =========================================================
+            # 18. Delete AAAA Record
+            # =========================================================
+            if [ -n "$AAAA_RECORD_ID" ]; then
+              echo "→ Deleting AAAA record (DELETE /dnszone/$ZONE_ID/records/$AAAA_RECORD_ID)..."
+
+              curl -v -X DELETE \
+                -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+                "$BUNNY_API_URL/dnszone/$ZONE_ID/records/$AAAA_RECORD_ID" \
+                -o "delete-aaaa-${domain}.json" \
+                2> "delete-aaaa-${domain}-headers.log"
+
+              echo ""
+              echo "AAAA Record Delete Response (HTTP 204 expected):"
+              cat "delete-aaaa-${domain}.json" 2>/dev/null || echo "(empty response - 204 No Content)"
+              echo ""
+
+              sleep 1
+            fi
+
+            # =========================================================
+            # 19. Delete CNAME Record
+            # =========================================================
+            if [ -n "$CNAME_RECORD_ID" ]; then
+              echo "→ Deleting CNAME record (DELETE /dnszone/$ZONE_ID/records/$CNAME_RECORD_ID)..."
+
+              curl -v -X DELETE \
+                -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+                "$BUNNY_API_URL/dnszone/$ZONE_ID/records/$CNAME_RECORD_ID" \
+                -o "delete-cname-${domain}.json" \
+                2> "delete-cname-${domain}-headers.log"
+
+              echo ""
+              echo "CNAME Record Delete Response (HTTP 204 expected):"
+              cat "delete-cname-${domain}.json" 2>/dev/null || echo "(empty response - 204 No Content)"
+              echo ""
+
+              sleep 1
+            fi
+
+            # =========================================================
+            # 20. Delete TXT Record
+            # =========================================================
+            if [ -n "$TXT_RECORD_ID" ]; then
+              echo "→ Deleting TXT record (DELETE /dnszone/$ZONE_ID/records/$TXT_RECORD_ID)..."
+
+              curl -v -X DELETE \
+                -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+                "$BUNNY_API_URL/dnszone/$ZONE_ID/records/$TXT_RECORD_ID" \
+                -o "delete-txt-${domain}.json" \
+                2> "delete-txt-${domain}-headers.log"
+
+              echo ""
+              echo "TXT Record Delete Response (HTTP 204 expected):"
+              cat "delete-txt-${domain}.json" 2>/dev/null || echo "(empty response - 204 No Content)"
+              echo ""
+
+              sleep 1
+            fi
+
+            # =========================================================
+            # 21. Delete MX Record
+            # =========================================================
+            if [ -n "$MX_RECORD_ID" ]; then
+              echo "→ Deleting MX record (DELETE /dnszone/$ZONE_ID/records/$MX_RECORD_ID)..."
+
+              curl -v -X DELETE \
+                -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+                "$BUNNY_API_URL/dnszone/$ZONE_ID/records/$MX_RECORD_ID" \
+                -o "delete-mx-${domain}.json" \
+                2> "delete-mx-${domain}-headers.log"
+
+              echo ""
+              echo "MX Record Delete Response (HTTP 204 expected):"
+              cat "delete-mx-${domain}.json" 2>/dev/null || echo "(empty response - 204 No Content)"
+              echo ""
+
+              sleep 1
+            fi
+
+            echo "✅ All record operations completed for $domain"
+
+            echo "✅ All records deleted for $domain"
+            sleep 2
+          done
+
+          echo ""
+          echo "=========================================="
+          echo "Summary: DNS Record Operations Complete"
+          echo "=========================================="
+          echo "✅ Add A Record (Type 0)"
+          echo "✅ Add AAAA Record (Type 1)"
+          echo "✅ Add CNAME Record (Type 2)"
+          echo "✅ Add TXT Record (Type 3)"
+          echo "✅ Add MX Record (Type 4)"
+          echo "✅ Add SRV Record (Type 8)"
+          echo "✅ Add CAA Record (Type 9)"
+          echo "✅ Update A Record"
+          echo "✅ Update AAAA Record"
+          echo "✅ Update CNAME Record"
+          echo "✅ Update TXT Record"
+          echo "✅ Update MX Record"
+          echo "✅ Update SRV Record"
+          echo "✅ Update CAA Record"
+          echo "✅ Delete A Record"
+          echo "✅ Delete AAAA Record"
+          echo "✅ Delete CNAME Record"
+          echo "✅ Delete TXT Record"
+          echo "✅ Delete MX Record"
+          echo "✅ Delete SRV Record"
+          echo "✅ Delete CAA Record"
+
+      - name: Step 4b2 - Test DNS Query Statistics
+        run: |
+          echo "=========================================="
+          echo "STEP 4b2: Test DNS Query Statistics"
+          echo "=========================================="
+          echo "Testing: GET /dnszone/{id}/statistics"
+          echo ""
+
+          DOMAINS=("siemens.com" "shell.com" "nestle.com")
+
+          for domain in "${DOMAINS[@]}"; do
+            echo ""
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "Getting statistics for: $domain"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+            # Get zone ID from the import environment variable
+            ZONE_VAR="ZONE_IMPORT_${domain//./_}"
+            ZONE_ID=$(eval echo \$$ZONE_VAR)
+
+            if [ -z "$ZONE_ID" ]; then
+              echo "⚠️  Could not find zone ID for $domain"
+              continue
+            fi
+
+            echo "Zone ID: $ZONE_ID"
+            echo ""
+
+            # First, get all records in the zone
+            echo "→ Fetching all records in zone..."
+            curl -s -X GET \
+              -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+              "$BUNNY_API_URL/dnszone/$ZONE_ID" \
+              -o "zone-details-${domain}.json"
+
+            RECORD_COUNT=$(jq -r '.Records | length // 0' "zone-details-${domain}.json")
+            echo "   Found $RECORD_COUNT records in zone"
+            echo ""
+
+            # Generate DNS traffic by querying bunny.net nameservers
+            echo "→ Generating DNS traffic by querying records..."
+            echo "   Nameservers: kiki.bunny.net, coco.bunny.net"
+            echo ""
+
+            QUERY_COUNT=0
+            jq -r '.Records[] | "\(.Name) \(.Type)"' "zone-details-${domain}.json" | head -20 | while read -r name type; do
+              # Convert numeric type to record type name
+              case $type in
+                0) TYPE_NAME="A" ;;
+                1) TYPE_NAME="AAAA" ;;
+                2) TYPE_NAME="CNAME" ;;
+                3) TYPE_NAME="TXT" ;;
+                4) TYPE_NAME="MX" ;;
+                8) TYPE_NAME="SRV" ;;
+                9) TYPE_NAME="CAA" ;;
+                *) TYPE_NAME="A" ;;
+              esac
+
+              # Construct FQDN
+              if [ -z "$name" ] || [ "$name" = "@" ]; then
+                FQDN="$domain"
+              else
+                FQDN="${name}.${domain}"
+              fi
+
+              # Query both nameservers
+              echo "   Querying: $FQDN ($TYPE_NAME)"
+              dig +short @kiki.bunny.net "$FQDN" "$TYPE_NAME" > /dev/null 2>&1 || true
+              dig +short @coco.bunny.net "$FQDN" "$TYPE_NAME" > /dev/null 2>&1 || true
+
+              QUERY_COUNT=$((QUERY_COUNT + 1))
+            done
+
+            echo ""
+            echo "   Generated ~$((QUERY_COUNT * 2)) DNS queries"
+            echo ""
+
+            # Wait for statistics to update
+            echo "→ Waiting 5 seconds for statistics to update..."
+            sleep 5
+            echo ""
+
+            # Get statistics (should now have some data)
+            echo "→ Getting DNS query statistics (GET /dnszone/$ZONE_ID/statistics)..."
+            curl -v -X GET \
+              -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+              "$BUNNY_API_URL/dnszone/$ZONE_ID/statistics" \
+              -o "statistics-${domain}.json" \
+              2> "statistics-${domain}-headers.log"
+
+            echo ""
+            echo "Statistics Response:"
+            cat "statistics-${domain}.json" | jq '.' 2>/dev/null || cat "statistics-${domain}.json"
+            echo ""
+
+            # Try with date range parameters (last 24 hours)
+            echo "→ Getting statistics with date range (last 24 hours)..."
+            DATE_FROM=$(date -u -d '24 hours ago' '+%Y-%m-%dT%H:%M:%S' 2>/dev/null || date -u -v-24H '+%Y-%m-%dT%H:%M:%S')
+            DATE_TO=$(date -u '+%Y-%m-%dT%H:%M:%S')
+
+            echo "   From: $DATE_FROM"
+            echo "   To:   $DATE_TO"
+            echo ""
+
+            curl -v -X GET \
+              -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+              "$BUNNY_API_URL/dnszone/$ZONE_ID/statistics?dateFrom=${DATE_FROM}&dateTo=${DATE_TO}" \
+              -o "statistics-range-${domain}.json" \
+              2> "statistics-range-${domain}-headers.log"
+
+            echo ""
+            echo "Statistics with Date Range:"
+            cat "statistics-range-${domain}.json" | jq '.' 2>/dev/null || cat "statistics-range-${domain}.json"
+            echo ""
+
+            echo "✅ Statistics retrieved for $domain"
+            sleep 1
+          done
+
+          echo ""
+          echo "=========================================="
+          echo "Summary: DNS Statistics Test"
+          echo "=========================================="
+          echo "Note: Statistics may be zero/empty for newly created zones"
+          echo "      that haven't received real DNS queries yet."
+
+      # =================================================================
+      # STEP 4c: EXPLORE - DNSSEC Operations
+      # =================================================================
+      - name: Step 4c - Test DNSSEC Enable/Disable
+        run: |
+          echo "=========================================="
+          echo "STEP 4c: Test DNSSEC Operations"
+          echo "=========================================="
+          echo "Testing: POST /dnszone/{id}/dnssec/enable"
+          echo "Testing: GET /dnszone/{id}/dnssec"
+          echo "Testing: POST /dnszone/{id}/dnssec/disable"
+          echo ""
+
+          DOMAINS=("siemens.com" "shell.com" "nestle.com")
+
+          for domain in "${DOMAINS[@]}"; do
+            echo ""
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "Testing DNSSEC for: $domain"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+            # Get zone ID from the import environment variable
+            ZONE_VAR="ZONE_IMPORT_${domain//./_}"
+            ZONE_ID=$(eval echo \$$ZONE_VAR)
+
+            if [ -z "$ZONE_ID" ]; then
+              echo "⚠️  Could not find zone ID for $domain"
+              continue
+            fi
+
+            echo "Zone ID: $ZONE_ID"
+            echo ""
+
+            # Step 1: Enable DNSSEC
+            echo "→ Enabling DNSSEC (POST /dnszone/$ZONE_ID/dnssec)..."
+            curl -v -X POST \
+              -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+              "$BUNNY_API_URL/dnszone/$ZONE_ID/dnssec" \
+              -o "dnssec-enable-${domain}.json" \
+              2> "dnssec-enable-${domain}-headers.log"
+
+            echo ""
+            echo "✅ DNSSEC Enable Response (includes DS/DNSKEY records):"
+            cat "dnssec-enable-${domain}.json" | jq '.' 2>/dev/null || cat "dnssec-enable-${domain}.json"
+            echo ""
+
+            # Extract and display DS and DNSKEY information
+            if [ -f "dnssec-enable-${domain}.json" ]; then
+              echo "DNSSEC Details:"
+              echo "  Enabled: $(jq -r '.Enabled // "unknown"' "dnssec-enable-${domain}.json")"
+              echo "  DS Record: $(jq -r '.DsRecord // "None"' "dnssec-enable-${domain}.json")"
+              echo "  Algorithm: $(jq -r '.Algorithm // "unknown"' "dnssec-enable-${domain}.json")"
+              echo "  KeyTag: $(jq -r '.KeyTag // "unknown"' "dnssec-enable-${domain}.json")"
+              echo "  Digest: $(jq -r '.Digest // "None"' "dnssec-enable-${domain}.json" | head -c 50)..."
+              echo "  DigestType: $(jq -r '.DigestType // "unknown"' "dnssec-enable-${domain}.json")"
+              echo "  PublicKey: $(jq -r '.PublicKey // "None"' "dnssec-enable-${domain}.json" | head -c 50)..."
+              echo "  Flags: $(jq -r '.Flags // "unknown"' "dnssec-enable-${domain}.json")"
+              echo "  DsConfigured: $(jq -r '.DsConfigured // "unknown"' "dnssec-enable-${domain}.json")"
+            fi
+            echo ""
+
+            # Small delay before checking zone
+            echo "Waiting 2 seconds..."
+            sleep 2
+
+            # Step 2: Get Zone details WITH DNSSEC enabled
+            echo "→ Getting Zone details (GET /dnszone/$ZONE_ID) - DNSSEC should be enabled..."
+            curl -v -X GET \
+              -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+              "$BUNNY_API_URL/dnszone/$ZONE_ID" \
+              -o "getzone-dnssec-enabled-${domain}.json" \
+              2> "getzone-dnssec-enabled-${domain}-headers.log"
+
+            echo ""
+            echo "Zone Details (with DNSSEC enabled):"
+            cat "getzone-dnssec-enabled-${domain}.json" | jq '{Id, Domain, DnsSecEnabled, DateModified, CustomNameserversEnabled, LoggingEnabled, SoaEmail}' 2>/dev/null || cat "getzone-dnssec-enabled-${domain}.json"
+            echo ""
+            echo "  DnsSecEnabled: $(jq -r '.DnsSecEnabled // "unknown"' "getzone-dnssec-enabled-${domain}.json")"
+            echo ""
+
+            sleep 1
+
+            # Step 3: Disable DNSSEC
+            echo "→ Disabling DNSSEC (DELETE /dnszone/$ZONE_ID/dnssec)..."
+            curl -v -X DELETE \
+              -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+              "$BUNNY_API_URL/dnszone/$ZONE_ID/dnssec" \
+              -o "dnssec-disable-${domain}.json" \
+              2> "dnssec-disable-${domain}-headers.log"
+
+            echo ""
+            echo "Disable response:"
+            cat "dnssec-disable-${domain}.json" | jq '.' 2>/dev/null || cat "dnssec-disable-${domain}.json"
+            echo ""
+
+            sleep 1
+
+            # Step 4: Get Zone details AFTER disabling DNSSEC
+            echo "→ Getting Zone details again (GET /dnszone/$ZONE_ID) - DNSSEC should be disabled..."
+            curl -v -X GET \
+              -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+              "$BUNNY_API_URL/dnszone/$ZONE_ID" \
+              -o "getzone-dnssec-disabled-${domain}.json" \
+              2> "getzone-dnssec-disabled-${domain}-headers.log"
+
+            echo ""
+            echo "Zone Details (after disabling DNSSEC):"
+            cat "getzone-dnssec-disabled-${domain}.json" | jq '{Id, Domain, DnsSecEnabled, DateModified, CustomNameserversEnabled, LoggingEnabled, SoaEmail}' 2>/dev/null || cat "getzone-dnssec-disabled-${domain}.json"
+            echo ""
+            echo "  DnsSecEnabled: $(jq -r '.DnsSecEnabled // "unknown"' "getzone-dnssec-disabled-${domain}.json")"
+            echo ""
+
+            sleep 1
+
+            # Step 5: Test UpdateZone - Change SOA email and enable logging
+            echo "→ Testing UpdateZone (POST /dnszone/$ZONE_ID) - Update SOA email and logging..."
+            curl -v -X POST \
+              -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+              -H "Content-Type: application/json" \
+              -d "{\"SoaEmail\": \"dns-admin@${domain}\", \"LoggingEnabled\": true}" \
+              "$BUNNY_API_URL/dnszone/$ZONE_ID" \
+              -o "updatezone-${domain}.json" \
+              2> "updatezone-${domain}-headers.log"
+
+            echo ""
+            echo "UpdateZone response:"
+            cat "updatezone-${domain}.json" | jq '{Id, Domain, SoaEmail, LoggingEnabled, DnsSecEnabled}' 2>/dev/null || cat "updatezone-${domain}.json"
+            echo ""
+
+            echo "✅ All zone operations completed for $domain"
+            sleep 2
+          done
+
+          echo ""
+          echo "=========================================="
+          echo "Summary: DNSSEC Operations Test"
+          echo "=========================================="
+
+      # =================================================================
+      # STEP 5: CLEANUP - Delete the test zone
+      # =================================================================
+      - name: Step 5 - Cleanup all test zones
         if: always()
         run: |
           echo "=========================================="
-          echo "STEP 4: Cleanup - Delete test zone"
+          echo "STEP 5: Cleanup - Delete all test zones"
           echo "=========================================="
 
           # Get all zone IDs
           curl -s \
-            -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
+            -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
             "$BUNNY_API_URL/dnszone" \
             | jq -r '.Items[]?.Id // empty' > zone-ids-final.txt
 
@@ -217,7 +1889,7 @@ jobs:
               echo "→ Deleting zone ID: $zone_id"
 
               curl -v -X DELETE \
-                -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
+                -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
                 "$BUNNY_API_URL/dnszone/$zone_id" \
                 2>&1 | tee "cleanup-zone-${zone_id}.log"
 
@@ -234,19 +1906,19 @@ jobs:
           echo "=========================================="
 
           curl -v \
-            -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
+            -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
             "$BUNNY_API_URL/dnszone" \
             2>&1 | tee zones-final.log
 
           echo ""
           echo "Pretty-printed:"
           curl -s \
-            -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
+            -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
             "$BUNNY_API_URL/dnszone" \
             | jq '.'
 
           ZONE_COUNT=$(curl -s \
-            -H "AccessKey: ${{ secrets.BUNNY_API_KEY }}" \
+            -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
             "$BUNNY_API_URL/dnszone" \
             | jq '.Items | length')
 
@@ -289,4 +1961,5 @@ jobs:
             *.log
             *.json
             *.txt
+            *.zone
           retention-days: 30
