@@ -344,7 +344,7 @@ jobs:
             curl -v -X POST \
               -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
               -H "Content-Type: application/json" \
-              -d "{\"Domain\": \"$domain\"}" \
+              -d "{\"Name\": \"$domain\"}" \
               "$BUNNY_API_URL/dnszone/checkavailability" \
               2>&1 | tee "availability-${domain}.log"
 
