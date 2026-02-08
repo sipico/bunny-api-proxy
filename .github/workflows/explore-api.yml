@@ -771,4 +771,5 @@ jobs:
             *.log
             *.json
             *.txt
+            *.zone
           retention-days: 30
