@@ -652,6 +652,51 @@ func (c *Client) DisableDNSSEC(ctx context.Context, zoneID int64) (*DNSSECRespon
 	return nil, parseError(resp.StatusCode, body)
 }
 
+// IssueCertificate triggers issuance of a wildcard SSL certificate for a zone.
+func (c *Client) IssueCertificate(ctx context.Context, zoneID int64, domain string) error {
+	url := fmt.Sprintf("%s/dnszone/%d/certificate/issue", c.baseURL, zoneID)
+
+	reqBody := struct {
+		Domain string `json:"Domain"`
+	}{Domain: domain}
+
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		return fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+	httpReq.Header.Set("AccessKey", c.apiKey)
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return fmt.Errorf("failed to issue certificate: %w", err)
+	}
+	defer func() {
+		//nolint:errcheck
+		resp.Body.Close()
+	}()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read response: %w", err)
+	}
+
+	if resp.StatusCode == http.StatusOK {
+		return nil
+	}
+
+	if resp.StatusCode == http.StatusNotFound {
+		return ErrNotFound
+	}
+
+	return parseError(resp.StatusCode, respBody)
+}
+
 // parseError parses API error responses and returns an appropriate error.
 func parseError(statusCode int, body []byte) error {
 	switch statusCode {

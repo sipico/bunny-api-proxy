@@ -129,6 +129,14 @@ func TestParseRequest(t *testing.T) {
 			wantZoneID: 123,
 		},
 		{
+			name:       "issue certificate",
+			method:     "POST",
+			path:       "/dnszone/123/certificate/issue",
+			body:       `{"Domain":"*.example.com"}`,
+			wantAction: ActionIssueCertificate,
+			wantZoneID: 123,
+		},
+		{
 			name:    "invalid path",
 			method:  "GET",
 			path:    "/invalid",

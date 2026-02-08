@@ -46,6 +46,8 @@ const (
 	ActionEnableDNSSEC Action = "enable_dnssec"
 	// ActionDisableDNSSEC disables DNSSEC for a zone (admin only).
 	ActionDisableDNSSEC Action = "disable_dnssec"
+	// ActionIssueCertificate issues a wildcard SSL certificate (admin only).
+	ActionIssueCertificate Action = "issue_certificate"
 )
 
 // Errors for authentication and authorization failures.

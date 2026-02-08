@@ -32,6 +32,7 @@ type mockBunnyClient struct {
 	exportRecordsFunc         func(context.Context, int64) (string, error)
 	enableDNSSECFunc          func(context.Context, int64) (*bunny.DNSSECResponse, error)
 	disableDNSSECFunc         func(context.Context, int64) (*bunny.DNSSECResponse, error)
+	issueCertificateFunc      func(context.Context, int64, string) error
 }
 
 func (m *mockBunnyClient) ListZones(ctx context.Context, opts *bunny.ListZonesOptions) (*bunny.ListZonesResponse, error) {
@@ -149,6 +150,13 @@ func newTestRequestWithKeyInfo(path string, params map[string]string, keyInfo *a
 }
 
 // TestNewHandler_WithLogger tests handler creation with non-nil logger
+func (m *mockBunnyClient) IssueCertificate(ctx context.Context, zoneID int64, domain string) error {
+	if m.issueCertificateFunc != nil {
+		return m.issueCertificateFunc(ctx, zoneID, domain)
+	}
+	return nil
+}
+
 func TestNewHandler_WithLogger(t *testing.T) {
 	t.Parallel()
 	logger := slog.New(slog.NewTextHandler(nil, nil))
@@ -2418,5 +2426,101 @@ func TestHandleDisableDNSSEC_NotFound(t *testing.T) {
 
 	if w.Code != http.StatusNotFound {
 		t.Errorf("expected status %d, got %d", http.StatusNotFound, w.Code)
+	}
+}
+
+func TestHandleIssueCertificate_Success(t *testing.T) {
+	t.Parallel()
+	mockClient := &mockBunnyClient{
+		issueCertificateFunc: func(_ context.Context, _ int64, _ string) error {
+			return nil
+		},
+	}
+	handler := NewHandler(mockClient, slog.Default())
+
+	r := chi.NewRouter()
+	r.Post("/dnszone/{zoneID}/certificate/issue", handler.HandleIssueCertificate)
+
+	body := `{"Domain":"*.example.com"}`
+	req := httptest.NewRequest(http.MethodPost, "/dnszone/1/certificate/issue", bytes.NewBufferString(body))
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status %d, got %d", http.StatusOK, w.Code)
+	}
+}
+
+func TestHandleIssueCertificate_InvalidZoneID(t *testing.T) {
+	t.Parallel()
+	handler := NewHandler(&mockBunnyClient{}, slog.Default())
+
+	r := chi.NewRouter()
+	r.Post("/dnszone/{zoneID}/certificate/issue", handler.HandleIssueCertificate)
+
+	req := httptest.NewRequest(http.MethodPost, "/dnszone/abc/certificate/issue", bytes.NewBufferString(`{"Domain":"test.com"}`))
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d", http.StatusBadRequest, w.Code)
+	}
+}
+
+func TestHandleIssueCertificate_InvalidBody(t *testing.T) {
+	t.Parallel()
+	handler := NewHandler(&mockBunnyClient{}, slog.Default())
+
+	r := chi.NewRouter()
+	r.Post("/dnszone/{zoneID}/certificate/issue", handler.HandleIssueCertificate)
+
+	req := httptest.NewRequest(http.MethodPost, "/dnszone/1/certificate/issue", bytes.NewBufferString(`{invalid`))
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d", http.StatusBadRequest, w.Code)
+	}
+}
+
+func TestHandleIssueCertificate_NotFound(t *testing.T) {
+	t.Parallel()
+	mockClient := &mockBunnyClient{
+		issueCertificateFunc: func(_ context.Context, _ int64, _ string) error {
+			return bunny.ErrNotFound
+		},
+	}
+	handler := NewHandler(mockClient, slog.Default())
+
+	r := chi.NewRouter()
+	r.Post("/dnszone/{zoneID}/certificate/issue", handler.HandleIssueCertificate)
+
+	req := httptest.NewRequest(http.MethodPost, "/dnszone/999/certificate/issue", bytes.NewBufferString(`{"Domain":"test.com"}`))
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusNotFound {
+		t.Errorf("expected status %d, got %d", http.StatusNotFound, w.Code)
+	}
+}
+
+func TestHandleIssueCertificate_BunnyError(t *testing.T) {
+	t.Parallel()
+	mockClient := &mockBunnyClient{
+		issueCertificateFunc: func(_ context.Context, _ int64, _ string) error {
+			return fmt.Errorf("connection failed")
+		},
+	}
+	handler := NewHandler(mockClient, slog.Default())
+
+	r := chi.NewRouter()
+	r.Post("/dnszone/{zoneID}/certificate/issue", handler.HandleIssueCertificate)
+
+	req := httptest.NewRequest(http.MethodPost, "/dnszone/1/certificate/issue", bytes.NewBufferString(`{"Domain":"test.com"}`))
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("expected status %d, got %d", http.StatusInternalServerError, w.Code)
 	}
 }

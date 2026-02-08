@@ -664,6 +664,31 @@ func (s *Server) handleDisableDNSSEC(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// handleIssueCertificate handles POST /dnszone/{id}/certificate/issue.
+func (s *Server) handleIssueCertificate(w http.ResponseWriter, r *http.Request) {
+	idStr := chi.URLParam(r, "id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		http.Error(w, "invalid zone ID", http.StatusBadRequest)
+		return
+	}
+
+	s.state.mu.RLock()
+	_, ok := s.state.zones[id]
+	s.state.mu.RUnlock()
+
+	if !ok {
+		s.writeError(w, http.StatusNotFound, "dnszone.zone.not_found", "Id", "The requested DNS zone was not found")
+		return
+	}
+
+	// Read and discard body
+	//nolint:errcheck
+	io.ReadAll(r.Body)
+
+	w.WriteHeader(http.StatusOK)
+}
+
 // recordTypeName converts a record type integer to its DNS name.
 func recordTypeName(t int) string {
 	switch t {
