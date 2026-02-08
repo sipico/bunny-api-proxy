@@ -1,7 +1,103 @@
 # E2E Test Coverage Analysis
 
 **Date:** 2026-02-08
+**Last Updated:** 2026-02-08 (API Exploration Completed)
 **Purpose:** Analyze e2e test coverage for bunny-api-proxy endpoints and assess domain testing limitations
+
+---
+
+## 🔍 Real API Exploration Results (February 2026)
+
+**Exploration Workflow:** `.github/workflows/explore-api.yml` (branch: `claude/exploration-api-SHP62`)
+**Status:** ✅ Completed - 15/19 bunny.net DNS endpoints validated
+**Artifacts:** All responses saved to GitHub Actions artifacts (30-day retention)
+
+### Endpoints Validated with Real bunny.net API
+
+| Category | Endpoint | Method | Status | Key Findings |
+|----------|----------|--------|--------|--------------|
+| **Zone Management** | `/dnszone` | GET | ✅ Works | Returns `{Items: [...]}` |
+| | `/dnszone` | POST | ✅ Works | Accepts optional `Records` array |
+| | `/dnszone/{id}` | GET | ✅ Works | Includes `DnsSecEnabled` field |
+| | `/dnszone/{id}` | POST | ✅ Works | Update SOA email, logging, nameservers |
+| | `/dnszone/{id}` | DELETE | ✅ Works | Returns 204 No Content |
+| | `/dnszone/checkavailability` | POST | ✅ Works | Queries domain registries |
+| **Records** | `/dnszone/{id}/records` | PUT | ✅ Works | Returns 201 with record object |
+| | `/dnszone/{id}/records/{recordId}` | POST | ✅ Works | Returns 204 No Content |
+| | `/dnszone/{id}/records/{recordId}` | DELETE | ✅ Works | Returns 204 No Content |
+| **Import/Export** | `/dnszone/{id}/export` | GET | ✅ Works | BIND format, **SRV records missing (bug)** |
+| | `/dnszone/{id}/import` | POST | ✅ Works | Accepts BIND format |
+| **Scanning** | `/dnszone/{id}/records/scan` | POST | ✅ Works | Triggers background scan job |
+| | `/dnszone/{id}/records/scan` | GET | ✅ Works | Returns scan results |
+| **DNSSEC** | `/dnszone/{id}/dnssec` | POST | ✅ Works | Returns DS/DNSKEY records |
+| | `/dnszone/{id}/dnssec` | DELETE | ✅ Works | Disables DNSSEC |
+
+### 🎯 Critical Discoveries
+
+**1. DNSSEC Works Without Real Domain** ✅
+- bunny.net generates DNSSEC keys for ANY zone (even fake domains)
+- Returns complete DS records and DNSKEY public keys
+- Algorithm 13 (ECDSAP256SHA256) used
+- **No parent zone delegation needed to test the API**
+
+**2. Scan Results Directly Compatible with Zone Creation** ✅
+- Scan output JSON can be POST to `/dnszone` with `Records` field
+- `IsProxied` field silently ignored (no errors)
+- Validated with real domains: siemens.com (119 records), shell.com (136 records), nestle.com (144 records)
+
+**3. CAA Records Format Issue** ⚠️
+- Scan puts Flags/Tag in `Value` string
+- Zone creation needs separate `Flags` and `Tag` fields
+- Workaround: Manual reformatting required
+
+**4. SRV Records Export Bug** ❌
+- **bunny.net API bug:** SRV records (Type 8) NOT exported in BIND format
+- All other types export correctly (A, AAAA, CNAME, TXT, MX, CAA)
+- Tested: 8 SRV records created, 0 exported
+
+**5. Import/Export Workflow Validated** ✅
+- Complete round-trip tested: Scan → Create → Export → Import
+- Import success: 0 failed, 0 skipped for all test domains
+- BIND format parsing works perfectly
+
+**6. Record Operations Fully Functional** ✅
+- CAA records (Type 9): Add/Update/Delete tested
+- SRV records (Type 8): Add/Update/Delete tested
+- All operations return correct HTTP status codes (201, 204)
+
+**7. Zone GetZone/UpdateZone Validated** ✅
+- GetZone includes DNSSEC status (`DnsSecEnabled: true/false`)
+- UpdateZone can modify SOA email, logging, nameservers
+- Changes persist correctly
+
+### API Documentation Corrections
+
+**Incorrect Documentation Found:**
+| Documented Endpoint | Actual Endpoint | Notes |
+|---------------------|-----------------|-------|
+| `POST /dnszone/{id}/dnssec/enable` | `POST /dnszone/{id}/dnssec` | No `/enable` suffix |
+| `POST /dnszone/{id}/dnssec/disable` | `DELETE /dnszone/{id}/dnssec` | Use DELETE, not POST |
+| `GET /dnszone/{id}/dnssec` | ❌ Does not exist | Returns 405 Method Not Allowed |
+
+**Correct Usage:**
+- Enable DNSSEC: `POST /dnszone/{id}/dnssec` → Returns `DnsSecDsRecordModel`
+- Disable DNSSEC: `DELETE /dnszone/{id}/dnssec` → Returns `DnsSecDsRecordModel` (all fields null)
+- Get DNSSEC details: No separate GET endpoint, use enable/disable responses
+
+### Test Coverage Impact
+
+**Previous Assumptions:**
+- ❌ DNSSEC requires real domain delegation
+- ❌ Import/Export needs real DNS validation
+- ❌ Statistics require real traffic
+
+**Actual Reality:**
+- ✅ **DNSSEC is just an API operation** - works with fake domains
+- ✅ **Import/Export is just BIND parsing** - works with fake domains
+- ✅ **Statistics return zero for fake domains** - API still works
+
+**Updated Strategy:**
+Can now add e2e tests for **all** of these endpoints without registering a domain!
 
 ---
 
