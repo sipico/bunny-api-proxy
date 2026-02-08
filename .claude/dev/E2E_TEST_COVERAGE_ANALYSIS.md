@@ -410,58 +410,64 @@ Only 3 endpoints truly require real domains, but we can test them creatively wit
 
 ---
 
-### 5. **One-Off Exploration: Real API Response Discovery** (Priority: LOW)
+### 5. **Iterative API Exploration with curl** (Priority: LOW)
 
-Before implementing tests, run a one-off manual exploration to discover real API behavior:
+Before implementing tests, run iterative exploration to discover real API behavior:
 
-**Goal:** Understand what the real bunny.net API returns for these edge cases
+**Tool:** Manual GitHub Actions workflow (`.github/workflows/explore-api.yml`)
 
-**Approach:**
+**How to Run:**
+1. Go to **Actions** → **Explore bunny.net API** → **Run workflow**
+2. Select exploration step (`all`, `zones`, `availability`, `dnssec`, `scanning`)
+3. Review verbose logs and download artifacts
+
+**Or via gh CLI:**
 ```bash
-# Run with real API key in GitHub Actions (secrets available)
-# Or locally with BUNNY_API_KEY set
-BUNNY_API_KEY=xxx go test -v -run TestExplore_RealDomains ./tests/exploration/
+gh workflow run explore-api.yml --repo sipico/bunny-api-proxy
+gh run list --workflow=explore-api.yml
+gh run view <run-id> --log
 ```
 
-**Test Scenarios:**
+**What it explores:**
 
-1. **Add well-known domain as zone:**
-   ```go
-   // Can we add amazon.com as a zone in bunny.net?
-   // What does the API response look like?
-   zone, err := client.CreateZone(ctx, "amazon.com")
-   ```
+1. **Zone creation:**
+   - Create test zone (`test-explore-bap.xyz`)
+   - Try to create `amazon.com` zone (success or error?)
 
-2. **Trigger DNS scan on well-known domain:**
-   ```go
-   // What records does bunny.net discover for amazon.com?
-   // What's the job response format?
-   job, err := client.TriggerDNSScan(ctx, zoneID)
-   // Poll for results...
-   results, err := client.GetDNSScanResults(ctx, zoneID)
-   ```
+2. **Domain availability:**
+   - Check `amazon.com`, `google.com` (expect: not available)
+   - Check fake domains (expect: available)
+   - Document actual response format
 
-3. **Check availability of various domains:**
-   ```go
-   // What does "not available" look like?
-   resp1, _ := client.CheckAvailability(ctx, "amazon.com")
-   // What does "available" look like?
-   resp2, _ := client.CheckAvailability(ctx, "not-registered-12345.xyz")
-   ```
+3. **DNSSEC operations:**
+   - Enable DNSSEC on test zone
+   - Get zone details with DNSSEC info
+   - Inspect DS records format
 
-4. **Certificate issuance error:**
-   ```go
-   // What error does bunny.net return for unvalidated domain?
-   _, err := client.IssueCertificate(ctx, zoneID, "fake-domain.xyz")
-   ```
+4. **DNS scanning:**
+   - Trigger scan on fake domain
+   - Poll for results
+   - Document job status flow
 
 **Benefits:**
-- ✅ Discover actual API response structures
-- ✅ Use responses to enhance mockbunny accuracy
-- ✅ Identify edge cases and error formats
-- ✅ Document assumptions about API behavior
+- ✅ Simple curl commands (no Go code needed)
+- ✅ Verbose HTTP logging (`curl -v`)
+- ✅ Pretty-printed JSON responses (`jq`)
+- ✅ All logs saved as artifacts
+- ✅ Automatic cleanup before/after
+- ✅ Can iterate by adding more steps
 
-**Output:** Document findings in `tests/exploration/REAL_API_RESPONSES.md` for reference
+**Output:**
+- GitHub Actions logs with full HTTP traces
+- Artifacts downloadable as `.log` and `.json` files
+- Document findings in `.claude/dev/REAL_API_RESPONSES.md`
+
+**Next Steps:**
+1. Run initial exploration (`all` steps)
+2. Review logs for API response formats
+3. Add new curl commands based on findings
+4. Iterate until satisfied
+5. Use responses to enhance mockbunny
 
 ---
 
