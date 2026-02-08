@@ -802,6 +802,100 @@ jobs:
           echo "=========================================="
 
       # =================================================================
+      # STEP 4c: EXPLORE - DNSSEC Operations
+      # =================================================================
+      - name: Step 4c - Test DNSSEC Enable/Disable
+        run: |
+          echo "=========================================="
+          echo "STEP 4c: Test DNSSEC Operations"
+          echo "=========================================="
+          echo "Testing: POST /dnszone/{id}/dnssec/enable"
+          echo "Testing: GET /dnszone/{id}/dnssec"
+          echo "Testing: POST /dnszone/{id}/dnssec/disable"
+          echo ""
+
+          DOMAINS=("siemens.com" "shell.com" "nestle.com")
+
+          for domain in "${DOMAINS[@]}"; do
+            echo ""
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "Testing DNSSEC for: $domain"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+            # Get zone ID from the import environment variable
+            ZONE_VAR="ZONE_IMPORT_${domain//./_}"
+            ZONE_ID=$(eval echo \$$ZONE_VAR)
+
+            if [ -z "$ZONE_ID" ]; then
+              echo "⚠️  Could not find zone ID for $domain"
+              continue
+            fi
+
+            echo "Zone ID: $ZONE_ID"
+            echo ""
+
+            # Step 1: Enable DNSSEC
+            echo "→ Enabling DNSSEC..."
+            curl -v -X POST \
+              -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+              "$BUNNY_API_URL/dnszone/$ZONE_ID/dnssec/enable" \
+              -o "dnssec-enable-${domain}.json" \
+              2> "dnssec-enable-${domain}-headers.log"
+
+            echo ""
+            echo "Enable response:"
+            cat "dnssec-enable-${domain}.json" | jq '.' 2>/dev/null || cat "dnssec-enable-${domain}.json"
+            echo ""
+
+            # Small delay to let DNSSEC provision
+            echo "Waiting 3 seconds for DNSSEC to provision..."
+            sleep 3
+
+            # Step 2: Get DNSSEC details (DS and DNSKEY records)
+            echo "→ Retrieving DNSSEC details (DS and DNSKEY records)..."
+            curl -v -X GET \
+              -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+              "$BUNNY_API_URL/dnszone/$ZONE_ID/dnssec" \
+              -o "dnssec-details-${domain}.json" \
+              2> "dnssec-details-${domain}-headers.log"
+
+            echo ""
+            echo "DNSSEC details:"
+            cat "dnssec-details-${domain}.json" | jq '.' 2>/dev/null || cat "dnssec-details-${domain}.json"
+            echo ""
+
+            # Extract and display DS and DNSKEY records
+            echo "DS Records:"
+            jq -r '.DsRecords[]? // "None"' "dnssec-details-${domain}.json" 2>/dev/null || echo "No DS records or parsing error"
+            echo ""
+
+            echo "DNSKEY Records:"
+            jq -r '.DnskeyRecords[]? // "None"' "dnssec-details-${domain}.json" 2>/dev/null || echo "No DNSKEY records or parsing error"
+            echo ""
+
+            # Step 3: Disable DNSSEC
+            echo "→ Disabling DNSSEC..."
+            curl -v -X POST \
+              -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+              "$BUNNY_API_URL/dnszone/$ZONE_ID/dnssec/disable" \
+              -o "dnssec-disable-${domain}.json" \
+              2> "dnssec-disable-${domain}-headers.log"
+
+            echo ""
+            echo "Disable response:"
+            cat "dnssec-disable-${domain}.json" | jq '.' 2>/dev/null || cat "dnssec-disable-${domain}.json"
+            echo ""
+
+            echo "✅ DNSSEC operations completed for $domain"
+            sleep 2
+          done
+
+          echo ""
+          echo "=========================================="
+          echo "Summary: DNSSEC Operations Test"
+          echo "=========================================="
+
+      # =================================================================
       # STEP 5: CLEANUP - Delete the test zone
       # =================================================================
       - name: Step 5 - Cleanup all test zones
