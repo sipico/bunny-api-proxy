@@ -2305,7 +2305,7 @@ func TestHandleEnableDNSSEC_Success(t *testing.T) {
 	t.Parallel()
 	mockClient := &mockBunnyClient{
 		enableDNSSECFunc: func(_ context.Context, id int64) (*bunny.DNSSECResponse, error) {
-			return &bunny.DNSSECResponse{DnsSecEnabled: true, DnsSecAlgorithm: 13, DsKeyTag: 12345}, nil
+			return &bunny.DNSSECResponse{Enabled: true, Algorithm: 13, KeyTag: 12345}, nil
 		},
 	}
 	handler := NewHandler(mockClient, slog.Default())
@@ -2325,7 +2325,7 @@ func TestHandleEnableDNSSEC_Success(t *testing.T) {
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
-	if !resp.DnsSecEnabled {
+	if !resp.Enabled {
 		t.Error("expected DNSSEC to be enabled")
 	}
 }
@@ -2392,7 +2392,7 @@ func TestHandleDisableDNSSEC_Success(t *testing.T) {
 	t.Parallel()
 	mockClient := &mockBunnyClient{
 		disableDNSSECFunc: func(_ context.Context, id int64) (*bunny.DNSSECResponse, error) {
-			return &bunny.DNSSECResponse{DnsSecEnabled: false}, nil
+			return &bunny.DNSSECResponse{Enabled: false}, nil
 		},
 	}
 	handler := NewHandler(mockClient, slog.Default())
@@ -2412,7 +2412,7 @@ func TestHandleDisableDNSSEC_Success(t *testing.T) {
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
-	if resp.DnsSecEnabled {
+	if resp.Enabled {
 		t.Error("expected DNSSEC to be disabled")
 	}
 }

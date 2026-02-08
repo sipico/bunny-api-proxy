@@ -402,9 +402,9 @@ func TestE2E_EnableDNSSEC_Success(t *testing.T) {
 	require.NoError(t, err)
 	// Verify the response contains the expected DNSSEC fields (values may differ
 	// between mock and real API for fresh test zones)
-	_, hasDnsSecEnabled := result["DnsSecEnabled"]
-	require.True(t, hasDnsSecEnabled, "response should contain DnsSecEnabled field")
-	t.Logf("DNSSEC response: DnsSecEnabled=%v, DnsSecAlgorithm=%v", result["DnsSecEnabled"], result["DnsSecAlgorithm"])
+	_, hasEnabled := result["Enabled"]
+	require.True(t, hasEnabled, "response should contain Enabled field")
+	t.Logf("DNSSEC response: Enabled=%v, Algorithm=%v", result["Enabled"], result["Algorithm"])
 }
 
 // TestE2E_DisableDNSSEC_Success verifies disabling DNSSEC through the proxy.
@@ -425,11 +425,11 @@ func TestE2E_DisableDNSSEC_Success(t *testing.T) {
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
 	var result struct {
-		DnsSecEnabled bool `json:"DnsSecEnabled"`
+		Enabled bool `json:"Enabled"`
 	}
 	err := json.NewDecoder(resp.Body).Decode(&result)
 	require.NoError(t, err)
-	require.False(t, result.DnsSecEnabled, "DNSSEC should be disabled")
+	require.False(t, result.Enabled, "DNSSEC should be disabled")
 }
 
 // TestE2E_EnableDNSSEC_ZoneNotFound verifies enabling DNSSEC on non-existent zone returns 404.

@@ -628,28 +628,26 @@ func (s *Server) handleEnableDNSSEC(w http.ResponseWriter, r *http.Request) {
 
 	zone.DnsSecEnabled = true
 
-	dsDigest := "AABBCCDD"
-	dnsKeyPublicKey := "mockpublickey123"
 	writeJSON(w, http.StatusOK, struct {
-		DnsSecEnabled   bool    `json:"DnsSecEnabled"`
-		DnsSecAlgorithm int     `json:"DnsSecAlgorithm"`
-		DsKeyTag        int     `json:"DsKeyTag"`
-		DsAlgorithm     int     `json:"DsAlgorithm"`
-		DsDigestType    int     `json:"DsDigestType"`
-		DsDigest        *string `json:"DsDigest"`
-		DnsKeyFlags     int     `json:"DnsKeyFlags"`
-		DnsKeyAlgorithm int     `json:"DnsKeyAlgorithm"`
-		DnsKeyPublicKey *string `json:"DnsKeyPublicKey"`
+		Enabled      bool   `json:"Enabled"`
+		DsRecord     string `json:"DsRecord"`
+		Digest       string `json:"Digest"`
+		DigestType   string `json:"DigestType"`
+		Algorithm    int    `json:"Algorithm"`
+		PublicKey    string `json:"PublicKey"`
+		KeyTag       int    `json:"KeyTag"`
+		Flags        int    `json:"Flags"`
+		DsConfigured bool   `json:"DsConfigured"`
 	}{
-		DnsSecEnabled:   true,
-		DnsSecAlgorithm: 13,
-		DsKeyTag:        12345,
-		DsAlgorithm:     13,
-		DsDigestType:    2,
-		DsDigest:        &dsDigest,
-		DnsKeyFlags:     257,
-		DnsKeyAlgorithm: 13,
-		DnsKeyPublicKey: &dnsKeyPublicKey,
+		Enabled:      true,
+		DsRecord:     fmt.Sprintf("%s. 3600 IN DS 12345 13 2 AABBCCDD", zone.Domain),
+		Digest:       "AABBCCDD",
+		DigestType:   "SHA256 (2)",
+		Algorithm:    13,
+		PublicKey:    "mockpublickey123",
+		KeyTag:       12345,
+		Flags:        257,
+		DsConfigured: false,
 	})
 }
 
@@ -674,25 +672,25 @@ func (s *Server) handleDisableDNSSEC(w http.ResponseWriter, r *http.Request) {
 	zone.DnsSecEnabled = false
 
 	writeJSON(w, http.StatusOK, struct {
-		DnsSecEnabled   bool    `json:"DnsSecEnabled"`
-		DnsSecAlgorithm int     `json:"DnsSecAlgorithm"`
-		DsKeyTag        int     `json:"DsKeyTag"`
-		DsAlgorithm     int     `json:"DsAlgorithm"`
-		DsDigestType    int     `json:"DsDigestType"`
-		DsDigest        *string `json:"DsDigest"`
-		DnsKeyFlags     int     `json:"DnsKeyFlags"`
-		DnsKeyAlgorithm int     `json:"DnsKeyAlgorithm"`
-		DnsKeyPublicKey *string `json:"DnsKeyPublicKey"`
+		Enabled      bool   `json:"Enabled"`
+		DsRecord     string `json:"DsRecord"`
+		Digest       string `json:"Digest"`
+		DigestType   string `json:"DigestType"`
+		Algorithm    int    `json:"Algorithm"`
+		PublicKey    string `json:"PublicKey"`
+		KeyTag       int    `json:"KeyTag"`
+		Flags        int    `json:"Flags"`
+		DsConfigured bool   `json:"DsConfigured"`
 	}{
-		DnsSecEnabled:   false,
-		DnsSecAlgorithm: 0,
-		DsKeyTag:        0,
-		DsAlgorithm:     0,
-		DsDigestType:    0,
-		DsDigest:        nil,
-		DnsKeyFlags:     0,
-		DnsKeyAlgorithm: 0,
-		DnsKeyPublicKey: nil,
+		Enabled:      false,
+		DsRecord:     "",
+		Digest:       "",
+		DigestType:   "",
+		Algorithm:    0,
+		PublicKey:    "",
+		KeyTag:       0,
+		Flags:        0,
+		DsConfigured: false,
 	})
 }
 

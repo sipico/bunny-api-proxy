@@ -1778,17 +1778,25 @@ func TestHandleEnableDNSSEC_Success(t *testing.T) {
 	}
 
 	var result struct {
-		DnsSecEnabled   bool `json:"DnsSecEnabled"`
-		DnsSecAlgorithm int  `json:"DnsSecAlgorithm"`
+		Enabled   bool `json:"Enabled"`
+		Algorithm int  `json:"Algorithm"`
+		KeyTag    int  `json:"KeyTag"`
+		Flags     int  `json:"Flags"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
-	if !result.DnsSecEnabled {
+	if !result.Enabled {
 		t.Error("expected DNSSEC to be enabled")
 	}
-	if result.DnsSecAlgorithm != 13 {
-		t.Errorf("expected algorithm 13, got %d", result.DnsSecAlgorithm)
+	if result.Algorithm != 13 {
+		t.Errorf("expected algorithm 13, got %d", result.Algorithm)
+	}
+	if result.KeyTag != 12345 {
+		t.Errorf("expected KeyTag 12345, got %d", result.KeyTag)
+	}
+	if result.Flags != 257 {
+		t.Errorf("expected Flags 257, got %d", result.Flags)
 	}
 }
 
@@ -1845,12 +1853,12 @@ func TestHandleDisableDNSSEC_Success(t *testing.T) {
 	}
 
 	var result struct {
-		DnsSecEnabled bool `json:"DnsSecEnabled"`
+		Enabled bool `json:"Enabled"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
-	if result.DnsSecEnabled {
+	if result.Enabled {
 		t.Error("expected DNSSEC to be disabled")
 	}
 }

@@ -134,18 +134,20 @@ type ImportRecordsResponse struct {
 	Skipped            int `json:"Skipped"`
 }
 
-// DNSSECResponse represents the DNSSEC configuration for a DNS zone.
-// Field names match the real bunny.net API response (DnsSecDsRecordModel).
+// DNSSECResponse represents the DNSSEC enable/disable response from bunny.net API.
+// Field names match the real API response observed in the explore workflow:
+// POST /dnszone/{id}/dnssec returns {Enabled, Algorithm, KeyTag, Flags, ...}
+// DELETE /dnszone/{id}/dnssec returns {Enabled: false, ...}
 type DNSSECResponse struct {
-	DnsSecEnabled   bool    `json:"DnsSecEnabled"`
-	DnsSecAlgorithm int     `json:"DnsSecAlgorithm"`
-	DsKeyTag        int     `json:"DsKeyTag"`
-	DsAlgorithm     int     `json:"DsAlgorithm"`
-	DsDigestType    int     `json:"DsDigestType"`
-	DsDigest        *string `json:"DsDigest"`
-	DnsKeyFlags     int     `json:"DnsKeyFlags"`
-	DnsKeyAlgorithm int     `json:"DnsKeyAlgorithm"`
-	DnsKeyPublicKey *string `json:"DnsKeyPublicKey"`
+	Enabled      bool   `json:"Enabled"`
+	DsRecord     string `json:"DsRecord"`
+	Digest       string `json:"Digest"`
+	DigestType   string `json:"DigestType"`
+	Algorithm    int    `json:"Algorithm"`
+	PublicKey    string `json:"PublicKey"`
+	KeyTag       int    `json:"KeyTag"`
+	Flags        int    `json:"Flags"`
+	DsConfigured bool   `json:"DsConfigured"`
 }
 
 // ZoneStatisticsResponse represents DNS query statistics for a zone.
