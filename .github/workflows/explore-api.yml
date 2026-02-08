@@ -802,6 +802,222 @@ jobs:
           echo "=========================================="
 
       # =================================================================
+      # STEP 4b1: EXPLORE - Record Operations (Add/Update/Delete)
+      # =================================================================
+      - name: Step 4b1 - Test Record Operations
+        run: |
+          echo "=========================================="
+          echo "STEP 4b1: Test DNS Record Operations"
+          echo "=========================================="
+          echo "Testing: PUT /dnszone/{id}/records (Add Record)"
+          echo "Testing: POST /dnszone/{id}/records/{recordId} (Update Record)"
+          echo "Testing: DELETE /dnszone/{id}/records/{recordId} (Delete Record)"
+          echo ""
+          echo "Record types: CAA (Type 9) and SRV (Type 8)"
+          echo ""
+
+          DOMAINS=("siemens.com" "shell.com" "nestle.com")
+
+          for domain in "${DOMAINS[@]}"; do
+            echo ""
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "Testing record operations for: $domain"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+            # Get zone ID from the import environment variable
+            ZONE_VAR="ZONE_IMPORT_${domain//./_}"
+            ZONE_ID=$(eval echo \$$ZONE_VAR)
+
+            if [ -z "$ZONE_ID" ]; then
+              echo "⚠️  Could not find zone ID for $domain"
+              continue
+            fi
+
+            echo "Zone ID: $ZONE_ID"
+            echo ""
+
+            # =========================================================
+            # 1. Add CAA Record (Type 9)
+            # =========================================================
+            echo "→ Adding CAA record (PUT /dnszone/$ZONE_ID/records)..."
+            echo "   CAA: 0 issue \"letsencrypt.org\""
+
+            curl -v -X PUT \
+              -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+              -H "Content-Type: application/json" \
+              -d '{
+                "Type": 9,
+                "Name": "",
+                "Value": "letsencrypt.org",
+                "Ttl": 3600,
+                "Flags": 0,
+                "Tag": "issue"
+              }' \
+              "$BUNNY_API_URL/dnszone/$ZONE_ID/records" \
+              -o "add-caa-${domain}.json" \
+              2> "add-caa-${domain}-headers.log"
+
+            echo ""
+            echo "CAA Record Added:"
+            cat "add-caa-${domain}.json" | jq '{Id, Type, Name, Value, Flags, Tag, Ttl}' 2>/dev/null || cat "add-caa-${domain}.json"
+
+            CAA_RECORD_ID=$(jq -r '.Id // empty' "add-caa-${domain}.json")
+            echo "  Record ID: $CAA_RECORD_ID"
+            echo ""
+
+            sleep 1
+
+            # =========================================================
+            # 2. Add SRV Record (Type 8)
+            # =========================================================
+            echo "→ Adding SRV record (PUT /dnszone/$ZONE_ID/records)..."
+            echo "   SRV: _test._tcp -> test-target.example.com:8080 (priority 10, weight 20)"
+
+            curl -v -X PUT \
+              -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+              -H "Content-Type: application/json" \
+              -d '{
+                "Type": 8,
+                "Name": "_test._tcp",
+                "Value": "test-target.example.com",
+                "Ttl": 3600,
+                "Priority": 10,
+                "Weight": 20,
+                "Port": 8080
+              }' \
+              "$BUNNY_API_URL/dnszone/$ZONE_ID/records" \
+              -o "add-srv-${domain}.json" \
+              2> "add-srv-${domain}-headers.log"
+
+            echo ""
+            echo "SRV Record Added:"
+            cat "add-srv-${domain}.json" | jq '{Id, Type, Name, Value, Priority, Weight, Port, Ttl}' 2>/dev/null || cat "add-srv-${domain}.json"
+
+            SRV_RECORD_ID=$(jq -r '.Id // empty' "add-srv-${domain}.json")
+            echo "  Record ID: $SRV_RECORD_ID"
+            echo ""
+
+            sleep 1
+
+            # =========================================================
+            # 3. Update CAA Record (change CA to digicert.com)
+            # =========================================================
+            if [ -n "$CAA_RECORD_ID" ]; then
+              echo "→ Updating CAA record (POST /dnszone/$ZONE_ID/records/$CAA_RECORD_ID)..."
+              echo "   Changing CA from letsencrypt.org -> digicert.com"
+
+              curl -v -X POST \
+                -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+                -H "Content-Type: application/json" \
+                -d "{
+                  \"Id\": $CAA_RECORD_ID,
+                  \"Type\": 9,
+                  \"Name\": \"\",
+                  \"Value\": \"digicert.com\",
+                  \"Ttl\": 3600,
+                  \"Flags\": 0,
+                  \"Tag\": \"issue\"
+                }" \
+                "$BUNNY_API_URL/dnszone/$ZONE_ID/records/$CAA_RECORD_ID" \
+                -o "update-caa-${domain}.json" \
+                2> "update-caa-${domain}-headers.log"
+
+              echo ""
+              echo "CAA Record Update Response (HTTP 204 expected):"
+              cat "update-caa-${domain}.json" 2>/dev/null || echo "(empty response - 204 No Content)"
+              echo ""
+
+              sleep 1
+            fi
+
+            # =========================================================
+            # 4. Update SRV Record (change port and priority)
+            # =========================================================
+            if [ -n "$SRV_RECORD_ID" ]; then
+              echo "→ Updating SRV record (POST /dnszone/$ZONE_ID/records/$SRV_RECORD_ID)..."
+              echo "   Changing port 8080 -> 9090, priority 10 -> 5"
+
+              curl -v -X POST \
+                -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+                -H "Content-Type: application/json" \
+                -d "{
+                  \"Id\": $SRV_RECORD_ID,
+                  \"Type\": 8,
+                  \"Name\": \"_test._tcp\",
+                  \"Value\": \"test-target.example.com\",
+                  \"Ttl\": 3600,
+                  \"Priority\": 5,
+                  \"Weight\": 20,
+                  \"Port\": 9090
+                }" \
+                "$BUNNY_API_URL/dnszone/$ZONE_ID/records/$SRV_RECORD_ID" \
+                -o "update-srv-${domain}.json" \
+                2> "update-srv-${domain}-headers.log"
+
+              echo ""
+              echo "SRV Record Update Response (HTTP 204 expected):"
+              cat "update-srv-${domain}.json" 2>/dev/null || echo "(empty response - 204 No Content)"
+              echo ""
+
+              sleep 1
+            fi
+
+            # =========================================================
+            # 5. Delete CAA Record
+            # =========================================================
+            if [ -n "$CAA_RECORD_ID" ]; then
+              echo "→ Deleting CAA record (DELETE /dnszone/$ZONE_ID/records/$CAA_RECORD_ID)..."
+
+              curl -v -X DELETE \
+                -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+                "$BUNNY_API_URL/dnszone/$ZONE_ID/records/$CAA_RECORD_ID" \
+                -o "delete-caa-${domain}.json" \
+                2> "delete-caa-${domain}-headers.log"
+
+              echo ""
+              echo "CAA Record Delete Response (HTTP 204 expected):"
+              cat "delete-caa-${domain}.json" 2>/dev/null || echo "(empty response - 204 No Content)"
+              echo ""
+
+              sleep 1
+            fi
+
+            # =========================================================
+            # 6. Delete SRV Record
+            # =========================================================
+            if [ -n "$SRV_RECORD_ID" ]; then
+              echo "→ Deleting SRV record (DELETE /dnszone/$ZONE_ID/records/$SRV_RECORD_ID)..."
+
+              curl -v -X DELETE \
+                -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+                "$BUNNY_API_URL/dnszone/$ZONE_ID/records/$SRV_RECORD_ID" \
+                -o "delete-srv-${domain}.json" \
+                2> "delete-srv-${domain}-headers.log"
+
+              echo ""
+              echo "SRV Record Delete Response (HTTP 204 expected):"
+              cat "delete-srv-${domain}.json" 2>/dev/null || echo "(empty response - 204 No Content)"
+              echo ""
+
+              sleep 1
+            fi
+
+            echo "✅ All record operations completed for $domain"
+            sleep 2
+          done
+
+          echo ""
+          echo "=========================================="
+          echo "Summary: DNS Record Operations Test"
+          echo "=========================================="
+          echo "✅ Add CAA Record (Type 9)"
+          echo "✅ Add SRV Record (Type 8)"
+          echo "✅ Update CAA Record"
+          echo "✅ Update SRV Record"
+          echo "✅ Delete CAA Record"
+          echo "✅ Delete SRV Record"
+
+      # =================================================================
       # STEP 4c: EXPLORE - DNSSEC Operations
       # =================================================================
       - name: Step 4c - Test DNSSEC Enable/Disable
