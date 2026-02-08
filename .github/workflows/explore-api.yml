@@ -465,14 +465,23 @@ jobs:
             for attempt in 1 2 3; do
               echo "Attempt $attempt - Fetching scan results..."
 
+              # Save clean JSON response to file, verbose output separate
               curl -v -X GET \
                 -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
                 "$BUNNY_API_URL/dnszone/$ZONE_ID/records/scan" \
-                2>&1 | tee "scan-result-${domain}-attempt${attempt}.log"
+                -o "scan-result-${domain}-attempt${attempt}.json" \
+                2> "scan-result-${domain}-attempt${attempt}-headers.log"
 
               echo ""
-              echo "✅ Response saved to scan-result-${domain}-attempt${attempt}.log"
-              echo "(Raw output will be available in artifacts for offline analysis)"
+              echo "✅ Clean JSON saved to: scan-result-${domain}-attempt${attempt}.json"
+              echo "   Verbose headers saved to: scan-result-${domain}-attempt${attempt}-headers.log"
+
+              # Show preview of results
+              if [ -f "scan-result-${domain}-attempt${attempt}.json" ]; then
+                RECORD_COUNT=$(jq -r '.Records | length // 0' "scan-result-${domain}-attempt${attempt}.json" 2>/dev/null || echo "0")
+                STATUS=$(jq -r '.Status // "unknown"' "scan-result-${domain}-attempt${attempt}.json" 2>/dev/null || echo "unknown")
+                echo "   Status: $STATUS, Records: $RECORD_COUNT"
+              fi
 
               # Small delay before next attempt
               if [ $attempt -lt 3 ]; then
@@ -509,17 +518,18 @@ jobs:
             echo "Registering domain: $domain"
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-            # Find the latest scan result file
-            SCAN_FILE=$(ls -t scan-result-${domain}-attempt*.log 2>/dev/null | head -1)
+            # Find the latest clean scan result JSON file
+            SCAN_FILE=$(ls -t scan-result-${domain}-attempt*.json 2>/dev/null | head -1)
 
             if [ ! -f "$SCAN_FILE" ]; then
               echo "⚠️  No scan results found for $domain"
               continue
             fi
 
-            # Extract ALL records from scan results (UNALTERED - including IsProxied)
-            RECORDS=$(cat "$SCAN_FILE" | strings | grep -o '{"JobId".*' | head -1 | \
-              jq -c '.Records' 2>/dev/null || echo "[]")
+            echo "Reading scan results from: $SCAN_FILE"
+
+            # Extract ALL records from clean JSON (UNALTERED - including IsProxied)
+            RECORDS=$(jq -c '.Records' "$SCAN_FILE" 2>/dev/null || echo "[]")
 
             if [ "$RECORDS" = "[]" ] || [ -z "$RECORDS" ]; then
               echo "⚠️  Could not extract records from scan results"
@@ -537,16 +547,18 @@ jobs:
             echo "Creating zone: $domain with ALL $RECORD_COUNT scan records..."
             echo ""
 
-            CREATE_RESPONSE=$(curl -v -X POST \
+            # Save clean response to JSON file, verbose to separate log
+            curl -v -X POST \
               -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
               -H "Content-Type: application/json" \
               -d "{\"Domain\": \"$domain\", \"Records\": $RECORDS}" \
               "$BUNNY_API_URL/dnszone" \
-              2>&1 | tee "create-with-records-${domain}.log")
+              -o "create-with-records-${domain}.json" \
+              2> "create-with-records-${domain}-headers.log"
 
             echo ""
             echo "Response (pretty-printed):"
-            RESPONSE=$(tail -1 "create-with-records-${domain}.log")
+            RESPONSE=$(cat "create-with-records-${domain}.json")
             echo "$RESPONSE" | jq '.' 2>/dev/null || echo "$RESPONSE"
             echo ""
 
@@ -611,17 +623,19 @@ jobs:
             echo "Zone ID: $ZONE_ID"
             echo "Exporting..."
 
+            # Save clean BIND zone file directly, verbose headers separate
             curl -v -X GET \
               -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
               "$BUNNY_API_URL/dnszone/$ZONE_ID/export" \
-              2>&1 | tee "export-${domain}.log"
-
-            # Extract the zone file (non-curl output)
-            grep -v "^[\*<>]" "export-${domain}.log" | grep -v "^{" > "export-${domain}.zone" || true
+              -o "export-${domain}.zone" \
+              2> "export-${domain}-headers.log"
 
             if [ -s "export-${domain}.zone" ]; then
+              FILE_SIZE=$(wc -c < "export-${domain}.zone")
               echo ""
-              echo "✅ Exported to export-${domain}.zone"
+              echo "✅ Clean BIND zone file saved: export-${domain}.zone ($FILE_SIZE bytes)"
+              echo "   Verbose headers saved: export-${domain}-headers.log"
+              echo ""
               echo "Preview (first 10 lines):"
               head -10 "export-${domain}.zone"
             else
