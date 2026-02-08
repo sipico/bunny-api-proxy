@@ -338,32 +338,134 @@ The following can be tested immediately without any real domain:
 
 ---
 
-### 4. **Real Domain Endpoints: Test Error Paths with Fake Domains** (Priority: MEDIUM)
+### 4. **Real Domain Endpoints: Pragmatic Testing Strategies** (Priority: MEDIUM)
 
-Only 3 endpoints truly require real domains for **full functionality**, but we can still test error paths:
+Only 3 endpoints truly require real domains, but we can test them creatively without registering our own domain!
 
-| Endpoint | Test with Fake Domain | Test with Real Domain |
-|----------|----------------------|----------------------|
-| POST /dnszone/checkavailability | ✅ Error handling, response format | ✅ Actual availability check |
-| POST /dnszone/{zoneID}/certificate/issue | ✅ Request validation, error response | ✅ Actual certificate issuance |
-| POST /dnszone/{zoneID}/recheckdns | ✅ Job creation, empty results | ✅ Actual DNS record discovery |
+#### A. Check Availability Endpoint
 
-**Phase 1 (Fake Domains):**
-- Test that endpoints accept requests
-- Verify error handling for invalid inputs
-- Check response format/structure
-- Validate permission enforcement
+**Mock Strategy:**
+- Enhance mockbunny to return canned responses:
+  - Test domains (`*-bap.xyz`): Return `{"Available": true}`
+  - Well-known domains (`amazon.com`, `google.com`): Return `{"Available": false}`
+  - Invalid formats: Return appropriate errors
 
-**Phase 2 (Real Domain - Optional):**
-- Add one real test domain (~$10/year)
-- Test actual functionality in nightly/pre-release builds
-- Use build tag: `//go:build e2e && real_domain`
+**Real API Strategy:**
+- Use well-known registered domains for "not available" tests:
+  - `amazon.com`, `google.com`, `microsoft.com` → Always returns `false`
+  - Test the negative path with guaranteed results
+- Use obviously fake domains for "available" tests:
+  - `definitely-not-registered-{timestamp}.xyz` → Likely returns `true`
+- **No domain registration needed!**
 
-**Recommendation:** Start with Phase 1 (fake domain error path testing), defer Phase 2 (real domain) until needed
+#### B. DNS Scanning Endpoint
+
+**Clever Real Domain Strategy:**
+- Add well-known domains as zones: `amazon.com`, `google.com`
+  - bunny.net will allow adding these (even though they're not delegated to bunny.net)
+  - Zones can exist in bunny.net without being authoritative
+- Trigger DNS scan on these zones:
+  - bunny.net queries the **real public DNS** for these domains
+  - Returns actual records (A, MX, TXT, NS, etc.)
+  - Validates the scan endpoint works end-to-end
+- Compare to scanning a fake domain:
+  - Scan `1-test-bap.xyz` → Returns empty/NXDOMAIN
+  - Validates empty result handling
+
+**Benefits:**
+- ✅ Tests real DNS lookups without registering a domain
+- ✅ Stable, predictable DNS records (Amazon/Google won't disappear)
+- ✅ No ongoing costs or maintenance
+- ✅ Can verify actual API response format
+
+**Mock Strategy:**
+- mockbunny returns synthetic scan results:
+  - Job creation: Returns `{"JobId": "uuid", "Status": "Pending"}`
+  - Job polling: Returns `{"Status": "Completed", "Records": [...]}`
+  - Fake domain: Returns `{"Status": "Completed", "Records": []}`
+
+#### C. Certificate Issuance Endpoint
+
+**Mock Strategy:**
+- mockbunny simulates certificate issuance flow:
+  - Accepts request, returns success or validation error
+  - Tests proxy authorization and request handling
+
+**Real API Strategy:**
+- Test with fake domain → Expects ACME validation failure:
+  - Request certificate for `1-test-bap.xyz`
+  - Should return error about domain not being delegated/validated
+  - Validates error path and response format
+- **Not recommended to test success path** (requires real delegation)
+
+#### Summary Table
+
+| Endpoint | Mock Testing | Real API Testing | Domain Cost |
+|----------|-------------|------------------|-------------|
+| **CheckAvailability** | Canned responses for known domains | Test with amazon.com (not available), fake domains (available) | $0 |
+| **DNS Scanning** | Synthetic scan results | Add amazon.com/google.com as zones, scan real DNS | $0 |
+| **Certificate Issuance** | Simulated success/failure | Test error path with fake domain | $0 |
+
+**Recommendation:** All three can be tested meaningfully without registering a domain!
 
 ---
 
-### 4. **Test Organization** (Priority: LOW)
+### 5. **One-Off Exploration: Real API Response Discovery** (Priority: LOW)
+
+Before implementing tests, run a one-off manual exploration to discover real API behavior:
+
+**Goal:** Understand what the real bunny.net API returns for these edge cases
+
+**Approach:**
+```bash
+# Run with real API key in GitHub Actions (secrets available)
+# Or locally with BUNNY_API_KEY set
+BUNNY_API_KEY=xxx go test -v -run TestExplore_RealDomains ./tests/exploration/
+```
+
+**Test Scenarios:**
+
+1. **Add well-known domain as zone:**
+   ```go
+   // Can we add amazon.com as a zone in bunny.net?
+   // What does the API response look like?
+   zone, err := client.CreateZone(ctx, "amazon.com")
+   ```
+
+2. **Trigger DNS scan on well-known domain:**
+   ```go
+   // What records does bunny.net discover for amazon.com?
+   // What's the job response format?
+   job, err := client.TriggerDNSScan(ctx, zoneID)
+   // Poll for results...
+   results, err := client.GetDNSScanResults(ctx, zoneID)
+   ```
+
+3. **Check availability of various domains:**
+   ```go
+   // What does "not available" look like?
+   resp1, _ := client.CheckAvailability(ctx, "amazon.com")
+   // What does "available" look like?
+   resp2, _ := client.CheckAvailability(ctx, "not-registered-12345.xyz")
+   ```
+
+4. **Certificate issuance error:**
+   ```go
+   // What error does bunny.net return for unvalidated domain?
+   _, err := client.IssueCertificate(ctx, zoneID, "fake-domain.xyz")
+   ```
+
+**Benefits:**
+- ✅ Discover actual API response structures
+- ✅ Use responses to enhance mockbunny accuracy
+- ✅ Identify edge cases and error formats
+- ✅ Document assumptions about API behavior
+
+**Output:** Document findings in `tests/exploration/REAL_API_RESPONSES.md` for reference
+
+---
+
+### 6. **Test Organization** (Priority: LOW)
 
 Consider organizing tests by category:
 
@@ -441,24 +543,216 @@ tests/e2e/
 
 **All of Phase 1 can be done with fake domains!** No real domain needed.
 
-**Phase 2 (Short-term - Medium Effort):**
-1. Add error path tests for certificate issuance (verify API rejects invalid requests)
-2. Add error path tests for DNS scanning (verify job creation works)
-3. Add error path tests for domain availability checks
+**Phase 2 (Short-term - Medium Effort, $0 Cost):**
+1. **Run one-off exploration** with real API to discover response formats
+   - Add amazon.com/google.com as zones
+   - Trigger DNS scans and document results
+   - Test availability checks with known domains
+   - Use findings to enhance mockbunny
+
+2. **Add "real domain" tests using well-known domains:**
+   - DNS scanning: Scan amazon.com/google.com (real DNS records)
+   - Availability: Test amazon.com (not available), fake domains (available)
+   - Certificate issuance: Test error path with fake domain
+
+3. **Enhance mockbunny:**
+   - Add canned availability responses based on domain name
+   - Add synthetic DNS scan results
+   - Use real API responses as reference
+
 4. Document which endpoints are "API-tested" vs "functionality-tested"
 
-**Phase 3 (Long-term - Optional, Lower Priority):**
-1. Register a real test domain (~$10/year) if full functionality validation desired
-2. Add smoke tests for certificate issuance with real domain
-3. Add smoke tests for DNS scanning with real domain
-4. Run real domain tests in nightly/pre-release builds only
-5. Consider test organization refactoring for maintainability
+**Phase 3 (Long-term - Optional, ONLY if needed):**
+1. Consider test organization refactoring for maintainability (split large test files)
+2. Add performance/load testing for high-traffic scenarios
+3. Consider registering a domain ONLY if:
+   - Need to test actual certificate issuance success (unlikely)
+   - Need to test domain delegation workflows
+   - Current strategy proves insufficient
 
-**Recommendation:** Focus on Phase 1 - it covers 85% of the missing tests without needing any real domain!
+**Recommendation:**
+- **Phase 1** covers 85% of missing tests with fake domains
+- **Phase 2** covers the remaining 15% with creative use of real domains (amazon.com/google.com)
+- **No domain registration needed!** Total cost: $0
 
 ---
 
-## Appendix: Test Coverage Summary
+## Appendix A: Exploration Test Approach
+
+### Purpose
+Before implementing full e2e tests for "real domain" endpoints, run a one-off exploration to understand actual API behavior.
+
+### Implementation Plan
+
+**Create exploration test:**
+```go
+// tests/exploration/real_domains_test.go
+//go:build exploration
+// +build exploration
+
+package exploration
+
+import (
+    "context"
+    "encoding/json"
+    "os"
+    "testing"
+    "time"
+
+    "github.com/sipico/bunny-api-proxy/internal/bunny"
+)
+
+// TestExplore_AddWellKnownDomain tests adding amazon.com as a zone
+func TestExplore_AddWellKnownDomain(t *testing.T) {
+    apiKey := os.Getenv("BUNNY_API_KEY")
+    if apiKey == "" {
+        t.Skip("BUNNY_API_KEY not set")
+    }
+
+    client := bunny.NewClient(apiKey)
+    ctx := context.Background()
+
+    // Try to add amazon.com (won't be authoritative, just testing API)
+    zone, err := client.CreateZone(ctx, "amazon.com")
+    if err != nil {
+        t.Logf("Creating amazon.com zone failed (expected): %v", err)
+    } else {
+        t.Logf("Successfully created zone: %+v", zone)
+        // Cleanup
+        defer client.DeleteZone(ctx, zone.ID)
+    }
+}
+
+// TestExplore_DNSScan tests DNS scanning on a well-known domain
+func TestExplore_DNSScan(t *testing.T) {
+    apiKey := os.Getenv("BUNNY_API_KEY")
+    if apiKey == "" {
+        t.Skip("BUNNY_API_KEY not set")
+    }
+
+    client := bunny.NewClient(apiKey)
+    ctx := context.Background()
+
+    // Create zone for amazon.com (or use existing if API allows)
+    zone, err := client.CreateZone(ctx, "amazon.com")
+    if err != nil {
+        t.Fatalf("Failed to create zone: %v", err)
+    }
+    defer client.DeleteZone(ctx, zone.ID)
+
+    t.Logf("Created zone: %d", zone.ID)
+
+    // Trigger DNS scan
+    job, err := client.TriggerDNSScan(ctx, zone.ID)
+    if err != nil {
+        t.Fatalf("Failed to trigger scan: %v", err)
+    }
+
+    t.Logf("Scan job created: %+v", job)
+
+    // Poll for results
+    for i := 0; i < 30; i++ {
+        time.Sleep(2 * time.Second)
+
+        result, err := client.GetDNSScanResults(ctx, zone.ID)
+        if err != nil {
+            t.Logf("Poll %d: Error getting results: %v", i+1, err)
+            continue
+        }
+
+        t.Logf("Poll %d: Status=%s", i+1, result.Status)
+
+        if result.Status == "Completed" || result.Status == "Failed" {
+            // Pretty print results
+            jsonBytes, _ := json.MarshalIndent(result, "", "  ")
+            t.Logf("Final results:\n%s", string(jsonBytes))
+            break
+        }
+    }
+}
+
+// TestExplore_CheckAvailability tests domain availability checking
+func TestExplore_CheckAvailability(t *testing.T) {
+    apiKey := os.Getenv("BUNNY_API_KEY")
+    if apiKey == "" {
+        t.Skip("BUNNY_API_KEY not set")
+    }
+
+    client := bunny.NewClient(apiKey)
+    ctx := context.Background()
+
+    tests := []struct {
+        domain   string
+        expected string
+    }{
+        {"amazon.com", "not available (registered)"},
+        {"google.com", "not available (registered)"},
+        {"definitely-not-registered-12345678.xyz", "probably available"},
+    }
+
+    for _, tt := range tests {
+        result, err := client.CheckAvailability(ctx, tt.domain)
+        if err != nil {
+            t.Logf("%s: Error: %v", tt.domain, err)
+        } else {
+            jsonBytes, _ := json.MarshalIndent(result, "", "  ")
+            t.Logf("%s (expected: %s):\n%s", tt.domain, tt.expected, string(jsonBytes))
+        }
+    }
+}
+
+// TestExplore_CertificateIssuance tests certificate issuance error path
+func TestExplore_CertificateIssuance(t *testing.T) {
+    apiKey := os.Getenv("BUNNY_API_KEY")
+    if apiKey == "" {
+        t.Skip("BUNNY_API_KEY not set")
+    }
+
+    client := bunny.NewClient(apiKey)
+    ctx := context.Background()
+
+    // Create a fake zone
+    zone, err := client.CreateZone(ctx, "definitely-not-real-123.xyz")
+    if err != nil {
+        t.Fatalf("Failed to create zone: %v", err)
+    }
+    defer client.DeleteZone(ctx, zone.ID)
+
+    // Try to issue certificate (should fail validation)
+    _, err = client.IssueCertificate(ctx, zone.ID, "definitely-not-real-123.xyz")
+    if err != nil {
+        t.Logf("Certificate issuance failed (expected): %v", err)
+        t.Logf("Error type: %T", err)
+    } else {
+        t.Log("Certificate issuance succeeded (unexpected!)")
+    }
+}
+```
+
+**Run exploration:**
+```bash
+# In GitHub Actions with secrets
+BUNNY_API_KEY=${{ secrets.BUNNY_API_KEY }} go test -v -tags=exploration ./tests/exploration/
+
+# Or locally
+BUNNY_API_KEY=xxx go test -v -tags=exploration ./tests/exploration/
+```
+
+**Document findings:**
+Create `tests/exploration/REAL_API_RESPONSES.md` with:
+- Actual API response JSON
+- Error formats and codes
+- Timing information (how long scans take)
+- Any surprises or edge cases
+
+**Use findings to:**
+1. Enhance mockbunny with accurate response formats
+2. Validate test assumptions
+3. Update e2e tests with realistic expectations
+
+---
+
+## Appendix B: Test Coverage Summary
 
 **E2E Tests by Function:**
 - ✅ Health & System: 3 tests (main endpoints only)
