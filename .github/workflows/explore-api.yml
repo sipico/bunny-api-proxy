@@ -416,6 +416,103 @@ jobs:
           echo "=========================================="
 
       # =================================================================
+      # STEP 3g: EXPLORE - Poll DNS scan results
+      # =================================================================
+      - name: Step 3g - Poll DNS scan results
+        run: |
+          echo "=========================================="
+          echo "STEP 3g: Poll DNS scan results"
+          echo "=========================================="
+          echo "Testing: GET /dnszone/{zoneId}/records/scan"
+          echo ""
+
+          # First, get zone IDs for the domains we scanned
+          echo "Getting zone IDs for scanned domains..."
+          curl -s \
+            -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+            "$BUNNY_API_URL/dnszone" \
+            | jq '.Items[] | select(.Domain == "siemens.com" or .Domain == "shell.com" or .Domain == "nestle.com") | {Domain, Id}' \
+            > scanned-zones.json
+
+          cat scanned-zones.json
+
+          # Wait a bit for scans to process
+          echo ""
+          echo "Waiting 5 seconds for scans to process..."
+          sleep 5
+
+          # Poll each zone's scan results
+          DOMAINS=("siemens.com" "shell.com" "nestle.com")
+
+          for domain in "${DOMAINS[@]}"; do
+            echo ""
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "Checking scan results: $domain"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+            # Get zone ID for this domain
+            ZONE_ID=$(jq -r "select(.Domain == \"$domain\") | .Id" scanned-zones.json)
+
+            if [ -z "$ZONE_ID" ] || [ "$ZONE_ID" = "null" ]; then
+              echo "⚠️  Could not find zone ID for $domain"
+              continue
+            fi
+
+            echo "Zone ID: $ZONE_ID"
+            echo ""
+
+            # Poll scan status (try 3 times with delays)
+            for attempt in 1 2 3; do
+              echo "Attempt $attempt - Fetching scan results..."
+
+              curl -v -X GET \
+                -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+                "$BUNNY_API_URL/dnszone/$ZONE_ID/records/scan" \
+                2>&1 | tee "scan-result-${domain}-attempt${attempt}.log"
+
+              echo ""
+              echo "Pretty-printed:"
+              RESPONSE=$(tail -1 "scan-result-${domain}-attempt${attempt}.log")
+              echo "$RESPONSE" | jq '.' 2>/dev/null || echo "$RESPONSE"
+
+              # Check status
+              STATUS=$(echo "$RESPONSE" | jq -r '.Status // empty' 2>/dev/null)
+              RECORD_COUNT=$(echo "$RESPONSE" | jq -r '.Records | length // 0' 2>/dev/null)
+
+              echo ""
+              echo "Status: $STATUS"
+              echo "Records found: $RECORD_COUNT"
+
+              if [ "$STATUS" = "2" ] || [ "$STATUS" = "Completed" ]; then
+                echo "✅ Scan completed for $domain"
+
+                # Show discovered records
+                if [ "$RECORD_COUNT" -gt "0" ]; then
+                  echo ""
+                  echo "Discovered records:"
+                  echo "$RESPONSE" | jq -r '.Records[] | "\(.Type) \(.Name) = \(.Value)"' 2>/dev/null || echo "Could not parse records"
+                fi
+                break
+              elif [ "$STATUS" = "3" ] || [ "$STATUS" = "Failed" ]; then
+                echo "❌ Scan failed for $domain"
+                ERROR=$(echo "$RESPONSE" | jq -r '.Error // "Unknown error"' 2>/dev/null)
+                echo "Error: $ERROR"
+                break
+              else
+                echo "⏳ Scan still in progress (Status: $STATUS), waiting 3 seconds..."
+                sleep 3
+              fi
+            done
+
+            sleep 1
+          done
+
+          echo ""
+          echo "=========================================="
+          echo "Summary: DNS Scan Results"
+          echo "=========================================="
+
+      # =================================================================
       # STEP 4: CLEANUP - Delete the test zone
       # =================================================================
       - name: Step 4 - Delete test zone
