@@ -30,6 +30,7 @@ func NewRouter(handler *Handler, authMiddleware func(http.Handler) http.Handler,
 	r.With(requireAdmin).Post("/dnszone/{zoneID}/dnssec", handler.HandleEnableDNSSEC)
 	r.With(requireAdmin).Delete("/dnszone/{zoneID}/dnssec", handler.HandleDisableDNSSEC)
 	r.With(requireAdmin).Post("/dnszone/{zoneID}/certificate/issue", handler.HandleIssueCertificate)
+	r.With(requireAdmin).Get("/dnszone/{zoneID}/statistics", handler.HandleGetStatistics)
 	r.With(requireAdmin).Post("/dnszone/{zoneID}", handler.HandleUpdateZone)
 	r.Get("/dnszone/{zoneID}", handler.HandleGetZone)
 	r.Delete("/dnszone/{zoneID}", handler.HandleDeleteZone)

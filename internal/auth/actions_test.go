@@ -137,6 +137,13 @@ func TestParseRequest(t *testing.T) {
 			wantZoneID: 123,
 		},
 		{
+			name:       "get statistics",
+			method:     "GET",
+			path:       "/dnszone/123/statistics",
+			wantAction: ActionGetStatistics,
+			wantZoneID: 123,
+		},
+		{
 			name:    "invalid path",
 			method:  "GET",
 			path:    "/invalid",

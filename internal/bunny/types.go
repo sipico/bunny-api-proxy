@@ -144,3 +144,12 @@ type DNSSECResponse struct {
 	DigestType   string `json:"DigestType"`
 	PublicKey    string `json:"PublicKey"`
 }
+
+// ZoneStatisticsResponse represents DNS query statistics for a zone.
+type ZoneStatisticsResponse struct {
+	TotalQueriesServed       int64            `json:"TotalQueriesServed"`
+	QueriesServedChart       map[string]int64 `json:"QueriesServedChart"`
+	NormalQueriesServedChart map[string]int64 `json:"NormalQueriesServedChart"`
+	SmartQueriesServedChart  map[string]int64 `json:"SmartQueriesServedChart"`
+	QueriesByTypeChart       map[string]int64 `json:"QueriesByTypeChart"`
+}

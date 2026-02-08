@@ -24,6 +24,7 @@ var (
 	exportRecordsPattern     = regexp.MustCompile(`^/dnszone/(\d+)/export/?$`)
 	dnssecPattern            = regexp.MustCompile(`^/dnszone/(\d+)/dnssec/?$`)
 	issueCertificatePattern  = regexp.MustCompile(`^/dnszone/(\d+)/certificate/issue/?$`)
+	statisticsPattern        = regexp.MustCompile(`^/dnszone/(\d+)/statistics/?$`)
 )
 
 // ParseRequest extracts action, zone ID, and record type from HTTP request.
@@ -104,6 +105,13 @@ func ParseRequest(r *http.Request) (*Request, error) {
 		if matches := exportRecordsPattern.FindStringSubmatch(path); matches != nil {
 			zoneID, _ := strconv.ParseInt(matches[1], 10, 64) //nolint:errcheck // regex ensures valid number
 			return &Request{Action: ActionExportRecords, ZoneID: zoneID}, nil
+		}
+		// GET /dnszone/{id}/statistics - query statistics (admin only)
+		if r.Method == http.MethodGet {
+			if matches := statisticsPattern.FindStringSubmatch(path); matches != nil {
+				zoneID, _ := strconv.ParseInt(matches[1], 10, 64) //nolint:errcheck // regex ensures valid number
+				return &Request{Action: ActionGetStatistics, ZoneID: zoneID}, nil
+			}
 		}
 	}
 
