@@ -543,6 +543,25 @@ jobs:
             echo "$RECORDS" | jq '.[0:2]' 2>/dev/null || echo "$RECORDS"
             echo ""
 
+            # Check if zone already exists and delete it
+            echo "Checking if zone already exists for $domain..."
+            EXISTING_ZONE_ID=$(curl -s -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" "$BUNNY_API_URL/dnszone" | \
+              jq -r ".Items[] | select(.Domain == \"$domain\") | .Id" 2>/dev/null || echo "")
+
+            if [ -n "$EXISTING_ZONE_ID" ] && [ "$EXISTING_ZONE_ID" != "null" ]; then
+              echo "⚠️  Zone already exists (ID: $EXISTING_ZONE_ID), deleting..."
+              curl -s -X DELETE \
+                -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+                "$BUNNY_API_URL/dnszone/$EXISTING_ZONE_ID" \
+                -o "delete-${domain}.json" \
+                2> "delete-${domain}-headers.log"
+              echo "✅ Deleted existing zone"
+              sleep 1
+            else
+              echo "✅ No existing zone found"
+            fi
+            echo ""
+
             # Create zone with ALL scan records (completely unaltered)
             echo "Creating zone: $domain with ALL $RECORD_COUNT scan records..."
             echo ""
