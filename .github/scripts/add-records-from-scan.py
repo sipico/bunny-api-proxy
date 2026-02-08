@@ -23,23 +23,63 @@ import sys
 def extract_scan_results(scan_file):
     """Extract JSON scan results from curl log file."""
     with open(scan_file, 'r') as f:
-        content = f.read()
+        lines = f.readlines()
 
-    # Find JSON object starting with {"JobId"
-    match = re.search(r'(\{"JobId".*?\})(?:\s*\d+|$)', content, re.DOTALL)
-    if not match:
+    # Find the line with JSON (starts with {" and doesn't have curl markers)
+    json_line = None
+    for line in lines:
+        # Skip curl verbose output lines
+        if line.startswith(('*', '>', '<', '{', '}')):
+            continue
+        # Look for line that looks like JSON
+        if line.strip().startswith('{"JobId"'):
+            json_line = line
+            break
+
+    # If not found, try the last line (curl sometimes puts JSON at the end)
+    if not json_line:
+        for line in reversed(lines):
+            stripped = line.strip()
+            if stripped.startswith('{"JobId"'):
+                json_line = stripped
+                break
+
+    if not json_line:
         print(f"❌ Could not find JSON in {scan_file}")
         return None
 
-    # Clean control characters
-    json_str = match.group(1)
-    json_str = ''.join(c for c in json_str if ord(c) >= 32 or c in '\n\r\t')
+    # Extract just the JSON object by counting braces
+    start_idx = json_line.find('{"JobId"')
+    if start_idx == -1:
+        print(f"❌ Could not find JSON start in line")
+        return None
+
+    json_line = json_line[start_idx:]
+
+    # Find the matching closing brace
+    brace_count = 0
+    end_idx = 0
+    for i, char in enumerate(json_line):
+        if char == '{':
+            brace_count += 1
+        elif char == '}':
+            brace_count -= 1
+            if brace_count == 0:
+                end_idx = i + 1
+                break
+
+    if end_idx == 0:
+        print(f"❌ Could not find JSON end")
+        return None
+
+    json_str = json_line[:end_idx]
 
     try:
         data = json.loads(json_str)
         return data
     except json.JSONDecodeError as e:
         print(f"❌ Failed to parse JSON: {e}")
+        print(f"   JSON length: {len(json_str)} chars")
         return None
 
 
