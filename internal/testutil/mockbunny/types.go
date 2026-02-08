@@ -193,18 +193,22 @@ type ZoneShortTime struct {
 
 // State holds the internal mock server state.
 type State struct {
-	mu           sync.RWMutex
-	zones        map[int64]*Zone
-	nextZoneID   int64
-	nextRecordID int64
+	mu            sync.RWMutex
+	zones         map[int64]*Zone
+	nextZoneID    int64
+	nextRecordID  int64
+	scanTriggered map[int64]bool // tracks which zones have had a scan triggered
+	scanCallCount map[int64]int  // tracks how many times scan result has been polled per zone
 }
 
 // NewState creates a new State instance for the mock server.
 func NewState() *State {
 	s := &State{
-		zones:        make(map[int64]*Zone),
-		nextZoneID:   1,
-		nextRecordID: 1,
+		zones:         make(map[int64]*Zone),
+		nextZoneID:    1,
+		nextRecordID:  1,
+		scanTriggered: make(map[int64]bool),
+		scanCallCount: make(map[int64]int),
 	}
 	_ = &s.mu // Mutex will be used by state management methods
 	return s

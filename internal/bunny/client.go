@@ -774,19 +774,28 @@ func parseError(statusCode int, body []byte) error {
 	}
 }
 
-// TriggerDNSScan triggers a background DNS record scan for a zone.
-func (c *Client) TriggerDNSScan(ctx context.Context, zoneID int64) error {
-	url := fmt.Sprintf("%s/dnszone/%d/recheckdns", c.baseURL, zoneID)
+// TriggerDNSScan triggers a background DNS record scan for a domain.
+func (c *Client) TriggerDNSScan(ctx context.Context, domain string) (*DNSScanResult, error) {
+	url := fmt.Sprintf("%s/dnszone/records/scan", c.baseURL)
 
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, nil)
+	reqBody := struct {
+		Domain string `json:"Domain"`
+	}{Domain: domain}
+	bodyBytes, err := json.Marshal(reqBody)
 	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(bodyBytes))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 	httpReq.Header.Set("AccessKey", c.apiKey)
+	httpReq.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
-		return fmt.Errorf("failed to trigger DNS scan: %w", err)
+		return nil, fmt.Errorf("failed to trigger DNS scan: %w", err)
 	}
 	defer func() {
 		//nolint:errcheck
@@ -795,23 +804,27 @@ func (c *Client) TriggerDNSScan(ctx context.Context, zoneID int64) error {
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return fmt.Errorf("failed to read response: %w", err)
+		return nil, fmt.Errorf("failed to read response: %w", err)
 	}
 
 	if resp.StatusCode == http.StatusOK {
-		return nil
+		var result DNSScanResult
+		if err := json.Unmarshal(body, &result); err != nil {
+			return nil, fmt.Errorf("failed to parse response: %w", err)
+		}
+		return &result, nil
 	}
 
 	if resp.StatusCode == http.StatusNotFound {
-		return ErrNotFound
+		return nil, ErrNotFound
 	}
 
-	return parseError(resp.StatusCode, body)
+	return nil, parseError(resp.StatusCode, body)
 }
 
 // GetDNSScanResult retrieves the latest DNS record scan result.
 func (c *Client) GetDNSScanResult(ctx context.Context, zoneID int64) (*DNSScanResult, error) {
-	url := fmt.Sprintf("%s/dnszone/%d/recheckdns", c.baseURL, zoneID)
+	url := fmt.Sprintf("%s/dnszone/%d/records/scan", c.baseURL, zoneID)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {

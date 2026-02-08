@@ -466,7 +466,26 @@ func (s *Server) handleUpdateZone(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, zone)
 }
 
+// wellKnownUnavailableDomains contains domains that the real bunny.net API reports
+// as unavailable because they are already registered globally. The mock mirrors
+// this behavior so tests produce the same results against both mock and real API.
+var wellKnownUnavailableDomains = map[string]bool{
+	"amazon.com":    true,
+	"google.com":    true,
+	"siemens.com":   true,
+	"shell.com":     true,
+	"nestle.com":    true,
+	"sap.com":       true,
+	"lvmh.com":      true,
+	"unilever.com":  true,
+	"microsoft.com": true,
+	"apple.com":     true,
+}
+
 // handleCheckAvailability handles POST /dnszone/checkavailability to check domain availability.
+// Matches real bunny.net API behavior: checks both internal zone state AND well-known
+// registered domains. The real API queries domain registries, so well-known domains
+// like amazon.com always return Available: false regardless of account state.
 func (s *Server) handleCheckAvailability(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Name string `json:"Name"`
@@ -478,6 +497,14 @@ func (s *Server) handleCheckAvailability(w http.ResponseWriter, r *http.Request)
 
 	if req.Name == "" {
 		s.writeError(w, http.StatusBadRequest, "validation_error", "Name", "Name is required")
+		return
+	}
+
+	// Check well-known registered domains first (simulates registry check)
+	if wellKnownUnavailableDomains[req.Name] {
+		writeJSON(w, http.StatusOK, struct {
+			Available bool `json:"Available"`
+		}{Available: false})
 		return
 	}
 
@@ -727,28 +754,70 @@ func (s *Server) handleGetStatistics(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// handleTriggerScan handles POST /dnszone/{id}/recheckdns to trigger a DNS scan.
+// handleTriggerScan handles POST /dnszone/records/scan to trigger a DNS scan.
+// Takes {"Domain": "..."} in body. Returns Status: 1 (InProgress) immediately.
+// Matches real bunny.net API behavior observed in the explore workflow.
 func (s *Server) handleTriggerScan(w http.ResponseWriter, r *http.Request) {
-	idStr := chi.URLParam(r, "id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		http.Error(w, "invalid zone ID", http.StatusBadRequest)
+	var req struct {
+		Domain string `json:"Domain"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	s.state.mu.RLock()
-	_, ok := s.state.zones[id]
-	s.state.mu.RUnlock()
-
-	if !ok {
-		s.writeError(w, http.StatusNotFound, "dnszone.zone.not_found", "Id", "The requested DNS zone was not found")
+	if req.Domain == "" {
+		s.writeError(w, http.StatusBadRequest, "validation_error", "Domain", "Domain is required")
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
+	s.state.mu.Lock()
+	defer s.state.mu.Unlock()
+
+	// Find zone by domain
+	var zoneID int64
+	found := false
+	for id, zone := range s.state.zones {
+		if zone.Domain == req.Domain {
+			zoneID = id
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		s.writeError(w, http.StatusNotFound, "dnszone.zone.not_found", "Domain", "The requested DNS zone was not found")
+		return
+	}
+
+	// Mark scan as triggered and reset poll count
+	s.state.scanTriggered[zoneID] = true
+	s.state.scanCallCount[zoneID] = 0
+
+	// Return Status: 1 (InProgress) with empty records — matches real API
+	writeJSON(w, http.StatusOK, struct {
+		Status  int           `json:"Status"`
+		Records []interface{} `json:"Records"`
+	}{Status: 1, Records: []interface{}{}})
 }
 
-// handleGetScanResult handles GET /dnszone/{id}/recheckdns to get scan results.
+// scanRecord represents a record in a scan result response.
+type scanRecord struct {
+	Name      string      `json:"Name"`
+	Type      int         `json:"Type"`
+	TTL       int32       `json:"Ttl"`
+	Value     string      `json:"Value"`
+	Priority  interface{} `json:"Priority"`
+	Weight    interface{} `json:"Weight"`
+	Port      interface{} `json:"Port"`
+	IsProxied bool        `json:"IsProxied"`
+}
+
+// handleGetScanResult handles GET /dnszone/{id}/records/scan to get scan results.
+// Simulates the async scan lifecycle:
+// - No scan triggered: Status 0 (NotStarted)
+// - First poll after trigger: Status 1 (InProgress)
+// - Second+ poll after trigger: Status 2 (Completed) with zone records
 func (s *Server) handleGetScanResult(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
@@ -757,32 +826,48 @@ func (s *Server) handleGetScanResult(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.state.mu.RLock()
-	zone, ok := s.state.zones[id]
-	s.state.mu.RUnlock()
+	s.state.mu.Lock()
+	defer s.state.mu.Unlock()
 
+	zone, ok := s.state.zones[id]
 	if !ok {
 		s.writeError(w, http.StatusNotFound, "dnszone.zone.not_found", "Id", "The requested DNS zone was not found")
 		return
 	}
 
-	// Build mock scan results from existing records
-	s.state.mu.RLock()
-	defer s.state.mu.RUnlock()
-
-	type scanRecord struct {
-		Type  int    `json:"Type"`
-		Name  string `json:"Name"`
-		Value string `json:"Value"`
-		TTL   int32  `json:"Ttl"`
+	// Determine scan status based on trigger state
+	if !s.state.scanTriggered[id] {
+		// No scan triggered — Status 0 (NotStarted)
+		writeJSON(w, http.StatusOK, struct {
+			Status  int           `json:"Status"`
+			Records []interface{} `json:"Records"`
+		}{Status: 0, Records: []interface{}{}})
+		return
 	}
+
+	s.state.scanCallCount[id]++
+
+	if s.state.scanCallCount[id] <= 1 {
+		// First poll — Status 1 (InProgress)
+		writeJSON(w, http.StatusOK, struct {
+			Status  int           `json:"Status"`
+			Records []interface{} `json:"Records"`
+		}{Status: 1, Records: []interface{}{}})
+		return
+	}
+
+	// Second+ poll — Status 2 (Completed) with zone records
 	records := make([]scanRecord, len(zone.Records))
 	for i, rec := range zone.Records {
 		records[i] = scanRecord{
-			Type:  rec.Type,
-			Name:  rec.Name,
-			Value: rec.Value,
-			TTL:   rec.TTL,
+			Name:      rec.Name,
+			Type:      rec.Type,
+			TTL:       rec.TTL,
+			Value:     rec.Value,
+			Priority:  nil,
+			Weight:    nil,
+			Port:      nil,
+			IsProxied: false,
 		}
 	}
 
