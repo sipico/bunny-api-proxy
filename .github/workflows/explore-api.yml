@@ -862,11 +862,28 @@ jobs:
             fi
             echo ""
 
-            # Small delay before disabling
-            echo "Waiting 2 seconds before disabling..."
+            # Small delay before checking zone
+            echo "Waiting 2 seconds..."
             sleep 2
 
-            # Step 2: Disable DNSSEC
+            # Step 2: Get Zone details WITH DNSSEC enabled
+            echo "→ Getting Zone details (GET /dnszone/$ZONE_ID) - DNSSEC should be enabled..."
+            curl -v -X GET \
+              -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+              "$BUNNY_API_URL/dnszone/$ZONE_ID" \
+              -o "getzone-dnssec-enabled-${domain}.json" \
+              2> "getzone-dnssec-enabled-${domain}-headers.log"
+
+            echo ""
+            echo "Zone Details (with DNSSEC enabled):"
+            cat "getzone-dnssec-enabled-${domain}.json" | jq '{Id, Domain, DnsSecEnabled, DateModified, CustomNameserversEnabled, LoggingEnabled, SoaEmail}' 2>/dev/null || cat "getzone-dnssec-enabled-${domain}.json"
+            echo ""
+            echo "  DnsSecEnabled: $(jq -r '.DnsSecEnabled // "unknown"' "getzone-dnssec-enabled-${domain}.json")"
+            echo ""
+
+            sleep 1
+
+            # Step 3: Disable DNSSEC
             echo "→ Disabling DNSSEC (DELETE /dnszone/$ZONE_ID/dnssec)..."
             curl -v -X DELETE \
               -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
@@ -879,7 +896,41 @@ jobs:
             cat "dnssec-disable-${domain}.json" | jq '.' 2>/dev/null || cat "dnssec-disable-${domain}.json"
             echo ""
 
-            echo "✅ DNSSEC operations completed for $domain"
+            sleep 1
+
+            # Step 4: Get Zone details AFTER disabling DNSSEC
+            echo "→ Getting Zone details again (GET /dnszone/$ZONE_ID) - DNSSEC should be disabled..."
+            curl -v -X GET \
+              -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+              "$BUNNY_API_URL/dnszone/$ZONE_ID" \
+              -o "getzone-dnssec-disabled-${domain}.json" \
+              2> "getzone-dnssec-disabled-${domain}-headers.log"
+
+            echo ""
+            echo "Zone Details (after disabling DNSSEC):"
+            cat "getzone-dnssec-disabled-${domain}.json" | jq '{Id, Domain, DnsSecEnabled, DateModified, CustomNameserversEnabled, LoggingEnabled, SoaEmail}' 2>/dev/null || cat "getzone-dnssec-disabled-${domain}.json"
+            echo ""
+            echo "  DnsSecEnabled: $(jq -r '.DnsSecEnabled // "unknown"' "getzone-dnssec-disabled-${domain}.json")"
+            echo ""
+
+            sleep 1
+
+            # Step 5: Test UpdateZone - Change SOA email and enable logging
+            echo "→ Testing UpdateZone (POST /dnszone/$ZONE_ID) - Update SOA email and logging..."
+            curl -v -X POST \
+              -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+              -H "Content-Type: application/json" \
+              -d "{\"SoaEmail\": \"dns-admin@${domain}\", \"LoggingEnabled\": true}" \
+              "$BUNNY_API_URL/dnszone/$ZONE_ID" \
+              -o "updatezone-${domain}.json" \
+              2> "updatezone-${domain}-headers.log"
+
+            echo ""
+            echo "UpdateZone response:"
+            cat "updatezone-${domain}.json" | jq '{Id, Domain, SoaEmail, LoggingEnabled, DnsSecEnabled}' 2>/dev/null || cat "updatezone-${domain}.json"
+            echo ""
+
+            echo "✅ All zone operations completed for $domain"
             sleep 2
           done
 
