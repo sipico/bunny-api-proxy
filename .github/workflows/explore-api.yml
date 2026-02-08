@@ -490,15 +490,15 @@ jobs:
           echo "=========================================="
 
       # =================================================================
-      # STEP 3h: EXPLORE - Create zones with scan records (test with IsProxied)
+      # STEP 3h: EXPLORE - Register scanned domains with ALL scan records
       # =================================================================
-      - name: Step 3h - Create zones with scan records
+      - name: Step 3h - Register zones with complete scan results
         run: |
           echo "=========================================="
-          echo "STEP 3h: Create zones with scan records"
+          echo "STEP 3h: Register zones with complete scan results"
           echo "=========================================="
-          echo "Testing: POST /dnszone with Records array"
-          echo "Testing if IsProxied field is accepted or ignored"
+          echo "Testing: POST /dnszone with ALL Records from scan (unaltered)"
+          echo "Hypothesis: Scan output is directly compatible with create zone API"
           echo ""
 
           DOMAINS=("siemens.com" "shell.com" "nestle.com")
@@ -506,7 +506,7 @@ jobs:
           for domain in "${DOMAINS[@]}"; do
             echo ""
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            echo "Creating zone with records: test-${domain}"
+            echo "Registering domain: $domain"
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
             # Find the latest scan result file
@@ -517,56 +517,67 @@ jobs:
               continue
             fi
 
-            # Extract records from scan results (including IsProxied field - unaltered)
+            # Extract ALL records from scan results (UNALTERED - including IsProxied)
             RECORDS=$(cat "$SCAN_FILE" | strings | grep -o '{"JobId".*' | head -1 | \
-              jq -c '.Records[:5]' 2>/dev/null || echo "[]")
+              jq -c '.Records' 2>/dev/null || echo "[]")
 
             if [ "$RECORDS" = "[]" ] || [ -z "$RECORDS" ]; then
               echo "⚠️  Could not extract records from scan results"
               continue
             fi
 
-            echo "Extracted $(echo "$RECORDS" | jq 'length') records from scan"
-            echo "Sample record (with IsProxied):"
-            echo "$RECORDS" | jq '.[0]' || echo "$RECORDS"
+            RECORD_COUNT=$(echo "$RECORDS" | jq 'length' 2>/dev/null || echo "0")
+            echo "Extracted ALL $RECORD_COUNT records from scan"
+            echo ""
+            echo "Sample records (first 2):"
+            echo "$RECORDS" | jq '.[0:2]' 2>/dev/null || echo "$RECORDS"
             echo ""
 
-            # Create zone with records (unaltered - includes IsProxied field)
-            TEST_DOMAIN="test-${domain}"
-            echo "Creating zone: $TEST_DOMAIN with scan records..."
+            # Create zone with ALL scan records (completely unaltered)
+            echo "Creating zone: $domain with ALL $RECORD_COUNT scan records..."
+            echo ""
 
-            CREATE_RESPONSE=$(curl -s -X POST \
+            CREATE_RESPONSE=$(curl -v -X POST \
               -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
               -H "Content-Type: application/json" \
-              -d "{\"Domain\": \"$TEST_DOMAIN\", \"Records\": $RECORDS}" \
-              "$BUNNY_API_URL/dnszone")
+              -d "{\"Domain\": \"$domain\", \"Records\": $RECORDS}" \
+              "$BUNNY_API_URL/dnszone" \
+              2>&1 | tee "create-with-records-${domain}.log")
 
-            echo "Response:"
-            echo "$CREATE_RESPONSE" | jq '.' 2>/dev/null || echo "$CREATE_RESPONSE"
+            echo ""
+            echo "Response (pretty-printed):"
+            RESPONSE=$(tail -1 "create-with-records-${domain}.log")
+            echo "$RESPONSE" | jq '.' 2>/dev/null || echo "$RESPONSE"
+            echo ""
 
             # Check if zone was created
-            ZONE_ID=$(echo "$CREATE_RESPONSE" | jq -r '.Id // empty' 2>/dev/null)
+            ZONE_ID=$(echo "$RESPONSE" | jq -r '.Id // empty' 2>/dev/null)
             if [ -n "$ZONE_ID" ]; then
-              echo "✅ Zone created successfully: $TEST_DOMAIN (ID: $ZONE_ID)"
+              CREATED_COUNT=$(echo "$RESPONSE" | jq '.Records | length' 2>/dev/null || echo "0")
+              echo "✅ Zone created successfully: $domain (ID: $ZONE_ID)"
+              echo "   Records in scan:    $RECORD_COUNT"
+              echo "   Records created:    $CREATED_COUNT"
 
-              # Check how many records were created
-              RECORD_COUNT=$(echo "$CREATE_RESPONSE" | jq '.Records | length' 2>/dev/null || echo "0")
-              echo "   Records created: $RECORD_COUNT"
+              if [ "$CREATED_COUNT" = "$RECORD_COUNT" ]; then
+                echo "   ✅ ALL records transferred!"
+              else
+                echo "   ⚠️  Some records not created"
+              fi
 
-              # Save zone ID for cleanup
-              echo "ZONE_test_${domain//./_}=$ZONE_ID" >> $GITHUB_ENV
+              # Save zone ID for export and cleanup
+              echo "ZONE_${domain//./_}=$ZONE_ID" >> $GITHUB_ENV
             else
               echo "❌ Failed to create zone"
-              ERROR_MSG=$(echo "$CREATE_RESPONSE" | jq -r '.ErrorKey // .Message // "Unknown error"' 2>/dev/null)
+              ERROR_MSG=$(echo "$RESPONSE" | jq -r '.ErrorKey // .Message // "Unknown error"' 2>/dev/null)
               echo "   Error: $ERROR_MSG"
             fi
 
-            sleep 1
+            sleep 2
           done
 
           echo ""
           echo "=========================================="
-          echo "Summary: Zone Creation with Scan Records"
+          echo "Summary: Direct Scan-to-Zone Registration"
           echo "=========================================="
 
       # =================================================================
@@ -585,15 +596,15 @@ jobs:
           for domain in "${DOMAINS[@]}"; do
             echo ""
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            echo "Exporting zone: test-$domain"
+            echo "Exporting zone: $domain"
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
             # Get zone ID from environment (set in step 3h)
-            ZONE_VAR="ZONE_test_${domain//./_}"
+            ZONE_VAR="ZONE_${domain//./_}"
             ZONE_ID="${!ZONE_VAR}"
 
             if [ -z "$ZONE_ID" ] || [ "$ZONE_ID" = "null" ]; then
-              echo "⚠️  Zone not found for test-$domain"
+              echo "⚠️  Zone not found for $domain"
               continue
             fi
 
@@ -603,7 +614,7 @@ jobs:
             curl -v -X GET \
               -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
               "$BUNNY_API_URL/dnszone/$ZONE_ID/export" \
-              2>&1 | tee "export-test-${domain}.log"
+              2>&1 | tee "export-${domain}.log"
 
             # Extract the zone file (non-curl output)
             grep -v "^[\*<>]" "export-${domain}.log" | grep -v "^{" > "export-${domain}.zone" || true
