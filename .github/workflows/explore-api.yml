@@ -1048,7 +1048,61 @@ jobs:
             echo "Zone ID: $ZONE_ID"
             echo ""
 
-            # Get statistics (may be empty/zero for newly created zones)
+            # First, get all records in the zone
+            echo "→ Fetching all records in zone..."
+            curl -s -X GET \
+              -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
+              "$BUNNY_API_URL/dnszone/$ZONE_ID" \
+              -o "zone-details-${domain}.json"
+
+            RECORD_COUNT=$(jq -r '.Records | length // 0' "zone-details-${domain}.json")
+            echo "   Found $RECORD_COUNT records in zone"
+            echo ""
+
+            # Generate DNS traffic by querying bunny.net nameservers
+            echo "→ Generating DNS traffic by querying records..."
+            echo "   Nameservers: kiki.bunny.net, coco.bunny.net"
+            echo ""
+
+            QUERY_COUNT=0
+            jq -r '.Records[] | "\(.Name) \(.Type)"' "zone-details-${domain}.json" | head -20 | while read -r name type; do
+              # Convert numeric type to record type name
+              case $type in
+                0) TYPE_NAME="A" ;;
+                1) TYPE_NAME="AAAA" ;;
+                2) TYPE_NAME="CNAME" ;;
+                3) TYPE_NAME="TXT" ;;
+                4) TYPE_NAME="MX" ;;
+                8) TYPE_NAME="SRV" ;;
+                9) TYPE_NAME="CAA" ;;
+                *) TYPE_NAME="A" ;;
+              esac
+
+              # Construct FQDN
+              if [ -z "$name" ] || [ "$name" = "@" ]; then
+                FQDN="$domain"
+              else
+                FQDN="${name}.${domain}"
+              fi
+
+              # Query both nameservers
+              echo "   Querying: $FQDN ($TYPE_NAME)"
+              dig +short @kiki.bunny.net "$FQDN" "$TYPE_NAME" > /dev/null 2>&1 || true
+              dig +short @coco.bunny.net "$FQDN" "$TYPE_NAME" > /dev/null 2>&1 || true
+
+              QUERY_COUNT=$((QUERY_COUNT + 1))
+            done
+
+            echo ""
+            echo "   Generated ~$((QUERY_COUNT * 2)) DNS queries"
+            echo ""
+
+            # Wait for statistics to update
+            echo "→ Waiting 5 seconds for statistics to update..."
+            sleep 5
+            echo ""
+
+            # Get statistics (should now have some data)
             echo "→ Getting DNS query statistics (GET /dnszone/$ZONE_ID/statistics)..."
             curl -v -X GET \
               -H "AccessKey: ${{ secrets.BUNNY_API_TEST_KEY }}" \
