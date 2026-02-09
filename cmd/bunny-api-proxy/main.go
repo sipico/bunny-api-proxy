@@ -125,7 +125,10 @@ func initializeComponents(cfg *config.Config) (*serverComponents, error) {
 		Logger:    logger,
 		Prefix:    "BUNNY",
 	}
-	httpClient := &http.Client{Transport: loggingTransport}
+	httpClient := &http.Client{
+		Transport: loggingTransport,
+		Timeout:   30 * time.Second,
+	}
 	bunnyOpts = append(bunnyOpts, bunny.WithHTTPClient(httpClient))
 
 	bunnyClient := bunny.NewClient(cfg.BunnyAPIKey, bunnyOpts...)

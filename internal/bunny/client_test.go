@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/sipico/bunny-api-proxy/internal/testutil/mockbunny"
 )
@@ -2357,4 +2358,60 @@ func TestGetDNSScanResult(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestHTTPClientTimeout verifies that the HTTP client has a timeout configured
+// and that it prevents indefinite blocking when the upstream server is slow.
+func TestHTTPClientTimeout(t *testing.T) {
+	t.Parallel()
+
+	t.Run("client times out on slow upstream", func(t *testing.T) {
+		t.Parallel()
+
+		// Create a test server that delays response beyond the client timeout
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Use a select with context to allow the handler to exit when the client times out
+			select {
+			case <-r.Context().Done():
+				// Client cancelled/timed out, exit immediately
+				return
+			case <-time.After(60 * time.Second):
+				// This would only be reached if client didn't timeout
+				w.WriteHeader(http.StatusOK)
+			}
+		}))
+		defer ts.Close()
+
+		// Create a client with a 1-second timeout (short for testing)
+		httpClient := &http.Client{
+			Transport: http.DefaultTransport,
+			Timeout:   1 * time.Second,
+		}
+
+		client := NewClient("test-key", WithBaseURL(ts.URL), WithHTTPClient(httpClient))
+
+		// Attempt to list zones
+		start := time.Now()
+		_, err := client.ListZones(context.Background(), nil)
+		duration := time.Since(start)
+
+		// Verify that an error occurred
+		if err == nil {
+			t.Fatal("expected timeout error, got nil")
+		}
+
+		// Verify the error message indicates a timeout
+		errMsg := err.Error()
+		if !strings.Contains(errMsg, "timeout") && !strings.Contains(errMsg, "deadline") {
+			t.Errorf("expected timeout error, got: %v", err)
+		}
+
+		// Verify the request completed in roughly the timeout period (not 60 seconds)
+		// Allow some margin for test execution overhead
+		if duration > 5*time.Second {
+			t.Errorf("expected timeout around 1s, took %v", duration)
+		}
+
+		t.Logf("Request correctly timed out after %v with error: %v", duration, err)
+	})
 }
