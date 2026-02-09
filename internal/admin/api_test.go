@@ -115,6 +115,10 @@ func (m *mockStorageWithTokenCRUD) RemovePermission(ctx context.Context, permID 
 	return nil
 }
 
+func (m *mockStorageWithTokenCRUD) RemovePermissionForToken(ctx context.Context, tokenID, permID int64) error {
+	return nil
+}
+
 func (m *mockStorageWithTokenCRUD) GetPermissionsForToken(ctx context.Context, tokenID int64) ([]*storage.Permission, error) {
 	return make([]*storage.Permission, 0), nil
 }
@@ -505,14 +509,15 @@ type mockUnifiedStorage struct {
 	*mockStorageWithTokenCRUD
 
 	// Unified token operations
-	createUnifiedToken     func(ctx context.Context, name string, isAdmin bool, keyHash string) (*storage.Token, error)
-	getTokenByID           func(ctx context.Context, id int64) (*storage.Token, error)
-	listUnifiedTokens      func(ctx context.Context) ([]*storage.Token, error)
-	deleteUnifiedToken     func(ctx context.Context, id int64) error
-	countAdminTokens       func(ctx context.Context) (int, error)
-	addPermissionForToken  func(ctx context.Context, tokenID int64, perm *storage.Permission) (*storage.Permission, error)
-	removePermission       func(ctx context.Context, permID int64) error
-	getPermissionsForToken func(ctx context.Context, tokenID int64) ([]*storage.Permission, error)
+	createUnifiedToken      func(ctx context.Context, name string, isAdmin bool, keyHash string) (*storage.Token, error)
+	getTokenByID            func(ctx context.Context, id int64) (*storage.Token, error)
+	listUnifiedTokens       func(ctx context.Context) ([]*storage.Token, error)
+	deleteUnifiedToken      func(ctx context.Context, id int64) error
+	countAdminTokens        func(ctx context.Context) (int, error)
+	addPermissionForToken   func(ctx context.Context, tokenID int64, perm *storage.Permission) (*storage.Permission, error)
+	removePermission        func(ctx context.Context, permID int64) error
+	removePermissionForToken func(ctx context.Context, tokenID, permID int64) error
+	getPermissionsForToken  func(ctx context.Context, tokenID int64) ([]*storage.Permission, error)
 }
 
 func (m *mockUnifiedStorage) CreateToken(ctx context.Context, name string, isAdmin bool, keyHash string) (*storage.Token, error) {
@@ -562,6 +567,13 @@ func (m *mockUnifiedStorage) AddPermissionForToken(ctx context.Context, tokenID 
 func (m *mockUnifiedStorage) RemovePermission(ctx context.Context, permID int64) error {
 	if m.removePermission != nil {
 		return m.removePermission(ctx, permID)
+	}
+	return nil
+}
+
+func (m *mockUnifiedStorage) RemovePermissionForToken(ctx context.Context, tokenID, permID int64) error {
+	if m.removePermissionForToken != nil {
+		return m.removePermissionForToken(ctx, tokenID, permID)
 	}
 	return nil
 }

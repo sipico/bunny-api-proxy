@@ -60,6 +60,7 @@ type Storage interface {
 	CountAdminTokens(ctx context.Context) (int, error)
 	AddPermissionForToken(ctx context.Context, tokenID int64, perm *storage.Permission) (*storage.Permission, error)
 	RemovePermission(ctx context.Context, permID int64) error
+	RemovePermissionForToken(ctx context.Context, tokenID, permID int64) error
 	GetPermissionsForToken(ctx context.Context, tokenID int64) ([]*storage.Permission, error)
 }
 
