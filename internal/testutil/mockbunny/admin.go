@@ -97,13 +97,15 @@ func (s *Server) handleAdminCreateRecord(w http.ResponseWriter, r *http.Request)
 }
 
 // handleAdminReset handles DELETE /admin/reset
-// Clears all zones and records, resetting ID counters
+// Clears all zones and records, resetting ID counters and scan state
 func (s *Server) handleAdminReset(w http.ResponseWriter, r *http.Request) {
 	s.state.mu.Lock()
 	defer s.state.mu.Unlock()
 	s.state.zones = make(map[int64]*Zone)
 	s.state.nextZoneID = 1
 	s.state.nextRecordID = 1
+	s.state.scanTriggered = make(map[int64]bool)
+	s.state.scanCallCount = make(map[int64]int)
 	w.WriteHeader(http.StatusNoContent)
 }
 
