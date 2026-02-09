@@ -388,8 +388,8 @@ func TestIsMasterKey_UsesConstantTimeComparison(t *testing.T) {
 	lines := strings.Split(funcBody, "\n")
 	for _, line := range lines {
 		// Skip comments
-		if strings.Contains(line, "//") {
-			line = line[:strings.Index(line, "//")]
+		if idx := strings.Index(line, "//"); idx >= 0 {
+			line = line[:idx]
 		}
 		// Look for dangerous patterns
 		if strings.Contains(line, "== 1") || strings.Contains(line, "!= 1") {
