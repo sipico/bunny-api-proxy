@@ -15,7 +15,8 @@ const requestIDKey contextKey = "request-id"
 // RequestID is a middleware that generates a unique request ID for each request.
 // It adds the ID to the request context and includes it in the response headers.
 //
-// If the incoming request already has an X-Request-ID header, it will be used.
+// If the incoming request already has an X-Request-ID header, it will be used only
+// if it passes validation (length ≤ 128 chars, alphanumeric + dash/underscore/period).
 // Otherwise, a new UUID v4 will be generated.
 //
 // The request ID is:
@@ -26,8 +27,8 @@ func RequestID(next http.Handler) http.Handler {
 		// Check for existing X-Request-ID header
 		id := r.Header.Get("X-Request-ID")
 
-		// If not present or empty, generate a new UUID
-		if id == "" {
+		// If not present, empty, or invalid, generate a new UUID
+		if id == "" || !isValidRequestID(id) {
 			id = uuid.New().String()
 		}
 
@@ -41,6 +42,24 @@ func RequestID(next http.Handler) http.Handler {
 		// Call next handler with updated context
 		next.ServeHTTP(w, r)
 	})
+}
+
+// isValidRequestID validates that a request ID is safe to use.
+// A valid request ID must:
+// - Be at most 128 characters long
+// - Contain only alphanumeric characters, dash, underscore, or period
+func isValidRequestID(id string) bool {
+	if len(id) > 128 {
+		return false
+	}
+	for _, c := range id {
+		isAlphanumeric := (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
+		isAllowedSpecial := c == '-' || c == '_' || c == '.'
+		if !isAlphanumeric && !isAllowedSpecial {
+			return false
+		}
+	}
+	return true
 }
 
 // GetRequestID retrieves the request ID from the context.

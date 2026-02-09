@@ -147,3 +147,127 @@ func TestRequestID_EmptyHeader(t *testing.T) {
 
 	middleware.ServeHTTP(rec, req)
 }
+
+func TestRequestID_RejectsOversizedID(t *testing.T) {
+	t.Parallel()
+	// Test that oversized X-Request-ID (>128 chars) is rejected and UUID generated
+	oversizedID := string(make([]byte, 1000))
+	for i := 0; i < 1000; i++ {
+		oversizedID += "a"
+	}
+
+	middleware := RequestID(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		id := GetRequestID(r.Context())
+
+		// Should generate new UUID, not use oversized ID
+		if id == oversizedID {
+			t.Error("Should reject oversized ID and generate new UUID")
+		}
+
+		// Should be a valid UUID
+		_, err := uuid.Parse(id)
+		if err != nil {
+			t.Errorf("Should generate valid UUID for oversized input, got: %s", id)
+		}
+
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest("GET", "/test", nil)
+	req.Header.Set("X-Request-ID", oversizedID)
+	rec := httptest.NewRecorder()
+
+	middleware.ServeHTTP(rec, req)
+}
+
+func TestRequestID_RejectsNewlines(t *testing.T) {
+	t.Parallel()
+	// Test that X-Request-ID with newlines is rejected
+	idWithNewline := "request-id-1234\nmalicious"
+
+	middleware := RequestID(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		id := GetRequestID(r.Context())
+
+		// Should generate new UUID, not use ID with newlines
+		if id == idWithNewline {
+			t.Error("Should reject ID with newlines and generate new UUID")
+		}
+
+		// Should be a valid UUID
+		_, err := uuid.Parse(id)
+		if err != nil {
+			t.Errorf("Should generate valid UUID for input with newlines, got: %s", id)
+		}
+
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest("GET", "/test", nil)
+	req.Header.Set("X-Request-ID", idWithNewline)
+	rec := httptest.NewRecorder()
+
+	middleware.ServeHTTP(rec, req)
+}
+
+func TestRequestID_RejectsControlCharacters(t *testing.T) {
+	t.Parallel()
+	// Test that X-Request-ID with control characters is rejected
+	idWithControl := "request-id\x00-with-null"
+
+	middleware := RequestID(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		id := GetRequestID(r.Context())
+
+		// Should generate new UUID, not use ID with control chars
+		if id == idWithControl {
+			t.Error("Should reject ID with control characters and generate new UUID")
+		}
+
+		// Should be a valid UUID
+		_, err := uuid.Parse(id)
+		if err != nil {
+			t.Errorf("Should generate valid UUID for input with control chars, got: %s", id)
+		}
+
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest("GET", "/test", nil)
+	req.Header.Set("X-Request-ID", idWithControl)
+	rec := httptest.NewRecorder()
+
+	middleware.ServeHTTP(rec, req)
+}
+
+func TestRequestID_AcceptsValidCustomFormats(t *testing.T) {
+	t.Parallel()
+	// Test that valid custom ID formats are accepted
+	tests := []string{
+		"request-id-12345",
+		"request_id_12345",
+		"request.id.12345",
+		"req-id_123.456",
+		"UPPERCASE-REQUEST-ID",
+		"MixedCase_Request.ID-123",
+	}
+
+	for _, validID := range tests {
+		t.Run(validID, func(t *testing.T) {
+			middleware := RequestID(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				id := GetRequestID(r.Context())
+
+				// Valid IDs should be preserved
+				if id != validID {
+					t.Errorf("Expected ID %q, got %q", validID, id)
+				}
+
+				w.WriteHeader(http.StatusOK)
+			}))
+
+			req := httptest.NewRequest("GET", "/test", nil)
+			req.Header.Set("X-Request-ID", validID)
+			rec := httptest.NewRecorder()
+
+			middleware.ServeHTTP(rec, req)
+		})
+	}
+}
