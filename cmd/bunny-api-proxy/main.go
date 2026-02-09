@@ -67,7 +67,6 @@ type serverComponents struct {
 	logger           *slog.Logger
 	logLevel         *slog.LevelVar
 	store            storage.Storage
-	validator        *auth.Validator
 	bunnyClient      *bunny.Client
 	bootstrapService *auth.BootstrapService
 	proxyRouter      http.Handler
@@ -110,10 +109,7 @@ func initializeComponents(cfg *config.Config) (*serverComponents, error) {
 		return nil, fmt.Errorf("storage initialization failed: %w", err)
 	}
 
-	// 4. Create auth validator
-	validator := auth.NewValidator(store)
-
-	// 5. Create bunny client with real API key and logging transport
+	// 4. Create bunny client with real API key and logging transport
 	var bunnyOpts []bunny.Option
 	if cfg.BunnyAPIURL != "" {
 		bunnyOpts = append(bunnyOpts, bunny.WithBaseURL(cfg.BunnyAPIURL))
@@ -138,10 +134,10 @@ func initializeComponents(cfg *config.Config) (*serverComponents, error) {
 
 	bunnyClient := bunny.NewClient(cfg.BunnyAPIKey, bunnyOpts...)
 
-	// 6. Create bootstrap service for managing master key and bootstrap state
+	// 5. Create bootstrap service for managing master key and bootstrap state
 	bootstrapService := auth.NewBootstrapService(store, cfg.BunnyAPIKey)
 
-	// 7. Create proxy handler and router
+	// 6. Create proxy handler and router
 	proxyHandler := proxy.NewHandler(bunnyClient, logger)
 	proxyAuthenticator := auth.NewAuthenticator(store, bootstrapService)
 	// Chain authentication and permission checking middleware
@@ -150,12 +146,12 @@ func initializeComponents(cfg *config.Config) (*serverComponents, error) {
 	}
 	proxyRouter := proxy.NewRouter(proxyHandler, proxyAuthChain, logger)
 
-	// 8. Create admin handler and router
+	// 7. Create admin handler and router
 	adminHandler := admin.NewHandler(store, logLevel, logger)
 	adminHandler.SetBootstrapService(bootstrapService)
 	adminRouter := adminHandler.NewRouter()
 
-	// 9. Assemble main router
+	// 8. Assemble main router
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
@@ -171,7 +167,6 @@ func initializeComponents(cfg *config.Config) (*serverComponents, error) {
 		logger:           logger,
 		logLevel:         logLevel,
 		store:            store,
-		validator:        validator,
 		bunnyClient:      bunnyClient,
 		bootstrapService: bootstrapService,
 		proxyRouter:      proxyRouter,

@@ -2,7 +2,6 @@
 package auth
 
 import (
-	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -80,55 +79,8 @@ type KeyInfo struct {
 	Permissions []*storage.Permission
 }
 
-// Storage interface for dependency injection.
-type Storage interface {
-	ListScopedKeys(ctx context.Context) ([]*storage.ScopedKey, error)
-	GetPermissions(ctx context.Context, scopedKeyID int64) ([]*storage.Permission, error)
-}
-
-// Validator handles key validation and permission checking.
-type Validator struct {
-	storage Storage
-}
-
-// NewValidator creates a new Validator.
-func NewValidator(s Storage) *Validator {
-	return &Validator{storage: s}
-}
-
-// ValidateKey checks if the API key is valid.
-// Returns KeyInfo if valid, error if invalid.
-func (v *Validator) ValidateKey(ctx context.Context, apiKey string) (*KeyInfo, error) {
-	if apiKey == "" {
-		return nil, ErrMissingKey
-	}
-
-	keys, err := v.storage.ListScopedKeys(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	// Must iterate all keys - bcrypt hashes are not comparable directly
-	for _, key := range keys {
-		if storage.VerifyKey(apiKey, key.KeyHash) == nil {
-			// Found match - load permissions
-			perms, err := v.storage.GetPermissions(ctx, key.ID)
-			if err != nil {
-				return nil, err
-			}
-			return &KeyInfo{
-				KeyID:       key.ID,
-				KeyName:     key.Name,
-				Permissions: perms,
-			}, nil
-		}
-	}
-
-	return nil, ErrInvalidKey
-}
-
 // CheckPermission verifies if the key has permission for the request.
-func (v *Validator) CheckPermission(keyInfo *KeyInfo, req *Request) error {
+func CheckPermission(keyInfo *KeyInfo, req *Request) error {
 	// list_zones: always allowed if key is valid
 	if req.Action == ActionListZones {
 		return nil

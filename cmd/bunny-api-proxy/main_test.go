@@ -136,9 +136,6 @@ func TestInitializeComponentsWithValidConfig(t *testing.T) {
 	if components.store == nil {
 		t.Error("store is nil")
 	}
-	if components.validator == nil {
-		t.Error("validator is nil")
-	}
 	if components.bunnyClient == nil {
 		t.Error("bunnyClient is nil")
 	}
@@ -773,10 +770,6 @@ func TestInitializeComponentsValidatorCreated(t *testing.T) {
 	}
 	defer components.store.Close()
 
-	// Verify validator is not nil
-	if components.validator == nil {
-		t.Error("validator should not be nil")
-	}
 }
 
 // TestInitializeComponentsStorageCreated validates storage is created and working
@@ -966,9 +959,6 @@ func TestInitializeComponentsAllComponentsNotNil(t *testing.T) {
 	}
 	if components.store == nil {
 		t.Error("store is nil")
-	}
-	if components.validator == nil {
-		t.Error("validator is nil")
 	}
 	if components.bunnyClient == nil {
 		t.Error("bunnyClient is nil")
@@ -2022,9 +2012,6 @@ func TestRunWithHealthEndpoint(t *testing.T) {
 	}
 	if components.store == nil {
 		t.Error("store should not be nil")
-	}
-	if components.validator == nil {
-		t.Error("validator should not be nil")
 	}
 
 	// Test health endpoint directly

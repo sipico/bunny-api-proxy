@@ -147,8 +147,14 @@ func newTestRequest(method, path string, body io.Reader, params map[string]strin
 func newTestRequestWithKeyInfo(path string, params map[string]string, keyInfo *auth.KeyInfo) *http.Request {
 	r := newTestRequest(http.MethodGet, path, nil, params)
 
-	// Add KeyInfo to context using the auth package's context key
-	ctx := context.WithValue(r.Context(), auth.KeyInfoContextKey, keyInfo)
+	// Convert KeyInfo to Token and Permissions for the new context model
+	token := &storage.Token{
+		ID:      keyInfo.KeyID,
+		Name:    keyInfo.KeyName,
+		IsAdmin: false, // Tests can override if needed
+	}
+	ctx := auth.WithToken(r.Context(), token)
+	ctx = auth.WithPermissions(ctx, keyInfo.Permissions)
 	return r.WithContext(ctx)
 }
 
