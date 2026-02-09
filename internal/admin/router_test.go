@@ -11,6 +11,7 @@ import (
 
 	"github.com/sipico/bunny-api-proxy/internal/auth"
 	"github.com/sipico/bunny-api-proxy/internal/storage"
+	"github.com/sipico/bunny-api-proxy/internal/testutil/mockstore"
 )
 
 // TestAdminEndpointsRequireAdminToken tests that admin-only endpoints
@@ -28,7 +29,7 @@ func TestAdminEndpointsRequireAdminToken(t *testing.T) {
 
 	// Mock storage that returns both admin and scoped tokens
 	mock := &mockStorageWithToken{
-		mockStorage: &mockStorage{},
+		MockStorage: &mockstore.MockStorage{},
 		getTokenByHash: func(ctx context.Context, keyHash string) (*storage.Token, error) {
 			switch keyHash {
 			case adminTokenHash:
@@ -211,7 +212,7 @@ func TestWhoamiEndpointAvailableToAllTokens(t *testing.T) {
 	scopedTokenHash := auth.HashToken(scopedTokenSecret)
 
 	mock := &mockStorageWithToken{
-		mockStorage: &mockStorage{},
+		MockStorage: &mockstore.MockStorage{},
 		getTokenByHash: func(ctx context.Context, keyHash string) (*storage.Token, error) {
 			switch keyHash {
 			case adminTokenHash:
