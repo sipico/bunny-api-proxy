@@ -2,9 +2,11 @@ package bunny
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"log/slog"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -130,4 +132,84 @@ func redactSensitiveData(key string) string {
 		return "****"
 	}
 	return key[:4] + "..." + key[len(key)-4:]
+}
+
+// RetryTransport wraps an http.RoundTripper and retries on timeout errors.
+// Only retries idempotent methods (GET, HEAD, OPTIONS) to ensure safety.
+// Retries once with exponential backoff on timeout errors.
+type RetryTransport struct {
+	Transport http.RoundTripper
+	Logger    *slog.Logger
+}
+
+// RoundTrip implements http.RoundTripper interface with retry logic for timeouts.
+func (t *RetryTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	// Only retry idempotent methods
+	if !isIdempotentMethod(req.Method) {
+		return t.Transport.RoundTrip(req)
+	}
+
+	resp, err := t.Transport.RoundTrip(req)
+
+	// Check if it's a timeout error
+	if err != nil && isTimeoutError(err) {
+		t.Logger.Warn("HTTP request timed out, retrying",
+			"method", req.Method,
+			"url", req.URL.String(),
+			"error", err,
+		)
+
+		// Wait with exponential backoff before retry
+		time.Sleep(100 * time.Millisecond)
+
+		// Retry once
+		resp, err = t.Transport.RoundTrip(req)
+		if err != nil {
+			t.Logger.Error("HTTP request failed after retry",
+				"method", req.Method,
+				"url", req.URL.String(),
+				"error", err,
+			)
+		} else {
+			t.Logger.Info("HTTP request succeeded after retry",
+				"method", req.Method,
+				"url", req.URL.String(),
+			)
+		}
+	}
+
+	return resp, err
+}
+
+// isIdempotentMethod returns true for HTTP methods that are safe to retry.
+func isIdempotentMethod(method string) bool {
+	switch method {
+	case http.MethodGet, http.MethodHead, http.MethodOptions:
+		return true
+	default:
+		return false
+	}
+}
+
+// isTimeoutError checks if an error is a timeout error (context deadline or network timeout).
+func isTimeoutError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	// Check for context deadline exceeded
+	if err == context.DeadlineExceeded {
+		return true
+	}
+
+	// Check for net.Error with Timeout() method
+	if os.IsTimeout(err) {
+		return true
+	}
+
+	// Check string representation for timeout patterns
+	errStr := err.Error()
+	return strings.Contains(errStr, "Client.Timeout exceeded") ||
+		strings.Contains(errStr, "context deadline exceeded") ||
+		strings.Contains(errStr, "i/o timeout")
 }
