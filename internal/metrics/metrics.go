@@ -6,7 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"sync"
+	"sync/atomic"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -14,21 +14,17 @@ import (
 
 var (
 	// Global metrics - used by the application
-	requestsTotal      *prometheus.CounterVec
-	requestDuration    *prometheus.HistogramVec
-	authFailuresTotal  *prometheus.CounterVec
-	infoGauge          prometheus.Gauge
-	globalRegistryLock sync.Mutex
+	// Using atomic.Pointer for lock-free initialization checks on hot path metrics.
+	requestsTotal     atomic.Pointer[prometheus.CounterVec]
+	requestDuration   atomic.Pointer[prometheus.HistogramVec]
+	authFailuresTotal atomic.Pointer[prometheus.CounterVec]
 )
 
 // Init initializes all Prometheus metrics and registers them with the provided registry.
 // This should be called once at application startup.
 func Init(reg prometheus.Registerer) error {
-	globalRegistryLock.Lock()
-	defer globalRegistryLock.Unlock()
-
 	// HTTP request counter: tracks all requests by method, path (normalized), and status code
-	requestsTotal = prometheus.NewCounterVec(
+	requestsTotalVec := prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: "bunny",
 			Subsystem: "proxy",
@@ -37,12 +33,12 @@ func Init(reg prometheus.Registerer) error {
 		},
 		[]string{"method", "path", "status"},
 	)
-	if err := reg.Register(requestsTotal); err != nil {
+	if err := reg.Register(requestsTotalVec); err != nil {
 		return fmt.Errorf("failed to register requestsTotal: %w", err)
 	}
 
 	// Request duration histogram: tracks latency distribution
-	requestDuration = prometheus.NewHistogramVec(
+	requestDurationVec := prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Namespace: "bunny",
 			Subsystem: "proxy",
@@ -52,12 +48,12 @@ func Init(reg prometheus.Registerer) error {
 		},
 		[]string{"method", "path", "status"},
 	)
-	if err := reg.Register(requestDuration); err != nil {
+	if err := reg.Register(requestDurationVec); err != nil {
 		return fmt.Errorf("failed to register requestDuration: %w", err)
 	}
 
 	// Auth failures counter: tracks failed authentication attempts
-	authFailuresTotal = prometheus.NewCounterVec(
+	authFailuresTotalVec := prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: "bunny",
 			Subsystem: "proxy",
@@ -66,7 +62,7 @@ func Init(reg prometheus.Registerer) error {
 		},
 		[]string{"reason"},
 	)
-	if err := reg.Register(authFailuresTotal); err != nil {
+	if err := reg.Register(authFailuresTotalVec); err != nil {
 		return fmt.Errorf("failed to register authFailuresTotal: %w", err)
 	}
 
@@ -80,45 +76,44 @@ func Init(reg prometheus.Registerer) error {
 		},
 		[]string{"version"},
 	)
-	infoGauge = infoGaugeVec.WithLabelValues("1.0.0")
+	infoGaugeInstance := infoGaugeVec.WithLabelValues("1.0.0")
 	if err := reg.Register(infoGaugeVec); err != nil {
 		return fmt.Errorf("failed to register infoGauge: %w", err)
 	}
-	infoGauge.Set(1)
+	infoGaugeInstance.Set(1)
+
+	// Store metrics in atomics for lock-free access in record functions
+	requestsTotal.Store(requestsTotalVec)
+	requestDuration.Store(requestDurationVec)
+	authFailuresTotal.Store(authFailuresTotalVec)
 
 	return nil
 }
 
 // RecordRequest increments the requests counter for the given method, path, and status code.
 // The path should be normalized (e.g., "/dnszone/:id" instead of "/dnszone/123").
-// The mutex guards the global pointer read; Prometheus operations themselves are thread-safe.
+// Uses atomic.Pointer for lock-free nil checks; Prometheus operations themselves are thread-safe.
 func RecordRequest(method, path, statusCode string) {
-	globalRegistryLock.Lock()
-	defer globalRegistryLock.Unlock()
-	if requestsTotal != nil {
-		requestsTotal.WithLabelValues(method, path, statusCode).Inc()
+	if counter := requestsTotal.Load(); counter != nil {
+		counter.WithLabelValues(method, path, statusCode).Inc()
 	}
 }
 
 // RecordRequestDuration records the latency for a request.
 // Duration should be in seconds.
-// The mutex guards the global pointer read; Prometheus operations themselves are thread-safe.
+// Uses atomic.Pointer for lock-free nil checks; Prometheus operations themselves are thread-safe.
 func RecordRequestDuration(method, path, statusCode string, durationSeconds float64) {
-	globalRegistryLock.Lock()
-	defer globalRegistryLock.Unlock()
-	if requestDuration != nil {
-		requestDuration.WithLabelValues(method, path, statusCode).Observe(durationSeconds)
+	if histogram := requestDuration.Load(); histogram != nil {
+		histogram.WithLabelValues(method, path, statusCode).Observe(durationSeconds)
 	}
 }
 
 // RecordAuthFailure increments the auth failures counter for the given reason.
 // Common reasons: "invalid_key", "permission_denied", "missing_key"
-// The mutex guards the global pointer read; Prometheus operations themselves are thread-safe.
+// Uses atomic.Pointer for lock-free nil checks; Prometheus operations themselves are thread-safe.
 func RecordAuthFailure(reason string) {
-	globalRegistryLock.Lock()
-	defer globalRegistryLock.Unlock()
-	if authFailuresTotal != nil {
-		authFailuresTotal.WithLabelValues(reason).Inc()
+	if counter := authFailuresTotal.Load(); counter != nil {
+		counter.WithLabelValues(reason).Inc()
 	}
 }
 
