@@ -3,6 +3,7 @@ package bunny
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -134,61 +135,116 @@ func redactSensitiveData(key string) string {
 	return key[:4] + "..." + key[len(key)-4:]
 }
 
-// RetryTransport wraps an http.RoundTripper and retries on timeout errors.
-// Only retries idempotent methods (GET, HEAD, OPTIONS) to ensure safety.
-// Retries once with exponential backoff on timeout errors.
+// RetryTransport wraps an http.RoundTripper and retries on timeout errors and 5xx responses.
+// Retries idempotent methods (GET, HEAD, OPTIONS, DELETE, PUT) on both timeout and 5xx errors.
+// Retries non-idempotent methods (POST, PATCH) only on timeout errors (request didn't reach server).
+// Uses exponential backoff (1s, 2s, 4s) with max 3 retries (4 total attempts).
 type RetryTransport struct {
 	Transport http.RoundTripper
 	Logger    *slog.Logger
 }
 
-// RoundTrip implements http.RoundTripper interface with retry logic for timeouts.
+// RoundTrip implements http.RoundTripper interface with retry logic.
 func (t *RetryTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	// Only retry idempotent methods
-	if !isIdempotentMethod(req.Method) {
-		return t.Transport.RoundTrip(req)
-	}
+	const maxRetries = 3
+	backoff := 1 * time.Second
 
-	resp, err := t.Transport.RoundTrip(req)
+	var resp *http.Response
+	var err error
 
-	// Check if it's a timeout error
-	if err != nil && isTimeoutError(err) {
-		t.Logger.Warn("HTTP request timed out, retrying",
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		// Execute request
+		resp, err = t.Transport.RoundTrip(req)
+
+		// Determine if we should retry
+		shouldRetry := false
+		var retryReason string
+
+		if err != nil {
+			// Network/timeout errors: retry for ALL methods (request likely didn't reach server)
+			if isTimeoutError(err) {
+				shouldRetry = true
+				retryReason = fmt.Sprintf("timeout error: %v", err)
+			}
+		} else if resp != nil {
+			// 5xx errors: only retry for idempotent methods
+			if is5xxError(resp.StatusCode) && isIdempotentMethod(req.Method) {
+				shouldRetry = true
+				retryReason = fmt.Sprintf("server error: %d %s", resp.StatusCode, resp.Status)
+				// Close the response body before retrying
+				if resp.Body != nil {
+					//nolint:errcheck
+					resp.Body.Close()
+				}
+			}
+		}
+
+		// If we shouldn't retry or we've exhausted retries, return
+		if !shouldRetry || attempt == maxRetries {
+			if attempt > 0 && err != nil {
+				t.Logger.Error("HTTP request failed after retries",
+					"method", req.Method,
+					"url", req.URL.String(),
+					"attempts", attempt+1,
+					"error", err,
+				)
+			} else if attempt > 0 && resp != nil && is5xxError(resp.StatusCode) {
+				t.Logger.Error("HTTP request failed after retries",
+					"method", req.Method,
+					"url", req.URL.String(),
+					"attempts", attempt+1,
+					"status", resp.StatusCode,
+				)
+			}
+			return resp, err
+		}
+
+		// Log retry attempt
+		t.Logger.Warn("HTTP request failed, retrying",
 			"method", req.Method,
 			"url", req.URL.String(),
-			"error", err,
+			"attempt", attempt+1,
+			"reason", retryReason,
+			"backoff_ms", backoff.Milliseconds(),
 		)
 
-		// Wait with exponential backoff before retry
-		time.Sleep(100 * time.Millisecond)
-
-		// Retry once
-		resp, err = t.Transport.RoundTrip(req)
-		if err != nil {
-			t.Logger.Error("HTTP request failed after retry",
-				"method", req.Method,
-				"url", req.URL.String(),
-				"error", err,
-			)
-		} else {
-			t.Logger.Info("HTTP request succeeded after retry",
+		// Wait with exponential backoff, respecting context cancellation
+		select {
+		case <-time.After(backoff):
+			// Backoff completed, continue to retry
+		case <-req.Context().Done():
+			// Context cancelled during backoff
+			t.Logger.Warn("HTTP request cancelled during retry backoff",
 				"method", req.Method,
 				"url", req.URL.String(),
 			)
+			return resp, req.Context().Err()
 		}
+
+		// Exponential backoff: 1s, 2s, 4s
+		backoff *= 2
 	}
 
 	return resp, err
 }
 
-// isIdempotentMethod returns true for HTTP methods that are safe to retry.
+// isIdempotentMethod returns true for HTTP methods that are safe to retry on server errors.
+// GET, HEAD, OPTIONS: standard idempotent read operations
+// DELETE: idempotent (deleting twice yields same result)
+// PUT: typically idempotent (creating/replacing same resource)
+// POST: NOT idempotent (may have side effects)
 func isIdempotentMethod(method string) bool {
 	switch method {
-	case http.MethodGet, http.MethodHead, http.MethodOptions:
+	case http.MethodGet, http.MethodHead, http.MethodOptions, http.MethodDelete, http.MethodPut:
 		return true
 	default:
 		return false
 	}
+}
+
+// is5xxError returns true if the status code is a server error (5xx).
+func is5xxError(statusCode int) bool {
+	return statusCode >= 500 && statusCode < 600
 }
 
 // isTimeoutError checks if an error is a timeout error (context deadline or network timeout).

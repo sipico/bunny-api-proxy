@@ -1127,9 +1127,9 @@ func TestRetryTransport_IdempotentMethodDetection(t *testing.T) {
 		{"GET is idempotent", http.MethodGet, true},
 		{"HEAD is idempotent", http.MethodHead, true},
 		{"OPTIONS is idempotent", http.MethodOptions, true},
+		{"DELETE is idempotent", http.MethodDelete, true},
+		{"PUT is idempotent", http.MethodPut, true},
 		{"POST is not idempotent", http.MethodPost, false},
-		{"PUT is not idempotent", http.MethodPut, false},
-		{"DELETE is not idempotent", http.MethodDelete, false},
 		{"PATCH is not idempotent", http.MethodPatch, false},
 	}
 
@@ -1168,45 +1168,48 @@ func TestRetryTransport_TimeoutErrorDetection(t *testing.T) {
 	}
 }
 
-// TestRetryTransport_NoRetryForNonIdempotentMethods tests that non-idempotent methods are not retried.
-func TestRetryTransport_NoRetryForNonIdempotentMethods(t *testing.T) {
+// TestRetryTransport_RetriesTimeoutForAllMethods tests that timeout errors are retried even for non-idempotent methods.
+// Timeout means the request likely didn't reach the server, so it's safe to retry.
+func TestRetryTransport_RetriesTimeoutForAllMethods(t *testing.T) {
 	t.Parallel()
 	var buf bytes.Buffer
-	logger := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	logger := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelWarn}))
 
-	timeoutErr := fmt.Errorf("Get \"https://api.bunny.net/test\": context deadline exceeded (Client.Timeout exceeded while awaiting headers)")
-
-	mockTransport := &mockRoundTripper{
-		response: nil,
-		err:      timeoutErr,
+	timeoutErr := fmt.Errorf("Post \"https://api.bunny.net/test\": context deadline exceeded (Client.Timeout exceeded while awaiting headers)")
+	successResp := &http.Response{
+		StatusCode: http.StatusCreated,
+		Body:       io.NopCloser(strings.NewReader(`{"id":123}`)),
+		Header:     make(http.Header),
 	}
 
 	rt := &RetryTransport{
-		Transport: mockTransport,
-		Logger:    logger,
+		Transport: &failOnceThenSucceedTransport{
+			failOnce:    true,
+			failErr:     timeoutErr,
+			successResp: successResp,
+		},
+		Logger: logger,
 	}
 
 	// Create POST request (non-idempotent)
 	req, _ := http.NewRequest(http.MethodPost, "https://api.bunny.net/test", nil)
-
-	// Make the request
 	resp, err := rt.RoundTrip(req)
 
-	// Should fail immediately, no retry for POST
-	if err == nil {
-		t.Error("Expected error for POST request timeout")
+	// Should succeed after retry (timeout is safe to retry)
+	if err != nil {
+		t.Errorf("Expected no error after retry, got %v", err)
 	}
-	if err.Error() != timeoutErr.Error() {
-		t.Errorf("Expected %v, got %v", timeoutErr, err)
+	if resp == nil {
+		t.Fatal("Expected response after retry")
 	}
-	if resp != nil {
-		t.Error("Expected nil response on timeout")
+	if resp.StatusCode != http.StatusCreated {
+		t.Errorf("Expected status 201, got %d", resp.StatusCode)
 	}
 
-	// Verify no retry logs
+	// Verify retry logs
 	logOutput := buf.String()
-	if strings.Contains(logOutput, "retrying") {
-		t.Error("Should not retry non-idempotent methods")
+	if !strings.Contains(logOutput, "retrying") {
+		t.Error("Expected retry log message for timeout on POST")
 	}
 }
 
@@ -1260,13 +1263,13 @@ func TestRetryTransport_RetriesIdempotentOnTimeout(t *testing.T) {
 
 	// Verify retry logs
 	logOutput := buf.String()
-	if !strings.Contains(logOutput, "timed out, retrying") {
+	if !strings.Contains(logOutput, "retrying") {
 		t.Error("Expected retry log message")
 	}
 }
 
-// TestRetryTransport_StopsAfterTwoAttempts tests that retry stops after two attempts.
-func TestRetryTransport_StopsAfterTwoAttempts(t *testing.T) {
+// TestRetryTransport_StopsAfterMaxAttempts tests that retry stops after max attempts (4 total).
+func TestRetryTransport_StopsAfterMaxAttempts(t *testing.T) {
 	t.Parallel()
 	var buf bytes.Buffer
 	logger := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelError}))
@@ -1289,16 +1292,16 @@ func TestRetryTransport_StopsAfterTwoAttempts(t *testing.T) {
 
 	// Should fail with error
 	if err == nil {
-		t.Error("Expected error after retry also fails")
+		t.Error("Expected error after all retries fail")
 	}
 	if resp != nil {
 		t.Error("Expected nil response after all retries fail")
 	}
 
-	// Verify error log (not just warn)
+	// Verify error log
 	logOutput := buf.String()
-	if !strings.Contains(logOutput, "failed after retry") {
-		t.Error("Expected error log after retry failure")
+	if !strings.Contains(logOutput, "failed after retries") {
+		t.Error("Expected error log after max retries exceeded")
 	}
 }
 
