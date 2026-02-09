@@ -879,15 +879,13 @@ func TestE2E_MetricsIncrementAfterOperations(t *testing.T) {
 		resp.Body.Close()
 	}
 
-	// Give a moment for metrics to be recorded
-	time.Sleep(100 * time.Millisecond)
-
-	// Capture metrics after operations
-	afterBody := getMetricsBody(t)
-
-	// The metrics body should be different (longer or with higher counts)
-	// This is a basic check that metrics are being recorded
-	require.NotEqual(t, baselineBody, afterBody,
+	// Poll for metrics to be recorded with a timeout
+	// The metrics recording is asynchronous, so we retry until the metrics change
+	var afterBody string
+	require.Eventually(t, func() bool {
+		afterBody = getMetricsBody(t)
+		return afterBody != baselineBody
+	}, 5*time.Second, 50*time.Millisecond,
 		"metrics should change after performing operations")
 
 	// Verify specific metric names exist
