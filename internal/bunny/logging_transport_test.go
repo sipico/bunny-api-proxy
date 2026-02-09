@@ -1339,3 +1339,322 @@ func TestRetryTransport_NoRetryForNonTimeoutErrors(t *testing.T) {
 		t.Error("Should not retry non-timeout errors")
 	}
 }
+
+// fail5xxThenSucceedTransport is a test helper that fails with 5xx status codes, then succeeds.
+type fail5xxThenSucceedTransport struct {
+	attempts    int
+	failCount   int
+	statusCode  int
+	successResp *http.Response
+}
+
+func (t *fail5xxThenSucceedTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	t.attempts++
+	if t.attempts <= t.failCount {
+		return &http.Response{
+			StatusCode: t.statusCode,
+			Body:       io.NopCloser(strings.NewReader(`{"error":"server error"}`)),
+			Header:     make(http.Header),
+			Request:    req,
+		}, nil
+	}
+	return t.successResp, nil
+}
+
+// TestRetryTransport_Retries5xxForIdempotentMethods tests that GET is retried on 503.
+func TestRetryTransport_Retries5xxForIdempotentMethods(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelWarn}))
+
+	successResp := &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(strings.NewReader(`{"result":"ok"}`)),
+		Header:     make(http.Header),
+	}
+
+	rt := &RetryTransport{
+		Transport: &fail5xxThenSucceedTransport{
+			failCount:   2,
+			statusCode:  http.StatusServiceUnavailable,
+			successResp: successResp,
+		},
+		Logger: logger,
+	}
+
+	req, _ := http.NewRequest(http.MethodGet, "https://api.bunny.net/test", nil)
+	resp, err := rt.RoundTrip(req)
+
+	// Should succeed after retries
+	if err != nil {
+		t.Errorf("Expected no error after retry, got %v", err)
+	}
+	if resp == nil {
+		t.Fatal("Expected response after retry")
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", resp.StatusCode)
+	}
+
+	// Verify retry logs
+	logOutput := buf.String()
+	if !strings.Contains(logOutput, "retrying") {
+		t.Error("Expected retry log message for 503 error")
+	}
+}
+
+// TestRetryTransport_NoRetry5xxForNonIdempotentMethods tests that POST is NOT retried on 503.
+func TestRetryTransport_NoRetry5xxForNonIdempotentMethods(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo}))
+
+	mockTransport := &mockRoundTripper{
+		response: &http.Response{
+			StatusCode: http.StatusServiceUnavailable,
+			Body:       io.NopCloser(strings.NewReader(`{"error":"service unavailable"}`)),
+			Header:     make(http.Header),
+		},
+		err: nil,
+	}
+
+	rt := &RetryTransport{
+		Transport: mockTransport,
+		Logger:    logger,
+	}
+
+	// Create POST request (non-idempotent)
+	req, _ := http.NewRequest(http.MethodPost, "https://api.bunny.net/test", nil)
+	resp, err := rt.RoundTrip(req)
+
+	// Should fail immediately, no retry for POST on 5xx
+	if err != nil {
+		t.Errorf("Expected no transport error, got %v", err)
+	}
+	if resp == nil {
+		t.Fatal("Expected response")
+	}
+	if resp.StatusCode != http.StatusServiceUnavailable {
+		t.Errorf("Expected status 503, got %d", resp.StatusCode)
+	}
+
+	// Verify no retry logs
+	logOutput := buf.String()
+	if strings.Contains(logOutput, "retrying") {
+		t.Error("Should not retry non-idempotent POST on 5xx")
+	}
+}
+
+// TestRetryTransport_RetriesDELETEOn500 tests that DELETE is retried on 500.
+func TestRetryTransport_RetriesDELETEOn500(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelWarn}))
+
+	successResp := &http.Response{
+		StatusCode: http.StatusNoContent,
+		Body:       io.NopCloser(strings.NewReader("")),
+		Header:     make(http.Header),
+	}
+
+	rt := &RetryTransport{
+		Transport: &fail5xxThenSucceedTransport{
+			failCount:   1,
+			statusCode:  http.StatusInternalServerError,
+			successResp: successResp,
+		},
+		Logger: logger,
+	}
+
+	req, _ := http.NewRequest(http.MethodDelete, "https://api.bunny.net/test", nil)
+	resp, err := rt.RoundTrip(req)
+
+	// Should succeed after retry
+	if err != nil {
+		t.Errorf("Expected no error after retry, got %v", err)
+	}
+	if resp == nil {
+		t.Fatal("Expected response after retry")
+	}
+	if resp.StatusCode != http.StatusNoContent {
+		t.Errorf("Expected status 204, got %d", resp.StatusCode)
+	}
+
+	// Verify retry logs
+	logOutput := buf.String()
+	if !strings.Contains(logOutput, "retrying") {
+		t.Error("Expected retry log message for 500 error on DELETE")
+	}
+}
+
+// TestRetryTransport_NoRetryOn404 tests that 404 is NOT retried.
+func TestRetryTransport_NoRetryOn404(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo}))
+
+	mockTransport := &mockRoundTripper{
+		response: &http.Response{
+			StatusCode: http.StatusNotFound,
+			Body:       io.NopCloser(strings.NewReader(`{"error":"not found"}`)),
+			Header:     make(http.Header),
+		},
+		err: nil,
+	}
+
+	rt := &RetryTransport{
+		Transport: mockTransport,
+		Logger:    logger,
+	}
+
+	req, _ := http.NewRequest(http.MethodGet, "https://api.bunny.net/test", nil)
+	resp, err := rt.RoundTrip(req)
+
+	// Should return 404 immediately, no retry
+	if err != nil {
+		t.Errorf("Expected no transport error, got %v", err)
+	}
+	if resp == nil {
+		t.Fatal("Expected response")
+	}
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("Expected status 404, got %d", resp.StatusCode)
+	}
+
+	// Verify no retry logs
+	logOutput := buf.String()
+	if strings.Contains(logOutput, "retrying") {
+		t.Error("Should not retry 404 errors")
+	}
+}
+
+// TestRetryTransport_MaxRetriesExceeded tests that retries stop after max attempts.
+func TestRetryTransport_MaxRetriesExceeded(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelError}))
+
+	// Transport that always returns 503
+	alwaysFail503 := &mockRoundTripper{
+		response: &http.Response{
+			StatusCode: http.StatusServiceUnavailable,
+			Body:       io.NopCloser(strings.NewReader(`{"error":"service unavailable"}`)),
+			Header:     make(http.Header),
+		},
+		err: nil,
+	}
+
+	rt := &RetryTransport{
+		Transport: alwaysFail503,
+		Logger:    logger,
+	}
+
+	req, _ := http.NewRequest(http.MethodGet, "https://api.bunny.net/test", nil)
+	resp, err := rt.RoundTrip(req)
+
+	// Should return the 503 after max retries
+	if err != nil {
+		t.Errorf("Expected no transport error, got %v", err)
+	}
+	if resp == nil {
+		t.Fatal("Expected response")
+	}
+	if resp.StatusCode != http.StatusServiceUnavailable {
+		t.Errorf("Expected status 503 after max retries, got %d", resp.StatusCode)
+	}
+
+	// Verify error log after max retries
+	logOutput := buf.String()
+	if !strings.Contains(logOutput, "failed after") {
+		t.Error("Expected error log after max retries exceeded")
+	}
+}
+
+// TestRetryTransport_ContextCancellation tests that retry exits on context cancellation.
+func TestRetryTransport_ContextCancellation(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelWarn}))
+
+	// Transport that always returns 503
+	alwaysFail503 := &mockRoundTripper{
+		response: &http.Response{
+			StatusCode: http.StatusServiceUnavailable,
+			Body:       io.NopCloser(strings.NewReader(`{"error":"service unavailable"}`)),
+			Header:     make(http.Header),
+		},
+		err: nil,
+	}
+
+	rt := &RetryTransport{
+		Transport: alwaysFail503,
+		Logger:    logger,
+	}
+
+	// Create a context that we'll cancel
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// Cancel the context after a short delay
+	go func() {
+		time.Sleep(200 * time.Millisecond)
+		cancel()
+	}()
+
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.bunny.net/test", nil)
+	start := time.Now()
+	resp, err := rt.RoundTrip(req)
+	duration := time.Since(start)
+
+	// Should exit early due to context cancellation
+	// Not hitting the full retry duration (which would be 1s + 2s + 4s = 7s)
+	if duration > 3*time.Second {
+		t.Errorf("Expected early exit due to context cancellation, took %v", duration)
+	}
+
+	// Should return the last 503 response or context error
+	if resp == nil && err == nil {
+		t.Error("Expected either response or error")
+	}
+}
+
+// TestRetryTransport_RetryPUTOn5xx tests that PUT (AddRecord) is retried on 5xx.
+func TestRetryTransport_RetryPUTOn5xx(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelWarn}))
+
+	successResp := &http.Response{
+		StatusCode: http.StatusCreated,
+		Body:       io.NopCloser(strings.NewReader(`{"id":123}`)),
+		Header:     make(http.Header),
+	}
+
+	rt := &RetryTransport{
+		Transport: &fail5xxThenSucceedTransport{
+			failCount:   1,
+			statusCode:  http.StatusBadGateway,
+			successResp: successResp,
+		},
+		Logger: logger,
+	}
+
+	req, _ := http.NewRequest(http.MethodPut, "https://api.bunny.net/dnszone/1/records", strings.NewReader(`{"Name":"test"}`))
+	resp, err := rt.RoundTrip(req)
+
+	// Should succeed after retry
+	if err != nil {
+		t.Errorf("Expected no error after retry, got %v", err)
+	}
+	if resp == nil {
+		t.Fatal("Expected response after retry")
+	}
+	if resp.StatusCode != http.StatusCreated {
+		t.Errorf("Expected status 201, got %d", resp.StatusCode)
+	}
+
+	// Verify retry logs
+	logOutput := buf.String()
+	if !strings.Contains(logOutput, "retrying") {
+		t.Error("Expected retry log message for 502 error on PUT")
+	}
+}
