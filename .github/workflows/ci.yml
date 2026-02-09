@@ -16,16 +16,39 @@ on:
       - '.gitignore'
       - '.github/workflows/explore-api.yml'
 
-# Deduplicate: push and pull_request for the same branch share a group.
-# When both fire for the same commit, only one runs.
+# Cancel in-progress CI for the same PR/branch when new commits are pushed
 concurrency:
-  group: ci-${{ github.head_ref || github.ref_name }}
+  group: ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
+  # Skip push-triggered runs when a PR exists (PR-triggered run handles it)
+  preflight:
+    name: Preflight
+    runs-on: ubuntu-latest
+    outputs:
+      should_skip: ${{ steps.check.outputs.should_skip }}
+    steps:
+      - name: Check for open PR on push
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "push" ] && [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            PR_COUNT=$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$GITHUB_REF_NAME" --state open --json number --jq length)
+            if [ "$PR_COUNT" -gt 0 ]; then
+              echo "should_skip=true" >> "$GITHUB_OUTPUT"
+              echo "::notice::Skipping push CI — PR exists, PR-triggered CI will run instead"
+              exit 0
+            fi
+          fi
+          echo "should_skip=false" >> "$GITHUB_OUTPUT"
+
   test:
     name: Test
     runs-on: ubuntu-latest
+    needs: [preflight]
+    if: needs.preflight.outputs.should_skip != 'true'
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -50,6 +73,8 @@ jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
+    needs: [preflight]
+    if: needs.preflight.outputs.should_skip != 'true'
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -80,6 +105,8 @@ jobs:
   security:
     name: Security Scan
     runs-on: ubuntu-latest
+    needs: [preflight]
+    if: needs.preflight.outputs.should_skip != 'true'
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
