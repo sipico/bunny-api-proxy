@@ -572,3 +572,76 @@ func TestAdminCreateRecord_WithDefaults(t *testing.T) {
 		t.Errorf("expected SmartRoutingType 0 (None), got %d", record.SmartRoutingType)
 	}
 }
+
+func TestAdminReset_ClearsScanState(t *testing.T) {
+	t.Parallel()
+	s := New()
+	defer s.Close()
+
+	// Create first zone with records
+	records := []Record{
+		{Type: 0, Name: "@", Value: "192.168.1.1", TTL: 300},
+	}
+	zoneID1 := s.AddZoneWithRecords("test.com", records)
+
+	// Trigger first scan
+	reqBody1 := strings.NewReader(`{"Domain":"test.com"}`)
+	triggerResp1, err := http.Post(s.URL()+"/dnszone/records/scan", "application/json", reqBody1)
+	if err != nil {
+		t.Fatalf("failed to trigger first scan: %v", err)
+	}
+	triggerResp1.Body.Close()
+
+	// Poll scan multiple times to increment the call count
+	for i := 0; i < 3; i++ {
+		resp, err := http.Get(fmt.Sprintf("%s/dnszone/%d/records/scan", s.URL(), zoneID1))
+		if err != nil {
+			t.Fatalf("failed to get scan result: %v", err)
+		}
+		resp.Body.Close()
+	}
+
+	// After 3 polls and 1 trigger, scanCallCount[1] should be 3
+	// Now reset state
+	req, _ := http.NewRequest(http.MethodDelete, s.URL()+"/admin/reset", nil)
+	client := &http.Client{}
+	resetResp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("failed to reset: %v", err)
+	}
+	defer resetResp.Body.Close()
+
+	if resetResp.StatusCode != http.StatusNoContent {
+		t.Errorf("expected status %d, got %d", http.StatusNoContent, resetResp.StatusCode)
+	}
+
+	// After reset, create a new zone with a DIFFERENT domain (to avoid triggering scan on it)
+	zoneID2 := s.AddZoneWithRecords("example.com", records)
+
+	// zoneID2 should be 1 (same as zoneID1 because IDs reset)
+	if zoneID2 != 1 {
+		t.Fatalf("expected zoneID2 to be 1, got %d", zoneID2)
+	}
+
+	// Now try to get scan result for the new zone WITHOUT triggering a scan first
+	// If scanTriggered was not cleared, it would still be true from the old zone,
+	// causing the handler to return Status 1+ (InProgress/Completed) instead of 0 (NotStarted)
+	resp, err := http.Get(fmt.Sprintf("%s/dnszone/%d/records/scan", s.URL(), zoneID2))
+	if err != nil {
+		t.Fatalf("failed to get scan result for new zone: %v", err)
+	}
+	defer resp.Body.Close()
+
+	var result struct {
+		Status int `json:"Status"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("failed to decode scan result: %v", err)
+	}
+
+	// Expected: Status 0 (NotStarted) because we never triggered a scan on the new zone
+	// Bug: Status 1 or 2 (InProgress/Completed) if scanTriggered[1] was not cleared by reset
+	if result.Status != 0 {
+		t.Errorf("expected Status 0 (NotStarted) for new zone after reset, got %d (scan state from previous zone persisted)", result.Status)
+	}
+}
