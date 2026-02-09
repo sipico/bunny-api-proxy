@@ -992,3 +992,350 @@ func TestLoggingTransport_InfoLevel(t *testing.T) {
 		t.Error("Expected only one log at INFO level, but found more")
 	}
 }
+
+// trackingReadCloser tracks whether its body was read.
+type trackingReadCloser struct {
+	data      []byte
+	readPos   int
+	wasClosed bool
+	wasRead   bool
+}
+
+func (t *trackingReadCloser) Read(p []byte) (int, error) {
+	t.wasRead = true
+	if t.readPos >= len(t.data) {
+		return 0, io.EOF
+	}
+	n := copy(p, t.data[t.readPos:])
+	t.readPos += n
+	return n, nil
+}
+
+func (t *trackingReadCloser) Close() error {
+	t.wasClosed = true
+	return nil
+}
+
+// TestLoggingTransport_DoesNotBufferAtInfoLevel tests that request/response bodies are NOT buffered at INFO level.
+func TestLoggingTransport_DoesNotBufferAtInfoLevel(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	// Use INFO level
+	logger := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo}))
+
+	responseBody := "response data"
+	trackingResponseBody := &trackingReadCloser{data: []byte(responseBody)}
+
+	mockTransport := &mockRoundTripper{
+		response: &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       trackingResponseBody,
+			Header:     make(http.Header),
+		},
+	}
+
+	lt := &LoggingTransport{
+		Transport: mockTransport,
+		Logger:    logger,
+		Prefix:    "TEST",
+	}
+
+	req, err := http.NewRequest("GET", "https://api.bunny.net/dnszone", nil)
+	if err != nil {
+		t.Fatalf("Failed to create request: %v", err)
+	}
+
+	resp, err := lt.RoundTrip(req)
+	if err != nil {
+		t.Fatalf("RoundTrip failed: %v", err)
+	}
+
+	// At INFO level, the response body should NOT have been read by LoggingTransport
+	if trackingResponseBody.wasRead {
+		t.Error("Response body was buffered at INFO level, but should not be")
+	}
+
+	// The caller should still be able to read the body
+	callerBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("Failed to read response body: %v", err)
+	}
+
+	if string(callerBody) != responseBody {
+		t.Errorf("Expected caller to read %q, got %q", responseBody, string(callerBody))
+	}
+}
+
+// TestLoggingTransport_BuffersAtDebugLevel tests that request/response bodies ARE buffered at DEBUG level.
+func TestLoggingTransport_BuffersAtDebugLevel(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	// Use DEBUG level
+	logger := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
+
+	responseBody := "response data"
+	trackingResponseBody := &trackingReadCloser{data: []byte(responseBody)}
+
+	mockTransport := &mockRoundTripper{
+		response: &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       trackingResponseBody,
+			Header:     make(http.Header),
+		},
+	}
+
+	lt := &LoggingTransport{
+		Transport: mockTransport,
+		Logger:    logger,
+		Prefix:    "TEST",
+	}
+
+	req, err := http.NewRequest("GET", "https://api.bunny.net/dnszone", nil)
+	if err != nil {
+		t.Fatalf("Failed to create request: %v", err)
+	}
+
+	resp, err := lt.RoundTrip(req)
+	if err != nil {
+		t.Fatalf("RoundTrip failed: %v", err)
+	}
+
+	// At DEBUG level, the response body SHOULD have been read by LoggingTransport
+	if !trackingResponseBody.wasRead {
+		t.Error("Response body was not buffered at DEBUG level, but should be")
+	}
+
+	// The caller should still be able to read the body
+	callerBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("Failed to read response body: %v", err)
+	}
+
+	if string(callerBody) != responseBody {
+		t.Errorf("Expected caller to read %q, got %q", responseBody, string(callerBody))
+	}
+}
+
+// TestRetryTransport_IdempotentMethodDetection tests the idempotent method detection.
+func TestRetryTransport_IdempotentMethodDetection(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name         string
+		method       string
+		isIdempotent bool
+	}{
+		{"GET is idempotent", http.MethodGet, true},
+		{"HEAD is idempotent", http.MethodHead, true},
+		{"OPTIONS is idempotent", http.MethodOptions, true},
+		{"POST is not idempotent", http.MethodPost, false},
+		{"PUT is not idempotent", http.MethodPut, false},
+		{"DELETE is not idempotent", http.MethodDelete, false},
+		{"PATCH is not idempotent", http.MethodPatch, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := isIdempotentMethod(tt.method)
+			if result != tt.isIdempotent {
+				t.Errorf("isIdempotentMethod(%q) = %v, want %v", tt.method, result, tt.isIdempotent)
+			}
+		})
+	}
+}
+
+// TestRetryTransport_TimeoutErrorDetection tests timeout error detection.
+func TestRetryTransport_TimeoutErrorDetection(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name      string
+		err       error
+		isTimeout bool
+	}{
+		{"nil error", nil, false},
+		{"context deadline exceeded", context.DeadlineExceeded, true},
+		{"Client.Timeout exceeded error", fmt.Errorf("Get \"https://api.bunny.net/dnszone\": context deadline exceeded (Client.Timeout exceeded while awaiting headers)"), true},
+		{"i/o timeout error", fmt.Errorf("i/o timeout"), true},
+		{"generic error", fmt.Errorf("some other error"), false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := isTimeoutError(tt.err)
+			if result != tt.isTimeout {
+				t.Errorf("isTimeoutError(%v) = %v, want %v", tt.err, result, tt.isTimeout)
+			}
+		})
+	}
+}
+
+// TestRetryTransport_NoRetryForNonIdempotentMethods tests that non-idempotent methods are not retried.
+func TestRetryTransport_NoRetryForNonIdempotentMethods(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo}))
+
+	timeoutErr := fmt.Errorf("Get \"https://api.bunny.net/test\": context deadline exceeded (Client.Timeout exceeded while awaiting headers)")
+
+	mockTransport := &mockRoundTripper{
+		response: nil,
+		err:      timeoutErr,
+	}
+
+	rt := &RetryTransport{
+		Transport: mockTransport,
+		Logger:    logger,
+	}
+
+	// Create POST request (non-idempotent)
+	req, _ := http.NewRequest(http.MethodPost, "https://api.bunny.net/test", nil)
+
+	// Make the request
+	resp, err := rt.RoundTrip(req)
+
+	// Should fail immediately, no retry for POST
+	if err == nil {
+		t.Error("Expected error for POST request timeout")
+	}
+	if err.Error() != timeoutErr.Error() {
+		t.Errorf("Expected %v, got %v", timeoutErr, err)
+	}
+	if resp != nil {
+		t.Error("Expected nil response on timeout")
+	}
+
+	// Verify no retry logs
+	logOutput := buf.String()
+	if strings.Contains(logOutput, "retrying") {
+		t.Error("Should not retry non-idempotent methods")
+	}
+}
+
+// failOnceThenSucceedTransport is a test helper that fails once with timeout, then succeeds.
+type failOnceThenSucceedTransport struct {
+	failOnce    bool
+	failErr     error
+	successResp *http.Response
+}
+
+func (t *failOnceThenSucceedTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if t.failOnce {
+		t.failOnce = false
+		return nil, t.failErr
+	}
+	return t.successResp, nil
+}
+
+// TestRetryTransport_RetriesIdempotentOnTimeout tests that idempotent methods are retried on timeout.
+func TestRetryTransport_RetriesIdempotentOnTimeout(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelWarn}))
+
+	timeoutErr := fmt.Errorf("Get \"https://api.bunny.net/test\": context deadline exceeded (Client.Timeout exceeded while awaiting headers)")
+	successResp := &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(strings.NewReader(`{"result":"ok"}`)),
+		Header:     make(http.Header),
+	}
+
+	rt := &RetryTransport{
+		Transport: &failOnceThenSucceedTransport{
+			failOnce:    true,
+			failErr:     timeoutErr,
+			successResp: successResp,
+		},
+		Logger: logger,
+	}
+
+	req, _ := http.NewRequest(http.MethodGet, "https://api.bunny.net/test", nil)
+	resp, err := rt.RoundTrip(req)
+
+	// Should succeed on retry
+	if err != nil {
+		t.Errorf("Expected no error after retry, got %v", err)
+	}
+	if resp == nil {
+		t.Error("Expected response after retry")
+	}
+
+	// Verify retry logs
+	logOutput := buf.String()
+	if !strings.Contains(logOutput, "timed out, retrying") {
+		t.Error("Expected retry log message")
+	}
+}
+
+// TestRetryTransport_StopsAfterTwoAttempts tests that retry stops after two attempts.
+func TestRetryTransport_StopsAfterTwoAttempts(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelError}))
+
+	timeoutErr := fmt.Errorf("Get \"https://api.bunny.net/test\": context deadline exceeded (Client.Timeout exceeded while awaiting headers)")
+
+	// Transport that always times out
+	alwaysFailTransport := &mockRoundTripper{
+		response: nil,
+		err:      timeoutErr,
+	}
+
+	rt := &RetryTransport{
+		Transport: alwaysFailTransport,
+		Logger:    logger,
+	}
+
+	req, _ := http.NewRequest(http.MethodGet, "https://api.bunny.net/test", nil)
+	resp, err := rt.RoundTrip(req)
+
+	// Should fail with error
+	if err == nil {
+		t.Error("Expected error after retry also fails")
+	}
+	if resp != nil {
+		t.Error("Expected nil response after all retries fail")
+	}
+
+	// Verify error log (not just warn)
+	logOutput := buf.String()
+	if !strings.Contains(logOutput, "failed after retry") {
+		t.Error("Expected error log after retry failure")
+	}
+}
+
+// TestRetryTransport_NoRetryForNonTimeoutErrors tests that non-timeout errors are not retried.
+func TestRetryTransport_NoRetryForNonTimeoutErrors(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo}))
+
+	nonTimeoutErr := fmt.Errorf("connection refused")
+	mockTransport := &mockRoundTripper{
+		response: nil,
+		err:      nonTimeoutErr,
+	}
+
+	rt := &RetryTransport{
+		Transport: mockTransport,
+		Logger:    logger,
+	}
+
+	req, _ := http.NewRequest(http.MethodGet, "https://api.bunny.net/test", nil)
+	resp, err := rt.RoundTrip(req)
+
+	// Should fail immediately, no retry for non-timeout errors
+	if err == nil {
+		t.Error("Expected error")
+	}
+	if err.Error() != nonTimeoutErr.Error() {
+		t.Errorf("Expected %v, got %v", nonTimeoutErr, err)
+	}
+	if resp != nil {
+		t.Error("Expected nil response")
+	}
+
+	// Verify no retry logs
+	logOutput := buf.String()
+	if strings.Contains(logOutput, "timed out, retrying") {
+		t.Error("Should not retry non-timeout errors")
+	}
+}

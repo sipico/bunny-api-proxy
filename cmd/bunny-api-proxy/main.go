@@ -125,8 +125,13 @@ func initializeComponents(cfg *config.Config) (*serverComponents, error) {
 		Logger:    logger,
 		Prefix:    "BUNNY",
 	}
-	httpClient := &http.Client{
+	// Wrap with RetryTransport to retry on timeout errors
+	retryTransport := &bunny.RetryTransport{
 		Transport: loggingTransport,
+		Logger:    logger,
+	}
+	httpClient := &http.Client{
+		Transport: retryTransport,
 		Timeout:   30 * time.Second,
 	}
 	bunnyOpts = append(bunnyOpts, bunny.WithHTTPClient(httpClient))

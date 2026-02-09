@@ -2,9 +2,11 @@ package bunny
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"log/slog"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -26,9 +28,11 @@ func (t *LoggingTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 	// Extract request ID from context
 	requestID := middleware.GetRequestID(req.Context())
 
-	// Read request body
+	isDebug := t.Logger.Enabled(req.Context(), slog.LevelDebug)
+
+	// Only buffer request body if DEBUG logging is enabled
 	var reqBodyBytes []byte
-	if req.Body != nil {
+	if isDebug && req.Body != nil {
 		var err error
 		reqBodyBytes, err = io.ReadAll(req.Body)
 		if err != nil {
@@ -38,10 +42,9 @@ func (t *LoggingTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 		req.Body = io.NopCloser(bytes.NewReader(reqBodyBytes))
 	}
 
-	// Prepare request headers for logging (with redaction) - only for DEBUG
-	var reqHeaders map[string]string
-	if t.Logger.Enabled(req.Context(), slog.LevelDebug) {
-		reqHeaders = make(map[string]string)
+	// DEBUG: Log full request details
+	if isDebug {
+		reqHeaders := make(map[string]string)
 		for k, v := range req.Header {
 			if strings.EqualFold(k, "AccessKey") || strings.EqualFold(k, "Authorization") {
 				reqHeaders[k] = redactSensitiveData(strings.Join(v, ", "))
@@ -50,7 +53,6 @@ func (t *LoggingTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 			}
 		}
 
-		// DEBUG: Log full request details
 		t.Logger.Debug("Bunny API request",
 			"request_id", requestID,
 			"prefix", t.Prefix,
@@ -78,13 +80,17 @@ func (t *LoggingTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 		return nil, err
 	}
 
-	// Read response body
-	respBodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
+	// Only buffer response body if DEBUG logging is enabled
+	var respBodyBytes []byte
+	if isDebug {
+		var err error
+		respBodyBytes, err = io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, err
+		}
+		// Restore body for caller
+		resp.Body = io.NopCloser(bytes.NewReader(respBodyBytes))
 	}
-	// Restore body for caller
-	resp.Body = io.NopCloser(bytes.NewReader(respBodyBytes))
 
 	// INFO: Log operational summary
 	t.Logger.Info("Bunny API call",
@@ -97,7 +103,7 @@ func (t *LoggingTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 	)
 
 	// DEBUG: Log full response details
-	if t.Logger.Enabled(req.Context(), slog.LevelDebug) {
+	if isDebug {
 		t.Logger.Debug("Bunny API response",
 			"request_id", requestID,
 			"prefix", t.Prefix,
@@ -126,4 +132,84 @@ func redactSensitiveData(key string) string {
 		return "****"
 	}
 	return key[:4] + "..." + key[len(key)-4:]
+}
+
+// RetryTransport wraps an http.RoundTripper and retries on timeout errors.
+// Only retries idempotent methods (GET, HEAD, OPTIONS) to ensure safety.
+// Retries once with exponential backoff on timeout errors.
+type RetryTransport struct {
+	Transport http.RoundTripper
+	Logger    *slog.Logger
+}
+
+// RoundTrip implements http.RoundTripper interface with retry logic for timeouts.
+func (t *RetryTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	// Only retry idempotent methods
+	if !isIdempotentMethod(req.Method) {
+		return t.Transport.RoundTrip(req)
+	}
+
+	resp, err := t.Transport.RoundTrip(req)
+
+	// Check if it's a timeout error
+	if err != nil && isTimeoutError(err) {
+		t.Logger.Warn("HTTP request timed out, retrying",
+			"method", req.Method,
+			"url", req.URL.String(),
+			"error", err,
+		)
+
+		// Wait with exponential backoff before retry
+		time.Sleep(100 * time.Millisecond)
+
+		// Retry once
+		resp, err = t.Transport.RoundTrip(req)
+		if err != nil {
+			t.Logger.Error("HTTP request failed after retry",
+				"method", req.Method,
+				"url", req.URL.String(),
+				"error", err,
+			)
+		} else {
+			t.Logger.Info("HTTP request succeeded after retry",
+				"method", req.Method,
+				"url", req.URL.String(),
+			)
+		}
+	}
+
+	return resp, err
+}
+
+// isIdempotentMethod returns true for HTTP methods that are safe to retry.
+func isIdempotentMethod(method string) bool {
+	switch method {
+	case http.MethodGet, http.MethodHead, http.MethodOptions:
+		return true
+	default:
+		return false
+	}
+}
+
+// isTimeoutError checks if an error is a timeout error (context deadline or network timeout).
+func isTimeoutError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	// Check for context deadline exceeded
+	if err == context.DeadlineExceeded {
+		return true
+	}
+
+	// Check for net.Error with Timeout() method
+	if os.IsTimeout(err) {
+		return true
+	}
+
+	// Check string representation for timeout patterns
+	errStr := err.Error()
+	return strings.Contains(errStr, "Client.Timeout exceeded") ||
+		strings.Contains(errStr, "context deadline exceeded") ||
+		strings.Contains(errStr, "i/o timeout")
 }
