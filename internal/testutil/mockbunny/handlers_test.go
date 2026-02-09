@@ -1759,6 +1759,73 @@ func TestHandleExportRecords_InvalidZoneID(t *testing.T) {
 	}
 }
 
+// TestHandleExportRecords_ConcurrentExportNoRace tests that multiple concurrent
+// export operations do not cause a data race in handleExportRecords.
+// This test focuses on the handleExportRecords handler's lock management.
+// Before the fix, handleExportRecords had a TOCTOU race:
+// 1. Acquires RLock, looks up zone, releases RLock
+// 2. Re-acquires RLock and defers unlock
+// 3. Accesses zone.Records
+// Between the two lock acquisitions, another goroutine could modify zone.Records,
+// causing a data race. The fix holds the lock for the entire operation.
+// Run with: go test -race ./internal/testutil/mockbunny/...
+func TestHandleExportRecords_ConcurrentExportNoRace(t *testing.T) {
+	// Do not run in parallel since we're stress-testing concurrency intentionally
+	s := New()
+	defer s.Close()
+
+	records := []Record{
+		{Type: 0, Name: "@", Value: "192.168.1.1", TTL: 300},
+		{Type: 3, Name: "test", Value: "hello world", TTL: 60},
+	}
+	zoneID := s.AddZoneWithRecords("example.com", records)
+
+	done := make(chan bool)
+	errChan := make(chan error, 2)
+
+	// Goroutine 1: continuously export records (stress the read lock path)
+	go func() {
+		for i := 0; i < 200; i++ {
+			resp, err := http.Get(fmt.Sprintf("%s/dnszone/%d/export", s.URL(), zoneID))
+			if err != nil {
+				errChan <- fmt.Errorf("export request failed: %v", err)
+				return
+			}
+			// Read the entire response body to ensure the handler completes
+			_, _ = io.ReadAll(resp.Body)
+			resp.Body.Close()
+		}
+		done <- true
+	}()
+
+	// Goroutine 2: continuously export records (additional concurrent reads)
+	go func() {
+		for i := 0; i < 200; i++ {
+			resp, err := http.Get(fmt.Sprintf("%s/dnszone/%d/export", s.URL(), zoneID))
+			if err != nil {
+				errChan <- fmt.Errorf("export request failed: %v", err)
+				return
+			}
+			// Read the entire response body to ensure the handler completes
+			_, _ = io.ReadAll(resp.Body)
+			resp.Body.Close()
+		}
+		done <- true
+	}()
+
+	// Wait for both goroutines to complete
+	<-done
+	<-done
+
+	// Check for any errors
+	select {
+	case err := <-errChan:
+		t.Fatalf("concurrent export failed: %v", err)
+	default:
+		// No errors and no races detected (if run with -race flag)
+	}
+}
+
 func TestHandleEnableDNSSEC_Success(t *testing.T) {
 	t.Parallel()
 	s := New()
