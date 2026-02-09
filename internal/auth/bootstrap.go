@@ -65,10 +65,20 @@ func (b *BootstrapService) GetState(ctx context.Context) (BootstrapState, error)
 }
 
 // IsMasterKey checks if the provided key matches the bunny.net API key
-// Uses constant-time comparison to prevent timing attacks
+//
+// SECURITY: This function MUST use constant-time comparison to prevent timing
+// side-channel attacks. While SHA-256 hashing before comparison significantly
+// mitigates practical timing attacks (the hash computation dominates timing),
+// defense-in-depth requires using subtle.ConstantTimeCompare for the final
+// hash comparison.
+//
+// DO NOT refactor this to use == or strings.EqualFold - such changes would
+// introduce a timing side-channel vulnerability. The test
+// TestIsMasterKey_UsesConstantTimeComparison enforces this requirement.
 func (b *BootstrapService) IsMasterKey(key string) bool {
 	hash := sha256.Sum256([]byte(key))
 	keyHash := hex.EncodeToString(hash[:])
+	// SECURITY-CRITICAL: Must use constant-time comparison (see function comment)
 	return subtle.ConstantTimeCompare([]byte(keyHash), []byte(b.masterKeyHash)) == 1
 }
 
