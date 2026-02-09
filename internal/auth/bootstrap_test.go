@@ -5,6 +5,8 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"os"
+	"strings"
 	"testing"
 
 	"github.com/sipico/bunny-api-proxy/internal/storage"
@@ -322,20 +324,84 @@ func TestBootstrapStateString_Unknown(t *testing.T) {
 	}
 }
 
-func TestIsMasterKey_ConstantTimeComparison(t *testing.T) {
+func TestIsMasterKey_UsesConstantTimeComparison(t *testing.T) {
 	t.Parallel()
-	// Test that the comparison doesn't leak timing information
-	masterKey := "test-key-12345"
-	mock := &mockTokenStore{}
-	bs := NewBootstrapService(mock, masterKey)
+	// This test verifies that IsMasterKey uses subtle.ConstantTimeCompare
+	// to prevent timing side-channel attacks. While SHA-256 hashing before
+	// comparison mitigates practical timing attacks, defense-in-depth requires
+	// using constant-time comparison for the hash comparison step.
+	//
+	// This test inspects the source code to ensure the implementation uses
+	// subtle.ConstantTimeCompare. If a future refactor changes this to use
+	// == or strings.EqualFold, this test will fail and prevent the regression.
 
-	// Both correct and incorrect keys should be checked with constant time
-	correctKey := masterKey
-	incorrectKey := "wrong-key-12345"
+	sourceFile := "bootstrap.go"
+	content, err := os.ReadFile(sourceFile)
+	if err != nil {
+		t.Fatalf("failed to read source file %s: %v", sourceFile, err)
+	}
 
-	_ = bs.IsMasterKey(correctKey)   // Should return true
-	_ = bs.IsMasterKey(incorrectKey) // Should return false
-	// If this test runs without timing differences, constant-time comparison works
+	source := string(content)
+
+	// Verify that IsMasterKey function exists
+	if !strings.Contains(source, "func (b *BootstrapService) IsMasterKey(") {
+		t.Fatal("IsMasterKey function not found in source file")
+	}
+
+	// Extract the IsMasterKey function body
+	isMasterKeyStart := strings.Index(source, "func (b *BootstrapService) IsMasterKey(")
+	if isMasterKeyStart == -1 {
+		t.Fatal("could not find IsMasterKey function")
+	}
+
+	// Find the function body by locating the closing brace
+	// We need to find the matching closing brace for the function
+	funcBody := source[isMasterKeyStart:]
+	openBraces := 0
+	funcEnd := -1
+	for i, ch := range funcBody {
+		if ch == '{' {
+			openBraces++
+		} else if ch == '}' {
+			openBraces--
+			if openBraces == 0 {
+				funcEnd = i
+				break
+			}
+		}
+	}
+
+	if funcEnd == -1 {
+		t.Fatal("could not find end of IsMasterKey function")
+	}
+
+	funcBody = funcBody[:funcEnd+1]
+
+	// Verify that the function uses subtle.ConstantTimeCompare
+	if !strings.Contains(funcBody, "subtle.ConstantTimeCompare") {
+		t.Errorf("IsMasterKey function must use subtle.ConstantTimeCompare for constant-time comparison\n"+
+			"Found function:\n%s", funcBody)
+	}
+
+	// Also verify that it doesn't use insecure comparison operators
+	// Check for == comparison on the hash (excluding comments)
+	lines := strings.Split(funcBody, "\n")
+	for _, line := range lines {
+		// Skip comments
+		if strings.Contains(line, "//") {
+			line = line[:strings.Index(line, "//")]
+		}
+		// Look for dangerous patterns
+		if strings.Contains(line, "== 1") || strings.Contains(line, "!= 1") {
+			// This is okay - it's checking the result of ConstantTimeCompare
+			continue
+		}
+		if (strings.Contains(line, "keyHash") || strings.Contains(line, "masterKeyHash")) &&
+			(strings.Contains(line, "==") || strings.Contains(line, "!=")) {
+			t.Errorf("IsMasterKey appears to use == or != for hash comparison instead of subtle.ConstantTimeCompare\n"+
+				"Problematic line: %s", strings.TrimSpace(line))
+		}
+	}
 }
 
 func TestBootstrapService_ZeroLength_MasterKey(t *testing.T) {
