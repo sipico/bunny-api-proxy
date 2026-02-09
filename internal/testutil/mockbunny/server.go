@@ -62,6 +62,9 @@ func New() *Server {
 	// Apply Vary: Accept-Encoding header middleware to GET responses
 	r.Use(VaryAcceptEncodingMiddleware)
 
+	// Apply failure injection middleware
+	r.Use(FailureInjectionMiddleware(state))
+
 	// Wire up DNS API handlers with authentication (if API key is configured)
 	r.Group(func(r chi.Router) {
 		if apiKey != "" {
@@ -230,4 +233,49 @@ func (s *Server) GetState() map[int64]Zone {
 // This allows running mockbunny outside of httptest.
 func (s *Server) Handler() chi.Router {
 	return s.router
+}
+
+// SetNextError schedules the next N requests to fail with the given status code and message.
+// This method is thread-safe.
+func (s *Server) SetNextError(statusCode int, message string, count int) {
+	s.state.mu.Lock()
+	defer s.state.mu.Unlock()
+
+	s.state.failureInjection.nextErrorStatus = statusCode
+	s.state.failureInjection.nextErrorMessage = message
+	s.state.failureInjection.nextErrorCount = count
+	s.state.failureInjection.nextErrorRemaining = count
+}
+
+// SetLatency schedules the next N requests to have the given delay.
+// This method is thread-safe.
+func (s *Server) SetLatency(duration time.Duration, count int) {
+	s.state.mu.Lock()
+	defer s.state.mu.Unlock()
+
+	s.state.failureInjection.latencyDuration = duration
+	s.state.failureInjection.latencyCount = count
+	s.state.failureInjection.latencyRemaining = count
+}
+
+// SetRateLimit schedules rate limiting: after the given number of successful requests,
+// all subsequent requests will return 429 Too Many Requests.
+// Setting afterRequests to 0 means immediate rate limiting.
+// This method is thread-safe.
+func (s *Server) SetRateLimit(afterRequests int) {
+	s.state.mu.Lock()
+	defer s.state.mu.Unlock()
+
+	s.state.failureInjection.rateLimitAfter = afterRequests
+	s.state.failureInjection.rateLimitCounter = 0
+}
+
+// SetMalformedResponse schedules the next N responses to return invalid JSON.
+// This method is thread-safe.
+func (s *Server) SetMalformedResponse(count int) {
+	s.state.mu.Lock()
+	defer s.state.mu.Unlock()
+
+	s.state.failureInjection.malformedCount = count
+	s.state.failureInjection.malformedRemaining = count
 }

@@ -191,14 +191,39 @@ type ZoneShortTime struct {
 	CertificateKeyType       int                `json:"CertificateKeyType"` // 0 = Ecdsa, 1 = Rsa
 }
 
+// FailureInjection holds state for simulating failure modes.
+type FailureInjection struct {
+	// Error injection
+	nextErrorStatus    int
+	nextErrorMessage   string
+	nextErrorCount     int
+	nextErrorRemaining int
+
+	// Latency injection
+	latencyDuration  time.Duration
+	latencyCount     int
+	latencyRemaining int
+
+	// Rate limiting
+	// rateLimitAfter = -1 means disabled (default)
+	// rateLimitAfter >= 0 means active
+	rateLimitAfter   int // return 429 after this many successful requests (-1 = disabled)
+	rateLimitCounter int // current count of successful requests
+
+	// Malformed response
+	malformedCount     int
+	malformedRemaining int
+}
+
 // State holds the internal mock server state.
 type State struct {
-	mu            sync.RWMutex
-	zones         map[int64]*Zone
-	nextZoneID    int64
-	nextRecordID  int64
-	scanTriggered map[int64]bool // tracks which zones have had a scan triggered
-	scanCallCount map[int64]int  // tracks how many times scan result has been polled per zone
+	mu               sync.RWMutex
+	zones            map[int64]*Zone
+	nextZoneID       int64
+	nextRecordID     int64
+	scanTriggered    map[int64]bool   // tracks which zones have had a scan triggered
+	scanCallCount    map[int64]int    // tracks how many times scan result has been polled per zone
+	failureInjection FailureInjection // holds failure injection state
 }
 
 // NewState creates a new State instance for the mock server.
@@ -209,6 +234,9 @@ func NewState() *State {
 		nextRecordID:  1,
 		scanTriggered: make(map[int64]bool),
 		scanCallCount: make(map[int64]int),
+		failureInjection: FailureInjection{
+			rateLimitAfter: -1, // disabled by default
+		},
 	}
 	_ = &s.mu // Mutex will be used by state management methods
 	return s
