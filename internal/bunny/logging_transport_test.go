@@ -992,3 +992,126 @@ func TestLoggingTransport_InfoLevel(t *testing.T) {
 		t.Error("Expected only one log at INFO level, but found more")
 	}
 }
+
+// trackingReadCloser tracks whether its body was read.
+type trackingReadCloser struct {
+	data      []byte
+	readPos   int
+	wasClosed bool
+	wasRead   bool
+}
+
+func (t *trackingReadCloser) Read(p []byte) (int, error) {
+	t.wasRead = true
+	if t.readPos >= len(t.data) {
+		return 0, io.EOF
+	}
+	n := copy(p, t.data[t.readPos:])
+	t.readPos += n
+	return n, nil
+}
+
+func (t *trackingReadCloser) Close() error {
+	t.wasClosed = true
+	return nil
+}
+
+// TestLoggingTransport_DoesNotBufferAtInfoLevel tests that request/response bodies are NOT buffered at INFO level.
+func TestLoggingTransport_DoesNotBufferAtInfoLevel(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	// Use INFO level
+	logger := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo}))
+
+	responseBody := "response data"
+	trackingResponseBody := &trackingReadCloser{data: []byte(responseBody)}
+
+	mockTransport := &mockRoundTripper{
+		response: &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       trackingResponseBody,
+			Header:     make(http.Header),
+		},
+	}
+
+	lt := &LoggingTransport{
+		Transport: mockTransport,
+		Logger:    logger,
+		Prefix:    "TEST",
+	}
+
+	req, err := http.NewRequest("GET", "https://api.bunny.net/dnszone", nil)
+	if err != nil {
+		t.Fatalf("Failed to create request: %v", err)
+	}
+
+	resp, err := lt.RoundTrip(req)
+	if err != nil {
+		t.Fatalf("RoundTrip failed: %v", err)
+	}
+
+	// At INFO level, the response body should NOT have been read by LoggingTransport
+	if trackingResponseBody.wasRead {
+		t.Error("Response body was buffered at INFO level, but should not be")
+	}
+
+	// The caller should still be able to read the body
+	callerBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("Failed to read response body: %v", err)
+	}
+
+	if string(callerBody) != responseBody {
+		t.Errorf("Expected caller to read %q, got %q", responseBody, string(callerBody))
+	}
+}
+
+// TestLoggingTransport_BuffersAtDebugLevel tests that request/response bodies ARE buffered at DEBUG level.
+func TestLoggingTransport_BuffersAtDebugLevel(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	// Use DEBUG level
+	logger := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
+
+	responseBody := "response data"
+	trackingResponseBody := &trackingReadCloser{data: []byte(responseBody)}
+
+	mockTransport := &mockRoundTripper{
+		response: &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       trackingResponseBody,
+			Header:     make(http.Header),
+		},
+	}
+
+	lt := &LoggingTransport{
+		Transport: mockTransport,
+		Logger:    logger,
+		Prefix:    "TEST",
+	}
+
+	req, err := http.NewRequest("GET", "https://api.bunny.net/dnszone", nil)
+	if err != nil {
+		t.Fatalf("Failed to create request: %v", err)
+	}
+
+	resp, err := lt.RoundTrip(req)
+	if err != nil {
+		t.Fatalf("RoundTrip failed: %v", err)
+	}
+
+	// At DEBUG level, the response body SHOULD have been read by LoggingTransport
+	if !trackingResponseBody.wasRead {
+		t.Error("Response body was not buffered at DEBUG level, but should be")
+	}
+
+	// The caller should still be able to read the body
+	callerBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("Failed to read response body: %v", err)
+	}
+
+	if string(callerBody) != responseBody {
+		t.Errorf("Expected caller to read %q, got %q", responseBody, string(callerBody))
+	}
+}
