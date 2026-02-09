@@ -97,7 +97,7 @@ func (s *Server) handleAdminCreateRecord(w http.ResponseWriter, r *http.Request)
 }
 
 // handleAdminReset handles DELETE /admin/reset
-// Clears all zones and records, resetting ID counters and scan state
+// Clears all zones and records, resetting ID counters, scan state, and failure injection state
 func (s *Server) handleAdminReset(w http.ResponseWriter, r *http.Request) {
 	s.state.mu.Lock()
 	defer s.state.mu.Unlock()
@@ -106,6 +106,10 @@ func (s *Server) handleAdminReset(w http.ResponseWriter, r *http.Request) {
 	s.state.nextRecordID = 1
 	s.state.scanTriggered = make(map[int64]bool)
 	s.state.scanCallCount = make(map[int64]int)
+	// Clear failure injection state with proper initialization
+	s.state.failureInjection = FailureInjection{
+		rateLimitAfter: -1,
+	}
 	w.WriteHeader(http.StatusNoContent)
 }
 

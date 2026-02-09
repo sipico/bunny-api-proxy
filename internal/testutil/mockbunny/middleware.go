@@ -120,3 +120,79 @@ func VaryAcceptEncodingMiddleware(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 	})
 }
+
+// FailureInjectionMiddleware creates a middleware that applies configured failure injection rules.
+// It handles: error injection, latency injection, rate limiting, and malformed responses.
+// Admin endpoints are excluded from failure injection to allow control of the mock server.
+func FailureInjectionMiddleware(state *State) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Skip failure injection for admin endpoints
+			if strings.HasPrefix(r.URL.Path, "/admin") {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			state.mu.Lock()
+			fi := state.failureInjection
+
+			// Check for pending latency
+			if fi.latencyRemaining > 0 {
+				latency := fi.latencyDuration
+				state.failureInjection.latencyRemaining--
+				state.mu.Unlock()
+
+				// Sleep outside the lock
+				time.Sleep(latency)
+
+				state.mu.Lock()
+			}
+
+			// Check for rate limiting (only if enabled: rateLimitAfter >= 0)
+			if fi.rateLimitAfter >= 0 && fi.rateLimitCounter >= fi.rateLimitAfter {
+				state.mu.Unlock()
+				w.Header().Set("Content-Type", "application/json; charset=utf-8")
+				w.WriteHeader(http.StatusTooManyRequests)
+				//nolint:errcheck
+				w.Write([]byte(`{"ErrorKey":"rate_limit","Message":"Too many requests"}`))
+				return
+			}
+
+			// Check for pending errors
+			if fi.nextErrorRemaining > 0 {
+				statusCode := fi.nextErrorStatus
+				message := fi.nextErrorMessage
+				state.failureInjection.nextErrorRemaining--
+				state.mu.Unlock()
+
+				w.Header().Set("Content-Type", "application/json; charset=utf-8")
+				w.WriteHeader(statusCode)
+				//nolint:errcheck
+				w.Write([]byte(`{"ErrorKey":"injected_error","Message":"` + message + `"}`))
+				return
+			}
+
+			// Check for malformed response
+			if fi.malformedRemaining > 0 {
+				state.failureInjection.malformedRemaining--
+				state.mu.Unlock()
+
+				w.Header().Set("Content-Type", "application/json; charset=utf-8")
+				w.WriteHeader(http.StatusOK)
+				// Return intentionally invalid JSON
+				//nolint:errcheck
+				w.Write([]byte(`{invalid json`))
+				return
+			}
+
+			// If rate limit is active, increment counter for successful requests
+			if fi.rateLimitAfter >= 0 {
+				state.failureInjection.rateLimitCounter++
+			}
+
+			state.mu.Unlock()
+
+			next.ServeHTTP(w, r)
+		})
+	}
+}
