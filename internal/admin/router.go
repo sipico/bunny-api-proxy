@@ -33,16 +33,21 @@ func (h *Handler) NewRouter() chi.Router {
 		// Whoami endpoint - available to any authenticated token
 		r.Get("/whoami", h.HandleWhoami)
 
-		// Log level management
-		r.Post("/loglevel", h.HandleSetLogLevel)
+		// Admin-only endpoints - require admin token
+		r.Group(func(r chi.Router) {
+			r.Use(h.RequireAdmin)
 
-		// Unified token management (Issue 147)
-		r.Get("/tokens", h.HandleListUnifiedTokens)
-		r.Post("/tokens", h.HandleCreateUnifiedToken)
-		r.Get("/tokens/{id}", h.HandleGetUnifiedToken)
-		r.Delete("/tokens/{id}", h.HandleDeleteUnifiedToken)
-		r.Post("/tokens/{id}/permissions", h.HandleAddTokenPermission)
-		r.Delete("/tokens/{id}/permissions/{pid}", h.HandleDeleteTokenPermission)
+			// Log level management
+			r.Post("/loglevel", h.HandleSetLogLevel)
+
+			// Unified token management (Issue 147)
+			r.Get("/tokens", h.HandleListUnifiedTokens)
+			r.Post("/tokens", h.HandleCreateUnifiedToken)
+			r.Get("/tokens/{id}", h.HandleGetUnifiedToken)
+			r.Delete("/tokens/{id}", h.HandleDeleteUnifiedToken)
+			r.Post("/tokens/{id}/permissions", h.HandleAddTokenPermission)
+			r.Delete("/tokens/{id}/permissions/{pid}", h.HandleDeleteTokenPermission)
+		})
 	})
 
 	return r
