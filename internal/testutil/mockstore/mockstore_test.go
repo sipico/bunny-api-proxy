@@ -31,7 +31,7 @@ func TestMockStorage_DefaultBehavior(t *testing.T) {
 		t.Errorf("CreateToken default should not return error, got %v", err)
 	}
 	if token == nil {
-		t.Error("CreateToken default should return a token")
+		t.Fatal("CreateToken default should return a token")
 	}
 	if token.Name != "test" {
 		t.Errorf("CreateToken default token name = %q, want %q", token.Name, "test")
@@ -169,5 +169,240 @@ func TestMockStorage_GetPermissions(t *testing.T) {
 	_, err = mock.GetPermissions(ctx, 999)
 	if err != storage.ErrNotFound {
 		t.Errorf("GetPermissions should return ErrNotFound for unknown key, got %v", err)
+	}
+}
+
+// TestMockStorage_AllMethods exercises all methods to improve coverage.
+func TestMockStorage_AllMethods(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	mock := &MockStorage{}
+
+	// Test all default behaviors
+	// Scoped key operations
+	id, err := mock.CreateScopedKey(ctx, "test", "key")
+	if err != nil || id == 0 {
+		t.Errorf("CreateScopedKey default failed: id=%d, err=%v", id, err)
+	}
+
+	_, err = mock.GetScopedKeyByHash(ctx, "hash")
+	if err != storage.ErrNotFound {
+		t.Errorf("GetScopedKeyByHash default should return ErrNotFound, got %v", err)
+	}
+
+	_, err = mock.GetScopedKey(ctx, 1)
+	if err != storage.ErrNotFound {
+		t.Errorf("GetScopedKey default should return ErrNotFound, got %v", err)
+	}
+
+	if err := mock.DeleteScopedKey(ctx, 1); err != nil {
+		t.Errorf("DeleteScopedKey default should not error, got %v", err)
+	}
+
+	// Permission operations
+	permID, err := mock.AddPermission(ctx, 1, &storage.Permission{})
+	if err != nil || permID == 0 {
+		t.Errorf("AddPermission default failed: id=%d, err=%v", permID, err)
+	}
+
+	if err := mock.DeletePermission(ctx, 1); err != nil {
+		t.Errorf("DeletePermission default should not error, got %v", err)
+	}
+
+	// Token operations
+	if err := mock.DeleteToken(ctx, 1); err != nil {
+		t.Errorf("DeleteToken default should not error, got %v", err)
+	}
+
+	_, err = mock.GetTokenByID(ctx, 1)
+	if err != storage.ErrNotFound {
+		t.Errorf("GetTokenByID default should return ErrNotFound, got %v", err)
+	}
+
+	// Admin token operations
+	adminID, err := mock.CreateAdminToken(ctx, "admin", "token")
+	if err != nil || adminID == 0 {
+		t.Errorf("CreateAdminToken default failed: id=%d, err=%v", adminID, err)
+	}
+
+	_, err = mock.ValidateAdminToken(ctx, "token")
+	if err != storage.ErrNotFound {
+		t.Errorf("ValidateAdminToken default should return ErrNotFound, got %v", err)
+	}
+
+	adminTokens, err := mock.ListAdminTokens(ctx)
+	if err != nil || adminTokens == nil {
+		t.Errorf("ListAdminTokens default failed: tokens=%v, err=%v", adminTokens, err)
+	}
+
+	if err := mock.DeleteAdminToken(ctx, 1); err != nil {
+		t.Errorf("DeleteAdminToken default should not error, got %v", err)
+	}
+
+	// Unified operations
+	count, err := mock.CountAdminTokens(ctx)
+	if err != nil || count != 0 {
+		t.Errorf("CountAdminTokens default failed: count=%d, err=%v", count, err)
+	}
+
+	perm, err := mock.AddPermissionForToken(ctx, 1, &storage.Permission{})
+	if err != nil || perm == nil {
+		t.Errorf("AddPermissionForToken default failed: perm=%v, err=%v", perm, err)
+	}
+
+	if err := mock.RemovePermission(ctx, 1); err != nil {
+		t.Errorf("RemovePermission default should not error, got %v", err)
+	}
+
+	tokenPerms, err := mock.GetPermissionsForToken(ctx, 1)
+	if err != nil || tokenPerms == nil {
+		t.Errorf("GetPermissionsForToken default failed: perms=%v, err=%v", tokenPerms, err)
+	}
+
+	// Close
+	if err := mock.Close(); err != nil {
+		t.Errorf("Close default should not error, got %v", err)
+	}
+}
+
+// TestMockStorage_CustomFunctions exercises custom function paths to improve coverage.
+func TestMockStorage_CustomFunctions(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	// Test custom functions return custom values
+	customErr := storage.ErrDuplicate
+	mock := &MockStorage{
+		CreateScopedKeyFunc: func(ctx context.Context, name string, key string) (int64, error) {
+			return 42, customErr
+		},
+		GetScopedKeyByHashFunc: func(ctx context.Context, keyHash string) (*storage.ScopedKey, error) {
+			return &storage.ScopedKey{ID: 123}, nil
+		},
+		GetScopedKeyFunc: func(ctx context.Context, id int64) (*storage.ScopedKey, error) {
+			return &storage.ScopedKey{ID: id}, nil
+		},
+		DeleteScopedKeyFunc: func(ctx context.Context, id int64) error {
+			return customErr
+		},
+		AddPermissionFunc: func(ctx context.Context, scopedKeyID int64, perm *storage.Permission) (int64, error) {
+			return 99, nil
+		},
+		DeletePermissionFunc: func(ctx context.Context, id int64) error {
+			return customErr
+		},
+		DeleteTokenFunc: func(ctx context.Context, id int64) error {
+			return customErr
+		},
+		GetTokenByIDFunc: func(ctx context.Context, id int64) (*storage.Token, error) {
+			return &storage.Token{ID: id}, nil
+		},
+		CreateAdminTokenFunc: func(ctx context.Context, name, token string) (int64, error) {
+			return 789, customErr
+		},
+		ValidateAdminTokenFunc: func(ctx context.Context, token string) (*storage.AdminToken, error) {
+			return &storage.AdminToken{ID: 111}, nil
+		},
+		ListAdminTokensFunc: func(ctx context.Context) ([]*storage.AdminToken, error) {
+			return []*storage.AdminToken{{ID: 222}}, nil
+		},
+		DeleteAdminTokenFunc: func(ctx context.Context, id int64) error {
+			return customErr
+		},
+		CountAdminTokensFunc: func(ctx context.Context) (int, error) {
+			return 5, customErr
+		},
+		AddPermissionForTokenFunc: func(ctx context.Context, tokenID int64, perm *storage.Permission) (*storage.Permission, error) {
+			return &storage.Permission{ID: 333}, customErr
+		},
+		RemovePermissionFunc: func(ctx context.Context, permID int64) error {
+			return customErr
+		},
+		GetPermissionsForTokenFunc: func(ctx context.Context, tokenID int64) ([]*storage.Permission, error) {
+			return []*storage.Permission{{ID: 444}}, customErr
+		},
+		CloseFunc: func() error {
+			return customErr
+		},
+	}
+
+	// Exercise all custom functions
+	id, err := mock.CreateScopedKey(ctx, "test", "key")
+	if id != 42 || err != customErr {
+		t.Errorf("CreateScopedKey custom: got id=%d err=%v, want id=42 err=%v", id, err, customErr)
+	}
+
+	key, err := mock.GetScopedKeyByHash(ctx, "hash")
+	if key == nil || key.ID != 123 || err != nil {
+		t.Errorf("GetScopedKeyByHash custom: got key=%v err=%v", key, err)
+	}
+
+	key, err = mock.GetScopedKey(ctx, 555)
+	if key == nil || key.ID != 555 || err != nil {
+		t.Errorf("GetScopedKey custom: got key=%v err=%v", key, err)
+	}
+
+	if err := mock.DeleteScopedKey(ctx, 1); err != customErr {
+		t.Errorf("DeleteScopedKey custom: got %v, want %v", err, customErr)
+	}
+
+	permID, err := mock.AddPermission(ctx, 1, &storage.Permission{})
+	if permID != 99 || err != nil {
+		t.Errorf("AddPermission custom: got id=%d err=%v", permID, err)
+	}
+
+	if err := mock.DeletePermission(ctx, 1); err != customErr {
+		t.Errorf("DeletePermission custom: got %v, want %v", err, customErr)
+	}
+
+	if err := mock.DeleteToken(ctx, 1); err != customErr {
+		t.Errorf("DeleteToken custom: got %v, want %v", err, customErr)
+	}
+
+	token, err := mock.GetTokenByID(ctx, 666)
+	if token == nil || token.ID != 666 || err != nil {
+		t.Errorf("GetTokenByID custom: got token=%v err=%v", token, err)
+	}
+
+	adminID, err := mock.CreateAdminToken(ctx, "admin", "token")
+	if adminID != 789 || err != customErr {
+		t.Errorf("CreateAdminToken custom: got id=%d err=%v, want id=789 err=%v", adminID, err, customErr)
+	}
+
+	adminToken, err := mock.ValidateAdminToken(ctx, "token")
+	if adminToken == nil || adminToken.ID != 111 || err != nil {
+		t.Errorf("ValidateAdminToken custom: got token=%v err=%v", adminToken, err)
+	}
+
+	adminTokens, err := mock.ListAdminTokens(ctx)
+	if len(adminTokens) != 1 || adminTokens[0].ID != 222 || err != nil {
+		t.Errorf("ListAdminTokens custom: got tokens=%v err=%v", adminTokens, err)
+	}
+
+	if err := mock.DeleteAdminToken(ctx, 1); err != customErr {
+		t.Errorf("DeleteAdminToken custom: got %v, want %v", err, customErr)
+	}
+
+	count, err := mock.CountAdminTokens(ctx)
+	if count != 5 || err != customErr {
+		t.Errorf("CountAdminTokens custom: got count=%d err=%v, want count=5 err=%v", count, err, customErr)
+	}
+
+	perm, err := mock.AddPermissionForToken(ctx, 1, &storage.Permission{})
+	if perm == nil || perm.ID != 333 || err != customErr {
+		t.Errorf("AddPermissionForToken custom: got perm=%v err=%v", perm, err)
+	}
+
+	if err := mock.RemovePermission(ctx, 1); err != customErr {
+		t.Errorf("RemovePermission custom: got %v, want %v", err, customErr)
+	}
+
+	perms, err := mock.GetPermissionsForToken(ctx, 1)
+	if len(perms) != 1 || perms[0].ID != 444 || err != customErr {
+		t.Errorf("GetPermissionsForToken custom: got perms=%v err=%v", perms, err)
+	}
+
+	if err := mock.Close(); err != customErr {
+		t.Errorf("Close custom: got %v, want %v", err, customErr)
 	}
 }
