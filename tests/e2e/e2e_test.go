@@ -1122,14 +1122,16 @@ func TestE2E_ScopedTokenAdminAPIRestrictions(t *testing.T) {
 // If not set, the test will try to use PROXY_URL but results may be inconsistent
 // if other tests have already bootstrapped the proxy.
 func TestE2E_BootstrapFlowFresh(t *testing.T) {
-	// Try to use a dedicated fresh proxy instance, fall back to regular proxy
-	freshProxyURL := getEnv("BUNNY_FRESH_PROXY_URL", proxyURL)
+	// This test requires a dedicated fresh proxy instance with no pre-existing admin tokens.
+	// Skip if BUNNY_FRESH_PROXY_URL is not set - we cannot test bootstrap flow on shared proxy.
+	freshProxyURL := os.Getenv("BUNNY_FRESH_PROXY_URL")
+	if freshProxyURL == "" {
+		t.Skip("Skipping bootstrap flow test: BUNNY_FRESH_PROXY_URL not set (requires dedicated fresh proxy instance)")
+	}
 
-	// Wait for fresh proxy to be ready (if different from regular proxy)
-	if freshProxyURL != proxyURL {
-		if err := waitForService(freshProxyURL+"/health", 30*time.Second); err != nil {
-			t.Skipf("Fresh proxy not available at %s: %v (this test requires a dedicated fresh proxy)", freshProxyURL, err)
-		}
+	// Wait for fresh proxy to be ready
+	if err := waitForService(freshProxyURL+"/health", 30*time.Second); err != nil {
+		t.Skipf("Fresh proxy not available at %s: %v", freshProxyURL, err)
 	}
 
 	// Use testenv in fresh mode to skip automatic token bootstrap
