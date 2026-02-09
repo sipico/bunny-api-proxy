@@ -1207,3 +1207,65 @@ func TestRemovePermissionForTokenNotFound(t *testing.T) {
 		t.Errorf("expected ErrNotFound for non-existent permission, got: %v", err)
 	}
 }
+
+// TestPing verifies that Ping successfully checks database connectivity.
+func TestPing(t *testing.T) {
+	t.Parallel()
+
+	s, err := New(":memory:")
+	if err != nil {
+		t.Fatalf("failed to create storage: %v", err)
+	}
+	defer func() { _ = s.Close() }()
+	ctx := context.Background()
+
+	// Test successful ping with working database
+	err = s.Ping(ctx)
+	if err != nil {
+		t.Errorf("Ping failed on healthy database: %v", err)
+	}
+}
+
+// TestPingDatabaseClosed verifies that Ping fails when database is closed.
+func TestPingDatabaseClosed(t *testing.T) {
+	t.Parallel()
+
+	s, err := New(":memory:")
+	if err != nil {
+		t.Fatalf("failed to create storage: %v", err)
+	}
+
+	// Close the database
+	err = s.Close()
+	if err != nil {
+		t.Fatalf("failed to close storage: %v", err)
+	}
+
+	ctx := context.Background()
+
+	// Test that Ping fails with closed database
+	err = s.Ping(ctx)
+	if err == nil {
+		t.Errorf("expected Ping to fail with closed database, got nil")
+	}
+}
+
+// TestPingWithCancelledContext verifies that Ping fails with cancelled context.
+func TestPingWithCancelledContext(t *testing.T) {
+	t.Parallel()
+
+	s, err := New(":memory:")
+	if err != nil {
+		t.Fatalf("failed to create storage: %v", err)
+	}
+	defer func() { _ = s.Close() }()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	// Test that Ping fails with cancelled context
+	err = s.Ping(ctx)
+	if err == nil {
+		t.Errorf("expected Ping to fail with cancelled context, got nil")
+	}
+}
