@@ -28,6 +28,15 @@ var (
 	adminTokenCacheMu sync.Mutex
 )
 
+// InvalidateAdminTokenCache clears the package-level admin token cache.
+// This should be called by tests that delete or invalidate admin tokens to prevent
+// subsequent tests from using stale cached tokens.
+func InvalidateAdminTokenCache() {
+	adminTokenCacheMu.Lock()
+	defer adminTokenCacheMu.Unlock()
+	adminTokenCache = ""
+}
+
 // TestMode represents the testing mode.
 type TestMode string
 
