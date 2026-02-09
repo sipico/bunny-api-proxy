@@ -169,6 +169,64 @@ func TestParseRequest(t *testing.T) {
 			path:    "/dnszone/123",
 			wantErr: true,
 		},
+		// Boundary and malformed input tests
+		{
+			name:    "integer overflow zone ID",
+			method:  "GET",
+			path:    "/dnszone/99999999999999999999",
+			wantErr: true,
+		},
+		{
+			name:    "negative zone ID",
+			method:  "GET",
+			path:    "/dnszone/-1",
+			wantErr: true,
+		},
+		{
+			name:       "leading zeros zone ID",
+			method:     "GET",
+			path:       "/dnszone/007",
+			wantAction: ActionGetZone,
+			wantZoneID: 7,
+		},
+		{
+			name:    "floating point zone ID",
+			method:  "GET",
+			path:    "/dnszone/12.5",
+			wantErr: true,
+		},
+		{
+			name:    "empty segment between zone and records",
+			method:  "GET",
+			path:    "/dnszone//records",
+			wantErr: true,
+		},
+		{
+			name:       "int64 max valid zone ID",
+			method:     "GET",
+			path:       "/dnszone/9223372036854775807",
+			wantAction: ActionGetZone,
+			wantZoneID: 9223372036854775807,
+		},
+		{
+			name:    "integer overflow in record ID",
+			method:  "DELETE",
+			path:    "/dnszone/123/records/99999999999999999999",
+			wantErr: true,
+		},
+		{
+			name:    "negative record ID",
+			method:  "DELETE",
+			path:    "/dnszone/123/records/-1",
+			wantErr: true,
+		},
+		{
+			name:       "leading zeros in record ID",
+			method:     "DELETE",
+			path:       "/dnszone/456/records/0042",
+			wantAction: ActionDeleteRecord,
+			wantZoneID: 456,
+		},
 	}
 
 	for _, tt := range tests {
