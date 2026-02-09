@@ -26,9 +26,11 @@ func (t *LoggingTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 	// Extract request ID from context
 	requestID := middleware.GetRequestID(req.Context())
 
-	// Read request body
+	isDebug := t.Logger.Enabled(req.Context(), slog.LevelDebug)
+
+	// Only buffer request body if DEBUG logging is enabled
 	var reqBodyBytes []byte
-	if req.Body != nil {
+	if isDebug && req.Body != nil {
 		var err error
 		reqBodyBytes, err = io.ReadAll(req.Body)
 		if err != nil {
@@ -38,10 +40,9 @@ func (t *LoggingTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 		req.Body = io.NopCloser(bytes.NewReader(reqBodyBytes))
 	}
 
-	// Prepare request headers for logging (with redaction) - only for DEBUG
-	var reqHeaders map[string]string
-	if t.Logger.Enabled(req.Context(), slog.LevelDebug) {
-		reqHeaders = make(map[string]string)
+	// DEBUG: Log full request details
+	if isDebug {
+		reqHeaders := make(map[string]string)
 		for k, v := range req.Header {
 			if strings.EqualFold(k, "AccessKey") || strings.EqualFold(k, "Authorization") {
 				reqHeaders[k] = redactSensitiveData(strings.Join(v, ", "))
@@ -50,7 +51,6 @@ func (t *LoggingTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 			}
 		}
 
-		// DEBUG: Log full request details
 		t.Logger.Debug("Bunny API request",
 			"request_id", requestID,
 			"prefix", t.Prefix,
@@ -78,13 +78,17 @@ func (t *LoggingTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 		return nil, err
 	}
 
-	// Read response body
-	respBodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
+	// Only buffer response body if DEBUG logging is enabled
+	var respBodyBytes []byte
+	if isDebug {
+		var err error
+		respBodyBytes, err = io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, err
+		}
+		// Restore body for caller
+		resp.Body = io.NopCloser(bytes.NewReader(respBodyBytes))
 	}
-	// Restore body for caller
-	resp.Body = io.NopCloser(bytes.NewReader(respBodyBytes))
 
 	// INFO: Log operational summary
 	t.Logger.Info("Bunny API call",
@@ -97,7 +101,7 @@ func (t *LoggingTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 	)
 
 	// DEBUG: Log full response details
-	if t.Logger.Enabled(req.Context(), slog.LevelDebug) {
+	if isDebug {
 		t.Logger.Debug("Bunny API response",
 			"request_id", requestID,
 			"prefix", t.Prefix,
