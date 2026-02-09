@@ -306,9 +306,6 @@ jobs:
     needs: [test, lint, docker]  # Runs in parallel with mock E2E (separate runner, no interference)
     # Only run on PRs to main
     if: github.event_name == 'pull_request' && github.base_ref == 'main'
-    concurrency:
-      group: e2e-real-api
-      cancel-in-progress: false
 
     steps:
       - name: Checkout code
