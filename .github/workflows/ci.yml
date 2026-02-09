@@ -303,7 +303,7 @@ jobs:
   e2e-test-real-api:
     name: E2E Tests (Real Bunny.net API)
     runs-on: ubuntu-latest
-    needs: [test, lint, docker, e2e-test]  # Wait for docker build and mock tests to pass
+    needs: [test, lint, docker]  # Runs in parallel with mock E2E (separate runner, no interference)
     # Only run on PRs to main
     if: github.event_name == 'pull_request' && github.base_ref == 'main'
     concurrency:
