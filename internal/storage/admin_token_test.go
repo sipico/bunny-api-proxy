@@ -3,7 +3,6 @@ package storage
 import (
 	"context"
 	"testing"
-	"time"
 
 	_ "modernc.org/sqlite"
 )
