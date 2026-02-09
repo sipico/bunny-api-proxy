@@ -1105,6 +1105,222 @@ func TestE2E_ScopedTokenAdminAPIRestrictions(t *testing.T) {
 }
 
 // =============================================================================
+// Bootstrap Flow E2E Testing
+// =============================================================================
+
+// TestE2E_BootstrapFlowFresh verifies the complete bootstrap lifecycle starting
+// from a fresh proxy with no pre-existing admin tokens.
+//
+// This test covers:
+// 1. Master key authentication in UNCONFIGURED state
+// 2. Creating first admin token via master key
+// 3. Master key lockout after admin token creation
+// 4. Admin token can create scoped tokens
+// 5. Scoped tokens can perform DNS operations
+//
+// Note: This test requires a fresh proxy instance (BUNNY_FRESH_PROXY_URL env var).
+// If not set, the test will try to use PROXY_URL but results may be inconsistent
+// if other tests have already bootstrapped the proxy.
+func TestE2E_BootstrapFlowFresh(t *testing.T) {
+	// Try to use a dedicated fresh proxy instance, fall back to regular proxy
+	freshProxyURL := getEnv("BUNNY_FRESH_PROXY_URL", proxyURL)
+
+	// Wait for fresh proxy to be ready (if different from regular proxy)
+	if freshProxyURL != proxyURL {
+		if err := waitForService(freshProxyURL+"/health", 30*time.Second); err != nil {
+			t.Skipf("Fresh proxy not available at %s: %v (this test requires a dedicated fresh proxy)", freshProxyURL, err)
+		}
+	}
+
+	// Use testenv in fresh mode to skip automatic token bootstrap
+	env := testenv.SetupFresh(t, true)
+	env.ProxyURL = freshProxyURL
+
+	// Override the default proxyURL for this test
+	originalProxyURL := proxyURL
+	proxyURL = freshProxyURL
+	t.Cleanup(func() {
+		proxyURL = originalProxyURL
+	})
+
+	t.Run("Step 1: Master key works in UNCONFIGURED state", func(t *testing.T) {
+		// In fresh state, master key should work
+		resp := env.MakeRequestWithMasterKey(t, "GET", "/admin/api/whoami", nil)
+		defer resp.Body.Close()
+
+		require.Equal(t, http.StatusOK, resp.StatusCode,
+			"master key should work in UNCONFIGURED state to check whoami")
+
+		var whoami struct {
+			IsAdmin     bool   `json:"is_admin"`
+			IsMasterKey bool   `json:"is_master_key"`
+			Name        string `json:"name"`
+		}
+		err := json.NewDecoder(resp.Body).Decode(&whoami)
+		require.NoError(t, err)
+		require.True(t, whoami.IsAdmin, "master key should have admin permissions")
+		require.True(t, whoami.IsMasterKey, "master key should be identified as master key")
+	})
+
+	// Step 2: Bootstrap first admin token
+	var adminToken string
+	t.Run("Step 2: Master key creates first admin token", func(t *testing.T) {
+		tokenBody := map[string]interface{}{
+			"name":     "bootstrap-admin",
+			"is_admin": true,
+		}
+		resp := env.MakeRequestWithMasterKey(t, "POST", "/admin/api/tokens", tokenBody)
+		defer resp.Body.Close()
+
+		require.Equal(t, http.StatusCreated, resp.StatusCode,
+			"master key should be able to create first admin token in UNCONFIGURED state")
+
+		var created struct {
+			Token   string `json:"token"`
+			IsAdmin bool   `json:"is_admin"`
+		}
+		err := json.NewDecoder(resp.Body).Decode(&created)
+		require.NoError(t, err)
+		require.NotEmpty(t, created.Token, "response should contain admin token")
+		require.True(t, created.IsAdmin, "created token should be admin")
+
+		adminToken = created.Token
+		env.AdminToken = adminToken
+	})
+
+	// Step 3: Verify master key is locked out
+	t.Run("Step 3: Master key is locked out after admin token created", func(t *testing.T) {
+		tokenBody := map[string]interface{}{
+			"name":     "should-fail",
+			"is_admin": true,
+		}
+		resp := env.MakeRequestWithMasterKey(t, "POST", "/admin/api/tokens", tokenBody)
+		defer resp.Body.Close()
+
+		require.Equal(t, http.StatusForbidden, resp.StatusCode,
+			"master key should be locked out after first admin token is created")
+
+		var errResp struct {
+			Error string `json:"error"`
+		}
+		err := json.NewDecoder(resp.Body).Decode(&errResp)
+		require.NoError(t, err)
+		require.Equal(t, "master_key_locked", errResp.Error,
+			"error should indicate master key is locked")
+	})
+
+	// Step 4: Create test zones for DNS operations
+	zones := env.CreateTestZones(t, 1)
+	zone := zones[0]
+
+	// Step 5: Admin token can create scoped tokens
+	var scopedToken string
+	t.Run("Step 4: Admin token can create scoped tokens", func(t *testing.T) {
+		tokenBody := map[string]interface{}{
+			"name":         "bootstrap-scoped",
+			"is_admin":     false,
+			"zones":        []int64{zone.ID},
+			"actions":      []string{"list_zones", "get_zone", "list_records", "add_record", "delete_record"},
+			"record_types": []string{"TXT"},
+		}
+		body, _ := json.Marshal(tokenBody)
+
+		req, _ := http.NewRequest("POST", proxyURL+"/admin/api/tokens", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("AccessKey", adminToken)
+
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+
+		require.Equal(t, http.StatusCreated, resp.StatusCode,
+			"admin token should be able to create scoped tokens")
+
+		var created struct {
+			Token   string `json:"token"`
+			IsAdmin bool   `json:"is_admin"`
+		}
+		err = json.NewDecoder(resp.Body).Decode(&created)
+		require.NoError(t, err)
+		require.NotEmpty(t, created.Token, "response should contain scoped token")
+		require.False(t, created.IsAdmin, "created token should not be admin")
+
+		scopedToken = created.Token
+	})
+
+	// Step 6: Scoped token can perform DNS operations
+	t.Run("Step 5: Scoped token can perform DNS operations", func(t *testing.T) {
+		// 5a: List zones
+		resp := proxyRequest(t, "GET", "/dnszone", scopedToken, nil)
+		defer resp.Body.Close()
+		require.Equal(t, http.StatusOK, resp.StatusCode,
+			"scoped token should be able to list zones")
+
+		var zones struct {
+			Items []struct {
+				ID     int64  `json:"Id"`
+				Domain string `json:"Domain"`
+			} `json:"Items"`
+		}
+		err := json.NewDecoder(resp.Body).Decode(&zones)
+		require.NoError(t, err)
+		require.GreaterOrEqual(t, len(zones.Items), 1, "should have at least one zone")
+
+		// 5b: Get zone details
+		resp2 := proxyRequest(t, "GET", fmt.Sprintf("/dnszone/%d", zone.ID), scopedToken, nil)
+		defer resp2.Body.Close()
+		require.Equal(t, http.StatusOK, resp2.StatusCode,
+			"scoped token should be able to get zone details")
+
+		// 5c: Add a TXT record
+		recordBody := map[string]interface{}{
+			"Type":  3, // TXT
+			"Name":  "_bootstrap-test",
+			"Value": "bootstrap-verification-token",
+			"TTL":   300,
+		}
+		bodyBytes, _ := json.Marshal(recordBody)
+		resp3 := proxyRequest(t, "POST", fmt.Sprintf("/dnszone/%d/records", zone.ID), scopedToken, bodyBytes)
+		defer resp3.Body.Close()
+		require.Equal(t, http.StatusCreated, resp3.StatusCode,
+			"scoped token should be able to add records")
+
+		var record struct {
+			ID    int64  `json:"Id"`
+			Type  int    `json:"Type"`
+			Name  string `json:"Name"`
+			Value string `json:"Value"`
+		}
+		err = json.NewDecoder(resp3.Body).Decode(&record)
+		require.NoError(t, err)
+		require.NotZero(t, record.ID, "record should have an ID")
+		require.Equal(t, 3, record.Type, "record type should be TXT (3)")
+		require.Equal(t, "_bootstrap-test", record.Name)
+		require.Equal(t, "bootstrap-verification-token", record.Value)
+
+		// 5d: List records to verify the new record is there
+		resp4 := proxyRequest(t, "GET", fmt.Sprintf("/dnszone/%d/records", zone.ID), scopedToken, nil)
+		defer resp4.Body.Close()
+		require.Equal(t, http.StatusOK, resp4.StatusCode,
+			"scoped token should be able to list records")
+
+		var records []struct {
+			ID    int64  `json:"Id"`
+			Value string `json:"Value"`
+		}
+		err = json.NewDecoder(resp4.Body).Decode(&records)
+		require.NoError(t, err)
+		require.GreaterOrEqual(t, len(records), 1, "should have at least one record")
+
+		// 5e: Delete the record
+		resp5 := proxyRequest(t, "DELETE", fmt.Sprintf("/dnszone/%d/records/%d", zone.ID, record.ID), scopedToken, nil)
+		defer resp5.Body.Close()
+		require.Equal(t, http.StatusNoContent, resp5.StatusCode,
+			"scoped token should be able to delete records")
+	})
+}
+
+// =============================================================================
 // Helper Functions
 // =============================================================================
 

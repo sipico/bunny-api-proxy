@@ -59,6 +59,9 @@ type TestEnv struct {
 	ProxyURL string
 	// AdminToken is the cached admin token for E2E tests (bootstrap once).
 	AdminToken string
+	// FreshDatabase indicates the proxy should start with a fresh/empty database state.
+	// When true, ensureAdminToken() is skipped, allowing tests to test the bootstrap flow.
+	FreshDatabase bool
 
 	// Internal state
 	mockServer *mockbunny.Server
@@ -70,15 +73,29 @@ type TestEnv struct {
 // Verifies account is empty before proceeding, and registers comprehensive cleanup.
 //
 // For E2E tests, set PROXY_URL environment variable to enable proxy-based operations.
+// For fresh database mode (bootstrap flow testing), use SetupFresh instead.
 func Setup(t *testing.T) *TestEnv {
+	env := SetupFresh(t, false)
+	return env
+}
+
+// SetupFresh creates a new test environment with optional fresh database mode.
+// When fresh=true, the environment will NOT automatically bootstrap an admin token,
+// allowing tests to test the bootstrap flow starting from UNCONFIGURED state.
+// When fresh=false, behaves identically to Setup().
+//
+// For bootstrap flow tests that start with a fresh database, use SetupFresh(t, true).
+// For normal tests that assume pre-bootstrapped state, use Setup(t) or SetupFresh(t, false).
+func SetupFresh(t *testing.T, fresh bool) *TestEnv {
 	mode := getTestMode()
 
 	env := &TestEnv{
-		Mode:       mode,
-		CommitHash: getCommitHash(),
-		Zones:      make([]*bunny.Zone, 0),
-		ctx:        context.Background(),
-		ProxyURL:   os.Getenv("PROXY_URL"),
+		Mode:          mode,
+		CommitHash:    getCommitHash(),
+		Zones:         make([]*bunny.Zone, 0),
+		ctx:           context.Background(),
+		ProxyURL:      os.Getenv("PROXY_URL"),
+		FreshDatabase: fresh,
 	}
 
 	switch mode {
@@ -425,6 +442,7 @@ func getCommitHash() string {
 // ensureAdminToken ensures an admin token exists for E2E tests.
 // Bootstrap: Creates first admin token using BUNNY_MASTER_API_KEY.
 // Subsequent calls return cached token (shared across all E2E tests using same proxy).
+// For fresh database tests that need explicit bootstrap control, use BootstrapAdminToken instead.
 func (e *TestEnv) ensureAdminToken(t *testing.T) {
 	t.Helper()
 
@@ -447,6 +465,23 @@ func (e *TestEnv) ensureAdminToken(t *testing.T) {
 	}
 
 	// Bootstrap new admin token
+	e.bootstrapAdminTokenFromMasterKey(t)
+}
+
+// BootstrapAdminToken explicitly bootstraps an admin token using the master key.
+// Unlike ensureAdminToken, this bypasses caching and forces a new token creation.
+// This is used by bootstrap flow tests that need to verify the bootstrap sequence.
+// Returns the created token string.
+func (e *TestEnv) BootstrapAdminToken(t *testing.T) string {
+	t.Helper()
+	e.bootstrapAdminTokenFromMasterKey(t)
+	return e.AdminToken
+}
+
+// bootstrapAdminTokenFromMasterKey is the internal helper that creates an admin token from the master key.
+func (e *TestEnv) bootstrapAdminTokenFromMasterKey(t *testing.T) {
+	t.Helper()
+
 	masterAPIKey := os.Getenv("BUNNY_MASTER_API_KEY")
 	if masterAPIKey == "" {
 		masterAPIKey = "test-api-key-for-mockbunny" // Default for mock mode
@@ -498,7 +533,7 @@ func (e *TestEnv) ensureAdminToken(t *testing.T) {
 
 	// Also cache at package-level ONLY if using the shared E2E proxy
 	// Unit tests with MockProxyServer shouldn't share tokens
-	proxyEnvURL = os.Getenv("PROXY_URL")
+	proxyEnvURL := os.Getenv("PROXY_URL")
 	if proxyEnvURL != "" && e.ProxyURL == proxyEnvURL {
 		adminTokenCacheMu.Lock()
 		adminTokenCache = result.Token
@@ -620,4 +655,45 @@ func (e *TestEnv) deleteZoneViaProxy(t *testing.T, id int64) error {
 	}
 
 	return nil
+}
+
+// MakeRequestWithMasterKey makes an HTTP request to the proxy using the master key.
+// This is used by bootstrap flow tests to verify master key authentication behavior.
+func (e *TestEnv) MakeRequestWithMasterKey(t *testing.T, method, path string, body interface{}) *http.Response {
+	t.Helper()
+
+	masterAPIKey := os.Getenv("BUNNY_MASTER_API_KEY")
+	if masterAPIKey == "" {
+		masterAPIKey = "test-api-key-for-mockbunny" // Default for mock mode
+	}
+
+	var bodyReader io.Reader
+	if body != nil {
+		if str, ok := body.(string); ok {
+			bodyReader = bytes.NewBufferString(str)
+		} else {
+			jsonBytes, err := json.Marshal(body)
+			if err != nil {
+				t.Fatalf("failed to marshal body: %v", err)
+			}
+			bodyReader = bytes.NewBuffer(jsonBytes)
+		}
+	}
+
+	req, err := http.NewRequest(method, e.ProxyURL+path, bodyReader)
+	if err != nil {
+		t.Fatalf("failed to create request: %v", err)
+	}
+
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	req.Header.Set("AccessKey", masterAPIKey)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("failed to make request with master key: %v", err)
+	}
+
+	return resp
 }
