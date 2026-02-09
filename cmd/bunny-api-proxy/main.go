@@ -340,12 +340,12 @@ func healthHandler(w http.ResponseWriter, _ *http.Request) {
 // readyHandler returns OK if the service is ready to serve requests (DB connected)
 func readyHandler(store storage.Storage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Check database connectivity by attempting a simple operation
+		// Check database connectivity with a lightweight ping
 		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 		defer cancel()
 
-		// Test database connectivity by listing tokens
-		_, err := store.ListTokens(ctx)
+		// Test database connectivity with Ping (lightweight SELECT 1)
+		err := store.Ping(ctx)
 		if err != nil {
 			// Database error
 			w.Header().Set("Content-Type", "application/json")

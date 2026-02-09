@@ -30,6 +30,7 @@ type Handler struct {
 // Extended by later issues with additional methods
 type Storage interface {
 	// Health check
+	Ping(ctx context.Context) error
 	Close() error
 
 	// AdminToken operations (Issue 3)

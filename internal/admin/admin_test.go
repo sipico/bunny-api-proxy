@@ -65,6 +65,10 @@ func TestNewHandler(t *testing.T) {
 // mockStorageForAdminTest implements minimal Storage interface for admin_test.go
 type mockStorageForAdminTest struct{}
 
+func (m *mockStorageForAdminTest) Ping(ctx context.Context) error {
+	return nil
+}
+
 func (m *mockStorageForAdminTest) Close() error {
 	return nil
 }

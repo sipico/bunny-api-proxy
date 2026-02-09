@@ -17,6 +17,10 @@ type mockStorage struct {
 	closeErr error
 }
 
+func (m *mockStorage) Ping(ctx context.Context) error {
+	return nil
+}
+
 func (m *mockStorage) Close() error {
 	return m.closeErr
 }
@@ -108,13 +112,13 @@ func (m *mockStorage) GetTokenByHash(ctx context.Context, keyHash string) (*stor
 	return nil, storage.ErrNotFound
 }
 
-// failingListTokensStorage embeds mockStorage but returns an error from ListTokens
-type failingListTokensStorage struct {
+// failingPingStorage embeds mockStorage but returns an error from Ping
+type failingPingStorage struct {
 	mockStorage
 }
 
-func (m *failingListTokensStorage) ListTokens(ctx context.Context) ([]*storage.Token, error) {
-	return nil, fmt.Errorf("database connection lost")
+func (m *failingPingStorage) Ping(ctx context.Context) error {
+	return fmt.Errorf("database connection lost")
 }
 
 // failingWriter is a ResponseWriter that fails on Write to test error handling
@@ -186,7 +190,7 @@ func TestHandleReady(t *testing.T) {
 		},
 		{
 			name:       "database unavailable",
-			storage:    &failingListTokensStorage{},
+			storage:    &failingPingStorage{},
 			wantStatus: http.StatusServiceUnavailable,
 			wantDB:     "unavailable",
 		},

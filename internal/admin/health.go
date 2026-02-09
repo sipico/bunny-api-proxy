@@ -37,11 +37,11 @@ func (h *Handler) HandleReady(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check database connectivity
+	// Check database connectivity with a lightweight ping
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
-	_, err := h.storage.ListTokens(ctx)
+	err := h.storage.Ping(ctx)
 	if err != nil {
 		w.WriteHeader(http.StatusServiceUnavailable)
 		//nolint:errcheck // Response write errors are unrecoverable
