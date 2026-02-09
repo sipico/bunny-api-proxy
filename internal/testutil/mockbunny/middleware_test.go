@@ -8,9 +8,30 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
+
+// syncBuffer is a thread-safe wrapper around bytes.Buffer for concurrent writes.
+type syncBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+// Write safely writes to the underlying buffer with mutex protection.
+func (b *syncBuffer) Write(p []byte) (n int, err error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+// String safely reads the buffer contents with mutex protection.
+func (b *syncBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
+}
 
 // TestLoggingMiddleware_RequestLogging tests that requests are logged correctly.
 func TestLoggingMiddleware_RequestLogging(t *testing.T) {
@@ -461,8 +482,8 @@ func TestRedactHeaders(t *testing.T) {
 // TestLoggingMiddleware_ConcurrentRequests tests concurrent request handling.
 func TestLoggingMiddleware_ConcurrentRequests(t *testing.T) {
 	t.Parallel()
-	var buf bytes.Buffer
-	logger := slog.New(slog.NewJSONHandler(&buf, nil))
+	buf := &syncBuffer{}
+	logger := slog.New(slog.NewJSONHandler(buf, nil))
 
 	handler := LoggingMiddleware(logger)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(10 * time.Millisecond)
@@ -487,7 +508,7 @@ func TestLoggingMiddleware_ConcurrentRequests(t *testing.T) {
 	}
 
 	// Verify we have logs (5 requests + 5 responses = 10 entries)
-	decoder := json.NewDecoder(&buf)
+	decoder := json.NewDecoder(strings.NewReader(buf.String()))
 	logCount := 0
 	for {
 		var log map[string]interface{}
