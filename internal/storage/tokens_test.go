@@ -4,7 +4,6 @@ import (
 	"context"
 	"strings"
 	"testing"
-	"time"
 
 	_ "modernc.org/sqlite"
 )
@@ -250,8 +249,6 @@ func TestListTokens(t *testing.T) {
 		t.Fatalf("failed to create token 1: %v", err)
 	}
 
-	time.Sleep(1 * time.Second)
-
 	hash2, _ := HashKey("key2")
 	id2, err := s.CreateToken(ctx, "token-2", true, hash2)
 	if err != nil {
@@ -267,7 +264,7 @@ func TestListTokens(t *testing.T) {
 		t.Fatalf("expected 2 tokens, got %d", len(tokens))
 	}
 
-	// Test 3: Verify ordering (newest first)
+	// Test 3: Verify ordering (newest first = highest ID first)
 	if tokens[0].ID != id2.ID {
 		t.Errorf("expected first token to be id %d (created later), got %d", id2.ID, tokens[0].ID)
 	}
@@ -677,8 +674,6 @@ func TestTokenWorkflow(t *testing.T) {
 	// 1. Create multiple tokens
 	hash1, _ := HashKey("acme-key-abc123")
 	token1, _ := s.CreateToken(ctx, "acme-dns", false, hash1)
-
-	time.Sleep(1 * time.Second)
 
 	hash2, _ := HashKey("admin-key-xyz789")
 	token2, _ := s.CreateToken(ctx, "admin", true, hash2)

@@ -95,7 +95,7 @@ func (s *SQLiteStorage) GetTokenByID(ctx context.Context, id int64) (*Token, err
 // Returns empty slice if no tokens exist.
 func (s *SQLiteStorage) ListTokens(ctx context.Context) ([]*Token, error) {
 	rows, err := s.db.QueryContext(ctx,
-		"SELECT id, key_hash, name, is_admin, created_at FROM tokens ORDER BY created_at DESC")
+		"SELECT id, key_hash, name, is_admin, created_at FROM tokens ORDER BY created_at DESC, id DESC")
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to query tokens: %w", err)

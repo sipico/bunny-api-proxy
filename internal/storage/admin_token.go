@@ -65,7 +65,7 @@ func (s *SQLiteStorage) ValidateAdminToken(ctx context.Context, token string) (*
 // This filters the unified tokens table for records where is_admin=true.
 func (s *SQLiteStorage) ListAdminTokens(ctx context.Context) ([]*AdminToken, error) {
 	rows, err := s.db.QueryContext(ctx,
-		"SELECT id, key_hash, name, created_at FROM tokens WHERE is_admin = TRUE ORDER BY created_at DESC")
+		"SELECT id, key_hash, name, created_at FROM tokens WHERE is_admin = TRUE ORDER BY created_at DESC, id DESC")
 	if err != nil {
 		return nil, fmt.Errorf("failed to query admin tokens: %w", err)
 	}

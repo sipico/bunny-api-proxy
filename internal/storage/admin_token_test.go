@@ -3,7 +3,6 @@ package storage
 import (
 	"context"
 	"testing"
-	"time"
 
 	_ "modernc.org/sqlite"
 )
@@ -217,12 +216,9 @@ func TestListAdminTokens(t *testing.T) {
 	}
 
 	// Test 2: Create multiple admin tokens and verify order
-	// Wait 1 second between each to ensure different created_at timestamps (SQLite CURRENT_TIMESTAMP has second precision)
-	_, _ = s.CreateAdminToken(ctx, "token-1", "secret-1")
-	time.Sleep(1 * time.Second)
-	_, _ = s.CreateAdminToken(ctx, "token-2", "secret-2")
-	time.Sleep(1 * time.Second)
-	_, _ = s.CreateAdminToken(ctx, "token-3", "secret-3")
+	id1, _ := s.CreateAdminToken(ctx, "token-1", "secret-1")
+	id2, _ := s.CreateAdminToken(ctx, "token-2", "secret-2")
+	id3, _ := s.CreateAdminToken(ctx, "token-3", "secret-3")
 
 	tokens, err = s.ListAdminTokens(ctx)
 	if err != nil {
@@ -233,17 +229,17 @@ func TestListAdminTokens(t *testing.T) {
 		t.Errorf("expected 3 tokens, got %d", len(tokens))
 	}
 
-	// Verify ordered by created_at DESC (last created first)
-	if tokens[0].Name != "token-3" {
-		t.Errorf("expected first token to be 'token-3', got %s", tokens[0].Name)
+	// Verify ordered by created_at DESC, id DESC (newest first, then highest ID first)
+	if tokens[0].ID != id3 {
+		t.Errorf("expected first token to be id %d, got %d", id3, tokens[0].ID)
 	}
 
-	if tokens[1].Name != "token-2" {
-		t.Errorf("expected second token to be 'token-2', got %s", tokens[1].Name)
+	if tokens[1].ID != id2 {
+		t.Errorf("expected second token to be id %d, got %d", id2, tokens[1].ID)
 	}
 
-	if tokens[2].Name != "token-1" {
-		t.Errorf("expected third token to be 'token-1', got %s", tokens[2].Name)
+	if tokens[2].ID != id1 {
+		t.Errorf("expected third token to be id %d, got %d", id1, tokens[2].ID)
 	}
 
 	// Verify all fields are populated

@@ -80,7 +80,7 @@ func (s *SQLiteStorage) GetScopedKey(ctx context.Context, id int64) (*ScopedKey,
 // Wraps ListTokens and filters for is_admin=false.
 func (s *SQLiteStorage) ListScopedKeys(ctx context.Context) ([]*ScopedKey, error) {
 	rows, err := s.db.QueryContext(ctx,
-		"SELECT id, key_hash, name, created_at FROM tokens WHERE is_admin = FALSE ORDER BY created_at DESC")
+		"SELECT id, key_hash, name, created_at FROM tokens WHERE is_admin = FALSE ORDER BY created_at DESC, id DESC")
 	if err != nil {
 		return nil, fmt.Errorf("failed to query scoped keys: %w", err)
 	}
