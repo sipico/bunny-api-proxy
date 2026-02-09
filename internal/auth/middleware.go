@@ -174,9 +174,8 @@ func (m *Authenticator) CheckPermissions(next http.Handler) http.Handler {
 			}
 		}
 
-		// Use existing Validator logic for permission checking
-		validator := &Validator{} // Empty validator just for CheckPermission method
-		if err := validator.CheckPermission(keyInfo, req); err != nil {
+		// Check permissions
+		if err := CheckPermission(keyInfo, req); err != nil {
 			writeJSONError(w, http.StatusForbidden, "permission denied")
 			return
 		}
@@ -185,69 +184,25 @@ func (m *Authenticator) CheckPermissions(next http.Handler) http.Handler {
 	})
 }
 
-// --- Legacy support for existing Validator-based middleware ---
-// The following functions maintain backward compatibility with existing code.
-
-const (
-	// keyInfoKey is the context key for storing KeyInfo (legacy).
-	keyInfoKey ctxKey = 100
-)
-
-// KeyInfoContextKey is the public context key for storing KeyInfo (legacy).
-const KeyInfoContextKey = keyInfoKey
-
-// Middleware returns Chi-compatible middleware for API key validation (legacy).
-// This middleware uses the old Validator-based authentication.
-// For new code, use Authenticator.Authenticate instead.
-func Middleware(v *Validator) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Extract API key from AccessKey header
-			apiKey := extractAccessKey(r)
-			if apiKey == "" {
-				writeJSONError(w, http.StatusUnauthorized, "missing API key")
-				return
-			}
-
-			// Validate the key
-			keyInfo, err := v.ValidateKey(r.Context(), apiKey)
-			if err != nil {
-				if errors.Is(err, ErrInvalidKey) {
-					writeJSONError(w, http.StatusUnauthorized, "invalid API key")
-					return
-				}
-				writeJSONError(w, http.StatusInternalServerError, "internal error")
-				return
-			}
-
-			// Parse the request to determine required permissions
-			req, err := ParseRequest(r)
-			if err != nil {
-				writeJSONError(w, http.StatusBadRequest, err.Error())
-				return
-			}
-
-			// Check permissions
-			if err := v.CheckPermission(keyInfo, req); err != nil {
-				writeJSONError(w, http.StatusForbidden, "permission denied")
-				return
-			}
-
-			// Attach KeyInfo to context and continue
-			ctx := context.WithValue(r.Context(), keyInfoKey, keyInfo)
-			next.ServeHTTP(w, r.WithContext(ctx))
-		})
-	}
-}
-
-// GetKeyInfo retrieves KeyInfo from request context (legacy).
+// GetKeyInfo retrieves KeyInfo from request context by reconstructing it from Token and Permissions.
+// Returns nil if no token is present in the context.
+// This is for backward compatibility with code that expects KeyInfo.
 func GetKeyInfo(ctx context.Context) *KeyInfo {
-	if v := ctx.Value(keyInfoKey); v != nil {
-		if info, ok := v.(*KeyInfo); ok {
-			return info
-		}
+	token := TokenFromContext(ctx)
+	if token == nil {
+		return nil
 	}
-	return nil
+
+	perms := PermissionsFromContext(ctx)
+	if perms == nil {
+		perms = []*storage.Permission{} // Empty permissions for admin tokens
+	}
+
+	return &KeyInfo{
+		KeyID:       token.ID,
+		KeyName:     token.Name,
+		Permissions: perms,
+	}
 }
 
 // --- Helper functions ---
