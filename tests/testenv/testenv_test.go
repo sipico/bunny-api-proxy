@@ -3307,3 +3307,98 @@ func TestCleanupStaleZones_FastCompletionMockMode(t *testing.T) {
 		t.Errorf("Expected 0 zones after cleanup, got %d", len(resp.Items))
 	}
 }
+
+// TestAdminTokenCache_Invalidation verifies that InvalidateAdminTokenCache() clears the package-level cache.
+func TestAdminTokenCache_Invalidation(t *testing.T) {
+	// Set the package-level cache to a test value
+	adminTokenCacheMu.Lock()
+	originalCache := adminTokenCache
+	adminTokenCache = "test-token-12345"
+	adminTokenCacheMu.Unlock()
+
+	// Verify cache is set
+	adminTokenCacheMu.Lock()
+	if adminTokenCache != "test-token-12345" {
+		adminTokenCacheMu.Unlock()
+		t.Fatalf("Cache not set correctly, got: %s", adminTokenCache)
+	}
+	adminTokenCacheMu.Unlock()
+
+	// Call InvalidateAdminTokenCache
+	InvalidateAdminTokenCache()
+
+	// Verify cache is cleared
+	adminTokenCacheMu.Lock()
+	if adminTokenCache != "" {
+		adminTokenCacheMu.Unlock()
+		t.Fatalf("Cache not cleared after invalidation, got: %s", adminTokenCache)
+	}
+	adminTokenCacheMu.Unlock()
+
+	// Restore original cache state
+	adminTokenCacheMu.Lock()
+	adminTokenCache = originalCache
+	adminTokenCacheMu.Unlock()
+}
+
+// TestAdminTokenCache_InvalidateEmpty verifies that InvalidateAdminTokenCache() works even on empty cache.
+func TestAdminTokenCache_InvalidateEmpty(t *testing.T) {
+	adminTokenCacheMu.Lock()
+	originalCache := adminTokenCache
+	adminTokenCache = ""
+	adminTokenCacheMu.Unlock()
+
+	// Should not panic when called on empty cache
+	InvalidateAdminTokenCache()
+
+	// Verify cache is still empty
+	adminTokenCacheMu.Lock()
+	if adminTokenCache != "" {
+		adminTokenCacheMu.Unlock()
+		t.Fatalf("Cache should be empty, got: %s", adminTokenCache)
+	}
+	adminTokenCacheMu.Unlock()
+
+	// Restore original cache state
+	adminTokenCacheMu.Lock()
+	adminTokenCache = originalCache
+	adminTokenCacheMu.Unlock()
+}
+
+// TestAdminTokenCache_MultipleInvalidations verifies that InvalidateAdminTokenCache() can be called multiple times.
+func TestAdminTokenCache_MultipleInvalidations(t *testing.T) {
+	adminTokenCacheMu.Lock()
+	originalCache := adminTokenCache
+	adminTokenCache = "token-1"
+	adminTokenCacheMu.Unlock()
+
+	// First invalidation
+	InvalidateAdminTokenCache()
+
+	adminTokenCacheMu.Lock()
+	if adminTokenCache != "" {
+		adminTokenCacheMu.Unlock()
+		t.Fatalf("Cache not cleared after first invalidation")
+	}
+	adminTokenCacheMu.Unlock()
+
+	// Set cache again
+	adminTokenCacheMu.Lock()
+	adminTokenCache = "token-2"
+	adminTokenCacheMu.Unlock()
+
+	// Second invalidation
+	InvalidateAdminTokenCache()
+
+	adminTokenCacheMu.Lock()
+	if adminTokenCache != "" {
+		adminTokenCacheMu.Unlock()
+		t.Fatalf("Cache not cleared after second invalidation")
+	}
+	adminTokenCacheMu.Unlock()
+
+	// Restore original cache state
+	adminTokenCacheMu.Lock()
+	adminTokenCache = originalCache
+	adminTokenCacheMu.Unlock()
+}

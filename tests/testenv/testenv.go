@@ -28,6 +28,27 @@ var (
 	adminTokenCacheMu sync.Mutex
 )
 
+// InvalidateAdminTokenCache clears the package-level admin token cache.
+// This should be called by tests that delete or invalidate admin tokens to prevent
+// subsequent tests from using stale cached tokens that would fail with 401 errors.
+//
+// Example usage in an E2E test:
+//
+//	func TestE2E_MyAdminTokenTest(t *testing.T) {
+//		env := testenv.Setup(t)
+//		// ... test code that deletes admin tokens ...
+//		testenv.InvalidateAdminTokenCache()
+//		// ... subsequent tests will get a fresh admin token
+//	}
+//
+// This is only needed for tests that delete or revoke admin tokens.
+// Regular token operations (create/list scoped tokens) do not require cache invalidation.
+func InvalidateAdminTokenCache() {
+	adminTokenCacheMu.Lock()
+	defer adminTokenCacheMu.Unlock()
+	adminTokenCache = ""
+}
+
 // TestMode represents the testing mode.
 type TestMode string
 
