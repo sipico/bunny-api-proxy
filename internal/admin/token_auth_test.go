@@ -10,11 +10,12 @@ import (
 
 	"github.com/sipico/bunny-api-proxy/internal/auth"
 	"github.com/sipico/bunny-api-proxy/internal/storage"
+	"github.com/sipico/bunny-api-proxy/internal/testutil/mockstore"
 )
 
-// mockStorageWithToken extends mockStorage with ValidateAdminToken
+// mockStorageWithToken extends mockstore.MockStorage with ValidateAdminToken
 type mockStorageWithToken struct {
-	*mockStorage
+	*mockstore.MockStorage
 	validateToken  func(ctx context.Context, token string) (*storage.AdminToken, error)
 	getTokenByHash func(ctx context.Context, keyHash string) (*storage.Token, error)
 	listTokens     func(ctx context.Context) ([]*storage.Token, error)
@@ -117,7 +118,7 @@ func (m *mockStorageWithToken) GetTokenByHash(ctx context.Context, keyHash strin
 	if m.getTokenByHash != nil {
 		return m.getTokenByHash(ctx, keyHash)
 	}
-	return m.mockStorage.GetTokenByHash(ctx, keyHash)
+	return m.MockStorage.GetTokenByHash(ctx, keyHash)
 }
 
 func TestTokenAuthMiddleware(t *testing.T) {
@@ -168,7 +169,7 @@ func TestTokenAuthMiddleware(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Setup mock storage
 			mock := &mockStorageWithToken{
-				mockStorage: &mockStorage{},
+				MockStorage: &mockstore.MockStorage{},
 				validateToken: func(ctx context.Context, token string) (*storage.AdminToken, error) {
 					if tt.validateError != nil {
 						return nil, tt.validateError
@@ -298,7 +299,7 @@ func TestTokenAuthMiddlewareMasterKey(t *testing.T) {
 	t.Run("master key authentication", func(t *testing.T) {
 		// Setup mock storage
 		mock := &mockStorageWithToken{
-			mockStorage: &mockStorage{},
+			MockStorage: &mockstore.MockStorage{},
 		}
 
 		h := NewHandler(mock, new(slog.LevelVar), slog.Default())
@@ -379,7 +380,7 @@ func TestTokenAuthMiddlewareUnifiedToken(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Setup mock storage
 			mock := &mockStorageWithToken{
-				mockStorage: &mockStorage{},
+				MockStorage: &mockstore.MockStorage{},
 				getTokenByHash: func(ctx context.Context, keyHash string) (*storage.Token, error) {
 					if len(tt.tokens) > 0 && keyHash == tt.tokens[0].KeyHash {
 						return tt.tokens[0], nil
@@ -434,7 +435,7 @@ func TestTokenAuthMiddlewareWhitespaceToken(t *testing.T) {
 	t.Parallel()
 	t.Run("token with only whitespace is rejected", func(t *testing.T) {
 		mock := &mockStorageWithToken{
-			mockStorage: &mockStorage{},
+			MockStorage: &mockstore.MockStorage{},
 		}
 
 		h := NewHandler(mock, new(slog.LevelVar), slog.Default())
@@ -465,7 +466,7 @@ func TestValidateUnifiedToken(t *testing.T) {
 
 	t.Run("returns error when GetTokenByHash fails", func(t *testing.T) {
 		mock := &mockStorageWithToken{
-			mockStorage: &mockStorage{},
+			MockStorage: &mockstore.MockStorage{},
 			getTokenByHash: func(ctx context.Context, keyHash string) (*storage.Token, error) {
 				return nil, errors.New("database error")
 			},
@@ -486,7 +487,7 @@ func TestValidateUnifiedToken(t *testing.T) {
 	t.Run("returns token when found", func(t *testing.T) {
 		expectedToken := &storage.Token{ID: 42, Name: "my-token", IsAdmin: true, KeyHash: tokenHash}
 		mock := &mockStorageWithToken{
-			mockStorage: &mockStorage{},
+			MockStorage: &mockstore.MockStorage{},
 			getTokenByHash: func(ctx context.Context, keyHash string) (*storage.Token, error) {
 				if keyHash == tokenHash {
 					return expectedToken, nil
@@ -511,7 +512,7 @@ func TestValidateUnifiedToken(t *testing.T) {
 
 	t.Run("returns ErrNotFound when token not found", func(t *testing.T) {
 		mock := &mockStorageWithToken{
-			mockStorage: &mockStorage{},
+			MockStorage: &mockstore.MockStorage{},
 			getTokenByHash: func(ctx context.Context, keyHash string) (*storage.Token, error) {
 				return nil, storage.ErrNotFound
 			},

@@ -15,11 +15,12 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/sipico/bunny-api-proxy/internal/storage"
+	"github.com/sipico/bunny-api-proxy/internal/testutil/mockstore"
 )
 
-// mockStorageWithTokenCRUD extends mockStorage with CRUD operations
+// mockStorageWithTokenCRUD extends mockstore.MockStorage with CRUD operations
 type mockStorageWithTokenCRUD struct {
-	*mockStorage
+	*mockstore.MockStorage
 	listTokens      func(ctx context.Context) ([]*storage.AdminToken, error)
 	createToken     func(ctx context.Context, name, token string) (int64, error)
 	deleteToken     func(ctx context.Context, id int64) error
@@ -182,7 +183,7 @@ func TestHandleSetLogLevel(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			logLevel := new(slog.LevelVar)
-			mock := &mockStorageWithTokenCRUD{mockStorage: &mockStorage{}}
+			mock := &mockStorageWithTokenCRUD{MockStorage: &mockstore.MockStorage{}}
 			h := NewHandler(mock, logLevel, slog.Default())
 
 			// Encode body
@@ -261,7 +262,7 @@ func TestHandleListTokens(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mock := &mockStorageWithTokenCRUD{
-				mockStorage: &mockStorage{},
+				MockStorage: &mockstore.MockStorage{},
 				listTokens: func(ctx context.Context) ([]*storage.AdminToken, error) {
 					if tt.setupErr != nil {
 						return nil, tt.setupErr
@@ -364,7 +365,7 @@ func TestHandleCreateToken(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mock := &mockStorageWithTokenCRUD{
-				mockStorage: &mockStorage{},
+				MockStorage: &mockstore.MockStorage{},
 				createToken: func(ctx context.Context, name, token string) (int64, error) {
 					if tt.mockErr != nil {
 						return 0, tt.mockErr
@@ -451,7 +452,7 @@ func TestHandleDeleteToken(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mock := &mockStorageWithTokenCRUD{
-				mockStorage: &mockStorage{},
+				MockStorage: &mockstore.MockStorage{},
 				deleteToken: func(ctx context.Context, id int64) error {
 					return tt.mockErr
 				},
@@ -590,7 +591,7 @@ func (m *mockUnifiedStorage) GetPermissionsForToken(ctx context.Context, tokenID
 func newMockUnifiedStorage() *mockUnifiedStorage {
 	return &mockUnifiedStorage{
 		mockStorageWithTokenCRUD: &mockStorageWithTokenCRUD{
-			mockStorage: &mockStorage{},
+			MockStorage: &mockstore.MockStorage{},
 		},
 	}
 }
