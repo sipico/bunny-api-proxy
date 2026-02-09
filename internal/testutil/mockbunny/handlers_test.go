@@ -1664,6 +1664,205 @@ func TestHandleImportRecords_InvalidZoneID(t *testing.T) {
 	}
 }
 
+// TestHandleImportRecords_CreatesThenReadsBack verifies that imported records
+// are actually added to the zone state and can be read back via GET /dnszone/{id}.
+// This test would fail if the import handler only counts lines without creating records.
+func TestHandleImportRecords_CreatesThenReadsBack(t *testing.T) {
+	t.Parallel()
+	s := New()
+	defer s.Close()
+
+	zoneID := s.AddZone("example.com")
+
+	// Import multiple record types
+	importData := `; Example zone file
+example.com. 300 IN A 1.2.3.4
+www 300 IN A 2.3.4.5
+mail 300 IN A 3.4.5.6
+example.com. 300 IN TXT "v=spf1 ~all"
+api 300 IN CNAME example.com.
+ipv6 300 IN AAAA 2001:db8::1`
+
+	req, _ := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/dnszone/%d/import", s.URL(), zoneID), strings.NewReader(importData))
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("failed to import records: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected status %d, got %d", http.StatusOK, resp.StatusCode)
+	}
+
+	var importResult struct {
+		Created int `json:"Created"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&importResult); err != nil {
+		t.Fatalf("failed to decode import response: %v", err)
+	}
+
+	if importResult.Created != 6 {
+		t.Errorf("expected 6 created records, got %d", importResult.Created)
+	}
+
+	// Now read the zone back and verify records exist
+	resp, err = http.Get(fmt.Sprintf("%s/dnszone/%d", s.URL(), zoneID))
+	if err != nil {
+		t.Fatalf("failed to get zone: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected status %d, got %d", http.StatusOK, resp.StatusCode)
+	}
+
+	var zone Zone
+	if err := json.NewDecoder(resp.Body).Decode(&zone); err != nil {
+		t.Fatalf("failed to decode zone: %v", err)
+	}
+
+	// Verify imported records exist in the zone
+	if len(zone.Records) != 6 {
+		t.Errorf("expected 6 records in zone, got %d", len(zone.Records))
+	}
+
+	// Verify specific records by type and value
+	recordsByType := make(map[int][]Record)
+	for _, r := range zone.Records {
+		recordsByType[r.Type] = append(recordsByType[r.Type], r)
+	}
+
+	// Check A records (type 0)
+	aRecords := recordsByType[0]
+	if len(aRecords) != 3 {
+		t.Errorf("expected 3 A records, got %d", len(aRecords))
+	}
+
+	// Check TXT records (type 3)
+	txtRecords := recordsByType[3]
+	if len(txtRecords) != 1 {
+		t.Errorf("expected 1 TXT record, got %d", len(txtRecords))
+	}
+	if txtRecords[0].Value != `"v=spf1 ~all"` {
+		t.Errorf("expected TXT value %q, got %q", `"v=spf1 ~all"`, txtRecords[0].Value)
+	}
+
+	// Check CNAME records (type 2)
+	cnameRecords := recordsByType[2]
+	if len(cnameRecords) != 1 {
+		t.Errorf("expected 1 CNAME record, got %d", len(cnameRecords))
+	}
+
+	// Check AAAA records (type 1)
+	aaaaRecords := recordsByType[1]
+	if len(aaaaRecords) != 1 {
+		t.Errorf("expected 1 AAAA record, got %d", len(aaaaRecords))
+	}
+}
+
+// TestHandleImportRecords_AllRecordTypes verifies that all supported DNS record types are parsed correctly
+func TestHandleImportRecords_AllRecordTypes(t *testing.T) {
+	t.Parallel()
+	s := New()
+	defer s.Close()
+
+	zoneID := s.AddZone("example.com")
+
+	// Import all DNS record types supported by the parser
+	importData := `; Test all record types
+example.com. 300 IN A 1.2.3.4
+ipv6 300 IN AAAA 2001:db8::1
+alias 300 IN CNAME target.example.com.
+txt 300 IN TXT "v=spf1 ~all"
+mail 300 IN MX 10 mail.example.com.
+spf 300 IN SPF "v=spf1 -all"
+redirect 300 IN REDIRECT example.com.
+pullzone 300 IN PULLZONE pullzone.bunny.net.
+srv 300 IN SRV 10 20 5060 sipserver.example.com.
+caa 300 IN CAA 0 issue "letsencrypt.org"
+ptr 300 IN PTR mail.example.com.
+script 300 IN SCRIPT "var x = 1;"
+ns 300 IN NS ns1.example.com.`
+
+	req, _ := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/dnszone/%d/import", s.URL(), zoneID), strings.NewReader(importData))
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("failed to import records: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected status %d, got %d", http.StatusOK, resp.StatusCode)
+	}
+
+	var importResult struct {
+		Created int `json:"Created"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&importResult); err != nil {
+		t.Fatalf("failed to decode import response: %v", err)
+	}
+
+	if importResult.Created != 13 {
+		t.Errorf("expected 13 created records, got %d", importResult.Created)
+	}
+
+	// Read the zone and verify all record types were created
+	resp, err = http.Get(fmt.Sprintf("%s/dnszone/%d", s.URL(), zoneID))
+	if err != nil {
+		t.Fatalf("failed to get zone: %v", err)
+	}
+	defer resp.Body.Close()
+
+	var zone Zone
+	if err := json.NewDecoder(resp.Body).Decode(&zone); err != nil {
+		t.Fatalf("failed to decode zone: %v", err)
+	}
+
+	if len(zone.Records) != 13 {
+		t.Errorf("expected 13 records in zone, got %d", len(zone.Records))
+	}
+
+	// Verify each record type
+	recordsByType := make(map[int][]Record)
+	for _, r := range zone.Records {
+		recordsByType[r.Type] = append(recordsByType[r.Type], r)
+	}
+
+	expectedTypes := map[int]string{
+		0:  "A",
+		1:  "AAAA",
+		2:  "CNAME",
+		3:  "TXT",
+		4:  "MX",
+		5:  "SPF",
+		6:  "REDIRECT",
+		7:  "PULLZONE",
+		8:  "SRV",
+		9:  "CAA",
+		10: "PTR",
+		11: "SCRIPT",
+		12: "NS",
+	}
+
+	for typeInt, typeName := range expectedTypes {
+		records, exists := recordsByType[typeInt]
+		if !exists || len(records) != 1 {
+			t.Errorf("expected exactly 1 %s record (type %d), got %d", typeName, typeInt, len(records))
+		}
+		if exists && len(records) > 0 {
+			// Verify the record has reasonable values
+			if records[0].TTL != 300 {
+				t.Errorf("expected TTL 300 for %s record, got %d", typeName, records[0].TTL)
+			}
+			if records[0].Type != typeInt {
+				t.Errorf("expected type %d for %s record, got %d", typeInt, typeName, records[0].Type)
+			}
+		}
+	}
+}
+
 func TestHandleExportRecords_Success(t *testing.T) {
 	t.Parallel()
 	s := New()
