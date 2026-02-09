@@ -48,6 +48,7 @@ type MockStorage struct {
 	GetPermissionsForTokenFunc   func(ctx context.Context, tokenID int64) ([]*storage.Permission, error)
 
 	// Lifecycle
+	PingFunc  func(ctx context.Context) error
 	CloseFunc func() error
 }
 
@@ -235,6 +236,14 @@ func (m *MockStorage) GetPermissionsForToken(ctx context.Context, tokenID int64)
 		return m.GetPermissionsForTokenFunc(ctx, tokenID)
 	}
 	return []*storage.Permission{}, nil
+}
+
+// Ping verifies database connectivity with a lightweight query.
+func (m *MockStorage) Ping(ctx context.Context) error {
+	if m.PingFunc != nil {
+		return m.PingFunc(ctx)
+	}
+	return nil
 }
 
 // Close closes the storage connection.
