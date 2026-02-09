@@ -67,6 +67,12 @@ type Storage interface {
 	ListAdminTokens(ctx context.Context) ([]*AdminToken, error)
 	DeleteAdminToken(ctx context.Context, id int64) error
 
+	// Health checks
+	// Ping verifies database connectivity with a lightweight query.
+	// This is used by health check endpoints (/ready) to verify the database is accessible
+	// without performing expensive operations like table scans.
+	Ping(ctx context.Context) error
+
 	// Lifecycle
 	Close() error
 
