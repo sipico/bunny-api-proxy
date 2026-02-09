@@ -144,6 +144,10 @@ func (m *mockStorageForAdminTest) RemovePermission(ctx context.Context, permID i
 	return nil
 }
 
+func (m *mockStorageForAdminTest) RemovePermissionForToken(ctx context.Context, tokenID, permID int64) error {
+	return nil
+}
+
 func (m *mockStorageForAdminTest) GetPermissionsForToken(ctx context.Context, tokenID int64) ([]*storage.Permission, error) {
 	return make([]*storage.Permission, 0), nil
 }
