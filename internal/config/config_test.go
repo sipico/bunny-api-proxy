@@ -13,6 +13,7 @@ func TestLoad_DefaultValues(t *testing.T) {
 		os.Unsetenv("DATABASE_PATH")
 		os.Unsetenv("BUNNY_API_URL")
 		os.Unsetenv("BUNNY_API_KEY")
+		os.Unsetenv("METRICS_LISTEN_ADDR")
 
 		cfg, err := Load()
 		if err != nil {
@@ -34,6 +35,9 @@ func TestLoad_DefaultValues(t *testing.T) {
 		if cfg.BunnyAPIKey != "" {
 			t.Errorf("BunnyAPIKey = %q, want empty string (not set)", cfg.BunnyAPIKey)
 		}
+		if cfg.MetricsListenAddr != "localhost:9090" {
+			t.Errorf("MetricsListenAddr = %q, want %q (default)", cfg.MetricsListenAddr, "localhost:9090")
+		}
 	})
 }
 
@@ -44,6 +48,7 @@ func TestLoad_CustomValues(t *testing.T) {
 		t.Setenv("DATABASE_PATH", "/custom/path.db")
 		t.Setenv("BUNNY_API_URL", "http://mockbunny:8081")
 		t.Setenv("BUNNY_API_KEY", "test-api-key-123")
+		t.Setenv("METRICS_LISTEN_ADDR", "127.0.0.1:8888")
 
 		cfg, err := Load()
 		if err != nil {
@@ -64,6 +69,9 @@ func TestLoad_CustomValues(t *testing.T) {
 		}
 		if cfg.BunnyAPIKey != "test-api-key-123" {
 			t.Errorf("BunnyAPIKey = %q, want %q", cfg.BunnyAPIKey, "test-api-key-123")
+		}
+		if cfg.MetricsListenAddr != "127.0.0.1:8888" {
+			t.Errorf("MetricsListenAddr = %q, want %q", cfg.MetricsListenAddr, "127.0.0.1:8888")
 		}
 	})
 }
@@ -186,6 +194,37 @@ func TestLoad_BunnyAPIURL(t *testing.T) {
 			}
 			if cfg.BunnyAPIURL != tt.want {
 				t.Errorf("BunnyAPIURL = %q, want %q", cfg.BunnyAPIURL, tt.want)
+			}
+		})
+	}
+}
+
+func TestLoad_MetricsListenAddr(t *testing.T) {
+	tests := []struct {
+		name     string
+		envValue string
+		want     string
+	}{
+		{"not set uses default", "", "localhost:9090"},
+		{"custom address", "127.0.0.1:8888", "127.0.0.1:8888"},
+		{"internal interface", "192.168.1.10:9090", "192.168.1.10:9090"},
+		{"localhost with custom port", "localhost:3000", "localhost:3000"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.envValue == "" {
+				os.Unsetenv("METRICS_LISTEN_ADDR")
+			} else {
+				t.Setenv("METRICS_LISTEN_ADDR", tt.envValue)
+			}
+
+			cfg, err := Load()
+			if err != nil {
+				t.Fatalf("Load() error = %v", err)
+			}
+			if cfg.MetricsListenAddr != tt.want {
+				t.Errorf("MetricsListenAddr = %q, want %q", cfg.MetricsListenAddr, tt.want)
 			}
 		})
 	}
