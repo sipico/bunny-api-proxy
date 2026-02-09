@@ -263,9 +263,6 @@ func TestListScopedKeys(t *testing.T) {
 		t.Fatalf("failed to create key 1: %v", err)
 	}
 
-	// Wait 1 second to ensure different created_at timestamps (SQLite CURRENT_TIMESTAMP has second precision)
-	time.Sleep(1 * time.Second)
-
 	id2, err := s.CreateScopedKey(ctx, "key-2", "secret-2")
 	if err != nil {
 		t.Fatalf("failed to create key 2: %v", err)
@@ -280,7 +277,7 @@ func TestListScopedKeys(t *testing.T) {
 		t.Fatalf("expected 2 keys, got %d", len(keys))
 	}
 
-	// Test 3: Verify ordering (newest first = id2 created later should be first)
+	// Test 3: Verify ordering (newest first = highest ID first)
 	if keys[0].ID != id2 {
 		t.Errorf("expected first key to be id %d (created later), got %d", id2, keys[0].ID)
 	}
@@ -377,8 +374,6 @@ func TestScopedKeyWorkflow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create acme key: %v", err)
 	}
-
-	time.Sleep(1 * time.Second)
 
 	id2, err := s.CreateScopedKey(ctx, "admin", "admin-key-xyz789")
 	if err != nil {
