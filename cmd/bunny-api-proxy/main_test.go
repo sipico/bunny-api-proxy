@@ -2535,3 +2535,142 @@ func TestRunHealthCheckUsesCorrectURL(t *testing.T) {
 		t.Errorf("expected runHealthCheck to return 1 when no server is running, got %d", result)
 	}
 }
+
+// TestMainRouterDoesNotHaveMetricsEndpoint verifies that /metrics is not on the main router
+func TestMainRouterDoesNotHaveMetricsEndpoint(t *testing.T) {
+	t.Parallel()
+
+	oldDatabasePath := os.Getenv("DATABASE_PATH")
+	oldLogLevel := os.Getenv("LOG_LEVEL")
+
+	defer func() {
+		if oldDatabasePath != "" {
+			os.Setenv("DATABASE_PATH", oldDatabasePath)
+		} else {
+			os.Unsetenv("DATABASE_PATH")
+		}
+		if oldLogLevel != "" {
+			os.Setenv("LOG_LEVEL", oldLogLevel)
+		} else {
+			os.Unsetenv("LOG_LEVEL")
+		}
+	}()
+
+	os.Setenv("DATABASE_PATH", ":memory:")
+	os.Setenv("LOG_LEVEL", "info")
+
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("failed to load config: %v", err)
+	}
+
+	components, err := initializeComponents(cfg)
+	if err != nil {
+		t.Fatalf("failed to initialize components: %v", err)
+	}
+	defer components.store.Close()
+
+	// Test that /metrics is NOT accessible as a public endpoint on the main router
+	// (requests to /metrics will be routed to the proxy and require authentication)
+	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	w := httptest.NewRecorder()
+	components.mainRouter.ServeHTTP(w, req)
+
+	// Should return 401 (unauthorized) since request is routed to auth-protected proxy
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("expected /metrics on main router to require auth (401), got %d", w.Code)
+	}
+}
+
+// TestMetricsRouterHasMetricsEndpoint verifies that /metrics is accessible on the metrics router
+func TestMetricsRouterHasMetricsEndpoint(t *testing.T) {
+	t.Parallel()
+
+	oldDatabasePath := os.Getenv("DATABASE_PATH")
+	oldLogLevel := os.Getenv("LOG_LEVEL")
+
+	defer func() {
+		if oldDatabasePath != "" {
+			os.Setenv("DATABASE_PATH", oldDatabasePath)
+		} else {
+			os.Unsetenv("DATABASE_PATH")
+		}
+		if oldLogLevel != "" {
+			os.Setenv("LOG_LEVEL", oldLogLevel)
+		} else {
+			os.Unsetenv("LOG_LEVEL")
+		}
+	}()
+
+	os.Setenv("DATABASE_PATH", ":memory:")
+	os.Setenv("LOG_LEVEL", "info")
+
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("failed to load config: %v", err)
+	}
+
+	components, err := initializeComponents(cfg)
+	if err != nil {
+		t.Fatalf("failed to initialize components: %v", err)
+	}
+	defer components.store.Close()
+
+	// Test that /metrics IS accessible on the metrics router without authentication
+	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	w := httptest.NewRecorder()
+	components.metricsRouter.ServeHTTP(w, req)
+
+	// Should return 200 (success) since /metrics should be on metrics router
+	if w.Code != http.StatusOK {
+		t.Errorf("expected /metrics on metrics router to return 200, got %d", w.Code)
+	}
+}
+
+// TestMetricsListenAddrDefaultValue verifies that metrics listen address defaults to localhost:9090
+func TestMetricsListenAddrDefaultValue(t *testing.T) {
+	t.Parallel()
+
+	oldMetricsAddr := os.Getenv("METRICS_LISTEN_ADDR")
+	defer func() {
+		if oldMetricsAddr != "" {
+			os.Setenv("METRICS_LISTEN_ADDR", oldMetricsAddr)
+		} else {
+			os.Unsetenv("METRICS_LISTEN_ADDR")
+		}
+	}()
+
+	os.Unsetenv("METRICS_LISTEN_ADDR")
+
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("failed to load config: %v", err)
+	}
+
+	if cfg.MetricsListenAddr != "localhost:9090" {
+		t.Errorf("expected default metrics address localhost:9090, got %s", cfg.MetricsListenAddr)
+	}
+}
+
+// TestMetricsListenAddrCustomValue verifies that metrics listen address can be customized
+func TestMetricsListenAddrCustomValue(t *testing.T) {
+	oldMetricsAddr := os.Getenv("METRICS_LISTEN_ADDR")
+	defer func() {
+		if oldMetricsAddr != "" {
+			os.Setenv("METRICS_LISTEN_ADDR", oldMetricsAddr)
+		} else {
+			os.Unsetenv("METRICS_LISTEN_ADDR")
+		}
+	}()
+
+	os.Setenv("METRICS_LISTEN_ADDR", "127.0.0.1:8888")
+
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("failed to load config: %v", err)
+	}
+
+	if cfg.MetricsListenAddr != "127.0.0.1:8888" {
+		t.Errorf("expected custom metrics address 127.0.0.1:8888, got %s", cfg.MetricsListenAddr)
+	}
+}

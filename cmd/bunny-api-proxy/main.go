@@ -73,6 +73,7 @@ type serverComponents struct {
 	proxyRouter      http.Handler
 	adminRouter      http.Handler
 	mainRouter       *chi.Mux
+	metricsRouter    http.Handler
 }
 
 // initializeComponents sets up all server components with proper error handling
@@ -155,9 +156,12 @@ func initializeComponents(cfg *config.Config) (*serverComponents, error) {
 
 	r.Get("/health", healthHandler)
 	r.Get("/ready", readyHandler(store))
-	r.Handle("/metrics", metrics.Handler())
 	r.Mount("/admin", adminRouter)
 	r.Mount("/", proxyRouter)
+
+	// 10. Assemble metrics router on a separate internal listener
+	metricsRouter := chi.NewRouter()
+	metricsRouter.Handle("/metrics", metrics.Handler())
 
 	return &serverComponents{
 		logger:           logger,
@@ -169,6 +173,7 @@ func initializeComponents(cfg *config.Config) (*serverComponents, error) {
 		proxyRouter:      proxyRouter,
 		adminRouter:      adminRouter,
 		mainRouter:       r,
+		metricsRouter:    metricsRouter,
 	}, nil
 }
 
@@ -176,6 +181,17 @@ func initializeComponents(cfg *config.Config) (*serverComponents, error) {
 func createServer(cfg *config.Config, handler http.Handler) *http.Server {
 	return &http.Server{
 		Addr:         cfg.ListenAddr,
+		Handler:      handler,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
+}
+
+// createMetricsServer creates and returns an HTTP server for metrics on the internal listener
+func createMetricsServer(cfg *config.Config, handler http.Handler) *http.Server {
+	return &http.Server{
+		Addr:         cfg.MetricsListenAddr,
 		Handler:      handler,
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
@@ -221,6 +237,55 @@ func startServerAndWaitForShutdown(logger *slog.Logger, server *http.Server) err
 	return nil
 }
 
+// startServersAndWaitForShutdown starts the main and metrics servers, handles graceful shutdown for both
+func startServersAndWaitForShutdown(logger *slog.Logger, mainServer *http.Server, metricsServer *http.Server, metricsErrors chan error) error {
+	logger.Info("Server listening", "address", mainServer.Addr)
+
+	// Channel to signal server shutdown
+	mainErrors := make(chan error, 1)
+
+	// Start main server in a goroutine
+	go func() {
+		mainErrors <- mainServer.ListenAndServe()
+	}()
+
+	// Wait for shutdown signal or server error
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
+	select {
+	case err := <-mainErrors:
+		if !errors.Is(err, http.ErrServerClosed) {
+			return fmt.Errorf("server error: %w", err)
+		}
+	case err := <-metricsErrors:
+		if !errors.Is(err, http.ErrServerClosed) {
+			return fmt.Errorf("metrics server error: %w", err)
+		}
+	case sig := <-sigChan:
+		logger.Info("Received signal, shutting down", "signal", sig.String())
+
+		// Graceful shutdown with timeout
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), serverShutdownTimeout)
+		defer cancel()
+
+		// Shut down both servers
+		mainErr := mainServer.Shutdown(shutdownCtx)
+		metricsErr := metricsServer.Shutdown(shutdownCtx)
+
+		if mainErr != nil {
+			return fmt.Errorf("main server shutdown failed: %w", mainErr)
+		}
+		if metricsErr != nil {
+			return fmt.Errorf("metrics server shutdown failed: %w", metricsErr)
+		}
+
+		logger.Info("Server shut down gracefully")
+	}
+
+	return nil
+}
+
 // run initializes all components and starts the server with graceful shutdown.
 func run() error {
 	// 1. Load and validate configuration
@@ -246,9 +311,19 @@ func run() error {
 		}
 	}()
 
-	// Create and start server with graceful shutdown
-	server := createServer(cfg, components.mainRouter)
-	return startServerAndWaitForShutdown(components.logger, server)
+	// Create servers
+	mainServer := createServer(cfg, components.mainRouter)
+	metricsServer := createMetricsServer(cfg, components.metricsRouter)
+
+	// Start metrics server in a goroutine
+	metricsErrors := make(chan error, 1)
+	go func() {
+		components.logger.Info("Metrics listener starting", "address", metricsServer.Addr)
+		metricsErrors <- metricsServer.ListenAndServe()
+	}()
+
+	// Start main server and handle graceful shutdown for both
+	return startServersAndWaitForShutdown(components.logger, mainServer, metricsServer, metricsErrors)
 }
 
 // healthHandler returns OK if the process is alive
