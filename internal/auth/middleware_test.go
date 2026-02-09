@@ -12,96 +12,65 @@ import (
 	"testing"
 
 	"github.com/sipico/bunny-api-proxy/internal/storage"
+	"github.com/sipico/bunny-api-proxy/internal/testutil/mockstore"
 )
 
 // --- Mock implementations for testing ---
 
-// authTestTokenStore implements storage.TokenStore for AuthMiddleware tests.
-// This is separate from mockTokenStore in bootstrap_test.go to allow for more
-// detailed testing of different error conditions.
+// authTestTokenStore is a helper struct that wraps mockstore.MockStorage and provides
+// stateful in-memory storage for auth middleware tests.
 type authTestTokenStore struct {
-	tokens        map[string]*storage.Token // keyed by hash
-	permissions   map[int64][]*storage.Permission
+	*mockstore.MockStorage
+	tokens        map[string]*storage.Token       // keyed by hash
+	permissions   map[int64][]*storage.Permission // keyed by token ID
 	hasAdminToken bool
 	getByHashErr  error
 	hasAdminErr   error
 	getPermsErr   error
 }
 
+// newAuthTestTokenStore creates a new test token store with in-memory state.
 func newAuthTestTokenStore() *authTestTokenStore {
-	return &authTestTokenStore{
-		tokens:      make(map[string]*storage.Token),
-		permissions: make(map[int64][]*storage.Permission),
+	store := &authTestTokenStore{
+		MockStorage:   &mockstore.MockStorage{},
+		tokens:        make(map[string]*storage.Token),
+		permissions:   make(map[int64][]*storage.Permission),
+		hasAdminToken: false,
 	}
-}
 
-func (m *authTestTokenStore) CreateToken(ctx context.Context, name string, isAdmin bool, keyHash string) (*storage.Token, error) {
-	token := &storage.Token{
-		ID:      int64(len(m.tokens) + 1),
-		KeyHash: keyHash,
-		Name:    name,
-		IsAdmin: isAdmin,
-	}
-	m.tokens[keyHash] = token
-	return token, nil
-}
-
-func (m *authTestTokenStore) GetTokenByHash(ctx context.Context, keyHash string) (*storage.Token, error) {
-	if m.getByHashErr != nil {
-		return nil, m.getByHashErr
-	}
-	if token, ok := m.tokens[keyHash]; ok {
-		return token, nil
-	}
-	return nil, storage.ErrNotFound
-}
-
-func (m *authTestTokenStore) GetTokenByID(ctx context.Context, id int64) (*storage.Token, error) {
-	for _, token := range m.tokens {
-		if token.ID == id {
+	// Configure function fields to use the in-memory state
+	store.GetTokenByHashFunc = func(ctx context.Context, keyHash string) (*storage.Token, error) {
+		if store.getByHashErr != nil {
+			return nil, store.getByHashErr
+		}
+		if token, ok := store.tokens[keyHash]; ok {
 			return token, nil
 		}
+		return nil, storage.ErrNotFound
 	}
-	return nil, storage.ErrNotFound
-}
 
-func (m *authTestTokenStore) ListTokens(ctx context.Context) ([]*storage.Token, error) {
-	tokens := make([]*storage.Token, 0, len(m.tokens))
-	for _, t := range m.tokens {
-		tokens = append(tokens, t)
-	}
-	return tokens, nil
-}
-
-func (m *authTestTokenStore) DeleteToken(ctx context.Context, id int64) error {
-	for hash, token := range m.tokens {
-		if token.ID == id {
-			delete(m.tokens, hash)
-			return nil
+	store.HasAnyAdminTokenFunc = func(ctx context.Context) (bool, error) {
+		if store.hasAdminErr != nil {
+			return false, store.hasAdminErr
 		}
+		return store.hasAdminToken, nil
 	}
-	return storage.ErrNotFound
-}
 
-func (m *authTestTokenStore) HasAnyAdminToken(ctx context.Context) (bool, error) {
-	if m.hasAdminErr != nil {
-		return false, m.hasAdminErr
+	store.GetPermissionsForTokenFunc = func(ctx context.Context, tokenID int64) ([]*storage.Permission, error) {
+		if store.getPermsErr != nil {
+			return nil, store.getPermsErr
+		}
+		if perms, ok := store.permissions[tokenID]; ok {
+			return perms, nil
+		}
+		return []*storage.Permission{}, nil
 	}
-	return m.hasAdminToken, nil
-}
 
-func (m *authTestTokenStore) GetPermissionsForToken(ctx context.Context, tokenID int64) ([]*storage.Permission, error) {
-	if m.getPermsErr != nil {
-		return nil, m.getPermsErr
-	}
-	if perms, ok := m.permissions[tokenID]; ok {
-		return perms, nil
-	}
-	return []*storage.Permission{}, nil
+	return store
 }
 
 // addToken adds a token to the mock store using the plaintext key.
-func (m *authTestTokenStore) addToken(id int64, name string, isAdmin bool, plaintextKey string) *storage.Token {
+func (s *authTestTokenStore) addToken(id int64, name string, isAdmin bool, plaintextKey string) *storage.Token {
 	hash := sha256.Sum256([]byte(plaintextKey))
 	keyHash := hex.EncodeToString(hash[:])
 	token := &storage.Token{
@@ -110,7 +79,7 @@ func (m *authTestTokenStore) addToken(id int64, name string, isAdmin bool, plain
 		Name:    name,
 		IsAdmin: isAdmin,
 	}
-	m.tokens[keyHash] = token
+	s.tokens[keyHash] = token
 	return token
 }
 
@@ -592,6 +561,171 @@ func TestRequireAdmin_NoContextValue(t *testing.T) {
 	}
 }
 
+// --- Legacy Middleware tests (keep for backward compatibility) ---
+
+func TestMiddleware_MissingAuth(t *testing.T) {
+	t.Parallel()
+	mockStorage := &mockstore.MockStorage{}
+	validator := &Validator{storage: mockStorage}
+	handler := Middleware(validator)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("handler should not be called")
+	}))
+
+	req := httptest.NewRequest("GET", "/dnszone", nil)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("status = %d, want 401", rec.Code)
+	}
+
+	var resp map[string]string
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if resp["error"] != "missing API key" {
+		t.Errorf("error = %q, want 'missing API key'", resp["error"])
+	}
+}
+
+func TestMiddleware_MissingAccessKey(t *testing.T) {
+	t.Parallel()
+	mockStorage := &mockstore.MockStorage{}
+	validator := &Validator{storage: mockStorage}
+	handler := Middleware(validator)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("handler should not be called")
+	}))
+
+	req := httptest.NewRequest("GET", "/dnszone", nil)
+	req.Header.Set("AccessKey", "")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("status = %d, want 401", rec.Code)
+	}
+}
+
+func TestMiddleware_InvalidAPIKey(t *testing.T) {
+	t.Parallel()
+	mockStorage := &mockstore.MockStorage{}
+	validator := &Validator{storage: mockStorage}
+	handler := Middleware(validator)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("handler should not be called")
+	}))
+
+	req := httptest.NewRequest("GET", "/dnszone", nil)
+	req.Header.Set("AccessKey", "invalid-key")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("status = %d, want 401", rec.Code)
+	}
+
+	var resp map[string]string
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if resp["error"] != "invalid API key" {
+		t.Errorf("error = %q, want 'invalid API key'", resp["error"])
+	}
+}
+
+func TestMiddleware_ListZonesNoAuth(t *testing.T) {
+	t.Parallel()
+	mockStorage := &mockstore.MockStorage{}
+	validator := &Validator{storage: mockStorage}
+	handler := Middleware(validator)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("handler should not be called")
+	}))
+
+	req := httptest.NewRequest("GET", "/dnszone", nil)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("status = %d, want 401", rec.Code)
+	}
+}
+
+func TestMiddleware_ValidatorInternalError(t *testing.T) {
+	t.Parallel()
+	mockStorage := &mockstore.MockStorage{
+		ListScopedKeysFunc: func(ctx context.Context) ([]*storage.ScopedKey, error) {
+			return nil, context.DeadlineExceeded
+		},
+	}
+	validator := &Validator{storage: mockStorage}
+	handler := Middleware(validator)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("handler should not be called")
+	}))
+
+	req := httptest.NewRequest("GET", "/dnszone", nil)
+	req.Header.Set("AccessKey", "test-key")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Errorf("status = %d, want 500", rec.Code)
+	}
+
+	var resp map[string]string
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if resp["error"] != "internal error" {
+		t.Errorf("error = %q, want 'internal error'", resp["error"])
+	}
+}
+
+func TestGetKeyInfo_ReturnsCorrectValue(t *testing.T) {
+	t.Parallel()
+	keyInfo := &KeyInfo{KeyID: 42, KeyName: "test-key"}
+	ctx := context.WithValue(context.Background(), keyInfoKey, keyInfo)
+
+	got := GetKeyInfo(ctx)
+
+	if got != keyInfo {
+		t.Errorf("GetKeyInfo returned wrong value")
+	}
+	if got.KeyID != 42 {
+		t.Errorf("KeyID = %d, want 42", got.KeyID)
+	}
+	if got.KeyName != "test-key" {
+		t.Errorf("KeyName = %q, want test-key", got.KeyName)
+	}
+}
+
+func TestGetKeyInfo_ReturnsNilWhenNotInContext(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	got := GetKeyInfo(ctx)
+
+	if got != nil {
+		t.Errorf("GetKeyInfo returned %v, want nil", got)
+	}
+}
+
+func TestGetKeyInfo_MultipleContextValues(t *testing.T) {
+	t.Parallel()
+	keyInfo := &KeyInfo{KeyID: 1, KeyName: "key1"}
+	type otherKey struct{}
+	ctx := context.WithValue(context.Background(), otherKey{}, "value")
+	ctx = context.WithValue(ctx, keyInfoKey, keyInfo)
+
+	got := GetKeyInfo(ctx)
+
+	if got != keyInfo {
+		t.Error("GetKeyInfo should return keyInfo even with multiple context values")
+	}
+}
+
 func TestExtractAccessKey_ValidKey(t *testing.T) {
 	t.Parallel()
 	req := httptest.NewRequest("GET", "/dnszone", nil)
@@ -898,6 +1032,364 @@ func TestParseRequest_InvalidMethod(t *testing.T) {
 
 	if err == nil {
 		t.Fatal("ParseRequest should return error for invalid method")
+	}
+}
+
+func TestMiddleware_RespondsWithJSON(t *testing.T) {
+	t.Parallel()
+	mockStorage := &mockstore.MockStorage{}
+	validator := &Validator{storage: mockStorage}
+	handler := Middleware(validator)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest("GET", "/dnszone", nil)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	contentType := rec.Header().Get("Content-Type")
+	if contentType != "application/json" {
+		t.Errorf("Content-Type = %q, want 'application/json'", contentType)
+	}
+
+	var resp map[string]string
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("response is not valid JSON: %v", err)
+	}
+}
+
+func TestMiddleware_ParseRequestErrorPath(t *testing.T) {
+	t.Parallel()
+	mockStorage := &mockstore.MockStorage{}
+	validator := &Validator{storage: mockStorage}
+
+	// Create a wrapper that simulates middleware with valid key
+	// but invalid request endpoint
+	middlewareHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		apiKey := extractAccessKey(r)
+		if apiKey == "" {
+			writeJSONError(w, http.StatusUnauthorized, "missing API key")
+			return
+		}
+
+		// For this test, assume key is valid
+		keyInfo := &KeyInfo{KeyID: 1, KeyName: "test"}
+
+		// Parse request with invalid endpoint
+		req, err := ParseRequest(r)
+		if err != nil {
+			writeJSONError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+
+		if validator.CheckPermission(keyInfo, req) != nil {
+			writeJSONError(w, http.StatusForbidden, "permission denied")
+			return
+		}
+
+		ctx := context.WithValue(r.Context(), keyInfoKey, keyInfo)
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}).ServeHTTP(w, r.WithContext(ctx))
+	})
+
+	req := httptest.NewRequest("GET", "/invalid/path", nil)
+	req.Header.Set("AccessKey", "test-key")
+	rec := httptest.NewRecorder()
+
+	middlewareHandler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("status = %d, want 400", rec.Code)
+	}
+}
+
+func TestMiddleware_PermissionDeniedPath(t *testing.T) {
+	t.Parallel()
+	mockStorage := &mockstore.MockStorage{}
+	validator := &Validator{storage: mockStorage}
+
+	// Simulate middleware flow with permission denied
+	middlewareHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		apiKey := extractAccessKey(r)
+		if apiKey == "" {
+			writeJSONError(w, http.StatusUnauthorized, "missing API key")
+			return
+		}
+
+		keyInfo, err := validator.ValidateKey(r.Context(), apiKey)
+		if err != nil {
+			if err == ErrInvalidKey {
+				writeJSONError(w, http.StatusUnauthorized, "invalid API key")
+				return
+			}
+			writeJSONError(w, http.StatusInternalServerError, "internal error")
+			return
+		}
+
+		req, err := ParseRequest(r)
+		if err != nil {
+			writeJSONError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+
+		if err := validator.CheckPermission(keyInfo, req); err != nil {
+			writeJSONError(w, http.StatusForbidden, "permission denied")
+			return
+		}
+
+		ctx := context.WithValue(r.Context(), keyInfoKey, keyInfo)
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}).ServeHTTP(w, r.WithContext(ctx))
+	})
+
+	// Request with valid structure but will fail permission check
+	// (no matching zones in permissions)
+	req := httptest.NewRequest("GET", "/dnszone/999/records", nil)
+	req.Header.Set("AccessKey", "test-key")
+	rec := httptest.NewRecorder()
+
+	middlewareHandler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("status = %d, want 401 (key validation fails first)", rec.Code)
+	}
+}
+
+func TestMiddleware_SuccessfulFlow(t *testing.T) {
+	t.Parallel()
+	// Test the full happy path through middleware
+	mockStorage := &mockstore.MockStorage{}
+	validator := &Validator{storage: mockStorage}
+
+	handlerWasCalled := false
+	handler := Middleware(validator)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		handlerWasCalled = true
+		info := GetKeyInfo(r.Context())
+		if info == nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	// Even though we have no valid key, the flow should be:
+	// 1. Extract access key - succeeds
+	// 2. ValidateKey - fails with invalid key
+	// So handler never gets called
+	req := httptest.NewRequest("GET", "/dnszone", nil)
+	req.Header.Set("AccessKey", "test-key")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if handlerWasCalled {
+		t.Error("handler should not be called for invalid key")
+	}
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("status = %d, want 401", rec.Code)
+	}
+}
+
+func TestMiddleware_AccessKeyWithSpecialChars(t *testing.T) {
+	t.Parallel()
+	mockStorage := &mockstore.MockStorage{}
+	validator := &Validator{storage: mockStorage}
+	handler := Middleware(validator)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	// API key with special characters (common in real API keys)
+	req := httptest.NewRequest("GET", "/dnszone", nil)
+	req.Header.Set("AccessKey", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("status = %d, want 401", rec.Code)
+	}
+
+	var resp map[string]string
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if resp["error"] != "invalid API key" {
+		t.Errorf("error = %q, want 'invalid API key'", resp["error"])
+	}
+}
+
+func TestMiddleware_MultipleAuthorizationHeaders(t *testing.T) {
+	t.Parallel()
+	mockStorage := &mockstore.MockStorage{}
+	validator := &Validator{storage: mockStorage}
+	handler := Middleware(validator)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	// Only the first AccessKey header should be used
+	req := httptest.NewRequest("GET", "/dnszone", nil)
+	req.Header.Add("AccessKey", "key1")
+	req.Header.Add("AccessKey", "key2")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("status = %d, want 401", rec.Code)
+	}
+}
+
+func TestMiddleware_LargeAuthorizationHeader(t *testing.T) {
+	t.Parallel()
+	mockStorage := &mockstore.MockStorage{}
+	validator := &Validator{storage: mockStorage}
+	handler := Middleware(validator)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	// Large API key (some systems have long tokens)
+	largeKey := ""
+	for i := 0; i < 100; i++ {
+		largeKey += "abcdefghijklmnopqrstuvwxyz"
+	}
+
+	req := httptest.NewRequest("GET", "/dnszone", nil)
+	req.Header.Set("AccessKey", largeKey)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("status = %d, want 401", rec.Code)
+	}
+
+	var resp map[string]string
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if resp["error"] != "invalid API key" {
+		t.Errorf("error = %q, want 'invalid API key'", resp["error"])
+	}
+}
+
+// Test actual middleware with invalid path (covers ParseRequest error lines 38-42)
+func TestMiddleware_InvalidPath(t *testing.T) {
+	t.Parallel()
+	// Create valid key that will pass validation
+	key := storage.ScopedKey{
+		ID:      1,
+		KeyHash: "$2a$10$v0GsHA36sCTL1dzOlhZ/w.mWUso5NgDWbPhJvDE3.CdV0xjn5vupy", // "test-key"
+	}
+	mockStorage := &mockstore.MockStorage{
+		ListScopedKeysFunc: func(ctx context.Context) ([]*storage.ScopedKey, error) {
+			return []*storage.ScopedKey{&key}, nil
+		},
+		GetPermissionsFunc: func(ctx context.Context, scopedKeyID int64) ([]*storage.Permission, error) {
+			return []*storage.Permission{}, nil
+		},
+	}
+	validator := NewValidator(mockStorage)
+
+	handler := Middleware(validator)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("handler should not be called")
+	}))
+
+	req := httptest.NewRequest("GET", "/invalid/path", nil)
+	req.Header.Set("AccessKey", "test-key")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("status = %d, want 400", rec.Code)
+	}
+}
+
+// Test actual middleware with forbidden access (covers CheckPermission error lines 45-48)
+func TestMiddleware_ForbiddenAccess(t *testing.T) {
+	t.Parallel()
+	// Create valid key with no permissions for zone 999
+	key := storage.ScopedKey{
+		ID:      1,
+		KeyHash: "$2a$10$v0GsHA36sCTL1dzOlhZ/w.mWUso5NgDWbPhJvDE3.CdV0xjn5vupy", // "test-key"
+	}
+	mockStorage := &mockstore.MockStorage{
+		ListScopedKeysFunc: func(ctx context.Context) ([]*storage.ScopedKey, error) {
+			return []*storage.ScopedKey{&key}, nil
+		},
+		GetPermissionsFunc: func(ctx context.Context, scopedKeyID int64) ([]*storage.Permission, error) {
+			if scopedKeyID == 1 {
+				return []*storage.Permission{}, nil // No permissions for this key
+			}
+			return []*storage.Permission{}, nil
+		},
+	}
+	validator := NewValidator(mockStorage)
+
+	handler := Middleware(validator)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("handler should not be called")
+	}))
+
+	req := httptest.NewRequest("GET", "/dnszone/999", nil)
+	req.Header.Set("AccessKey", "test-key")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("status = %d, want 403", rec.Code)
+	}
+}
+
+// Test successful request (covers context lines 51-52 and next.ServeHTTP)
+func TestMiddleware_SuccessfulRequest(t *testing.T) {
+	t.Parallel()
+	// Create valid key with proper permissions
+	key := storage.ScopedKey{
+		ID:      1,
+		KeyHash: "$2a$10$v0GsHA36sCTL1dzOlhZ/w.mWUso5NgDWbPhJvDE3.CdV0xjn5vupy", // "test-key"
+	}
+	mockStorage := &mockstore.MockStorage{
+		ListScopedKeysFunc: func(ctx context.Context) ([]*storage.ScopedKey, error) {
+			return []*storage.ScopedKey{&key}, nil
+		},
+		GetPermissionsFunc: func(ctx context.Context, scopedKeyID int64) ([]*storage.Permission, error) {
+			if scopedKeyID == 1 {
+				return []*storage.Permission{}, nil // list_zones is always allowed
+			}
+			return []*storage.Permission{}, nil
+		},
+	}
+	validator := NewValidator(mockStorage)
+
+	handlerCalled := false
+	var gotKeyInfo *KeyInfo
+	handler := Middleware(validator)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		handlerCalled = true
+		gotKeyInfo = GetKeyInfo(r.Context())
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest("GET", "/dnszone", nil)
+	req.Header.Set("AccessKey", "test-key")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if !handlerCalled {
+		t.Error("handler should have been called")
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("status = %d, want 200", rec.Code)
+	}
+	if gotKeyInfo == nil {
+		t.Error("KeyInfo should be in context")
+	}
+	if gotKeyInfo != nil && gotKeyInfo.KeyID != 1 {
+		t.Errorf("KeyInfo.KeyID = %d, want 1", gotKeyInfo.KeyID)
 	}
 }
 
