@@ -41,7 +41,10 @@ func ParseRequest(r *http.Request) (*Request, error) {
 	// GET /dnszone/{id} - get zone
 	if r.Method == http.MethodGet {
 		if matches := getZonePattern.FindStringSubmatch(path); matches != nil {
-			zoneID, _ := strconv.ParseInt(matches[1], 10, 64) //nolint:errcheck // regex ensures valid number
+			zoneID, err := strconv.ParseInt(matches[1], 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("invalid zone ID: %w", err)
+			}
 			return &Request{Action: ActionGetZone, ZoneID: zoneID}, nil
 		}
 	}
@@ -49,7 +52,10 @@ func ParseRequest(r *http.Request) (*Request, error) {
 	// GET /dnszone/{id}/records/scan - get DNS scan result (admin only)
 	if r.Method == http.MethodGet {
 		if matches := scanResultPattern.FindStringSubmatch(path); matches != nil {
-			zoneID, _ := strconv.ParseInt(matches[1], 10, 64) //nolint:errcheck // regex ensures valid number
+			zoneID, err := strconv.ParseInt(matches[1], 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("invalid zone ID: %w", err)
+			}
 			return &Request{Action: ActionGetDNSScanResult, ZoneID: zoneID}, nil
 		}
 	}
@@ -57,14 +63,20 @@ func ParseRequest(r *http.Request) (*Request, error) {
 	// GET /dnszone/{id}/records - list records
 	if r.Method == http.MethodGet && recordsPattern.MatchString(path) {
 		matches := recordsPattern.FindStringSubmatch(path)
-		zoneID, _ := strconv.ParseInt(matches[1], 10, 64) //nolint:errcheck // regex ensures valid number
+		zoneID, err := strconv.ParseInt(matches[1], 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("invalid zone ID: %w", err)
+		}
 		return &Request{Action: ActionListRecords, ZoneID: zoneID}, nil
 	}
 	// POST /dnszone/checkavailability - check zone availability (admin only)
 	// POST /dnszone/{id}/import - import records (admin only)
 	if r.Method == http.MethodPost {
 		if matches := importRecordsPattern.FindStringSubmatch(path); matches != nil {
-			zoneID, _ := strconv.ParseInt(matches[1], 10, 64) //nolint:errcheck // regex ensures valid number
+			zoneID, err := strconv.ParseInt(matches[1], 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("invalid zone ID: %w", err)
+			}
 			return &Request{Action: ActionImportRecords, ZoneID: zoneID}, nil
 		}
 	}
@@ -85,7 +97,10 @@ func ParseRequest(r *http.Request) (*Request, error) {
 	// POST /dnszone/{id}/dnssec - enable DNSSEC (admin only)
 	if r.Method == http.MethodPost {
 		if matches := dnssecPattern.FindStringSubmatch(path); matches != nil {
-			zoneID, _ := strconv.ParseInt(matches[1], 10, 64) //nolint:errcheck // regex ensures valid number
+			zoneID, err := strconv.ParseInt(matches[1], 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("invalid zone ID: %w", err)
+			}
 			return &Request{Action: ActionEnableDNSSEC, ZoneID: zoneID}, nil
 		}
 	}
@@ -93,14 +108,20 @@ func ParseRequest(r *http.Request) (*Request, error) {
 	// DELETE /dnszone/{id}/dnssec - disable DNSSEC (admin only)
 	if r.Method == http.MethodDelete {
 		if matches := dnssecPattern.FindStringSubmatch(path); matches != nil {
-			zoneID, _ := strconv.ParseInt(matches[1], 10, 64) //nolint:errcheck // regex ensures valid number
+			zoneID, err := strconv.ParseInt(matches[1], 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("invalid zone ID: %w", err)
+			}
 			return &Request{Action: ActionDisableDNSSEC, ZoneID: zoneID}, nil
 		}
 	}
 	// POST /dnszone/{id}/certificate/issue - issue wildcard certificate (admin only)
 	if r.Method == http.MethodPost {
 		if matches := issueCertificatePattern.FindStringSubmatch(path); matches != nil {
-			zoneID, _ := strconv.ParseInt(matches[1], 10, 64) //nolint:errcheck // regex ensures valid number
+			zoneID, err := strconv.ParseInt(matches[1], 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("invalid zone ID: %w", err)
+			}
 			return &Request{Action: ActionIssueCertificate, ZoneID: zoneID}, nil
 		}
 	}
@@ -109,7 +130,10 @@ func ParseRequest(r *http.Request) (*Request, error) {
 		if matches := updateZonePattern.FindStringSubmatch(path); matches != nil {
 			// Check if this is the update zone pattern (not followed by /records)
 			if !recordsPattern.MatchString(path) {
-				zoneID, _ := strconv.ParseInt(matches[1], 10, 64) //nolint:errcheck // regex ensures valid number
+				zoneID, err := strconv.ParseInt(matches[1], 10, 64)
+				if err != nil {
+					return nil, fmt.Errorf("invalid zone ID: %w", err)
+				}
 				return &Request{Action: ActionUpdateZone, ZoneID: zoneID}, nil
 			}
 		}
@@ -118,13 +142,19 @@ func ParseRequest(r *http.Request) (*Request, error) {
 	// GET /dnszone/{id}/export - export records (admin only)
 	if r.Method == http.MethodGet {
 		if matches := exportRecordsPattern.FindStringSubmatch(path); matches != nil {
-			zoneID, _ := strconv.ParseInt(matches[1], 10, 64) //nolint:errcheck // regex ensures valid number
+			zoneID, err := strconv.ParseInt(matches[1], 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("invalid zone ID: %w", err)
+			}
 			return &Request{Action: ActionExportRecords, ZoneID: zoneID}, nil
 		}
 		// GET /dnszone/{id}/statistics - query statistics (admin only)
 		if r.Method == http.MethodGet {
 			if matches := statisticsPattern.FindStringSubmatch(path); matches != nil {
-				zoneID, _ := strconv.ParseInt(matches[1], 10, 64) //nolint:errcheck // regex ensures valid number
+				zoneID, err := strconv.ParseInt(matches[1], 10, 64)
+				if err != nil {
+					return nil, fmt.Errorf("invalid zone ID: %w", err)
+				}
 				return &Request{Action: ActionGetStatistics, ZoneID: zoneID}, nil
 			}
 		}
@@ -133,12 +163,15 @@ func ParseRequest(r *http.Request) (*Request, error) {
 	// POST /dnszone/{id}/records - add record
 	if r.Method == http.MethodPost && recordsPattern.MatchString(path) {
 		matches := recordsPattern.FindStringSubmatch(path)
-		zoneID, _ := strconv.ParseInt(matches[1], 10, 64) //nolint:errcheck // regex ensures valid number
+		zoneID, err := strconv.ParseInt(matches[1], 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("invalid zone ID: %w", err)
+		}
 
 		// Read and restore body for later use
-		bodyBytes, err := io.ReadAll(r.Body)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read request body: %w", err)
+		bodyBytes, bodyErr := io.ReadAll(r.Body)
+		if bodyErr != nil {
+			return nil, fmt.Errorf("failed to read request body: %w", bodyErr)
 		}
 		r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 
@@ -163,12 +196,20 @@ func ParseRequest(r *http.Request) (*Request, error) {
 	// POST /dnszone/{id}/records/{rid} - update record
 	if r.Method == http.MethodPost {
 		if matches := updateRecordPattern.FindStringSubmatch(path); matches != nil {
-			zoneID, _ := strconv.ParseInt(matches[1], 10, 64) //nolint:errcheck // regex ensures valid number
+			zoneID, err := strconv.ParseInt(matches[1], 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("invalid zone ID: %w", err)
+			}
+			recordID, err := strconv.ParseInt(matches[2], 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("invalid record ID: %w", err)
+			}
+			_ = recordID // recordID is parsed but not currently used in Request
 
 			// Read and restore body for later use
-			bodyBytes, err := io.ReadAll(r.Body)
-			if err != nil {
-				return nil, fmt.Errorf("failed to read request body: %w", err)
+			bodyBytes, bodyErr := io.ReadAll(r.Body)
+			if bodyErr != nil {
+				return nil, fmt.Errorf("failed to read request body: %w", bodyErr)
 			}
 			r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 
@@ -194,7 +235,15 @@ func ParseRequest(r *http.Request) (*Request, error) {
 	// DELETE /dnszone/{id}/records/{rid} - delete record
 	if r.Method == http.MethodDelete {
 		if matches := deleteRecordPattern.FindStringSubmatch(path); matches != nil {
-			zoneID, _ := strconv.ParseInt(matches[1], 10, 64) //nolint:errcheck // regex ensures valid number
+			zoneID, err := strconv.ParseInt(matches[1], 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("invalid zone ID: %w", err)
+			}
+			recordID, err := strconv.ParseInt(matches[2], 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("invalid record ID: %w", err)
+			}
+			_ = recordID // recordID is parsed but not currently used in Request
 			return &Request{Action: ActionDeleteRecord, ZoneID: zoneID}, nil
 		}
 	}
