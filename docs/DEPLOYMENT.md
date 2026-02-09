@@ -326,8 +326,9 @@ All configuration is done via environment variables. They must be set before the
 |----------|------|----------|---------|-------------|
 | `BUNNY_API_KEY` | String | **Yes** | - | Your bunny.net master API key. Used for proxying requests to bunny.net and for bootstrap authentication. |
 | `LOG_LEVEL` | String | No | `info` | Logging verbosity: `debug`, `info`, `warn`, `error`. Can be changed dynamically via Admin API without restart. |
-| `LISTEN_ADDR` | Address | No | `:8080` | HTTP server listen address. Must match container port mapping if using Docker. |
+| `LISTEN_ADDR` | Address | No | `:8080` | HTTP server listen address (public API). Must match container port mapping if using Docker. |
 | `DATABASE_PATH` | File path | No | `/data/proxy.db` | SQLite database file location. Should be on a mounted volume for persistence. |
+| `METRICS_LISTEN_ADDR` | Address | No | `localhost:9090` | Internal-only metrics listener address. Metrics endpoint (`/metrics`) is isolated here for security (issue #294). Should NOT be exposed to the public internet. |
 | `BUNNY_API_URL` | URL | No | `https://api.bunny.net` | Override bunny.net API endpoint. Mainly for testing against mock servers. |
 
 ### Configuration Examples
@@ -869,22 +870,49 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
 ```
 
-### Monitoring with Prometheus (Optional)
+### Monitoring with Prometheus
 
-While the proxy doesn't currently export Prometheus metrics, you can monitor:
+The proxy exports Prometheus metrics on an internal-only listener for security (issue #294).
 
-1. **Container health**: Use Docker health status
-2. **Endpoint availability**: Poll `/health` and `/ready` endpoints
-3. **Logs**: Parse JSON logs for errors and warnings
+**Important**: Metrics are NOT accessible on the public API port (8080). They are only available on the internal metrics listener:
+- Default: `http://localhost:9090/metrics`
+- Configurable via: `METRICS_LISTEN_ADDR` environment variable
 
-Example Prometheus scrape config (future enhancement):
+**Prometheus scrape config**:
 ```yaml
 scrape_configs:
   - job_name: 'bunny-api-proxy'
     static_configs:
-      - targets: ['localhost:8080']
+      - targets: ['localhost:9090']  # Internal metrics listener
     metrics_path: '/metrics'
 ```
+
+**For Docker Compose** (expose internal listener for monitoring):
+```yaml
+services:
+  bunny-api-proxy:
+    image: ghcr.io/sipico/bunny-api-proxy:latest
+    environment:
+      METRICS_LISTEN_ADDR: ":9090"  # Expose on all interfaces in container
+    ports:
+      - "8080:8080"   # Public API
+      - "9090:9090"   # Internal metrics (restrict access in production)
+    # ... other config ...
+
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+    ports:
+      - "9090:9090"
+    # Only expose prometheus on localhost in production
+    networks:
+      - monitoring
+```
+
+**Security note**: In production, restrict access to the metrics listener (port 9090) to authorized monitoring systems only. Do not expose it to the public internet.
 
 ### Key Metrics to Monitor
 

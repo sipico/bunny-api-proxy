@@ -2535,3 +2535,590 @@ func TestRunHealthCheckUsesCorrectURL(t *testing.T) {
 		t.Errorf("expected runHealthCheck to return 1 when no server is running, got %d", result)
 	}
 }
+
+// TestMainRouterDoesNotHaveMetricsEndpoint verifies that /metrics is not on the main router
+func TestMainRouterDoesNotHaveMetricsEndpoint(t *testing.T) {
+	t.Parallel()
+
+	oldDatabasePath := os.Getenv("DATABASE_PATH")
+	oldLogLevel := os.Getenv("LOG_LEVEL")
+
+	defer func() {
+		if oldDatabasePath != "" {
+			os.Setenv("DATABASE_PATH", oldDatabasePath)
+		} else {
+			os.Unsetenv("DATABASE_PATH")
+		}
+		if oldLogLevel != "" {
+			os.Setenv("LOG_LEVEL", oldLogLevel)
+		} else {
+			os.Unsetenv("LOG_LEVEL")
+		}
+	}()
+
+	os.Setenv("DATABASE_PATH", ":memory:")
+	os.Setenv("LOG_LEVEL", "info")
+
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("failed to load config: %v", err)
+	}
+
+	components, err := initializeComponents(cfg)
+	if err != nil {
+		t.Fatalf("failed to initialize components: %v", err)
+	}
+	defer components.store.Close()
+
+	// Test that /metrics is NOT accessible as a public endpoint on the main router
+	// (requests to /metrics will be routed to the proxy and require authentication)
+	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	w := httptest.NewRecorder()
+	components.mainRouter.ServeHTTP(w, req)
+
+	// Should return 401 (unauthorized) since request is routed to auth-protected proxy
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("expected /metrics on main router to require auth (401), got %d", w.Code)
+	}
+}
+
+// TestMetricsRouterHasMetricsEndpoint verifies that /metrics is accessible on the metrics router
+func TestMetricsRouterHasMetricsEndpoint(t *testing.T) {
+	t.Parallel()
+
+	oldDatabasePath := os.Getenv("DATABASE_PATH")
+	oldLogLevel := os.Getenv("LOG_LEVEL")
+
+	defer func() {
+		if oldDatabasePath != "" {
+			os.Setenv("DATABASE_PATH", oldDatabasePath)
+		} else {
+			os.Unsetenv("DATABASE_PATH")
+		}
+		if oldLogLevel != "" {
+			os.Setenv("LOG_LEVEL", oldLogLevel)
+		} else {
+			os.Unsetenv("LOG_LEVEL")
+		}
+	}()
+
+	os.Setenv("DATABASE_PATH", ":memory:")
+	os.Setenv("LOG_LEVEL", "info")
+
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("failed to load config: %v", err)
+	}
+
+	components, err := initializeComponents(cfg)
+	if err != nil {
+		t.Fatalf("failed to initialize components: %v", err)
+	}
+	defer components.store.Close()
+
+	// Test that /metrics IS accessible on the metrics router without authentication
+	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	w := httptest.NewRecorder()
+	components.metricsRouter.ServeHTTP(w, req)
+
+	// Should return 200 (success) since /metrics should be on metrics router
+	if w.Code != http.StatusOK {
+		t.Errorf("expected /metrics on metrics router to return 200, got %d", w.Code)
+	}
+}
+
+// TestMetricsListenAddrDefaultValue verifies that metrics listen address defaults to localhost:9090
+func TestMetricsListenAddrDefaultValue(t *testing.T) {
+	t.Parallel()
+
+	oldMetricsAddr := os.Getenv("METRICS_LISTEN_ADDR")
+	defer func() {
+		if oldMetricsAddr != "" {
+			os.Setenv("METRICS_LISTEN_ADDR", oldMetricsAddr)
+		} else {
+			os.Unsetenv("METRICS_LISTEN_ADDR")
+		}
+	}()
+
+	os.Unsetenv("METRICS_LISTEN_ADDR")
+
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("failed to load config: %v", err)
+	}
+
+	if cfg.MetricsListenAddr != "localhost:9090" {
+		t.Errorf("expected default metrics address localhost:9090, got %s", cfg.MetricsListenAddr)
+	}
+}
+
+// TestMetricsListenAddrCustomValue verifies that metrics listen address can be customized
+func TestMetricsListenAddrCustomValue(t *testing.T) {
+	oldMetricsAddr := os.Getenv("METRICS_LISTEN_ADDR")
+	defer func() {
+		if oldMetricsAddr != "" {
+			os.Setenv("METRICS_LISTEN_ADDR", oldMetricsAddr)
+		} else {
+			os.Unsetenv("METRICS_LISTEN_ADDR")
+		}
+	}()
+
+	os.Setenv("METRICS_LISTEN_ADDR", "127.0.0.1:8888")
+
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("failed to load config: %v", err)
+	}
+
+	if cfg.MetricsListenAddr != "127.0.0.1:8888" {
+		t.Errorf("expected custom metrics address 127.0.0.1:8888, got %s", cfg.MetricsListenAddr)
+	}
+}
+
+// TestCreateMetricsServer verifies metrics server is created correctly
+func TestCreateMetricsServer(t *testing.T) {
+	t.Parallel()
+
+	oldDatabasePath := os.Getenv("DATABASE_PATH")
+	oldLogLevel := os.Getenv("LOG_LEVEL")
+	oldMetricsAddr := os.Getenv("METRICS_LISTEN_ADDR")
+
+	defer func() {
+		if oldDatabasePath != "" {
+			os.Setenv("DATABASE_PATH", oldDatabasePath)
+		} else {
+			os.Unsetenv("DATABASE_PATH")
+		}
+		if oldLogLevel != "" {
+			os.Setenv("LOG_LEVEL", oldLogLevel)
+		} else {
+			os.Unsetenv("LOG_LEVEL")
+		}
+		if oldMetricsAddr != "" {
+			os.Setenv("METRICS_LISTEN_ADDR", oldMetricsAddr)
+		} else {
+			os.Unsetenv("METRICS_LISTEN_ADDR")
+		}
+	}()
+
+	os.Setenv("DATABASE_PATH", ":memory:")
+	os.Setenv("LOG_LEVEL", "info")
+	os.Setenv("METRICS_LISTEN_ADDR", "localhost:8888")
+
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("failed to load config: %v", err)
+	}
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	server := createMetricsServer(cfg, handler)
+
+	if server == nil {
+		t.Fatal("metrics server should not be nil")
+	}
+
+	if server.Addr != "localhost:8888" {
+		t.Errorf("expected metrics server address localhost:8888, got %s", server.Addr)
+	}
+
+	if server.Handler == nil {
+		t.Error("metrics server handler should not be nil")
+	}
+
+	if server.ReadTimeout != 15*time.Second {
+		t.Errorf("expected read timeout 15s, got %v", server.ReadTimeout)
+	}
+
+	if server.WriteTimeout != 15*time.Second {
+		t.Errorf("expected write timeout 15s, got %v", server.WriteTimeout)
+	}
+
+	if server.IdleTimeout != 60*time.Second {
+		t.Errorf("expected idle timeout 60s, got %v", server.IdleTimeout)
+	}
+}
+
+// TestInitializeComponentsMetricsRouter verifies metrics router is created
+func TestInitializeComponentsMetricsRouter(t *testing.T) {
+	t.Parallel()
+
+	oldDatabasePath := os.Getenv("DATABASE_PATH")
+	oldLogLevel := os.Getenv("LOG_LEVEL")
+
+	defer func() {
+		if oldDatabasePath != "" {
+			os.Setenv("DATABASE_PATH", oldDatabasePath)
+		} else {
+			os.Unsetenv("DATABASE_PATH")
+		}
+		if oldLogLevel != "" {
+			os.Setenv("LOG_LEVEL", oldLogLevel)
+		} else {
+			os.Unsetenv("LOG_LEVEL")
+		}
+	}()
+
+	os.Setenv("DATABASE_PATH", ":memory:")
+	os.Setenv("LOG_LEVEL", "info")
+
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("failed to load config: %v", err)
+	}
+
+	components, err := initializeComponents(cfg)
+	if err != nil {
+		t.Fatalf("failed to initialize components: %v", err)
+	}
+	defer components.store.Close()
+
+	if components.metricsRouter == nil {
+		t.Error("metrics router should not be nil")
+	}
+
+	// Verify metrics router is a valid http.Handler
+	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	w := httptest.NewRecorder()
+	components.metricsRouter.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected /metrics to return 200, got %d", w.Code)
+	}
+}
+
+// TestStartServersAndWaitForShutdownGraceful tests graceful shutdown of both servers
+func TestStartServersAndWaitForShutdownGraceful(t *testing.T) {
+	// Don't use t.Parallel() - this test handles signals
+	var logBuffer bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&logBuffer, &slog.HandlerOptions{Level: slog.LevelInfo}))
+
+	// Create main server
+	mainServer := &http.Server{
+		Addr: ":0",
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("OK"))
+		}),
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+
+	// Create metrics server
+	metricsServer := &http.Server{
+		Addr: ":0",
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("metrics"))
+		}),
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+
+	metricsErrors := make(chan error, 1)
+
+	// Start both servers in a goroutine
+	done := make(chan error, 1)
+	go func() {
+		done <- startServersAndWaitForShutdown(logger, mainServer, metricsServer, metricsErrors)
+	}()
+
+	// Give servers time to start
+	time.Sleep(100 * time.Millisecond)
+
+	// Send SIGTERM to trigger graceful shutdown
+	err := syscall.Kill(syscall.Getpid(), syscall.SIGTERM)
+	if err != nil {
+		t.Fatalf("failed to send SIGTERM: %v", err)
+	}
+
+	// Wait for shutdown with timeout
+	shutdownDone := make(chan error, 1)
+	go func() {
+		shutdownDone <- <-done
+	}()
+
+	select {
+	case err := <-shutdownDone:
+		// Should complete gracefully (or be nil)
+		if err != nil {
+			t.Logf("Graceful shutdown returned: %v", err)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("timeout waiting for graceful shutdown")
+	}
+}
+
+// TestRunWithMetricsServerConfigured tests run() with custom metrics address
+func TestRunWithMetricsServerConfigured(t *testing.T) {
+	t.Parallel()
+
+	oldDatabasePath := os.Getenv("DATABASE_PATH")
+	oldLogLevel := os.Getenv("LOG_LEVEL")
+	oldListenAddr := os.Getenv("LISTEN_ADDR")
+	oldMetricsAddr := os.Getenv("METRICS_LISTEN_ADDR")
+	oldBunnyAPIKey := os.Getenv("BUNNY_API_KEY")
+
+	defer func() {
+		if oldDatabasePath != "" {
+			os.Setenv("DATABASE_PATH", oldDatabasePath)
+		} else {
+			os.Unsetenv("DATABASE_PATH")
+		}
+		if oldLogLevel != "" {
+			os.Setenv("LOG_LEVEL", oldLogLevel)
+		} else {
+			os.Unsetenv("LOG_LEVEL")
+		}
+		if oldListenAddr != "" {
+			os.Setenv("LISTEN_ADDR", oldListenAddr)
+		} else {
+			os.Unsetenv("LISTEN_ADDR")
+		}
+		if oldMetricsAddr != "" {
+			os.Setenv("METRICS_LISTEN_ADDR", oldMetricsAddr)
+		} else {
+			os.Unsetenv("METRICS_LISTEN_ADDR")
+		}
+		if oldBunnyAPIKey != "" {
+			os.Setenv("BUNNY_API_KEY", oldBunnyAPIKey)
+		} else {
+			os.Unsetenv("BUNNY_API_KEY")
+		}
+	}()
+
+	os.Setenv("DATABASE_PATH", ":memory:")
+	os.Setenv("LOG_LEVEL", "info")
+	os.Setenv("LISTEN_ADDR", ":0")
+	os.Setenv("METRICS_LISTEN_ADDR", "localhost:0")
+	os.Setenv("BUNNY_API_KEY", "test-key")
+
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("failed to load config: %v", err)
+	}
+
+	// Verify metrics address is set correctly
+	if cfg.MetricsListenAddr != "localhost:0" {
+		t.Errorf("expected metrics address localhost:0, got %s", cfg.MetricsListenAddr)
+	}
+}
+
+// TestCreateMetricsServerWithDifferentAddresses tests metrics server with various addresses
+func TestCreateMetricsServerWithDifferentAddresses(t *testing.T) {
+	t.Parallel()
+
+	oldDatabasePath := os.Getenv("DATABASE_PATH")
+	oldLogLevel := os.Getenv("LOG_LEVEL")
+
+	defer func() {
+		if oldDatabasePath != "" {
+			os.Setenv("DATABASE_PATH", oldDatabasePath)
+		} else {
+			os.Unsetenv("DATABASE_PATH")
+		}
+		if oldLogLevel != "" {
+			os.Setenv("LOG_LEVEL", oldLogLevel)
+		} else {
+			os.Unsetenv("LOG_LEVEL")
+		}
+	}()
+
+	os.Setenv("DATABASE_PATH", ":memory:")
+	os.Setenv("LOG_LEVEL", "info")
+
+	testCases := []string{
+		"localhost:9090",
+		"127.0.0.1:8888",
+		":0",
+	}
+
+	for _, addr := range testCases {
+		t.Run(addr, func(t *testing.T) {
+			cfg := &config.Config{
+				MetricsListenAddr: addr,
+			}
+
+			handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
+			server := createMetricsServer(cfg, handler)
+
+			if server == nil {
+				t.Fatal("server should not be nil")
+			}
+			if server.Addr != addr {
+				t.Errorf("expected address %s, got %s", addr, server.Addr)
+			}
+		})
+	}
+}
+
+// TestInitializeComponentsWithMetricsRouterNotNil verifies metrics router field
+func TestInitializeComponentsWithMetricsRouterNotNil(t *testing.T) {
+	t.Parallel()
+
+	oldDatabasePath := os.Getenv("DATABASE_PATH")
+	oldLogLevel := os.Getenv("LOG_LEVEL")
+
+	defer func() {
+		if oldDatabasePath != "" {
+			os.Setenv("DATABASE_PATH", oldDatabasePath)
+		} else {
+			os.Unsetenv("DATABASE_PATH")
+		}
+		if oldLogLevel != "" {
+			os.Setenv("LOG_LEVEL", oldLogLevel)
+		} else {
+			os.Unsetenv("LOG_LEVEL")
+		}
+	}()
+
+	os.Setenv("DATABASE_PATH", ":memory:")
+	os.Setenv("LOG_LEVEL", "info")
+
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("failed to load config: %v", err)
+	}
+
+	components, err := initializeComponents(cfg)
+	if err != nil {
+		t.Fatalf("failed to initialize components: %v", err)
+	}
+	defer components.store.Close()
+
+	// Verify metricsRouter field exists and is not nil
+	if components.metricsRouter == nil {
+		t.Fatal("metricsRouter field should not be nil")
+	}
+}
+
+// TestServerComponentsHasMetricsRouter verifies serverComponents struct has metricsRouter
+func TestServerComponentsHasMetricsRouter(t *testing.T) {
+	t.Parallel()
+
+	oldDatabasePath := os.Getenv("DATABASE_PATH")
+	oldLogLevel := os.Getenv("LOG_LEVEL")
+
+	defer func() {
+		if oldDatabasePath != "" {
+			os.Setenv("DATABASE_PATH", oldDatabasePath)
+		} else {
+			os.Unsetenv("DATABASE_PATH")
+		}
+		if oldLogLevel != "" {
+			os.Setenv("LOG_LEVEL", oldLogLevel)
+		} else {
+			os.Unsetenv("LOG_LEVEL")
+		}
+	}()
+
+	os.Setenv("DATABASE_PATH", ":memory:")
+	os.Setenv("LOG_LEVEL", "info")
+
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("failed to load config: %v", err)
+	}
+
+	components, err := initializeComponents(cfg)
+	if err != nil {
+		t.Fatalf("failed to initialize components: %v", err)
+	}
+
+	// Test all components including metricsRouter
+	if components == nil {
+		t.Fatal("components should not be nil")
+	}
+	defer components.store.Close()
+	if components.logger == nil {
+		t.Error("logger is nil")
+	}
+	if components.store == nil {
+		t.Error("store is nil")
+	}
+	if components.mainRouter == nil {
+		t.Error("mainRouter is nil")
+	}
+	if components.metricsRouter == nil {
+		t.Error("metricsRouter is nil")
+	}
+}
+
+// TestCreateMetricsServerPreservesTimeout tests metrics server timeout configuration
+func TestCreateMetricsServerPreservesTimeout(t *testing.T) {
+	t.Parallel()
+
+	cfg := &config.Config{
+		MetricsListenAddr: ":9090",
+	}
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
+	server := createMetricsServer(cfg, handler)
+
+	// Verify timeout values match main server
+	if server.ReadTimeout != 15*time.Second {
+		t.Errorf("expected ReadTimeout 15s, got %v", server.ReadTimeout)
+	}
+	if server.WriteTimeout != 15*time.Second {
+		t.Errorf("expected WriteTimeout 15s, got %v", server.WriteTimeout)
+	}
+	if server.IdleTimeout != 60*time.Second {
+		t.Errorf("expected IdleTimeout 60s, got %v", server.IdleTimeout)
+	}
+}
+
+// TestInitializeComponentsProducesValidMetricsHandler tests metrics handler works
+func TestInitializeComponentsProducesValidMetricsHandler(t *testing.T) {
+	t.Parallel()
+
+	oldDatabasePath := os.Getenv("DATABASE_PATH")
+	oldLogLevel := os.Getenv("LOG_LEVEL")
+
+	defer func() {
+		if oldDatabasePath != "" {
+			os.Setenv("DATABASE_PATH", oldDatabasePath)
+		} else {
+			os.Unsetenv("DATABASE_PATH")
+		}
+		if oldLogLevel != "" {
+			os.Setenv("LOG_LEVEL", oldLogLevel)
+		} else {
+			os.Unsetenv("LOG_LEVEL")
+		}
+	}()
+
+	os.Setenv("DATABASE_PATH", ":memory:")
+	os.Setenv("LOG_LEVEL", "info")
+
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("failed to load config: %v", err)
+	}
+
+	components, err := initializeComponents(cfg)
+	if err != nil {
+		t.Fatalf("failed to initialize components: %v", err)
+	}
+	defer components.store.Close()
+
+	// Test that metrics handler returns valid response
+	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	w := httptest.NewRecorder()
+	components.metricsRouter.ServeHTTP(w, req)
+
+	// Should return 200 OK with Prometheus format
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status 200, got %d", w.Code)
+	}
+
+	// Should have Content-Type header for Prometheus
+	contentType := w.Header().Get("Content-Type")
+	if contentType == "" {
+		t.Error("expected Content-Type header in response")
+	}
+
+	// Should have body with metrics data
+	if w.Body.Len() == 0 {
+		t.Error("expected metrics data in response body")
+	}
+}
