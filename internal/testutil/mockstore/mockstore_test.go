@@ -254,6 +254,10 @@ func TestMockStorage_AllMethods(t *testing.T) {
 		t.Errorf("RemovePermission default should not error, got %v", err)
 	}
 
+	if err := mock.RemovePermissionForToken(ctx, 1, 1); err != nil {
+		t.Errorf("RemovePermissionForToken default should not error, got %v", err)
+	}
+
 	tokenPerms, err := mock.GetPermissionsForToken(ctx, 1)
 	if err != nil || tokenPerms == nil {
 		t.Errorf("GetPermissionsForToken default failed: perms=%v, err=%v", tokenPerms, err)
@@ -316,6 +320,9 @@ func TestMockStorage_CustomFunctions(t *testing.T) {
 			return &storage.Permission{ID: 333}, customErr
 		},
 		RemovePermissionFunc: func(ctx context.Context, permID int64) error {
+			return customErr
+		},
+		RemovePermissionForTokenFunc: func(ctx context.Context, tokenID, permID int64) error {
 			return customErr
 		},
 		GetPermissionsForTokenFunc: func(ctx context.Context, tokenID int64) ([]*storage.Permission, error) {
@@ -395,6 +402,10 @@ func TestMockStorage_CustomFunctions(t *testing.T) {
 
 	if err := mock.RemovePermission(ctx, 1); err != customErr {
 		t.Errorf("RemovePermission custom: got %v, want %v", err, customErr)
+	}
+
+	if err := mock.RemovePermissionForToken(ctx, 1, 1); err != customErr {
+		t.Errorf("RemovePermissionForToken custom: got %v, want %v", err, customErr)
 	}
 
 	perms, err := mock.GetPermissionsForToken(ctx, 1)

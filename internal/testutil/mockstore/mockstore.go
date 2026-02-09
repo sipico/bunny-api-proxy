@@ -41,10 +41,11 @@ type MockStorage struct {
 	DeleteAdminTokenFunc   func(ctx context.Context, id int64) error
 
 	// Unified token operations (extended API from Issue 147)
-	CountAdminTokensFunc       func(ctx context.Context) (int, error)
-	AddPermissionForTokenFunc  func(ctx context.Context, tokenID int64, perm *storage.Permission) (*storage.Permission, error)
-	RemovePermissionFunc       func(ctx context.Context, permID int64) error
-	GetPermissionsForTokenFunc func(ctx context.Context, tokenID int64) ([]*storage.Permission, error)
+	CountAdminTokensFunc         func(ctx context.Context) (int, error)
+	AddPermissionForTokenFunc    func(ctx context.Context, tokenID int64, perm *storage.Permission) (*storage.Permission, error)
+	RemovePermissionFunc         func(ctx context.Context, permID int64) error
+	RemovePermissionForTokenFunc func(ctx context.Context, tokenID, permID int64) error
+	GetPermissionsForTokenFunc   func(ctx context.Context, tokenID int64) ([]*storage.Permission, error)
 
 	// Lifecycle
 	CloseFunc func() error
@@ -216,6 +217,14 @@ func (m *MockStorage) AddPermissionForToken(ctx context.Context, tokenID int64, 
 func (m *MockStorage) RemovePermission(ctx context.Context, permID int64) error {
 	if m.RemovePermissionFunc != nil {
 		return m.RemovePermissionFunc(ctx, permID)
+	}
+	return nil
+}
+
+// RemovePermissionForToken removes a permission by ID, verifying it belongs to the specified token.
+func (m *MockStorage) RemovePermissionForToken(ctx context.Context, tokenID, permID int64) error {
+	if m.RemovePermissionForTokenFunc != nil {
+		return m.RemovePermissionForTokenFunc(ctx, tokenID, permID)
 	}
 	return nil
 }
