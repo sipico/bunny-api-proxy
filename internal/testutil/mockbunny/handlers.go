@@ -582,19 +582,22 @@ func (s *Server) handleExportRecords(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Hold lock for entire operation to avoid TOCTOU race:
+	// - Lock acquired
+	// - Zone lookup performed
+	// - Zone data (Records) accessed
+	// - Lock released
+	// This ensures no other goroutine can modify the zone between lookup and use.
 	s.state.mu.RLock()
-	zone, ok := s.state.zones[id]
-	s.state.mu.RUnlock()
+	defer s.state.mu.RUnlock()
 
+	zone, ok := s.state.zones[id]
 	if !ok {
 		s.writeError(w, http.StatusNotFound, "dnszone.zone.not_found", "Id", "The requested DNS zone was not found")
 		return
 	}
 
-	// Build BIND zone file format
-	s.state.mu.RLock()
-	defer s.state.mu.RUnlock()
-
+	// Build BIND zone file format (while still holding lock)
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf(";; Zone: %s\n", zone.Domain))
 	for _, rec := range zone.Records {
