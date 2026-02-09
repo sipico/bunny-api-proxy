@@ -1664,6 +1664,103 @@ func TestHandleImportRecords_InvalidZoneID(t *testing.T) {
 	}
 }
 
+// TestHandleImportRecords_CreatesThenReadsBack verifies that imported records
+// are actually added to the zone state and can be read back via GET /dnszone/{id}.
+// This test would fail if the import handler only counts lines without creating records.
+func TestHandleImportRecords_CreatesThenReadsBack(t *testing.T) {
+	t.Parallel()
+	s := New()
+	defer s.Close()
+
+	zoneID := s.AddZone("example.com")
+
+	// Import multiple record types
+	importData := `; Example zone file
+example.com. 300 IN A 1.2.3.4
+www 300 IN A 2.3.4.5
+mail 300 IN A 3.4.5.6
+example.com. 300 IN TXT "v=spf1 ~all"
+api 300 IN CNAME example.com.
+ipv6 300 IN AAAA 2001:db8::1`
+
+	req, _ := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/dnszone/%d/import", s.URL(), zoneID), strings.NewReader(importData))
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("failed to import records: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected status %d, got %d", http.StatusOK, resp.StatusCode)
+	}
+
+	var importResult struct {
+		Created int `json:"Created"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&importResult); err != nil {
+		t.Fatalf("failed to decode import response: %v", err)
+	}
+
+	if importResult.Created != 6 {
+		t.Errorf("expected 6 created records, got %d", importResult.Created)
+	}
+
+	// Now read the zone back and verify records exist
+	resp, err = http.Get(fmt.Sprintf("%s/dnszone/%d", s.URL(), zoneID))
+	if err != nil {
+		t.Fatalf("failed to get zone: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected status %d, got %d", http.StatusOK, resp.StatusCode)
+	}
+
+	var zone Zone
+	if err := json.NewDecoder(resp.Body).Decode(&zone); err != nil {
+		t.Fatalf("failed to decode zone: %v", err)
+	}
+
+	// Verify imported records exist in the zone
+	if len(zone.Records) != 6 {
+		t.Errorf("expected 6 records in zone, got %d", len(zone.Records))
+	}
+
+	// Verify specific records by type and value
+	recordsByType := make(map[int][]Record)
+	for _, r := range zone.Records {
+		recordsByType[r.Type] = append(recordsByType[r.Type], r)
+	}
+
+	// Check A records (type 0)
+	aRecords := recordsByType[0]
+	if len(aRecords) != 3 {
+		t.Errorf("expected 3 A records, got %d", len(aRecords))
+	}
+
+	// Check TXT records (type 3)
+	txtRecords := recordsByType[3]
+	if len(txtRecords) != 1 {
+		t.Errorf("expected 1 TXT record, got %d", len(txtRecords))
+	}
+	if txtRecords[0].Value != `"v=spf1 ~all"` {
+		t.Errorf("expected TXT value %q, got %q", `"v=spf1 ~all"`, txtRecords[0].Value)
+	}
+
+	// Check CNAME records (type 2)
+	cnameRecords := recordsByType[2]
+	if len(cnameRecords) != 1 {
+		t.Errorf("expected 1 CNAME record, got %d", len(cnameRecords))
+	}
+
+	// Check AAAA records (type 1)
+	aaaaRecords := recordsByType[1]
+	if len(aaaaRecords) != 1 {
+		t.Errorf("expected 1 AAAA record, got %d", len(aaaaRecords))
+	}
+}
+
 func TestHandleExportRecords_Success(t *testing.T) {
 	t.Parallel()
 	s := New()

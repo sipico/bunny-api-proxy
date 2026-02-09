@@ -527,6 +527,7 @@ func (s *Server) handleCheckAvailability(w http.ResponseWriter, r *http.Request)
 }
 
 // handleImportRecords handles POST /dnszone/{id}/import to import DNS records.
+// Parses BIND zone file format: name TTL IN type value
 func (s *Server) handleImportRecords(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
@@ -537,7 +538,7 @@ func (s *Server) handleImportRecords(w http.ResponseWriter, r *http.Request) {
 
 	// Hold lock for entire operation to avoid TOCTOU race
 	s.state.mu.RLock()
-	_, ok := s.state.zones[id]
+	zone, ok := s.state.zones[id]
 	s.state.mu.RUnlock()
 
 	if !ok {
@@ -545,22 +546,92 @@ func (s *Server) handleImportRecords(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Read and discard body (simulating import processing)
+	// Read body
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "failed to read body", http.StatusBadRequest)
 		return
 	}
 
-	// Simulate import: count lines that look like DNS records
-	// For mock purposes, count non-empty, non-comment lines as "successful"
-	successful := 0
+	// Parse BIND zone file format and create records
+	created := 0
+	failed := 0
+
+	s.state.mu.Lock()
+	defer s.state.mu.Unlock()
+
 	for _, line := range strings.Split(string(body), "\n") {
 		line = strings.TrimSpace(line)
-		if line != "" && !strings.HasPrefix(line, ";") {
-			successful++
+		// Skip empty lines and comments
+		if line == "" || strings.HasPrefix(line, ";") {
+			continue
 		}
+
+		// Parse BIND format: name TTL IN type value
+		// Example: "example.com. 300 IN A 1.2.3.4"
+		parts := strings.Fields(line)
+		if len(parts) < 5 {
+			failed++
+			continue
+		}
+
+		// Extract fields
+		name := parts[0]
+		// Remove trailing dot from BIND format
+		name = strings.TrimSuffix(name, ".")
+
+		// Parse TTL (parts[1])
+		ttl, err := strconv.ParseInt(parts[1], 10, 32)
+		if err != nil {
+			failed++
+			continue
+		}
+
+		// Skip "IN" class (parts[2]) — it's not stored in Record struct
+
+		// Parse record type (parts[3])
+		typeStr := strings.ToUpper(parts[3])
+		typeInt := recordTypeStringToInt(typeStr)
+		if typeInt < 0 {
+			failed++
+			continue
+		}
+
+		// Value is everything from parts[4] onward (joined with spaces)
+		value := strings.Join(parts[4:], " ")
+
+		// Create record with auto-incrementing ID
+		record := Record{
+			ID:                    s.state.nextRecordID,
+			Type:                  typeInt,
+			Name:                  name,
+			Value:                 value,
+			TTL:                   int32(ttl),
+			Weight:                0,
+			Priority:              0,
+			Port:                  0,
+			Flags:                 0,
+			Tag:                   "",
+			Disabled:              false,
+			Comment:               "",
+			LinkName:              "",
+			IPGeoLocationInfo:     nil,
+			GeolocationInfo:       nil,
+			MonitorStatus:         0,
+			MonitorType:           0,
+			EnviromentalVariables: []interface{}{},
+			SmartRoutingType:      0,
+			AutoSslIssuance:       true,
+			AccelerationStatus:    0,
+		}
+		s.state.nextRecordID++
+
+		zone.Records = append(zone.Records, record)
+		created++
 	}
+
+	// Update zone modification time
+	zone.DateModified = MockBunnyTime{Time: time.Now().UTC()}
 
 	writeJSON(w, http.StatusOK, struct {
 		TotalRecordsParsed int `json:"TotalRecordsParsed"`
@@ -568,11 +639,46 @@ func (s *Server) handleImportRecords(w http.ResponseWriter, r *http.Request) {
 		Failed             int `json:"Failed"`
 		Skipped            int `json:"Skipped"`
 	}{
-		TotalRecordsParsed: successful,
-		Created:            successful,
-		Failed:             0,
+		TotalRecordsParsed: created + failed,
+		Created:            created,
+		Failed:             failed,
 		Skipped:            0,
 	})
+}
+
+// recordTypeStringToInt converts a DNS record type string to its integer value.
+// Returns -1 if the type is not recognized.
+func recordTypeStringToInt(typeStr string) int {
+	switch typeStr {
+	case "A":
+		return 0
+	case "AAAA":
+		return 1
+	case "CNAME":
+		return 2
+	case "TXT":
+		return 3
+	case "MX":
+		return 4
+	case "SPF":
+		return 5
+	case "REDIRECT":
+		return 6
+	case "PULLZONE":
+		return 7
+	case "SRV":
+		return 8
+	case "CAA":
+		return 9
+	case "PTR":
+		return 10
+	case "SCRIPT":
+		return 11
+	case "NS":
+		return 12
+	default:
+		return -1
+	}
 }
 
 // handleExportRecords handles GET /dnszone/{id}/export to export DNS records.
