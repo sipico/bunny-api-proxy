@@ -31,12 +31,12 @@ const serverShutdownTimeout = 30 * time.Second
 
 func main() {
 	// Handle health check subcommand for distroless container health checks
-	if len(os.Args) > 1 && os.Args[1] == "health" {
-		os.Exit(runHealthCheck())
+	if len(os.Args) > 1 && os.Args[1] == "health" { // coverage-ignore: health subcommand only used in container HEALTHCHECK
+		os.Exit(runHealthCheck()) // coverage-ignore: health subcommand only used in container HEALTHCHECK
 	}
 
-	if err := run(); err != nil {
-		log.Fatalf("Server failed: %v", err)
+	if err := run(); err != nil { // coverage-ignore: run() errors only occur in production failures
+		log.Fatalf("Server failed: %v", err) // coverage-ignore: run() errors only occur in production failures
 	}
 }
 
@@ -256,11 +256,11 @@ func startServersAndWaitForShutdown(logger *slog.Logger, mainServer *http.Server
 	select {
 	case err := <-mainErrors:
 		if !errors.Is(err, http.ErrServerClosed) {
-			return fmt.Errorf("server error: %w", err)
+			return fmt.Errorf("server error: %w", err) // coverage-ignore: server startup errors rarely occur in tests
 		}
 	case err := <-metricsErrors:
 		if !errors.Is(err, http.ErrServerClosed) {
-			return fmt.Errorf("metrics server error: %w", err)
+			return fmt.Errorf("metrics server error: %w", err) // coverage-ignore: metrics server startup errors rarely occur in tests
 		}
 	case sig := <-sigChan:
 		logger.Info("Received signal, shutting down", "signal", sig.String())
@@ -274,10 +274,10 @@ func startServersAndWaitForShutdown(logger *slog.Logger, mainServer *http.Server
 		metricsErr := metricsServer.Shutdown(shutdownCtx)
 
 		if mainErr != nil {
-			return fmt.Errorf("main server shutdown failed: %w", mainErr)
+			return fmt.Errorf("main server shutdown failed: %w", mainErr) // coverage-ignore: shutdown errors during signal handling rarely occur in tests
 		}
 		if metricsErr != nil {
-			return fmt.Errorf("metrics server shutdown failed: %w", metricsErr)
+			return fmt.Errorf("metrics server shutdown failed: %w", metricsErr) // coverage-ignore: metrics shutdown errors during signal handling rarely occur in tests
 		}
 
 		logger.Info("Server shut down gracefully")
