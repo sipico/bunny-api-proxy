@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -112,6 +114,10 @@ func (m *mockStorageWithTokenCRUD) AddPermissionForToken(ctx context.Context, to
 }
 
 func (m *mockStorageWithTokenCRUD) RemovePermission(ctx context.Context, permID int64) error {
+	return nil
+}
+
+func (m *mockStorageWithTokenCRUD) RemovePermissionForToken(ctx context.Context, tokenID, permID int64) error {
 	return nil
 }
 
@@ -505,14 +511,15 @@ type mockUnifiedStorage struct {
 	*mockStorageWithTokenCRUD
 
 	// Unified token operations
-	createUnifiedToken     func(ctx context.Context, name string, isAdmin bool, keyHash string) (*storage.Token, error)
-	getTokenByID           func(ctx context.Context, id int64) (*storage.Token, error)
-	listUnifiedTokens      func(ctx context.Context) ([]*storage.Token, error)
-	deleteUnifiedToken     func(ctx context.Context, id int64) error
-	countAdminTokens       func(ctx context.Context) (int, error)
-	addPermissionForToken  func(ctx context.Context, tokenID int64, perm *storage.Permission) (*storage.Permission, error)
-	removePermission       func(ctx context.Context, permID int64) error
-	getPermissionsForToken func(ctx context.Context, tokenID int64) ([]*storage.Permission, error)
+	createUnifiedToken       func(ctx context.Context, name string, isAdmin bool, keyHash string) (*storage.Token, error)
+	getTokenByID             func(ctx context.Context, id int64) (*storage.Token, error)
+	listUnifiedTokens        func(ctx context.Context) ([]*storage.Token, error)
+	deleteUnifiedToken       func(ctx context.Context, id int64) error
+	countAdminTokens         func(ctx context.Context) (int, error)
+	addPermissionForToken    func(ctx context.Context, tokenID int64, perm *storage.Permission) (*storage.Permission, error)
+	removePermission         func(ctx context.Context, permID int64) error
+	removePermissionForToken func(ctx context.Context, tokenID, permID int64) error
+	getPermissionsForToken   func(ctx context.Context, tokenID int64) ([]*storage.Permission, error)
 }
 
 func (m *mockUnifiedStorage) CreateToken(ctx context.Context, name string, isAdmin bool, keyHash string) (*storage.Token, error) {
@@ -562,6 +569,13 @@ func (m *mockUnifiedStorage) AddPermissionForToken(ctx context.Context, tokenID 
 func (m *mockUnifiedStorage) RemovePermission(ctx context.Context, permID int64) error {
 	if m.removePermission != nil {
 		return m.removePermission(ctx, permID)
+	}
+	return nil
+}
+
+func (m *mockUnifiedStorage) RemovePermissionForToken(ctx context.Context, tokenID, permID int64) error {
+	if m.removePermissionForToken != nil {
+		return m.removePermissionForToken(ctx, tokenID, permID)
 	}
 	return nil
 }
@@ -1289,7 +1303,7 @@ func TestHandleDeleteTokenPermission(t *testing.T) {
 				}
 				return tt.mockToken, nil
 			}
-			mock.removePermission = func(ctx context.Context, permID int64) error {
+			mock.removePermissionForToken = func(ctx context.Context, tokenID, permID int64) error {
 				return tt.mockDelErr
 			}
 
@@ -1306,6 +1320,98 @@ func TestHandleDeleteTokenPermission(t *testing.T) {
 
 			if w.Code != tt.wantStatus {
 				t.Errorf("expected status %d, got %d: %s", tt.wantStatus, w.Code, w.Body.String())
+			}
+		})
+	}
+}
+
+// TestHandleDeleteTokenPermissionIDOR tests that the IDOR vulnerability is fixed.
+// It verifies that trying to delete a permission from the wrong token returns 404.
+func TestHandleDeleteTokenPermissionIDOR(t *testing.T) {
+	t.Parallel()
+
+	// Create a mock that tracks which permissions belong to which tokens
+	mock := newMockUnifiedStorage()
+
+	// Token 1 owns permission 1
+	// Token 2 owns permission 2
+	tokenIDToOwningTokenID := map[int64]int64{1: 1, 2: 2}
+
+	mock.getTokenByID = func(ctx context.Context, id int64) (*storage.Token, error) {
+		// Both tokens exist
+		if id == 1 || id == 2 {
+			return &storage.Token{ID: id, Name: "token-" + fmt.Sprintf("%d", id), IsAdmin: false}, nil
+		}
+		return nil, storage.ErrNotFound
+	}
+
+	mock.removePermissionForToken = func(ctx context.Context, tokenID, permID int64) error {
+		// Check if the permission is actually owned by this token
+		if owningToken, exists := tokenIDToOwningTokenID[permID]; exists {
+			if owningToken != tokenID {
+				// Permission belongs to a different token - IDOR attempt
+				return storage.ErrNotFound
+			}
+			// Permission belongs to this token - allowed to delete
+			return nil
+		}
+		// Permission doesn't exist
+		return storage.ErrNotFound
+	}
+
+	h := NewHandler(mock, new(slog.LevelVar), slog.Default())
+
+	tests := []struct {
+		name       string
+		tokenID    int64
+		permID     int64
+		wantStatus int
+		wantError  bool
+	}{
+		{
+			name:       "delete own permission succeeds",
+			tokenID:    1,
+			permID:     1,
+			wantStatus: http.StatusNoContent,
+			wantError:  false,
+		},
+		{
+			name:       "attempt to delete other token's permission fails with 404",
+			tokenID:    1,
+			permID:     2,
+			wantStatus: http.StatusNotFound,
+			wantError:  true,
+		},
+		{
+			name:       "attempt to delete non-existent permission fails with 404",
+			tokenID:    1,
+			permID:     999,
+			wantStatus: http.StatusNotFound,
+			wantError:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest("DELETE",
+				fmt.Sprintf("/api/tokens/%d/permissions/%d", tt.tokenID, tt.permID), nil)
+			ctx := chi.NewRouteContext()
+			ctx.URLParams.Add("id", fmt.Sprintf("%d", tt.tokenID))
+			ctx.URLParams.Add("pid", fmt.Sprintf("%d", tt.permID))
+			req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, ctx))
+
+			w := httptest.NewRecorder()
+			h.HandleDeleteTokenPermission(w, req)
+
+			if w.Code != tt.wantStatus {
+				t.Errorf("expected status %d, got %d: %s", tt.wantStatus, w.Code, w.Body.String())
+			}
+
+			if tt.wantError {
+				// Verify error response
+				if !strings.Contains(w.Body.String(), "Permission not found") {
+					t.Errorf("expected error message about permission not found, got: %s", w.Body.String())
+				}
 			}
 		})
 	}

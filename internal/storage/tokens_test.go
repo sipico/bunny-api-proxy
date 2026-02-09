@@ -1115,3 +1115,95 @@ func TestGetPermissionsEmptyList(t *testing.T) {
 		t.Errorf("expected 0 permissions, got %d", len(perms))
 	}
 }
+
+// TestRemovePermissionForToken verifies that RemovePermissionForToken only deletes permissions
+// that belong to the specified token (fixes IDOR vulnerability).
+func TestRemovePermissionForToken(t *testing.T) {
+	t.Parallel()
+
+	s, err := New(":memory:")
+	if err != nil {
+		t.Fatalf("failed to create storage: %v", err)
+	}
+	defer func() { _ = s.Close() }()
+	ctx := context.Background()
+
+	// Create two tokens
+	hash1, _ := HashKey("test-key-1")
+	token1, _ := s.CreateToken(ctx, "token-1", false, hash1)
+
+	hash2, _ := HashKey("test-key-2")
+	token2, _ := s.CreateToken(ctx, "token-2", false, hash2)
+
+	// Add permissions to both tokens
+	perm1 := &Permission{
+		ZoneID:         100,
+		AllowedActions: []string{"list_records"},
+		RecordTypes:    []string{"TXT"},
+	}
+	_, _ = s.AddPermissionForToken(ctx, token1.ID, perm1)
+
+	perm2 := &Permission{
+		ZoneID:         200,
+		AllowedActions: []string{"list_records"},
+		RecordTypes:    []string{"A"},
+	}
+	addedPerm2, _ := s.AddPermissionForToken(ctx, token2.ID, perm2)
+
+	// Attempt to delete permission 2 as if it belonged to token 1
+	// This should fail and return ErrNotFound
+	err = s.RemovePermissionForToken(ctx, token1.ID, addedPerm2.ID)
+	if err != ErrNotFound {
+		t.Errorf("expected ErrNotFound when deleting permission from wrong token, got: %v", err)
+	}
+
+	// Verify both permissions still exist
+	perms1, _ := s.GetPermissionsForToken(ctx, token1.ID)
+	if len(perms1) != 1 {
+		t.Errorf("expected token1 to still have 1 permission, got %d", len(perms1))
+	}
+
+	perms2, _ := s.GetPermissionsForToken(ctx, token2.ID)
+	if len(perms2) != 1 {
+		t.Errorf("expected token2 to still have 1 permission, got %d", len(perms2))
+	}
+
+	// Now delete permission 2 from the correct token
+	err = s.RemovePermissionForToken(ctx, token2.ID, addedPerm2.ID)
+	if err != nil {
+		t.Fatalf("failed to remove permission from correct token: %v", err)
+	}
+
+	// Verify permission 2 is deleted and permission 1 still exists
+	perms2, _ = s.GetPermissionsForToken(ctx, token2.ID)
+	if len(perms2) != 0 {
+		t.Errorf("expected token2 to have 0 permissions after deletion, got %d", len(perms2))
+	}
+
+	perms1, _ = s.GetPermissionsForToken(ctx, token1.ID)
+	if len(perms1) != 1 {
+		t.Errorf("expected token1 to still have 1 permission, got %d", len(perms1))
+	}
+}
+
+// TestRemovePermissionForTokenNotFound verifies ErrNotFound when permission doesn't exist.
+func TestRemovePermissionForTokenNotFound(t *testing.T) {
+	t.Parallel()
+
+	s, err := New(":memory:")
+	if err != nil {
+		t.Fatalf("failed to create storage: %v", err)
+	}
+	defer func() { _ = s.Close() }()
+	ctx := context.Background()
+
+	// Create a token
+	hash, _ := HashKey("test-key")
+	token, _ := s.CreateToken(ctx, "test-token", false, hash)
+
+	// Try to delete non-existent permission
+	err = s.RemovePermissionForToken(ctx, token.ID, 999)
+	if err != ErrNotFound {
+		t.Errorf("expected ErrNotFound for non-existent permission, got: %v", err)
+	}
+}

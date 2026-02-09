@@ -649,14 +649,14 @@ func (h *Handler) HandleDeleteTokenPermission(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// Delete the permission
-	err = h.storage.RemovePermission(ctx, permID)
+	// Delete the permission (only if it belongs to this token)
+	err = h.storage.RemovePermissionForToken(ctx, tokenID, permID)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			WriteError(w, http.StatusNotFound, ErrCodeNotFound, "Permission not found")
+			WriteError(w, http.StatusNotFound, ErrCodeNotFound, "Permission not found for this token")
 			return
 		}
-		h.logger.Error("failed to delete permission", "error", err, "permission_id", permID)
+		h.logger.Error("failed to delete permission", "error", err, "token_id", tokenID, "permission_id", permID)
 		WriteError(w, http.StatusInternalServerError, ErrCodeInternalError, "Failed to delete permission")
 		return
 	}

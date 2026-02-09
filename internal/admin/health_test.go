@@ -96,6 +96,10 @@ func (m *mockStorage) RemovePermission(ctx context.Context, permID int64) error 
 	return nil
 }
 
+func (m *mockStorage) RemovePermissionForToken(ctx context.Context, tokenID, permID int64) error {
+	return nil
+}
+
 func (m *mockStorage) GetPermissionsForToken(ctx context.Context, tokenID int64) ([]*storage.Permission, error) {
 	return make([]*storage.Permission, 0), nil
 }

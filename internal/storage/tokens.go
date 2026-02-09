@@ -246,6 +246,29 @@ func (s *SQLiteStorage) RemovePermission(ctx context.Context, permID int64) erro
 	return nil
 }
 
+// RemovePermissionForToken deletes a permission by ID, but only if it belongs to the specified token.
+// This prevents IDOR (Insecure Direct Object Reference) attacks.
+// Returns ErrNotFound if the permission doesn't exist or doesn't belong to the token.
+func (s *SQLiteStorage) RemovePermissionForToken(ctx context.Context, tokenID, permID int64) error {
+	result, err := s.db.ExecContext(ctx,
+		"DELETE FROM permissions WHERE id = ? AND token_id = ?",
+		permID, tokenID)
+	if err != nil {
+		return fmt.Errorf("failed to delete permission: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return ErrNotFound
+	}
+
+	return nil
+}
+
 // GetPermissionsForToken retrieves all permissions for a token.
 // Returns empty slice if no permissions exist (not an error).
 // The AllowedActions and RecordTypes are JSON-decoded.
