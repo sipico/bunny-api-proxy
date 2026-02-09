@@ -92,16 +92,17 @@ func (s *Server) handleGetZone(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Hold lock for entire operation to avoid TOCTOU race
 	s.state.mu.RLock()
-	zone, ok := s.state.zones[id]
-	s.state.mu.RUnlock()
+	defer s.state.mu.RUnlock()
 
+	zone, ok := s.state.zones[id]
 	if !ok {
 		s.writeError(w, http.StatusNotFound, "dnszone.zone.not_found", "Id", "The requested DNS zone was not found")
 		return
 	}
 
-	// Convert zone to short time format for GET response
+	// Convert zone to short time format for GET response (while still holding lock)
 	shortZone := zone.ZoneShortTime()
 	writeJSON(w, http.StatusOK, shortZone)
 }
@@ -534,6 +535,7 @@ func (s *Server) handleImportRecords(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Hold lock for entire operation to avoid TOCTOU race
 	s.state.mu.RLock()
 	_, ok := s.state.zones[id]
 	s.state.mu.RUnlock()
@@ -706,6 +708,7 @@ func (s *Server) handleIssueCertificate(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// Hold lock for entire operation to avoid TOCTOU race
 	s.state.mu.RLock()
 	_, ok := s.state.zones[id]
 	s.state.mu.RUnlock()
@@ -731,6 +734,7 @@ func (s *Server) handleGetStatistics(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Hold lock for entire operation to avoid TOCTOU race
 	s.state.mu.RLock()
 	_, ok := s.state.zones[id]
 	s.state.mu.RUnlock()
