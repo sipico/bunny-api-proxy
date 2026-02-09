@@ -879,15 +879,7 @@ func TestEnsureAdminToken_Bootstrap(t *testing.T) {
 	}
 
 	masterKey := "test-master-key"
-	originalMasterKey := os.Getenv("BUNNY_MASTER_API_KEY")
-	os.Setenv("BUNNY_MASTER_API_KEY", masterKey)
-	defer func() {
-		if originalMasterKey != "" {
-			os.Setenv("BUNNY_MASTER_API_KEY", originalMasterKey)
-		} else {
-			os.Unsetenv("BUNNY_MASTER_API_KEY")
-		}
-	}()
+	t.Setenv("BUNNY_MASTER_API_KEY", masterKey)
 
 	env.ensureAdminToken(t)
 
@@ -1229,8 +1221,7 @@ func TestE2EFullWorkflow_TokenBootstrap(t *testing.T) {
 			}
 			_ = env
 
-			os.Setenv("BUNNY_MASTER_API_KEY", tt.masterKey)
-			defer os.Unsetenv("BUNNY_MASTER_API_KEY")
+			t.Setenv("BUNNY_MASTER_API_KEY", tt.masterKey)
 
 			env.ensureAdminToken(t)
 
@@ -1429,13 +1420,7 @@ func TestEnsureAdminToken_DefaultFallback(t *testing.T) {
 	}
 
 	// Clear any existing BUNNY_MASTER_API_KEY
-	originalKey := os.Getenv("BUNNY_MASTER_API_KEY")
-	os.Unsetenv("BUNNY_MASTER_API_KEY")
-	defer func() {
-		if originalKey != "" {
-			os.Setenv("BUNNY_MASTER_API_KEY", originalKey)
-		}
-	}()
+	t.Setenv("BUNNY_MASTER_API_KEY", "")
 
 	env.ensureAdminToken(t)
 
@@ -1447,14 +1432,12 @@ func TestEnsureAdminToken_DefaultFallback(t *testing.T) {
 // TestSetupMock_ExternalMockbunny tests setup with external mockbunny URL.
 func TestSetupMock_ExternalMockbunny(t *testing.T) {
 	externalURL := "http://localhost:8000"
-	os.Setenv("MOCKBUNNY_URL", externalURL)
-	defer os.Unsetenv("MOCKBUNNY_URL")
+	t.Setenv("MOCKBUNNY_URL", externalURL)
 
 	// Create a temporary mock server to simulate external mockbunny
 	mockProxy := NewMockProxyServer(t)
 	defer mockProxy.Close()
-	os.Setenv("MOCKBUNNY_URL", mockProxy.URL)
-	defer os.Unsetenv("MOCKBUNNY_URL")
+	t.Setenv("MOCKBUNNY_URL", mockProxy.URL)
 
 	t.Setenv("BUNNY_TEST_MODE", "mock")
 	env := Setup(t)
@@ -1551,8 +1534,7 @@ func TestE2E_CompleteWorkflow_WithVerification(t *testing.T) {
 		),
 	}
 
-	os.Setenv("BUNNY_MASTER_API_KEY", "test-master-key")
-	defer os.Unsetenv("BUNNY_MASTER_API_KEY")
+	t.Setenv("BUNNY_MASTER_API_KEY", "test-master-key")
 
 	// Step 1: Verify empty state
 	env.ensureAdminToken(t)
@@ -1597,7 +1579,7 @@ func TestGetCommitHash_GitAvailable(t *testing.T) {
 
 // TestSetupMock_InProcess tests setup with in-process mock server.
 func TestSetupMock_InProcess(t *testing.T) {
-	os.Unsetenv("MOCKBUNNY_URL")
+	t.Setenv("MOCKBUNNY_URL", "")
 	t.Setenv("BUNNY_TEST_MODE", "mock")
 
 	env := Setup(t)
@@ -1719,8 +1701,7 @@ func TestEnsureAdminToken_WithMasterKey(t *testing.T) {
 		AdminToken: "",
 	}
 
-	os.Setenv("BUNNY_MASTER_API_KEY", "test-master-key")
-	defer os.Unsetenv("BUNNY_MASTER_API_KEY")
+	t.Setenv("BUNNY_MASTER_API_KEY", "test-master-key")
 
 	// Bootstrap token
 	env.ensureAdminToken(t)
@@ -1738,13 +1719,7 @@ func TestEnsureAdminToken_WithMasterKey(t *testing.T) {
 // TestSetupReal_NoApiKey tests setup correctly skips real mode without API key.
 func TestSetupReal_NoApiKey(t *testing.T) {
 	// Save and clear BUNNY_API_KEY
-	oldKey := os.Getenv("BUNNY_API_KEY")
-	os.Unsetenv("BUNNY_API_KEY")
-	defer func() {
-		if oldKey != "" {
-			os.Setenv("BUNNY_API_KEY", oldKey)
-		}
-	}()
+	t.Setenv("BUNNY_API_KEY", "")
 
 	t.Setenv("BUNNY_TEST_MODE", "real")
 
@@ -1802,8 +1777,7 @@ func TestE2E_CompleteFlow_WithCleanup(t *testing.T) {
 		),
 	}
 
-	os.Setenv("BUNNY_MASTER_API_KEY", "test-master-key")
-	defer os.Unsetenv("BUNNY_MASTER_API_KEY")
+	t.Setenv("BUNNY_MASTER_API_KEY", "test-master-key")
 
 	// Bootstrap token
 	env.ensureAdminToken(t)
@@ -2045,8 +2019,7 @@ func TestCreateTestZones_E2EModeWithMultiple(t *testing.T) {
 		),
 	}
 
-	os.Setenv("BUNNY_MASTER_API_KEY", "test-master-key")
-	defer os.Unsetenv("BUNNY_MASTER_API_KEY")
+	t.Setenv("BUNNY_MASTER_API_KEY", "test-master-key")
 
 	env.ensureAdminToken(t)
 
@@ -2109,8 +2082,7 @@ func TestEnsureAdminToken_TokenCaching(t *testing.T) {
 		AdminToken: "",
 	}
 
-	os.Setenv("BUNNY_MASTER_API_KEY", "test-master-key")
-	defer os.Unsetenv("BUNNY_MASTER_API_KEY")
+	t.Setenv("BUNNY_MASTER_API_KEY", "test-master-key")
 
 	// First call - bootstrap
 	env.ensureAdminToken(t)
@@ -2533,17 +2505,9 @@ func TestGetCommitHash_Consistency(t *testing.T) {
 
 // TestSetupMock_InProcessMockbunny tests in-process mock initialization.
 func TestSetupMock_InProcessMockbunny(t *testing.T) {
-	os.Unsetenv("MOCKBUNNY_URL")
 	t.Setenv("BUNNY_TEST_MODE", "mock")
-
 	// Unset external mock to force in-process creation
-	oldMockbunny := os.Getenv("MOCKBUNNY_URL")
-	os.Unsetenv("MOCKBUNNY_URL")
-	defer func() {
-		if oldMockbunny != "" {
-			os.Setenv("MOCKBUNNY_URL", oldMockbunny)
-		}
-	}()
+	t.Setenv("MOCKBUNNY_URL", "")
 
 	env := Setup(t)
 
@@ -2574,8 +2538,7 @@ func TestEnsureAdminToken_RequestFormatting(t *testing.T) {
 		AdminToken: "",
 	}
 
-	os.Setenv("BUNNY_MASTER_API_KEY", "test-master-key")
-	defer os.Unsetenv("BUNNY_MASTER_API_KEY")
+	t.Setenv("BUNNY_MASTER_API_KEY", "test-master-key")
 
 	// Bootstrap - tests that request is properly formatted with correct headers
 	env.ensureAdminToken(t)
