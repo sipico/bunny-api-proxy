@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/sipico/bunny-api-proxy/internal/auth"
 	"github.com/sipico/bunny-api-proxy/internal/bunny"
@@ -21,6 +22,15 @@ import (
 // testLogger creates a disabled logger for testing (won't produce output).
 func testLogger() *slog.Logger {
 	return slog.New(slog.NewTextHandler(nil, &slog.HandlerOptions{Level: slog.LevelWarn}))
+}
+
+// newMemoryStorage creates a new in-memory SQLite database for testing.
+func newMemoryStorage(t *testing.T) storage.Storage {
+	db, err := storage.New(":memory:")
+	if err != nil {
+		t.Fatalf("failed to create memory storage: %v", err)
+	}
+	return db
 }
 
 // hashTokenForTest hashes a token using SHA256 (same as storage.hashToken)
@@ -789,5 +799,216 @@ func TestIntegration_GetDNSScanResult_AdminOnly(t *testing.T) {
 				t.Errorf("expected status %d, got %d (body: %s)", tt.wantStatus, w.Code, w.Body.String())
 			}
 		})
+	}
+}
+
+// TestIntegration_FailureInjection_5xxError tests proxy error handling for 5xx responses from upstream
+func TestIntegration_FailureInjection_5xxError(t *testing.T) {
+	t.Parallel()
+
+	// Setup bunny mock server
+	mockServer := mockbunny.New()
+	defer mockServer.Close()
+
+	zoneID := mockServer.AddZone("example.com")
+
+	// Inject 503 error for next request
+	mockServer.SetNextError(http.StatusServiceUnavailable, "Service Unavailable", 1)
+
+	// Setup proxy
+	client := bunny.NewClient("test-key", bunny.WithBaseURL(mockServer.URL()))
+	handler := NewHandler(client, testLogger())
+	db := newMemoryStorage(t)
+	bootstrap := auth.NewBootstrapService(db, "master-key")
+	authenticator := auth.NewAuthenticator(db, bootstrap)
+
+	// Create test token
+	testToken := "test-key-5xx"
+	testHash := hashTokenForTest(testToken)
+	_, err := db.CreateToken(context.Background(), "Test Token", false, testHash)
+	if err != nil {
+		t.Fatalf("failed to create token: %v", err)
+	}
+
+	router := NewRouter(handler, authenticator.Authenticate, testLogger())
+
+	// Request should get the 503 error from upstream
+	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/dnszone/%d", zoneID), nil)
+	req.Header.Set("AccessKey", testToken)
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	// Proxy should propagate the 503 error
+	if w.Code != http.StatusServiceUnavailable {
+		t.Errorf("expected status %d, got %d", http.StatusServiceUnavailable, w.Code)
+	}
+
+	// Next request should succeed (error injection consumed)
+	req = httptest.NewRequest(http.MethodGet, fmt.Sprintf("/dnszone/%d", zoneID), nil)
+	req.Header.Set("AccessKey", testToken)
+	w = httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status %d after error injection consumed, got %d", http.StatusOK, w.Code)
+	}
+}
+
+// TestIntegration_FailureInjection_RateLimit tests proxy handling of 429 rate limit responses
+func TestIntegration_FailureInjection_RateLimit(t *testing.T) {
+	t.Parallel()
+
+	// Setup bunny mock server
+	mockServer := mockbunny.New()
+	defer mockServer.Close()
+
+	zoneID := mockServer.AddZone("example.com")
+
+	// Rate limit after 1 successful request
+	mockServer.SetRateLimit(1)
+
+	// Setup proxy
+	client := bunny.NewClient("test-key", bunny.WithBaseURL(mockServer.URL()))
+	handler := NewHandler(client, testLogger())
+	db := newMemoryStorage(t)
+	bootstrap := auth.NewBootstrapService(db, "master-key")
+	authenticator := auth.NewAuthenticator(db, bootstrap)
+
+	// Create test token
+	testToken := "test-key-ratelimit"
+	testHash := hashTokenForTest(testToken)
+	_, err := db.CreateToken(context.Background(), "Test Token", false, testHash)
+	if err != nil {
+		t.Fatalf("failed to create token: %v", err)
+	}
+
+	router := NewRouter(handler, authenticator.Authenticate, testLogger())
+
+	// First request should succeed
+	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/dnszone/%d", zoneID), nil)
+	req.Header.Set("AccessKey", testToken)
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected first request to succeed with status %d, got %d", http.StatusOK, w.Code)
+	}
+
+	// Second request should be rate limited
+	req = httptest.NewRequest(http.MethodGet, fmt.Sprintf("/dnszone/%d", zoneID), nil)
+	req.Header.Set("AccessKey", testToken)
+	w = httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusTooManyRequests {
+		t.Errorf("expected status %d for rate limited request, got %d", http.StatusTooManyRequests, w.Code)
+	}
+}
+
+// TestIntegration_FailureInjection_MalformedResponse tests proxy handling of malformed JSON responses
+func TestIntegration_FailureInjection_MalformedResponse(t *testing.T) {
+	t.Parallel()
+
+	// Setup bunny mock server
+	mockServer := mockbunny.New()
+	defer mockServer.Close()
+
+	zoneID := mockServer.AddZone("example.com")
+
+	// Inject malformed response for next request
+	mockServer.SetMalformedResponse(1)
+
+	// Setup proxy
+	client := bunny.NewClient("test-key", bunny.WithBaseURL(mockServer.URL()))
+	handler := NewHandler(client, testLogger())
+	db := newMemoryStorage(t)
+	bootstrap := auth.NewBootstrapService(db, "master-key")
+	authenticator := auth.NewAuthenticator(db, bootstrap)
+
+	// Create test token
+	testToken := "test-key-malformed"
+	testHash := hashTokenForTest(testToken)
+	_, err := db.CreateToken(context.Background(), "Test Token", false, testHash)
+	if err != nil {
+		t.Fatalf("failed to create token: %v", err)
+	}
+
+	router := NewRouter(handler, authenticator.Authenticate, testLogger())
+
+	// Request should get malformed JSON from upstream
+	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/dnszone/%d", zoneID), nil)
+	req.Header.Set("AccessKey", testToken)
+	w := httptest.NewRecorder()
+
+	// This should not panic, but may return an error
+	router.ServeHTTP(w, req)
+
+	// Should get either error status or bad gateway
+	if w.Code < 400 {
+		t.Errorf("expected error status for malformed response, got %d", w.Code)
+	}
+
+	// Next request should succeed
+	req = httptest.NewRequest(http.MethodGet, fmt.Sprintf("/dnszone/%d", zoneID), nil)
+	req.Header.Set("AccessKey", testToken)
+	w = httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status %d after malformed injection consumed, got %d", http.StatusOK, w.Code)
+	}
+}
+
+// TestIntegration_FailureInjection_Latency tests proxy handling of slow responses from upstream
+func TestIntegration_FailureInjection_Latency(t *testing.T) {
+	t.Parallel()
+
+	// Setup bunny mock server
+	mockServer := mockbunny.New()
+	defer mockServer.Close()
+
+	zoneID := mockServer.AddZone("example.com")
+
+	// Inject 50ms latency for next request
+	mockServer.SetLatency(50*time.Millisecond, 1)
+
+	// Setup proxy
+	client := bunny.NewClient("test-key", bunny.WithBaseURL(mockServer.URL()))
+	handler := NewHandler(client, testLogger())
+	db := newMemoryStorage(t)
+	bootstrap := auth.NewBootstrapService(db, "master-key")
+	authenticator := auth.NewAuthenticator(db, bootstrap)
+
+	// Create test token
+	testToken := "test-key-latency"
+	testHash := hashTokenForTest(testToken)
+	_, err := db.CreateToken(context.Background(), "Test Token", false, testHash)
+	if err != nil {
+		t.Fatalf("failed to create token: %v", err)
+	}
+
+	router := NewRouter(handler, authenticator.Authenticate, testLogger())
+
+	// Request should succeed but take at least 50ms
+	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/dnszone/%d", zoneID), nil)
+	req.Header.Set("AccessKey", testToken)
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	// Should succeed despite latency
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status %d for delayed request, got %d", http.StatusOK, w.Code)
+	}
+
+	// Response should be valid JSON (not corrupted by latency)
+	var zone mockbunny.Zone
+	if err := json.NewDecoder(w.Body).Decode(&zone); err != nil {
+		t.Errorf("expected valid zone response, got error: %v", err)
 	}
 }
