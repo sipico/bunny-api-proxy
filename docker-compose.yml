@@ -57,14 +57,12 @@ services:
         max-size: "10m"
         max-file: "3"
 
-    # Security: Drop unnecessary Linux capabilities
-    # CAP_NET_RAW: prevents raw socket access
-    # CAP_NET_ADMIN: prevents network administration
-    # CAP_SYS_ADMIN: prevents system-level operations
+    # Security: Drop all Linux capabilities (proxy requires none)
+    # Following least-privilege principle: drop ALL, add back only what's needed
+    # The proxy is a simple HTTP server (read/write SQLite, make HTTP requests)
+    # and requires zero special Linux capabilities
     cap_drop:
-      - CAP_NET_RAW
-      - CAP_NET_ADMIN
-      - CAP_SYS_ADMIN
+      - ALL
 
     # Security: Read-only root filesystem
     # Prevents accidental or malicious modification of the image
