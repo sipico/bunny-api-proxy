@@ -2943,7 +2943,7 @@ func TestCreateMetricsServerWithDifferentAddresses(t *testing.T) {
 			server := createMetricsServer(cfg, handler)
 
 			if server == nil {
-				t.Error("server should not be nil")
+				t.Fatal("server should not be nil")
 			}
 			if server.Addr != addr {
 				t.Errorf("expected address %s, got %s", addr, server.Addr)
@@ -3024,12 +3024,12 @@ func TestServerComponentsHasMetricsRouter(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to initialize components: %v", err)
 	}
-	defer components.store.Close()
 
 	// Test all components including metricsRouter
 	if components == nil {
 		t.Fatal("components should not be nil")
 	}
+	defer components.store.Close()
 	if components.logger == nil {
 		t.Error("logger is nil")
 	}
