@@ -97,7 +97,3 @@ func TestMockStorage_CustomBehavior(t *testing.T) {
 		t.Errorf("GetTokenByHash should return custom error %v, got %v", customErr, err)
 	}
 }
-
-
-
-

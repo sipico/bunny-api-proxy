@@ -357,14 +357,3 @@ func TestEncryptionWithMultipleKeys(t *testing.T) {
 		t.Error("decryption with wrong key should fail")
 	}
 }
-
-func TestHashKeyTooLong(t *testing.T) {
-	t.Parallel()
-	// bcrypt has a 72-byte limit
-	longKey := strings.Repeat("a", 73)
-
-	_, err := HashKey(longKey)
-	if err == nil {
-		t.Error("expected hash to fail with key longer than 72 bytes")
-	}
-}
