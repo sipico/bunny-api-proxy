@@ -183,3 +183,94 @@ func TestMockStorage_LifecycleMethods(t *testing.T) {
 		t.Errorf("Close default should not error, got %v", err)
 	}
 }
+
+// TestMockStorage_CustomFunctions verifies custom function implementations.
+func TestMockStorage_CustomFunctions(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	customErr := storage.ErrNotFound
+	customToken := &storage.Token{ID: 99, Name: "custom"}
+	customPerms := []*storage.Permission{{ID: 1, TokenID: 1}}
+
+	mock := &MockStorage{
+		GetTokenByIDFunc: func(ctx context.Context, id int64) (*storage.Token, error) {
+			return customToken, customErr
+		},
+		DeleteTokenFunc: func(ctx context.Context, id int64) error {
+			return customErr
+		},
+		ListTokensFunc: func(ctx context.Context) ([]*storage.Token, error) {
+			return []*storage.Token{customToken}, customErr
+		},
+		CountAdminTokensFunc: func(ctx context.Context) (int, error) {
+			return 42, customErr
+		},
+		AddPermissionForTokenFunc: func(ctx context.Context, tokenID int64, perm *storage.Permission) (*storage.Permission, error) {
+			return &storage.Permission{ID: 99, TokenID: tokenID}, customErr
+		},
+		RemovePermissionFunc: func(ctx context.Context, permID int64) error {
+			return customErr
+		},
+		RemovePermissionForTokenFunc: func(ctx context.Context, tokenID, permID int64) error {
+			return customErr
+		},
+		GetPermissionsForTokenFunc: func(ctx context.Context, tokenID int64) ([]*storage.Permission, error) {
+			return customPerms, customErr
+		},
+		PingFunc: func(ctx context.Context) error {
+			return customErr
+		},
+		CloseFunc: func() error {
+			return customErr
+		},
+		HasAnyAdminTokenFunc: func(ctx context.Context) (bool, error) {
+			return true, customErr
+		},
+	}
+
+	// Test all custom functions
+	if token, err := mock.GetTokenByID(ctx, 1); token != customToken || err != customErr {
+		t.Error("GetTokenByID custom function not called")
+	}
+
+	if err := mock.DeleteToken(ctx, 1); err != customErr {
+		t.Error("DeleteToken custom function not called")
+	}
+
+	if tokens, err := mock.ListTokens(ctx); len(tokens) != 1 || err != customErr {
+		t.Error("ListTokens custom function not called")
+	}
+
+	if count, err := mock.CountAdminTokens(ctx); count != 42 || err != customErr {
+		t.Error("CountAdminTokens custom function not called")
+	}
+
+	if perm, err := mock.AddPermissionForToken(ctx, 1, &storage.Permission{}); perm.ID != 99 || err != customErr {
+		t.Error("AddPermissionForToken custom function not called")
+	}
+
+	if err := mock.RemovePermission(ctx, 1); err != customErr {
+		t.Error("RemovePermission custom function not called")
+	}
+
+	if err := mock.RemovePermissionForToken(ctx, 1, 1); err != customErr {
+		t.Error("RemovePermissionForToken custom function not called")
+	}
+
+	if perms, err := mock.GetPermissionsForToken(ctx, 1); len(perms) != 1 || err != customErr {
+		t.Error("GetPermissionsForToken custom function not called")
+	}
+
+	if err := mock.Ping(ctx); err != customErr {
+		t.Error("Ping custom function not called")
+	}
+
+	if err := mock.Close(); err != customErr {
+		t.Error("Close custom function not called")
+	}
+
+	if has, err := mock.HasAnyAdminToken(ctx); !has || err != customErr {
+		t.Error("HasAnyAdminToken custom function not called")
+	}
+}
