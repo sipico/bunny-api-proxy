@@ -13,25 +13,6 @@ import (
 	"github.com/sipico/bunny-api-proxy/internal/testutil/mockstore"
 )
 
-// mockStorageWithToken extends mockstore.MockStorage with ValidateAdminToken
-type mockStorageWithToken struct {
-	*mockstore.MockStorage
-	validateToken  func(ctx context.Context, token string) (*storage.AdminToken, error)
-	getTokenByHash func(ctx context.Context, keyHash string) (*storage.Token, error)
-	listTokens     func(ctx context.Context) ([]*storage.Token, error)
-}
-
-
-
-
-
-
-
-
-
-
-
-
 // Unified token operations (Issue 147)
 func (m *mockStorageWithToken) CreateToken(ctx context.Context, name string, isAdmin bool, keyHash string) (*storage.Token, error) {
 	return &storage.Token{ID: 1, Name: name, IsAdmin: isAdmin, KeyHash: keyHash}, nil

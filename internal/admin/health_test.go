@@ -25,17 +25,6 @@ func (m *mockStorage) Close() error {
 	return m.closeErr
 }
 
-
-
-
-
-
-
-
-
-
-
-
 // Unified token operations (Issue 147)
 func (m *mockStorage) CreateToken(ctx context.Context, name string, isAdmin bool, keyHash string) (*storage.Token, error) {
 	return &storage.Token{ID: 1, Name: name, IsAdmin: isAdmin, KeyHash: keyHash}, nil

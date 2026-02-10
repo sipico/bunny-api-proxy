@@ -19,18 +19,6 @@ import (
 	"github.com/sipico/bunny-api-proxy/internal/testutil/mockstore"
 )
 
-// mockStorageWithTokenCRUD extends mockstore.MockStorage with CRUD operations
-
-
-
-
-
-
-
-
-
-
-
 // Unified token operations (Issue 147) - base implementations
 func (m *mockStorageWithTokenCRUD) CreateToken(ctx context.Context, name string, isAdmin bool, keyHash string) (*storage.Token, error) {
 	return &storage.Token{ID: 1, Name: name, IsAdmin: isAdmin, KeyHash: keyHash}, nil
@@ -163,9 +151,6 @@ func TestHandleSetLogLevel(t *testing.T) {
 		})
 	}
 }
-
-
-
 
 func TestGenerateRandomKey(t *testing.T) {
 	t.Parallel()
