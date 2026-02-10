@@ -91,26 +91,8 @@ func TestReadyHandlerWithClosedStorage(t *testing.T) {
 }
 
 func TestInitializeComponentsWithValidConfig(t *testing.T) {
-	oldDatabasePath := os.Getenv("DATABASE_PATH")
-	oldLogLevel := os.Getenv("LOG_LEVEL")
-
-	defer func() {
-		if oldDatabasePath != "" {
-			os.Setenv("DATABASE_PATH", oldDatabasePath)
-		} else {
-			os.Unsetenv("DATABASE_PATH")
-		}
-		if oldLogLevel != "" {
-			os.Setenv("LOG_LEVEL", oldLogLevel)
-		} else {
-			os.Unsetenv("LOG_LEVEL")
-		}
-	}()
-
-	os.Setenv("DATABASE_PATH", ":memory:")
-	os.Setenv("LOG_LEVEL", "info")
-
-	// Load config
+	t.Setenv("DATABASE_PATH", ":memory:")
+	t.Setenv("LOG_LEVEL", "info")
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatalf("failed to load config: %v", err)
@@ -148,25 +130,8 @@ func TestInitializeComponentsWithValidConfig(t *testing.T) {
 }
 
 func TestInitializeComponentsWithDebugLogLevel(t *testing.T) {
-	oldDatabasePath := os.Getenv("DATABASE_PATH")
-	oldLogLevel := os.Getenv("LOG_LEVEL")
-
-	defer func() {
-		if oldDatabasePath != "" {
-			os.Setenv("DATABASE_PATH", oldDatabasePath)
-		} else {
-			os.Unsetenv("DATABASE_PATH")
-		}
-		if oldLogLevel != "" {
-			os.Setenv("LOG_LEVEL", oldLogLevel)
-		} else {
-			os.Unsetenv("LOG_LEVEL")
-		}
-	}()
-
-	os.Setenv("DATABASE_PATH", ":memory:")
-	os.Setenv("LOG_LEVEL", "debug")
-
+	t.Setenv("DATABASE_PATH", ":memory:")
+	t.Setenv("LOG_LEVEL", "debug")
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatalf("failed to load config: %v", err)
@@ -189,29 +154,6 @@ func TestInitializeComponentsWithDebugLogLevel(t *testing.T) {
 // internal/bunny/logging_transport_test.go and verified in E2E tests.
 func TestInitializeComponentsBunnyClientWithLoggingTransport(t *testing.T) {
 
-	oldDatabasePath := os.Getenv("DATABASE_PATH")
-	oldLogLevel := os.Getenv("LOG_LEVEL")
-	oldBunnyAPIURL := os.Getenv("BUNNY_API_URL")
-
-	defer func() {
-		if oldDatabasePath != "" {
-			os.Setenv("DATABASE_PATH", oldDatabasePath)
-		} else {
-			os.Unsetenv("DATABASE_PATH")
-		}
-		if oldLogLevel != "" {
-			os.Setenv("LOG_LEVEL", oldLogLevel)
-		} else {
-			os.Unsetenv("LOG_LEVEL")
-		}
-		if oldBunnyAPIURL != "" {
-			os.Setenv("BUNNY_API_URL", oldBunnyAPIURL)
-		} else {
-			os.Unsetenv("BUNNY_API_URL")
-		}
-	}()
-
-	// Create a mock bunny.net API server
 	requestCount := 0
 	mockAPIServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requestCount++
@@ -223,9 +165,9 @@ func TestInitializeComponentsBunnyClientWithLoggingTransport(t *testing.T) {
 	defer mockAPIServer.Close()
 
 	// Set up environment with mock API URL
-	os.Setenv("DATABASE_PATH", ":memory:")
-	os.Setenv("LOG_LEVEL", "debug") // Use debug to enable logging
-	os.Setenv("BUNNY_API_URL", mockAPIServer.URL)
+	t.Setenv("DATABASE_PATH", ":memory:")
+	t.Setenv("LOG_LEVEL", "debug") // Use debug to enable logging
+	t.Setenv("BUNNY_API_URL", mockAPIServer.URL)
 
 	cfg, err := config.Load()
 	if err != nil {
@@ -258,25 +200,8 @@ func TestInitializeComponentsBunnyClientWithLoggingTransport(t *testing.T) {
 }
 
 func TestInitializeComponentsWithInvalidLogLevel(t *testing.T) {
-	oldDatabasePath := os.Getenv("DATABASE_PATH")
-	oldLogLevel := os.Getenv("LOG_LEVEL")
-
-	defer func() {
-		if oldDatabasePath != "" {
-			os.Setenv("DATABASE_PATH", oldDatabasePath)
-		} else {
-			os.Unsetenv("DATABASE_PATH")
-		}
-		if oldLogLevel != "" {
-			os.Setenv("LOG_LEVEL", oldLogLevel)
-		} else {
-			os.Unsetenv("LOG_LEVEL")
-		}
-	}()
-
-	os.Setenv("DATABASE_PATH", ":memory:")
-	os.Setenv("LOG_LEVEL", "invalid-level")
-
+	t.Setenv("DATABASE_PATH", ":memory:")
+	t.Setenv("LOG_LEVEL", "invalid-level")
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatalf("failed to load config: %v", err)
@@ -293,25 +218,8 @@ func TestInitializeComponentsWithInvalidLogLevel(t *testing.T) {
 }
 
 func TestInitializeComponentsWithInvalidDataPath(t *testing.T) {
-	oldDatabasePath := os.Getenv("DATABASE_PATH")
-	oldLogLevel := os.Getenv("LOG_LEVEL")
-
-	defer func() {
-		if oldDatabasePath != "" {
-			os.Setenv("DATABASE_PATH", oldDatabasePath)
-		} else {
-			os.Unsetenv("DATABASE_PATH")
-		}
-		if oldLogLevel != "" {
-			os.Setenv("LOG_LEVEL", oldLogLevel)
-		} else {
-			os.Unsetenv("LOG_LEVEL")
-		}
-	}()
-
-	os.Setenv("DATABASE_PATH", "/nonexistent/path/does/not/exist/proxy.db")
-	os.Setenv("LOG_LEVEL", "info")
-
+	t.Setenv("DATABASE_PATH", "/nonexistent/path/does/not/exist/proxy.db")
+	t.Setenv("LOG_LEVEL", "info")
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatalf("failed to load config: %v", err)
@@ -328,32 +236,9 @@ func TestInitializeComponentsWithInvalidDataPath(t *testing.T) {
 }
 
 func TestRunWithInvalidLogLevel(t *testing.T) {
-	oldDatabasePath := os.Getenv("DATABASE_PATH")
-	oldLogLevel := os.Getenv("LOG_LEVEL")
-	oldBunnyAPIKey := os.Getenv("BUNNY_API_KEY")
-
-	defer func() {
-		if oldDatabasePath != "" {
-			os.Setenv("DATABASE_PATH", oldDatabasePath)
-		} else {
-			os.Unsetenv("DATABASE_PATH")
-		}
-		if oldLogLevel != "" {
-			os.Setenv("LOG_LEVEL", oldLogLevel)
-		} else {
-			os.Unsetenv("LOG_LEVEL")
-		}
-		if oldBunnyAPIKey != "" {
-			os.Setenv("BUNNY_API_KEY", oldBunnyAPIKey)
-		} else {
-			os.Unsetenv("BUNNY_API_KEY")
-		}
-	}()
-
-	os.Setenv("DATABASE_PATH", ":memory:")
-	os.Setenv("LOG_LEVEL", "invalid_level") // Invalid log level
-	os.Setenv("BUNNY_API_KEY", "test-key")
-
+	t.Setenv("DATABASE_PATH", ":memory:")
+	t.Setenv("LOG_LEVEL", "invalid_level")
+	t.Setenv("BUNNY_API_KEY", "test-key")
 	err := run()
 	if err == nil {
 		t.Error("expected run() to fail with invalid log level")
@@ -561,25 +446,8 @@ func TestReadyHandlerStatusOKResponse(t *testing.T) {
 // TestInitializeComponentsWithWarnLogLevel tests debug log level
 func TestInitializeComponentsWithWarnLogLevel(t *testing.T) {
 
-	oldDatabasePath := os.Getenv("DATABASE_PATH")
-	oldLogLevel := os.Getenv("LOG_LEVEL")
-
-	defer func() {
-		if oldDatabasePath != "" {
-			os.Setenv("DATABASE_PATH", oldDatabasePath)
-		} else {
-			os.Unsetenv("DATABASE_PATH")
-		}
-		if oldLogLevel != "" {
-			os.Setenv("LOG_LEVEL", oldLogLevel)
-		} else {
-			os.Unsetenv("LOG_LEVEL")
-		}
-	}()
-
-	os.Setenv("DATABASE_PATH", ":memory:")
-	os.Setenv("LOG_LEVEL", "warn")
-
+	t.Setenv("DATABASE_PATH", ":memory:")
+	t.Setenv("LOG_LEVEL", "warn")
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatalf("failed to load config: %v", err)
@@ -599,25 +467,8 @@ func TestInitializeComponentsWithWarnLogLevel(t *testing.T) {
 // TestInitializeComponentsWithErrorLogLevel tests error log level
 func TestInitializeComponentsWithErrorLogLevel(t *testing.T) {
 
-	oldDatabasePath := os.Getenv("DATABASE_PATH")
-	oldLogLevel := os.Getenv("LOG_LEVEL")
-
-	defer func() {
-		if oldDatabasePath != "" {
-			os.Setenv("DATABASE_PATH", oldDatabasePath)
-		} else {
-			os.Unsetenv("DATABASE_PATH")
-		}
-		if oldLogLevel != "" {
-			os.Setenv("LOG_LEVEL", oldLogLevel)
-		} else {
-			os.Unsetenv("LOG_LEVEL")
-		}
-	}()
-
-	os.Setenv("DATABASE_PATH", ":memory:")
-	os.Setenv("LOG_LEVEL", "error")
-
+	t.Setenv("DATABASE_PATH", ":memory:")
+	t.Setenv("LOG_LEVEL", "error")
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatalf("failed to load config: %v", err)
@@ -637,25 +488,8 @@ func TestInitializeComponentsWithErrorLogLevel(t *testing.T) {
 // TestInitializeComponentsRouterSetup validates that the main router is properly configured
 func TestInitializeComponentsRouterSetup(t *testing.T) {
 
-	oldDatabasePath := os.Getenv("DATABASE_PATH")
-	oldLogLevel := os.Getenv("LOG_LEVEL")
-
-	defer func() {
-		if oldDatabasePath != "" {
-			os.Setenv("DATABASE_PATH", oldDatabasePath)
-		} else {
-			os.Unsetenv("DATABASE_PATH")
-		}
-		if oldLogLevel != "" {
-			os.Setenv("LOG_LEVEL", oldLogLevel)
-		} else {
-			os.Unsetenv("LOG_LEVEL")
-		}
-	}()
-
-	os.Setenv("DATABASE_PATH", ":memory:")
-	os.Setenv("LOG_LEVEL", "info")
-
+	t.Setenv("DATABASE_PATH", ":memory:")
+	t.Setenv("LOG_LEVEL", "info")
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatalf("failed to load config: %v", err)
@@ -680,25 +514,8 @@ func TestInitializeComponentsRouterSetup(t *testing.T) {
 // TestInitializeComponentsReadyEndpoint validates that ready endpoint works
 func TestInitializeComponentsReadyEndpoint(t *testing.T) {
 
-	oldDatabasePath := os.Getenv("DATABASE_PATH")
-	oldLogLevel := os.Getenv("LOG_LEVEL")
-
-	defer func() {
-		if oldDatabasePath != "" {
-			os.Setenv("DATABASE_PATH", oldDatabasePath)
-		} else {
-			os.Unsetenv("DATABASE_PATH")
-		}
-		if oldLogLevel != "" {
-			os.Setenv("LOG_LEVEL", oldLogLevel)
-		} else {
-			os.Unsetenv("LOG_LEVEL")
-		}
-	}()
-
-	os.Setenv("DATABASE_PATH", ":memory:")
-	os.Setenv("LOG_LEVEL", "info")
-
+	t.Setenv("DATABASE_PATH", ":memory:")
+	t.Setenv("LOG_LEVEL", "info")
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatalf("failed to load config: %v", err)
@@ -723,25 +540,8 @@ func TestInitializeComponentsReadyEndpoint(t *testing.T) {
 // TestInitializeComponentsValidatorCreated validates validator is created
 func TestInitializeComponentsValidatorCreated(t *testing.T) {
 
-	oldDatabasePath := os.Getenv("DATABASE_PATH")
-	oldLogLevel := os.Getenv("LOG_LEVEL")
-
-	defer func() {
-		if oldDatabasePath != "" {
-			os.Setenv("DATABASE_PATH", oldDatabasePath)
-		} else {
-			os.Unsetenv("DATABASE_PATH")
-		}
-		if oldLogLevel != "" {
-			os.Setenv("LOG_LEVEL", oldLogLevel)
-		} else {
-			os.Unsetenv("LOG_LEVEL")
-		}
-	}()
-
-	os.Setenv("DATABASE_PATH", ":memory:")
-	os.Setenv("LOG_LEVEL", "info")
-
+	t.Setenv("DATABASE_PATH", ":memory:")
+	t.Setenv("LOG_LEVEL", "info")
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatalf("failed to load config: %v", err)
@@ -758,25 +558,8 @@ func TestInitializeComponentsValidatorCreated(t *testing.T) {
 // TestInitializeComponentsStorageCreated validates storage is created and working
 func TestInitializeComponentsStorageCreated(t *testing.T) {
 
-	oldDatabasePath := os.Getenv("DATABASE_PATH")
-	oldLogLevel := os.Getenv("LOG_LEVEL")
-
-	defer func() {
-		if oldDatabasePath != "" {
-			os.Setenv("DATABASE_PATH", oldDatabasePath)
-		} else {
-			os.Unsetenv("DATABASE_PATH")
-		}
-		if oldLogLevel != "" {
-			os.Setenv("LOG_LEVEL", oldLogLevel)
-		} else {
-			os.Unsetenv("LOG_LEVEL")
-		}
-	}()
-
-	os.Setenv("DATABASE_PATH", ":memory:")
-	os.Setenv("LOG_LEVEL", "info")
-
+	t.Setenv("DATABASE_PATH", ":memory:")
+	t.Setenv("LOG_LEVEL", "info")
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatalf("failed to load config: %v", err)
@@ -801,25 +584,8 @@ func TestInitializeComponentsStorageCreated(t *testing.T) {
 // TestInitializeComponentsBunnyClientCreated validates bunny client is created
 func TestInitializeComponentsBunnyClientCreated(t *testing.T) {
 
-	oldDatabasePath := os.Getenv("DATABASE_PATH")
-	oldLogLevel := os.Getenv("LOG_LEVEL")
-
-	defer func() {
-		if oldDatabasePath != "" {
-			os.Setenv("DATABASE_PATH", oldDatabasePath)
-		} else {
-			os.Unsetenv("DATABASE_PATH")
-		}
-		if oldLogLevel != "" {
-			os.Setenv("LOG_LEVEL", oldLogLevel)
-		} else {
-			os.Unsetenv("LOG_LEVEL")
-		}
-	}()
-
-	os.Setenv("DATABASE_PATH", ":memory:")
-	os.Setenv("LOG_LEVEL", "info")
-
+	t.Setenv("DATABASE_PATH", ":memory:")
+	t.Setenv("LOG_LEVEL", "info")
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatalf("failed to load config: %v", err)
@@ -842,33 +608,9 @@ func TestMainServerStartAndHealthCheck(t *testing.T) {
 		t.Skip("Skipping integration test in short mode")
 	}
 
-	oldDatabasePath := os.Getenv("DATABASE_PATH")
-	oldLogLevel := os.Getenv("LOG_LEVEL")
-	oldListenAddr := os.Getenv("LISTEN_ADDR")
-
-	defer func() {
-		if oldDatabasePath != "" {
-			os.Setenv("DATABASE_PATH", oldDatabasePath)
-		} else {
-			os.Unsetenv("DATABASE_PATH")
-		}
-		if oldLogLevel != "" {
-			os.Setenv("LOG_LEVEL", oldLogLevel)
-		} else {
-			os.Unsetenv("LOG_LEVEL")
-		}
-		if oldListenAddr != "" {
-			os.Setenv("LISTEN_ADDR", oldListenAddr)
-		} else {
-			os.Unsetenv("LISTEN_ADDR")
-		}
-	}()
-
-	os.Setenv("DATABASE_PATH", ":memory:")
-	os.Setenv("LOG_LEVEL", "info")
-	os.Setenv("LISTEN_ADDR", "9876") // Use a fixed port for testing
-
-	// Start server in a goroutine with a timeout
+	t.Setenv("DATABASE_PATH", ":memory:")
+	t.Setenv("LOG_LEVEL", "info")
+	t.Setenv("LISTEN_ADDR", "9876")
 	serverDone := make(chan error, 1)
 	go func() {
 		serverDone <- run()
@@ -895,25 +637,8 @@ func TestMainServerStartAndHealthCheck(t *testing.T) {
 // TestInitializeComponentsAllComponentsNotNil verifies no component is nil
 func TestInitializeComponentsAllComponentsNotNil(t *testing.T) {
 
-	oldDatabasePath := os.Getenv("DATABASE_PATH")
-	oldLogLevel := os.Getenv("LOG_LEVEL")
-
-	defer func() {
-		if oldDatabasePath != "" {
-			os.Setenv("DATABASE_PATH", oldDatabasePath)
-		} else {
-			os.Unsetenv("DATABASE_PATH")
-		}
-		if oldLogLevel != "" {
-			os.Setenv("LOG_LEVEL", oldLogLevel)
-		} else {
-			os.Unsetenv("LOG_LEVEL")
-		}
-	}()
-
-	os.Setenv("DATABASE_PATH", ":memory:")
-	os.Setenv("LOG_LEVEL", "info")
-
+	t.Setenv("DATABASE_PATH", ":memory:")
+	t.Setenv("LOG_LEVEL", "info")
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatalf("failed to load config: %v", err)
@@ -956,25 +681,8 @@ func TestInitializeComponentsAllComponentsNotNil(t *testing.T) {
 // TestInitializeComponentsLogLevelVariantWorks validates the log level can be changed
 func TestInitializeComponentsLogLevelVariantWorks(t *testing.T) {
 
-	oldDatabasePath := os.Getenv("DATABASE_PATH")
-	oldLogLevel := os.Getenv("LOG_LEVEL")
-
-	defer func() {
-		if oldDatabasePath != "" {
-			os.Setenv("DATABASE_PATH", oldDatabasePath)
-		} else {
-			os.Unsetenv("DATABASE_PATH")
-		}
-		if oldLogLevel != "" {
-			os.Setenv("LOG_LEVEL", oldLogLevel)
-		} else {
-			os.Unsetenv("LOG_LEVEL")
-		}
-	}()
-
-	os.Setenv("DATABASE_PATH", ":memory:")
-	os.Setenv("LOG_LEVEL", "info")
-
+	t.Setenv("DATABASE_PATH", ":memory:")
+	t.Setenv("LOG_LEVEL", "info")
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatalf("failed to load config: %v", err)
@@ -994,32 +702,9 @@ func TestInitializeComponentsLogLevelVariantWorks(t *testing.T) {
 
 // TestRunConfigLoadErrorHandling tests that run() handles config load errors
 func TestRunWithInvalidDatabasePath(t *testing.T) {
-	oldDatabasePath := os.Getenv("DATABASE_PATH")
-	oldLogLevel := os.Getenv("LOG_LEVEL")
-	oldBunnyAPIKey := os.Getenv("BUNNY_API_KEY")
-
-	defer func() {
-		if oldDatabasePath != "" {
-			os.Setenv("DATABASE_PATH", oldDatabasePath)
-		} else {
-			os.Unsetenv("DATABASE_PATH")
-		}
-		if oldLogLevel != "" {
-			os.Setenv("LOG_LEVEL", oldLogLevel)
-		} else {
-			os.Unsetenv("LOG_LEVEL")
-		}
-		if oldBunnyAPIKey != "" {
-			os.Setenv("BUNNY_API_KEY", oldBunnyAPIKey)
-		} else {
-			os.Unsetenv("BUNNY_API_KEY")
-		}
-	}()
-
-	os.Setenv("DATABASE_PATH", "/nonexistent/path/that/does/not/exist/db.sqlite")
-	os.Setenv("LOG_LEVEL", "info")
-	os.Setenv("BUNNY_API_KEY", "test-key")
-
+	t.Setenv("DATABASE_PATH", "/nonexistent/path/that/does/not/exist/db.sqlite")
+	t.Setenv("LOG_LEVEL", "info")
+	t.Setenv("BUNNY_API_KEY", "test-key")
 	err := run()
 	if err == nil {
 		t.Fatal("run() should return error with invalid database path")
@@ -1032,25 +717,8 @@ func TestRunWithInvalidDatabasePath(t *testing.T) {
 // TestInitializeComponentsWithAllLogLevels tests initialization with multiple log levels
 func TestInitializeComponentsWithInfoLogLevel(t *testing.T) {
 
-	oldDatabasePath := os.Getenv("DATABASE_PATH")
-	oldLogLevel := os.Getenv("LOG_LEVEL")
-
-	defer func() {
-		if oldDatabasePath != "" {
-			os.Setenv("DATABASE_PATH", oldDatabasePath)
-		} else {
-			os.Unsetenv("DATABASE_PATH")
-		}
-		if oldLogLevel != "" {
-			os.Setenv("LOG_LEVEL", oldLogLevel)
-		} else {
-			os.Unsetenv("LOG_LEVEL")
-		}
-	}()
-
-	os.Setenv("DATABASE_PATH", ":memory:")
-	os.Setenv("LOG_LEVEL", "info")
-
+	t.Setenv("DATABASE_PATH", ":memory:")
+	t.Setenv("LOG_LEVEL", "info")
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatalf("failed to load config: %v", err)
@@ -1074,25 +742,8 @@ func TestInitializeComponentsWithInfoLogLevel(t *testing.T) {
 
 // TestInitializeComponentsErrorDoesNotLeakResources tests that failed initialization cleans up
 func TestInitializeComponentsErrorHandling(t *testing.T) {
-	oldDatabasePath := os.Getenv("DATABASE_PATH")
-	oldLogLevel := os.Getenv("LOG_LEVEL")
-
-	defer func() {
-		if oldDatabasePath != "" {
-			os.Setenv("DATABASE_PATH", oldDatabasePath)
-		} else {
-			os.Unsetenv("DATABASE_PATH")
-		}
-		if oldLogLevel != "" {
-			os.Setenv("LOG_LEVEL", oldLogLevel)
-		} else {
-			os.Unsetenv("LOG_LEVEL")
-		}
-	}()
-
-	os.Setenv("DATABASE_PATH", "/invalid/path/proxy.db")
-	os.Setenv("LOG_LEVEL", "info")
-
+	t.Setenv("DATABASE_PATH", "/invalid/path/proxy.db")
+	t.Setenv("LOG_LEVEL", "info")
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatalf("failed to load config: %v", err)
@@ -1172,32 +823,9 @@ func TestReadyHandlerMultipleCalls(t *testing.T) {
 
 // TestCreateServer tests that the server is created with correct configuration
 func TestCreateServer(t *testing.T) {
-	oldDatabasePath := os.Getenv("DATABASE_PATH")
-	oldLogLevel := os.Getenv("LOG_LEVEL")
-	oldListenAddr := os.Getenv("LISTEN_ADDR")
-
-	defer func() {
-		if oldDatabasePath != "" {
-			os.Setenv("DATABASE_PATH", oldDatabasePath)
-		} else {
-			os.Unsetenv("DATABASE_PATH")
-		}
-		if oldLogLevel != "" {
-			os.Setenv("LOG_LEVEL", oldLogLevel)
-		} else {
-			os.Unsetenv("LOG_LEVEL")
-		}
-		if oldListenAddr != "" {
-			os.Setenv("LISTEN_ADDR", oldListenAddr)
-		} else {
-			os.Unsetenv("LISTEN_ADDR")
-		}
-	}()
-
-	os.Setenv("DATABASE_PATH", ":memory:")
-	os.Setenv("LOG_LEVEL", "info")
-	os.Setenv("LISTEN_ADDR", ":8080")
-
+	t.Setenv("DATABASE_PATH", ":memory:")
+	t.Setenv("LOG_LEVEL", "info")
+	t.Setenv("LISTEN_ADDR", ":8080")
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatalf("failed to load config: %v", err)
@@ -1237,32 +865,9 @@ func TestCreateServer(t *testing.T) {
 
 // TestCreateServerWithDifferentPorts tests server creation with different ports
 func TestCreateServerWithDifferentPorts(t *testing.T) {
-	oldDatabasePath := os.Getenv("DATABASE_PATH")
-	oldLogLevel := os.Getenv("LOG_LEVEL")
-	oldListenAddr := os.Getenv("LISTEN_ADDR")
-
-	defer func() {
-		if oldDatabasePath != "" {
-			os.Setenv("DATABASE_PATH", oldDatabasePath)
-		} else {
-			os.Unsetenv("DATABASE_PATH")
-		}
-		if oldLogLevel != "" {
-			os.Setenv("LOG_LEVEL", oldLogLevel)
-		} else {
-			os.Unsetenv("LOG_LEVEL")
-		}
-		if oldListenAddr != "" {
-			os.Setenv("LISTEN_ADDR", oldListenAddr)
-		} else {
-			os.Unsetenv("LISTEN_ADDR")
-		}
-	}()
-
-	os.Setenv("DATABASE_PATH", ":memory:")
-	os.Setenv("LOG_LEVEL", "info")
-	os.Setenv("LISTEN_ADDR", ":9000")
-
+	t.Setenv("DATABASE_PATH", ":memory:")
+	t.Setenv("LOG_LEVEL", "info")
+	t.Setenv("LISTEN_ADDR", ":9000")
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatalf("failed to load config: %v", err)
@@ -1300,25 +905,8 @@ func TestVersionConstant(t *testing.T) {
 // TestServerWithReadyAndHealthEndpoints tests that both endpoints are properly mounted
 func TestServerWithReadyAndHealthEndpoints(t *testing.T) {
 
-	oldDatabasePath := os.Getenv("DATABASE_PATH")
-	oldLogLevel := os.Getenv("LOG_LEVEL")
-
-	defer func() {
-		if oldDatabasePath != "" {
-			os.Setenv("DATABASE_PATH", oldDatabasePath)
-		} else {
-			os.Unsetenv("DATABASE_PATH")
-		}
-		if oldLogLevel != "" {
-			os.Setenv("LOG_LEVEL", oldLogLevel)
-		} else {
-			os.Unsetenv("LOG_LEVEL")
-		}
-	}()
-
-	os.Setenv("DATABASE_PATH", ":memory:")
-	os.Setenv("LOG_LEVEL", "info")
-
+	t.Setenv("DATABASE_PATH", ":memory:")
+	t.Setenv("LOG_LEVEL", "info")
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatalf("failed to load config: %v", err)
@@ -1390,32 +978,9 @@ func TestReadyHandlerResponseHeaders(t *testing.T) {
 // TestCreateServerHandlerIsSet tests that server handler is properly assigned
 func TestCreateServerHandlerIsSet(t *testing.T) {
 
-	oldDatabasePath := os.Getenv("DATABASE_PATH")
-	oldLogLevel := os.Getenv("LOG_LEVEL")
-	oldListenAddr := os.Getenv("LISTEN_ADDR")
-
-	defer func() {
-		if oldDatabasePath != "" {
-			os.Setenv("DATABASE_PATH", oldDatabasePath)
-		} else {
-			os.Unsetenv("DATABASE_PATH")
-		}
-		if oldLogLevel != "" {
-			os.Setenv("LOG_LEVEL", oldLogLevel)
-		} else {
-			os.Unsetenv("LOG_LEVEL")
-		}
-		if oldListenAddr != "" {
-			os.Setenv("LISTEN_ADDR", oldListenAddr)
-		} else {
-			os.Unsetenv("LISTEN_ADDR")
-		}
-	}()
-
-	os.Setenv("DATABASE_PATH", ":memory:")
-	os.Setenv("LOG_LEVEL", "info")
-	os.Setenv("LISTEN_ADDR", "8080")
-
+	t.Setenv("DATABASE_PATH", ":memory:")
+	t.Setenv("LOG_LEVEL", "info")
+	t.Setenv("LISTEN_ADDR", "8080")
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatalf("failed to load config: %v", err)
@@ -1437,26 +1002,8 @@ func TestCreateServerHandlerIsSet(t *testing.T) {
 // TestRunComponentInitializationPath tests the full run() component initialization path
 func TestRunComponentInitializationPath(t *testing.T) {
 
-	oldDatabasePath := os.Getenv("DATABASE_PATH")
-	oldLogLevel := os.Getenv("LOG_LEVEL")
-
-	defer func() {
-		if oldDatabasePath != "" {
-			os.Setenv("DATABASE_PATH", oldDatabasePath)
-		} else {
-			os.Unsetenv("DATABASE_PATH")
-		}
-		if oldLogLevel != "" {
-			os.Setenv("LOG_LEVEL", oldLogLevel)
-		} else {
-			os.Unsetenv("LOG_LEVEL")
-		}
-	}()
-
-	os.Setenv("DATABASE_PATH", ":memory:")
-	os.Setenv("LOG_LEVEL", "info")
-
-	// Test configuration loading and component initialization in run()
+	t.Setenv("DATABASE_PATH", ":memory:")
+	t.Setenv("LOG_LEVEL", "info")
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatalf("config load failed: %v", err)
@@ -1493,25 +1040,8 @@ func TestRunComponentInitializationPath(t *testing.T) {
 // TestInitializeComponentsLoggerDefaultLevel tests that logger is set as default
 func TestInitializeComponentsLoggerDefaultLevel(t *testing.T) {
 
-	oldDatabasePath := os.Getenv("DATABASE_PATH")
-	oldLogLevel := os.Getenv("LOG_LEVEL")
-
-	defer func() {
-		if oldDatabasePath != "" {
-			os.Setenv("DATABASE_PATH", oldDatabasePath)
-		} else {
-			os.Unsetenv("DATABASE_PATH")
-		}
-		if oldLogLevel != "" {
-			os.Setenv("LOG_LEVEL", oldLogLevel)
-		} else {
-			os.Unsetenv("LOG_LEVEL")
-		}
-	}()
-
-	os.Setenv("DATABASE_PATH", ":memory:")
-	os.Setenv("LOG_LEVEL", "info")
-
+	t.Setenv("DATABASE_PATH", ":memory:")
+	t.Setenv("LOG_LEVEL", "info")
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatalf("failed to load config: %v", err)
@@ -1533,32 +1063,9 @@ func TestInitializeComponentsLoggerDefaultLevel(t *testing.T) {
 // TestCreateServerTimeouts verifies timeout values are correctly set
 func TestCreateServerTimeouts(t *testing.T) {
 
-	oldDatabasePath := os.Getenv("DATABASE_PATH")
-	oldLogLevel := os.Getenv("LOG_LEVEL")
-	oldListenAddr := os.Getenv("LISTEN_ADDR")
-
-	defer func() {
-		if oldDatabasePath != "" {
-			os.Setenv("DATABASE_PATH", oldDatabasePath)
-		} else {
-			os.Unsetenv("DATABASE_PATH")
-		}
-		if oldLogLevel != "" {
-			os.Setenv("LOG_LEVEL", oldLogLevel)
-		} else {
-			os.Unsetenv("LOG_LEVEL")
-		}
-		if oldListenAddr != "" {
-			os.Setenv("LISTEN_ADDR", oldListenAddr)
-		} else {
-			os.Unsetenv("LISTEN_ADDR")
-		}
-	}()
-
-	os.Setenv("DATABASE_PATH", ":memory:")
-	os.Setenv("LOG_LEVEL", "info")
-	os.Setenv("LISTEN_ADDR", "8080")
-
+	t.Setenv("DATABASE_PATH", ":memory:")
+	t.Setenv("LOG_LEVEL", "info")
+	t.Setenv("LISTEN_ADDR", "8080")
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatalf("failed to load config: %v", err)
@@ -1588,26 +1095,8 @@ func TestCreateServerTimeouts(t *testing.T) {
 // TestStartServerAndWaitForShutdownWithServerError tests server shutdown when ListenAndServe returns error
 func TestStartServerAndWaitForShutdownWithServerError(t *testing.T) {
 
-	oldDatabasePath := os.Getenv("DATABASE_PATH")
-	oldLogLevel := os.Getenv("LOG_LEVEL")
-
-	defer func() {
-		if oldDatabasePath != "" {
-			os.Setenv("DATABASE_PATH", oldDatabasePath)
-		} else {
-			os.Unsetenv("DATABASE_PATH")
-		}
-		if oldLogLevel != "" {
-			os.Setenv("LOG_LEVEL", oldLogLevel)
-		} else {
-			os.Unsetenv("LOG_LEVEL")
-		}
-	}()
-
-	os.Setenv("DATABASE_PATH", ":memory:")
-	os.Setenv("LOG_LEVEL", "info")
-
-	// Create a mock server that fails immediately
+	t.Setenv("DATABASE_PATH", ":memory:")
+	t.Setenv("LOG_LEVEL", "info")
 	mockServer := &http.Server{
 		Addr: ":9999",
 	}
@@ -1637,25 +1126,8 @@ func TestStartServerAndWaitForShutdownWithServerError(t *testing.T) {
 // TestStorageCloseError tests that storage close errors are logged
 func TestStorageCloseError(t *testing.T) {
 
-	oldDatabasePath := os.Getenv("DATABASE_PATH")
-	oldLogLevel := os.Getenv("LOG_LEVEL")
-
-	defer func() {
-		if oldDatabasePath != "" {
-			os.Setenv("DATABASE_PATH", oldDatabasePath)
-		} else {
-			os.Unsetenv("DATABASE_PATH")
-		}
-		if oldLogLevel != "" {
-			os.Setenv("LOG_LEVEL", oldLogLevel)
-		} else {
-			os.Unsetenv("LOG_LEVEL")
-		}
-	}()
-
-	os.Setenv("DATABASE_PATH", ":memory:")
-	os.Setenv("LOG_LEVEL", "info")
-
+	t.Setenv("DATABASE_PATH", ":memory:")
+	t.Setenv("LOG_LEVEL", "info")
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatalf("failed to load config: %v", err)
@@ -1676,25 +1148,8 @@ func TestStorageCloseError(t *testing.T) {
 // TestInitializeComponentsLoggingLevel tests that log level parsing works correctly
 func TestInitializeComponentsLoggingLevelDebug(t *testing.T) {
 
-	oldDatabasePath := os.Getenv("DATABASE_PATH")
-	oldLogLevel := os.Getenv("LOG_LEVEL")
-
-	defer func() {
-		if oldDatabasePath != "" {
-			os.Setenv("DATABASE_PATH", oldDatabasePath)
-		} else {
-			os.Unsetenv("DATABASE_PATH")
-		}
-		if oldLogLevel != "" {
-			os.Setenv("LOG_LEVEL", oldLogLevel)
-		} else {
-			os.Unsetenv("LOG_LEVEL")
-		}
-	}()
-
-	os.Setenv("DATABASE_PATH", ":memory:")
-	os.Setenv("LOG_LEVEL", "debug")
-
+	t.Setenv("DATABASE_PATH", ":memory:")
+	t.Setenv("LOG_LEVEL", "debug")
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatalf("failed to load config: %v", err)
@@ -1715,32 +1170,9 @@ func TestInitializeComponentsLoggingLevelDebug(t *testing.T) {
 // TestCreateServerIsServerInitialized tests that createServer initializes all fields
 func TestCreateServerIsServerInitialized(t *testing.T) {
 
-	oldDatabasePath := os.Getenv("DATABASE_PATH")
-	oldLogLevel := os.Getenv("LOG_LEVEL")
-	oldListenAddr := os.Getenv("LISTEN_ADDR")
-
-	defer func() {
-		if oldDatabasePath != "" {
-			os.Setenv("DATABASE_PATH", oldDatabasePath)
-		} else {
-			os.Unsetenv("DATABASE_PATH")
-		}
-		if oldLogLevel != "" {
-			os.Setenv("LOG_LEVEL", oldLogLevel)
-		} else {
-			os.Unsetenv("LOG_LEVEL")
-		}
-		if oldListenAddr != "" {
-			os.Setenv("LISTEN_ADDR", oldListenAddr)
-		} else {
-			os.Unsetenv("LISTEN_ADDR")
-		}
-	}()
-
-	os.Setenv("DATABASE_PATH", ":memory:")
-	os.Setenv("LOG_LEVEL", "info")
-	os.Setenv("LISTEN_ADDR", "8080")
-
+	t.Setenv("DATABASE_PATH", ":memory:")
+	t.Setenv("LOG_LEVEL", "info")
+	t.Setenv("LISTEN_ADDR", "8080")
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatalf("failed to load config: %v", err)
@@ -1773,33 +1205,9 @@ func TestCreateServerIsServerInitialized(t *testing.T) {
 // TestRunCompleteFlow tests the full run() function with all components
 func TestRunCompleteFlow(t *testing.T) {
 
-	oldDatabasePath := os.Getenv("DATABASE_PATH")
-	oldLogLevel := os.Getenv("LOG_LEVEL")
-	oldListenAddr := os.Getenv("LISTEN_ADDR")
-
-	defer func() {
-		if oldDatabasePath != "" {
-			os.Setenv("DATABASE_PATH", oldDatabasePath)
-		} else {
-			os.Unsetenv("DATABASE_PATH")
-		}
-		if oldLogLevel != "" {
-			os.Setenv("LOG_LEVEL", oldLogLevel)
-		} else {
-			os.Unsetenv("LOG_LEVEL")
-		}
-		if oldListenAddr != "" {
-			os.Setenv("LISTEN_ADDR", oldListenAddr)
-		} else {
-			os.Unsetenv("LISTEN_ADDR")
-		}
-	}()
-
-	os.Setenv("DATABASE_PATH", ":memory:")
-	os.Setenv("LOG_LEVEL", "info")
-	os.Setenv("LISTEN_ADDR", "0") // Use port 0 for random assignment
-
-	// Load configuration
+	t.Setenv("DATABASE_PATH", ":memory:")
+	t.Setenv("LOG_LEVEL", "info")
+	t.Setenv("LISTEN_ADDR", "0")
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatalf("failed to load config: %v", err)
@@ -1838,32 +1246,9 @@ func TestRunCompleteFlow(t *testing.T) {
 
 // TestConfigLoadsWithDefaults tests that config loads successfully with all defaults
 func TestConfigLoadsWithDefaults(t *testing.T) {
-	oldDatabasePath := os.Getenv("DATABASE_PATH")
-	oldLogLevel := os.Getenv("LOG_LEVEL")
-	oldListenAddr := os.Getenv("LISTEN_ADDR")
-
-	defer func() {
-		if oldDatabasePath != "" {
-			os.Setenv("DATABASE_PATH", oldDatabasePath)
-		} else {
-			os.Unsetenv("DATABASE_PATH")
-		}
-		if oldLogLevel != "" {
-			os.Setenv("LOG_LEVEL", oldLogLevel)
-		} else {
-			os.Unsetenv("LOG_LEVEL")
-		}
-		if oldListenAddr != "" {
-			os.Setenv("LISTEN_ADDR", oldListenAddr)
-		} else {
-			os.Unsetenv("LISTEN_ADDR")
-		}
-	}()
-
-	// Clear all config env vars to test defaults
-	os.Unsetenv("DATABASE_PATH")
-	os.Unsetenv("LOG_LEVEL")
-	os.Unsetenv("LISTEN_ADDR")
+	t.Setenv("DATABASE_PATH", "")
+	t.Setenv("LOG_LEVEL", "")
+	t.Setenv("LISTEN_ADDR", "")
 
 	cfg, err := config.Load()
 	if err != nil {
@@ -1920,32 +1305,9 @@ func TestReadyHandlerMultipleRequestsConsistency(t *testing.T) {
 
 // TestRunWithHealthEndpoint tests that the server correctly exposes the health endpoint
 func TestRunWithHealthEndpoint(t *testing.T) {
-	oldDatabasePath := os.Getenv("DATABASE_PATH")
-	oldLogLevel := os.Getenv("LOG_LEVEL")
-	oldListenAddr := os.Getenv("LISTEN_ADDR")
-
-	defer func() {
-		if oldDatabasePath != "" {
-			os.Setenv("DATABASE_PATH", oldDatabasePath)
-		} else {
-			os.Unsetenv("DATABASE_PATH")
-		}
-		if oldLogLevel != "" {
-			os.Setenv("LOG_LEVEL", oldLogLevel)
-		} else {
-			os.Unsetenv("LOG_LEVEL")
-		}
-		if oldListenAddr != "" {
-			os.Setenv("LISTEN_ADDR", oldListenAddr)
-		} else {
-			os.Unsetenv("LISTEN_ADDR")
-		}
-	}()
-
-	os.Setenv("DATABASE_PATH", ":memory:")
-	os.Setenv("LOG_LEVEL", "info")
-	os.Setenv("LISTEN_ADDR", ":0") // Use random port
-
+	t.Setenv("DATABASE_PATH", ":memory:")
+	t.Setenv("LOG_LEVEL", "info")
+	t.Setenv("LISTEN_ADDR", ":0")
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatalf("failed to load config: %v", err)
@@ -1996,25 +1358,8 @@ func TestRunWithHealthEndpoint(t *testing.T) {
 // TestInitializeComponentsCreateAllRouters tests that all routers are created
 func TestInitializeComponentsCreateAllRouters(t *testing.T) {
 
-	oldDatabasePath := os.Getenv("DATABASE_PATH")
-	oldLogLevel := os.Getenv("LOG_LEVEL")
-
-	defer func() {
-		if oldDatabasePath != "" {
-			os.Setenv("DATABASE_PATH", oldDatabasePath)
-		} else {
-			os.Unsetenv("DATABASE_PATH")
-		}
-		if oldLogLevel != "" {
-			os.Setenv("LOG_LEVEL", oldLogLevel)
-		} else {
-			os.Unsetenv("LOG_LEVEL")
-		}
-	}()
-
-	os.Setenv("DATABASE_PATH", ":memory:")
-	os.Setenv("LOG_LEVEL", "info")
-
+	t.Setenv("DATABASE_PATH", ":memory:")
+	t.Setenv("LOG_LEVEL", "info")
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatalf("failed to load config: %v", err)
@@ -2062,25 +1407,8 @@ func TestInitializeComponentsCreateAllRouters(t *testing.T) {
 
 // TestRunInitializeComponentsWithInvalidLogLevel tests that initializeComponents fails with invalid log level
 func TestRunInitializeComponentsWithInvalidLogLevel(t *testing.T) {
-	oldDatabasePath := os.Getenv("DATABASE_PATH")
-	oldLogLevel := os.Getenv("LOG_LEVEL")
-
-	defer func() {
-		if oldDatabasePath != "" {
-			os.Setenv("DATABASE_PATH", oldDatabasePath)
-		} else {
-			os.Unsetenv("DATABASE_PATH")
-		}
-		if oldLogLevel != "" {
-			os.Setenv("LOG_LEVEL", oldLogLevel)
-		} else {
-			os.Unsetenv("LOG_LEVEL")
-		}
-	}()
-
-	os.Setenv("DATABASE_PATH", ":memory:")
-	os.Setenv("LOG_LEVEL", "invalid_level") // Invalid log level
-
+	t.Setenv("DATABASE_PATH", ":memory:")
+	t.Setenv("LOG_LEVEL", "invalid_level")
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatalf("config load should succeed: %v", err)
@@ -2098,25 +1426,8 @@ func TestRunInitializeComponentsWithInvalidLogLevel(t *testing.T) {
 // TestInitializeComponentsWithErrorPath tests error handling in initialization
 func TestInitializeComponentsValidation(t *testing.T) {
 
-	oldDatabasePath := os.Getenv("DATABASE_PATH")
-	oldLogLevel := os.Getenv("LOG_LEVEL")
-
-	defer func() {
-		if oldDatabasePath != "" {
-			os.Setenv("DATABASE_PATH", oldDatabasePath)
-		} else {
-			os.Unsetenv("DATABASE_PATH")
-		}
-		if oldLogLevel != "" {
-			os.Setenv("LOG_LEVEL", oldLogLevel)
-		} else {
-			os.Unsetenv("LOG_LEVEL")
-		}
-	}()
-
-	os.Setenv("DATABASE_PATH", ":memory:")
-	os.Setenv("LOG_LEVEL", "info")
-
+	t.Setenv("DATABASE_PATH", ":memory:")
+	t.Setenv("LOG_LEVEL", "info")
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatalf("config load should succeed: %v", err)
@@ -2148,32 +1459,9 @@ func TestCreateServerAddrFormatting(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.addr, func(t *testing.T) {
-			oldDatabasePath := os.Getenv("DATABASE_PATH")
-			oldLogLevel := os.Getenv("LOG_LEVEL")
-			oldListenAddr := os.Getenv("LISTEN_ADDR")
-
-			defer func() {
-				if oldDatabasePath != "" {
-					os.Setenv("DATABASE_PATH", oldDatabasePath)
-				} else {
-					os.Unsetenv("DATABASE_PATH")
-				}
-				if oldLogLevel != "" {
-					os.Setenv("LOG_LEVEL", oldLogLevel)
-				} else {
-					os.Unsetenv("LOG_LEVEL")
-				}
-				if oldListenAddr != "" {
-					os.Setenv("LISTEN_ADDR", oldListenAddr)
-				} else {
-					os.Unsetenv("LISTEN_ADDR")
-				}
-			}()
-
-			os.Setenv("DATABASE_PATH", ":memory:")
-			os.Setenv("LOG_LEVEL", "info")
-			os.Setenv("LISTEN_ADDR", tt.addr)
-
+			t.Setenv("DATABASE_PATH", ":memory:")
+			t.Setenv("LOG_LEVEL", "info")
+			t.Setenv("LISTEN_ADDR", tt.addr)
 			cfg, err := config.Load()
 			if err != nil {
 				t.Fatalf("config load failed: %v", err)
@@ -2194,32 +1482,9 @@ func TestStartActualServer(t *testing.T) {
 	// Note: t.Parallel() removed - this test starts an actual HTTP server
 	// and creates real database connections, should not run concurrently
 	// with 570+ other parallel tests to avoid resource exhaustion.
-	oldDatabasePath := os.Getenv("DATABASE_PATH")
-	oldLogLevel := os.Getenv("LOG_LEVEL")
-	oldListenAddr := os.Getenv("LISTEN_ADDR")
-
-	defer func() {
-		if oldDatabasePath != "" {
-			os.Setenv("DATABASE_PATH", oldDatabasePath)
-		} else {
-			os.Unsetenv("DATABASE_PATH")
-		}
-		if oldLogLevel != "" {
-			os.Setenv("LOG_LEVEL", oldLogLevel)
-		} else {
-			os.Unsetenv("LOG_LEVEL")
-		}
-		if oldListenAddr != "" {
-			os.Setenv("LISTEN_ADDR", oldListenAddr)
-		} else {
-			os.Unsetenv("LISTEN_ADDR")
-		}
-	}()
-
-	os.Setenv("DATABASE_PATH", ":memory:")
-	os.Setenv("LOG_LEVEL", "info")
-	os.Setenv("LISTEN_ADDR", ":0") // Use random port
-
+	t.Setenv("DATABASE_PATH", ":memory:")
+	t.Setenv("LOG_LEVEL", "info")
+	t.Setenv("LISTEN_ADDR", ":0")
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatalf("failed to load config: %v", err)
@@ -2264,32 +1529,8 @@ func TestStartActualServer(t *testing.T) {
 
 func TestRunInitializeComponentsInvalidLogLevel(t *testing.T) {
 
-	oldDatabasePath := os.Getenv("DATABASE_PATH")
-	oldLogLevel := os.Getenv("LOG_LEVEL")
-	oldBunnyAPIKey := os.Getenv("BUNNY_API_KEY")
-
-	defer func() {
-		if oldDatabasePath != "" {
-			os.Setenv("DATABASE_PATH", oldDatabasePath)
-		} else {
-			os.Unsetenv("DATABASE_PATH")
-		}
-		if oldLogLevel != "" {
-			os.Setenv("LOG_LEVEL", oldLogLevel)
-		} else {
-			os.Unsetenv("LOG_LEVEL")
-		}
-		if oldBunnyAPIKey != "" {
-			os.Setenv("BUNNY_API_KEY", oldBunnyAPIKey)
-		} else {
-			os.Unsetenv("BUNNY_API_KEY")
-		}
-	}()
-
-	os.Setenv("LOG_LEVEL", "INVALID_LEVEL")
-	os.Setenv("BUNNY_API_KEY", "test-key")
-
-	// Call run() with invalid log level
+	t.Setenv("LOG_LEVEL", "INVALID_LEVEL")
+	t.Setenv("BUNNY_API_KEY", "test-key")
 	err := run()
 
 	// Expect an error containing "invalid log level"
@@ -2467,25 +1708,8 @@ func TestRunHealthCheckUsesCorrectURL(t *testing.T) {
 // TestMainRouterDoesNotHaveMetricsEndpoint verifies that /metrics is not on the main router
 func TestMainRouterDoesNotHaveMetricsEndpoint(t *testing.T) {
 
-	oldDatabasePath := os.Getenv("DATABASE_PATH")
-	oldLogLevel := os.Getenv("LOG_LEVEL")
-
-	defer func() {
-		if oldDatabasePath != "" {
-			os.Setenv("DATABASE_PATH", oldDatabasePath)
-		} else {
-			os.Unsetenv("DATABASE_PATH")
-		}
-		if oldLogLevel != "" {
-			os.Setenv("LOG_LEVEL", oldLogLevel)
-		} else {
-			os.Unsetenv("LOG_LEVEL")
-		}
-	}()
-
-	os.Setenv("DATABASE_PATH", ":memory:")
-	os.Setenv("LOG_LEVEL", "info")
-
+	t.Setenv("DATABASE_PATH", ":memory:")
+	t.Setenv("LOG_LEVEL", "info")
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatalf("failed to load config: %v", err)
@@ -2512,25 +1736,8 @@ func TestMainRouterDoesNotHaveMetricsEndpoint(t *testing.T) {
 // TestMetricsRouterHasMetricsEndpoint verifies that /metrics is accessible on the metrics router
 func TestMetricsRouterHasMetricsEndpoint(t *testing.T) {
 
-	oldDatabasePath := os.Getenv("DATABASE_PATH")
-	oldLogLevel := os.Getenv("LOG_LEVEL")
-
-	defer func() {
-		if oldDatabasePath != "" {
-			os.Setenv("DATABASE_PATH", oldDatabasePath)
-		} else {
-			os.Unsetenv("DATABASE_PATH")
-		}
-		if oldLogLevel != "" {
-			os.Setenv("LOG_LEVEL", oldLogLevel)
-		} else {
-			os.Unsetenv("LOG_LEVEL")
-		}
-	}()
-
-	os.Setenv("DATABASE_PATH", ":memory:")
-	os.Setenv("LOG_LEVEL", "info")
-
+	t.Setenv("DATABASE_PATH", ":memory:")
+	t.Setenv("LOG_LEVEL", "info")
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatalf("failed to load config: %v", err)
@@ -2556,16 +1763,7 @@ func TestMetricsRouterHasMetricsEndpoint(t *testing.T) {
 // TestMetricsListenAddrDefaultValue verifies that metrics listen address defaults to localhost:9090
 func TestMetricsListenAddrDefaultValue(t *testing.T) {
 
-	oldMetricsAddr := os.Getenv("METRICS_LISTEN_ADDR")
-	defer func() {
-		if oldMetricsAddr != "" {
-			os.Setenv("METRICS_LISTEN_ADDR", oldMetricsAddr)
-		} else {
-			os.Unsetenv("METRICS_LISTEN_ADDR")
-		}
-	}()
-
-	os.Unsetenv("METRICS_LISTEN_ADDR")
+	t.Setenv("METRICS_LISTEN_ADDR", "")
 
 	cfg, err := config.Load()
 	if err != nil {
@@ -2579,17 +1777,7 @@ func TestMetricsListenAddrDefaultValue(t *testing.T) {
 
 // TestMetricsListenAddrCustomValue verifies that metrics listen address can be customized
 func TestMetricsListenAddrCustomValue(t *testing.T) {
-	oldMetricsAddr := os.Getenv("METRICS_LISTEN_ADDR")
-	defer func() {
-		if oldMetricsAddr != "" {
-			os.Setenv("METRICS_LISTEN_ADDR", oldMetricsAddr)
-		} else {
-			os.Unsetenv("METRICS_LISTEN_ADDR")
-		}
-	}()
-
-	os.Setenv("METRICS_LISTEN_ADDR", "127.0.0.1:8888")
-
+	t.Setenv("METRICS_LISTEN_ADDR", "127.0.0.1:8888")
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatalf("failed to load config: %v", err)
@@ -2603,32 +1791,9 @@ func TestMetricsListenAddrCustomValue(t *testing.T) {
 // TestCreateMetricsServer verifies metrics server is created correctly
 func TestCreateMetricsServer(t *testing.T) {
 
-	oldDatabasePath := os.Getenv("DATABASE_PATH")
-	oldLogLevel := os.Getenv("LOG_LEVEL")
-	oldMetricsAddr := os.Getenv("METRICS_LISTEN_ADDR")
-
-	defer func() {
-		if oldDatabasePath != "" {
-			os.Setenv("DATABASE_PATH", oldDatabasePath)
-		} else {
-			os.Unsetenv("DATABASE_PATH")
-		}
-		if oldLogLevel != "" {
-			os.Setenv("LOG_LEVEL", oldLogLevel)
-		} else {
-			os.Unsetenv("LOG_LEVEL")
-		}
-		if oldMetricsAddr != "" {
-			os.Setenv("METRICS_LISTEN_ADDR", oldMetricsAddr)
-		} else {
-			os.Unsetenv("METRICS_LISTEN_ADDR")
-		}
-	}()
-
-	os.Setenv("DATABASE_PATH", ":memory:")
-	os.Setenv("LOG_LEVEL", "info")
-	os.Setenv("METRICS_LISTEN_ADDR", "localhost:8888")
-
+	t.Setenv("DATABASE_PATH", ":memory:")
+	t.Setenv("LOG_LEVEL", "info")
+	t.Setenv("METRICS_LISTEN_ADDR", "localhost:8888")
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatalf("failed to load config: %v", err)
@@ -2668,25 +1833,8 @@ func TestCreateMetricsServer(t *testing.T) {
 // TestInitializeComponentsMetricsRouter verifies metrics router is created
 func TestInitializeComponentsMetricsRouter(t *testing.T) {
 
-	oldDatabasePath := os.Getenv("DATABASE_PATH")
-	oldLogLevel := os.Getenv("LOG_LEVEL")
-
-	defer func() {
-		if oldDatabasePath != "" {
-			os.Setenv("DATABASE_PATH", oldDatabasePath)
-		} else {
-			os.Unsetenv("DATABASE_PATH")
-		}
-		if oldLogLevel != "" {
-			os.Setenv("LOG_LEVEL", oldLogLevel)
-		} else {
-			os.Unsetenv("LOG_LEVEL")
-		}
-	}()
-
-	os.Setenv("DATABASE_PATH", ":memory:")
-	os.Setenv("LOG_LEVEL", "info")
-
+	t.Setenv("DATABASE_PATH", ":memory:")
+	t.Setenv("LOG_LEVEL", "info")
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatalf("failed to load config: %v", err)
@@ -2775,46 +1923,11 @@ func TestStartServersAndWaitForShutdownGraceful(t *testing.T) {
 // TestRunWithMetricsServerConfigured tests run() with custom metrics address
 func TestRunWithMetricsServerConfigured(t *testing.T) {
 
-	oldDatabasePath := os.Getenv("DATABASE_PATH")
-	oldLogLevel := os.Getenv("LOG_LEVEL")
-	oldListenAddr := os.Getenv("LISTEN_ADDR")
-	oldMetricsAddr := os.Getenv("METRICS_LISTEN_ADDR")
-	oldBunnyAPIKey := os.Getenv("BUNNY_API_KEY")
-
-	defer func() {
-		if oldDatabasePath != "" {
-			os.Setenv("DATABASE_PATH", oldDatabasePath)
-		} else {
-			os.Unsetenv("DATABASE_PATH")
-		}
-		if oldLogLevel != "" {
-			os.Setenv("LOG_LEVEL", oldLogLevel)
-		} else {
-			os.Unsetenv("LOG_LEVEL")
-		}
-		if oldListenAddr != "" {
-			os.Setenv("LISTEN_ADDR", oldListenAddr)
-		} else {
-			os.Unsetenv("LISTEN_ADDR")
-		}
-		if oldMetricsAddr != "" {
-			os.Setenv("METRICS_LISTEN_ADDR", oldMetricsAddr)
-		} else {
-			os.Unsetenv("METRICS_LISTEN_ADDR")
-		}
-		if oldBunnyAPIKey != "" {
-			os.Setenv("BUNNY_API_KEY", oldBunnyAPIKey)
-		} else {
-			os.Unsetenv("BUNNY_API_KEY")
-		}
-	}()
-
-	os.Setenv("DATABASE_PATH", ":memory:")
-	os.Setenv("LOG_LEVEL", "info")
-	os.Setenv("LISTEN_ADDR", ":0")
-	os.Setenv("METRICS_LISTEN_ADDR", "localhost:0")
-	os.Setenv("BUNNY_API_KEY", "test-key")
-
+	t.Setenv("DATABASE_PATH", ":memory:")
+	t.Setenv("LOG_LEVEL", "info")
+	t.Setenv("LISTEN_ADDR", ":0")
+	t.Setenv("METRICS_LISTEN_ADDR", "localhost:0")
+	t.Setenv("BUNNY_API_KEY", "test-key")
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatalf("failed to load config: %v", err)
@@ -2829,25 +1942,8 @@ func TestRunWithMetricsServerConfigured(t *testing.T) {
 // TestCreateMetricsServerWithDifferentAddresses tests metrics server with various addresses
 func TestCreateMetricsServerWithDifferentAddresses(t *testing.T) {
 
-	oldDatabasePath := os.Getenv("DATABASE_PATH")
-	oldLogLevel := os.Getenv("LOG_LEVEL")
-
-	defer func() {
-		if oldDatabasePath != "" {
-			os.Setenv("DATABASE_PATH", oldDatabasePath)
-		} else {
-			os.Unsetenv("DATABASE_PATH")
-		}
-		if oldLogLevel != "" {
-			os.Setenv("LOG_LEVEL", oldLogLevel)
-		} else {
-			os.Unsetenv("LOG_LEVEL")
-		}
-	}()
-
-	os.Setenv("DATABASE_PATH", ":memory:")
-	os.Setenv("LOG_LEVEL", "info")
-
+	t.Setenv("DATABASE_PATH", ":memory:")
+	t.Setenv("LOG_LEVEL", "info")
 	testCases := []string{
 		"localhost:9090",
 		"127.0.0.1:8888",
@@ -2876,25 +1972,8 @@ func TestCreateMetricsServerWithDifferentAddresses(t *testing.T) {
 // TestInitializeComponentsWithMetricsRouterNotNil verifies metrics router field
 func TestInitializeComponentsWithMetricsRouterNotNil(t *testing.T) {
 
-	oldDatabasePath := os.Getenv("DATABASE_PATH")
-	oldLogLevel := os.Getenv("LOG_LEVEL")
-
-	defer func() {
-		if oldDatabasePath != "" {
-			os.Setenv("DATABASE_PATH", oldDatabasePath)
-		} else {
-			os.Unsetenv("DATABASE_PATH")
-		}
-		if oldLogLevel != "" {
-			os.Setenv("LOG_LEVEL", oldLogLevel)
-		} else {
-			os.Unsetenv("LOG_LEVEL")
-		}
-	}()
-
-	os.Setenv("DATABASE_PATH", ":memory:")
-	os.Setenv("LOG_LEVEL", "info")
-
+	t.Setenv("DATABASE_PATH", ":memory:")
+	t.Setenv("LOG_LEVEL", "info")
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatalf("failed to load config: %v", err)
@@ -2915,25 +1994,8 @@ func TestInitializeComponentsWithMetricsRouterNotNil(t *testing.T) {
 // TestServerComponentsHasMetricsRouter verifies serverComponents struct has metricsRouter
 func TestServerComponentsHasMetricsRouter(t *testing.T) {
 
-	oldDatabasePath := os.Getenv("DATABASE_PATH")
-	oldLogLevel := os.Getenv("LOG_LEVEL")
-
-	defer func() {
-		if oldDatabasePath != "" {
-			os.Setenv("DATABASE_PATH", oldDatabasePath)
-		} else {
-			os.Unsetenv("DATABASE_PATH")
-		}
-		if oldLogLevel != "" {
-			os.Setenv("LOG_LEVEL", oldLogLevel)
-		} else {
-			os.Unsetenv("LOG_LEVEL")
-		}
-	}()
-
-	os.Setenv("DATABASE_PATH", ":memory:")
-	os.Setenv("LOG_LEVEL", "info")
-
+	t.Setenv("DATABASE_PATH", ":memory:")
+	t.Setenv("LOG_LEVEL", "info")
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatalf("failed to load config: %v", err)
@@ -2988,25 +2050,8 @@ func TestCreateMetricsServerPreservesTimeout(t *testing.T) {
 // TestInitializeComponentsProducesValidMetricsHandler tests metrics handler works
 func TestInitializeComponentsProducesValidMetricsHandler(t *testing.T) {
 
-	oldDatabasePath := os.Getenv("DATABASE_PATH")
-	oldLogLevel := os.Getenv("LOG_LEVEL")
-
-	defer func() {
-		if oldDatabasePath != "" {
-			os.Setenv("DATABASE_PATH", oldDatabasePath)
-		} else {
-			os.Unsetenv("DATABASE_PATH")
-		}
-		if oldLogLevel != "" {
-			os.Setenv("LOG_LEVEL", oldLogLevel)
-		} else {
-			os.Unsetenv("LOG_LEVEL")
-		}
-	}()
-
-	os.Setenv("DATABASE_PATH", ":memory:")
-	os.Setenv("LOG_LEVEL", "info")
-
+	t.Setenv("DATABASE_PATH", ":memory:")
+	t.Setenv("LOG_LEVEL", "info")
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatalf("failed to load config: %v", err)
