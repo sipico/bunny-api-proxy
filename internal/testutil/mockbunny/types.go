@@ -256,3 +256,16 @@ type ErrorResponse struct {
 	Field    string `json:"Field"`
 	Message  string `json:"Message"`
 }
+
+// CertificateIssueResponse represents the response from the certificate issue endpoint.
+// Returns status of the certificate issuance request along with certificate details
+// if the certificate was successfully issued.
+type CertificateIssueResponse struct {
+	Status      int    `json:"Status"`      // 0 = pending, 1 = issued, 2 = failed
+	Message     string `json:"Message"`     // Status message (e.g., "Certificate issued successfully")
+	Certificate string `json:"Certificate"` // The certificate in PEM format (stub data)
+	DateCreated string `json:"DateCreated"` // ISO 8601 timestamp when certificate was created
+	DateExpires string `json:"DateExpires"` // ISO 8601 timestamp when certificate expires
+	ThumbPrint  string `json:"ThumbPrint"`  // Certificate thumbprint/fingerprint
+	CN          string `json:"CN"`          // Common Name from the certificate
+}
