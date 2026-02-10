@@ -340,14 +340,57 @@ jobs:
     needs: [test, lint, docker]  # Runs in parallel with mock E2E (separate runner, no interference)
     # Only run on PRs to main
     if: github.event_name == 'pull_request' && github.base_ref == 'main'
-    # Serialize real API E2E tests — multiple runs hit the same bunny.net account
-    # and interfere with each other (zone creation/deletion conflicts).
-    # cancel-in-progress: true ensures newer runs take priority.
-    concurrency:
-      group: e2e-real-api
-      cancel-in-progress: true
 
     steps:
+      # Multiple PRs share one bunny.net account — serialize real API E2E to avoid
+      # zone creation/deletion conflicts. Uses FIFO ordering by run ID (lowest goes first).
+      # No concurrency group needed: no cancellation, no silent job dropping.
+      - name: Wait for exclusive real API access
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "Run $GITHUB_RUN_ID waiting for exclusive real API access..."
+          MAX_WAIT=900  # 15 minutes
+          WAITED=0
+          POLL=30
+
+          while [ $WAITED -lt $MAX_WAIT ]; do
+            # Find all in-progress CI runs with an active "E2E Tests (Real Bunny.net API)" job
+            ACTIVE_RUNS=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?status=in_progress" \
+              --jq '[.workflow_runs[].id]' 2>/dev/null || echo "[]")
+
+            MY_TURN=true
+            for RUN_ID in $(echo "$ACTIVE_RUNS" | jq -r '.[]'); do
+              [ "$RUN_ID" = "$GITHUB_RUN_ID" ] && continue
+
+              # Check if this other run has a real API E2E job that is in_progress
+              HAS_ACTIVE_E2E=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID/jobs" \
+                --jq '[.jobs[] | select(.name == "E2E Tests (Real Bunny.net API)" and .status == "in_progress")] | length' 2>/dev/null || echo "0")
+
+              if [ "$HAS_ACTIVE_E2E" -gt 0 ] && [ "$RUN_ID" -lt "$GITHUB_RUN_ID" ]; then
+                echo "Run $RUN_ID (lower ID) has active real API E2E — waiting... (${WAITED}s elapsed)"
+                MY_TURN=false
+                break
+              elif [ "$HAS_ACTIVE_E2E" -gt 0 ]; then
+                echo "Run $RUN_ID (higher ID) has active real API E2E — it should yield to us, waiting for it... (${WAITED}s elapsed)"
+                MY_TURN=false
+                break
+              fi
+            done
+
+            if [ "$MY_TURN" = "true" ]; then
+              echo "No other real API E2E active. Proceeding (run $GITHUB_RUN_ID)."
+              break
+            fi
+
+            sleep $POLL
+            WAITED=$((WAITED + POLL))
+          done
+
+          if [ $WAITED -ge $MAX_WAIT ]; then
+            echo "::warning::Timed out after ${MAX_WAIT}s waiting for exclusive access. Proceeding anyway."
+          fi
+
       - name: Checkout code
         uses: actions/checkout@v6
 
