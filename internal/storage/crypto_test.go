@@ -3,7 +3,6 @@ package storage
 import (
 	"crypto/rand"
 	"errors"
-	"strings"
 	"testing"
 )
 
