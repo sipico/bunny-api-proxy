@@ -24,7 +24,7 @@ concurrency:
 jobs:
   # Deduplicate push vs pull_request runs for the same branch.
   # - Push events: wait 15s for a PR to appear, then skip if one exists.
-  # - PR events: cancel any in-progress push-triggered run for the same branch.
+  # - PR events: proceed normally (no active cancellation to avoid blocked merges).
   preflight:
     name: Preflight
     runs-on: ubuntu-latest
@@ -46,17 +46,6 @@ jobs:
               echo "::notice::Skipping push CI — PR exists, PR-triggered CI will run instead"
               exit 0
             fi
-          fi
-
-          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
-            # Cancel any in-progress push-triggered CI runs for this branch (PR run takes priority)
-            BRANCH="${{ github.head_ref }}"
-            echo "Checking for push-triggered runs on branch $BRANCH to cancel..."
-            PUSH_RUNS=$(gh run list --repo "$GITHUB_REPOSITORY" --branch "$BRANCH" --event push --workflow ci.yml --json databaseId,status --jq '.[] | select(.status == "in_progress" or .status == "queued") | .databaseId')
-            for RUN_ID in $PUSH_RUNS; do
-              echo "::notice::Cancelling push-triggered run $RUN_ID (PR run takes priority)"
-              gh run cancel "$RUN_ID" --repo "$GITHUB_REPOSITORY" || true
-            done
           fi
 
           echo "should_skip=false" >> "$GITHUB_OUTPUT"
