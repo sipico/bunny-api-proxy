@@ -2557,3 +2557,54 @@ func TestHandleCheckAvailability_WellKnownDomain(t *testing.T) {
 		t.Error("expected well-known domain amazon.com to NOT be available")
 	}
 }
+
+// TestHandleGetStatistics_DocumentsHardcodedBehavior verifies that the mock server
+// returns hardcoded statistics. This test documents the current limitation that
+// statistics are not tracked based on actual zone activity.
+//
+// TODO(issue #323): In the future, statistics should be:
+// - Tracked per zone based on actual record operations
+// - Respect dateFrom/dateTo query parameters
+// - Return realistic values based on zone activity
+//
+// For MVP, returning hardcoded values is acceptable since the proxy
+// passes statistics through without modification. This test ensures
+// the hardcoded response structure is stable.
+func TestHandleGetStatistics_DocumentsHardcodedBehavior(t *testing.T) {
+	t.Parallel()
+	s := New()
+	defer s.Close()
+
+	id := s.AddZone("example.com")
+
+	resp, err := http.Get(fmt.Sprintf("%s/dnszone/%d/statistics", s.URL(), id))
+	if err != nil {
+		t.Fatalf("failed to get statistics: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// Verify the response structure matches what the proxy expects,
+	// even though values are hardcoded.
+	var result struct {
+		TotalQueriesServed       int64            `json:"TotalQueriesServed"`
+		QueriesServedChart       map[string]int64 `json:"QueriesServedChart"`
+		NormalQueriesServedChart map[string]int64 `json:"NormalQueriesServedChart"`
+		SmartQueriesServedChart  map[string]int64 `json:"SmartQueriesServedChart"`
+		QueriesByTypeChart       map[string]int64 `json:"QueriesByTypeChart"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	// These values are hardcoded and don't reflect actual zone activity.
+	// See issue #323 for improvements.
+	if result.TotalQueriesServed != 1000 {
+		t.Errorf("expected 1000 hardcoded queries, got %d", result.TotalQueriesServed)
+	}
+	if len(result.QueriesServedChart) == 0 {
+		t.Error("expected QueriesServedChart to have hardcoded entries")
+	}
+	if len(result.QueriesByTypeChart) == 0 {
+		t.Error("expected QueriesByTypeChart to have hardcoded entries")
+	}
+}
