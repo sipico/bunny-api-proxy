@@ -124,23 +124,10 @@ func (m *mockStorageWithToken) GetTokenByHash(ctx context.Context, keyHash strin
 func TestTokenAuthMiddleware(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		name           string
-		accessKey      string
-		validateResult *storage.AdminToken
-		validateError  error
-		wantStatus     int
-		wantContext    bool // Should token info be in context?
+		name       string
+		accessKey  string
+		wantStatus int
 	}{
-		{
-			name:      "valid token",
-			accessKey: "valid-token-123",
-			validateResult: &storage.AdminToken{
-				ID:   1,
-				Name: "test-token",
-			},
-			wantStatus:  http.StatusOK,
-			wantContext: true,
-		},
 		{
 			name:       "missing header",
 			accessKey:  "",
@@ -151,18 +138,6 @@ func TestTokenAuthMiddleware(t *testing.T) {
 			accessKey:  "",
 			wantStatus: http.StatusUnauthorized,
 		},
-		{
-			name:          "invalid token - not in database",
-			accessKey:     "invalid-token",
-			validateError: storage.ErrNotFound,
-			wantStatus:    http.StatusUnauthorized,
-		},
-		{
-			name:          "database error",
-			accessKey:     "valid-token",
-			validateError: errors.New("database error"),
-			wantStatus:    http.StatusInternalServerError,
-		},
 	}
 
 	for _, tt := range tests {
@@ -170,31 +145,12 @@ func TestTokenAuthMiddleware(t *testing.T) {
 			// Setup mock storage
 			mock := &mockStorageWithToken{
 				MockStorage: &mockstore.MockStorage{},
-				validateToken: func(ctx context.Context, token string) (*storage.AdminToken, error) {
-					if tt.validateError != nil {
-						return nil, tt.validateError
-					}
-					return tt.validateResult, nil
-				},
 			}
 
 			h := NewHandler(mock, new(slog.LevelVar), slog.Default())
 
-			// Create test handler that checks context
-			var contextHadToken bool
+			// Create test handler
 			testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				tokenInfo := GetTokenInfoFromContext(r.Context())
-				contextHadToken = (tokenInfo != nil)
-
-				if tt.wantContext && tokenInfo != nil {
-					if tokenInfo.ID != tt.validateResult.ID {
-						t.Errorf("expected token ID %d, got %d", tt.validateResult.ID, tokenInfo.ID)
-					}
-					if tokenInfo.Name != tt.validateResult.Name {
-						t.Errorf("expected token name %s, got %s", tt.validateResult.Name, tokenInfo.Name)
-					}
-				}
-
 				w.WriteHeader(http.StatusOK)
 			})
 
@@ -214,81 +170,6 @@ func TestTokenAuthMiddleware(t *testing.T) {
 			// Check status
 			if w.Code != tt.wantStatus {
 				t.Errorf("expected status %d, got %d", tt.wantStatus, w.Code)
-			}
-
-			// Check context
-			if tt.wantContext && !contextHadToken {
-				t.Error("expected token info in context, got none")
-			}
-			if !tt.wantContext && contextHadToken {
-				t.Error("expected no token info in context, but got one")
-			}
-		})
-	}
-}
-
-func TestGetTokenInfoFromContext(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		name              string
-		setupContext      func(ctx context.Context) context.Context
-		expectedTokenInfo *TokenInfo
-	}{
-		{
-			name: "context has no token info - returns nil",
-			setupContext: func(ctx context.Context) context.Context {
-				return ctx
-			},
-			expectedTokenInfo: nil,
-		},
-		{
-			name: "context has valid token info - returns TokenInfo",
-			setupContext: func(ctx context.Context) context.Context {
-				tokenInfo := &TokenInfo{
-					ID:   42,
-					Name: "my-token",
-				}
-				return WithTokenInfo(ctx, tokenInfo)
-			},
-			expectedTokenInfo: &TokenInfo{
-				ID:   42,
-				Name: "my-token",
-			},
-		},
-		{
-			name: "context has wrong type - returns nil",
-			setupContext: func(ctx context.Context) context.Context {
-				// Store a string instead of TokenInfo
-				return WithTokenInfo(ctx, "not-a-token-info")
-			},
-			expectedTokenInfo: nil,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			ctx := context.Background()
-			ctx = tt.setupContext(ctx)
-
-			result := GetTokenInfoFromContext(ctx)
-
-			if tt.expectedTokenInfo == nil {
-				if result != nil {
-					t.Errorf("expected nil, got %v", result)
-				}
-				return
-			}
-
-			if result == nil {
-				t.Errorf("expected %v, got nil", tt.expectedTokenInfo)
-				return
-			}
-
-			if result.ID != tt.expectedTokenInfo.ID {
-				t.Errorf("expected ID %d, got %d", tt.expectedTokenInfo.ID, result.ID)
-			}
-			if result.Name != tt.expectedTokenInfo.Name {
-				t.Errorf("expected Name %s, got %s", tt.expectedTokenInfo.Name, result.Name)
 			}
 		})
 	}

@@ -85,12 +85,3 @@ func HashKey(key string) (string, error) {
 	}
 	return string(hash), nil
 }
-
-// VerifyKey checks if a key matches a bcrypt hash.
-func VerifyKey(key, hash string) error {
-	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(key))
-	if err != nil {
-		return err
-	}
-	return nil
-}
