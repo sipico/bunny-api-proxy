@@ -2176,13 +2176,13 @@ func TestHandleIssueCertificate_Success(t *testing.T) {
 	}
 
 	var certResp struct {
-		Status      int       `json:"Status"`
-		Message     string    `json:"Message"`
-		Certificate string    `json:"Certificate"`
-		DateCreated string    `json:"DateCreated"`
-		DateExpires string    `json:"DateExpires"`
-		ThumbPrint  string    `json:"ThumbPrint"`
-		CN          string    `json:"CN"`
+		Status      int    `json:"Status"`
+		Message     string `json:"Message"`
+		Certificate string `json:"Certificate"`
+		DateCreated string `json:"DateCreated"`
+		DateExpires string `json:"DateExpires"`
+		ThumbPrint  string `json:"ThumbPrint"`
+		CN          string `json:"CN"`
 	}
 	if err := json.Unmarshal(respBody, &certResp); err != nil {
 		t.Errorf("expected valid JSON response, got error: %v", err)
