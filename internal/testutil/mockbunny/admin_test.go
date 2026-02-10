@@ -645,3 +645,108 @@ func TestAdminReset_ClearsScanState(t *testing.T) {
 		t.Errorf("expected Status 0 (NotStarted) for new zone after reset, got %d (scan state from previous zone persisted)", result.Status)
 	}
 }
+
+// TestRecordDefaultsConsistency verifies that records created via admin and DNS API paths
+// have identical default field values. Addresses issue #321.
+func TestRecordDefaultsConsistency(t *testing.T) {
+	t.Parallel()
+	s := New()
+	defer s.Close()
+
+	// Create zone via admin API
+	adminZoneBody := `{"domain": "admin.test.com"}`
+	adminZoneResp, err := http.Post(s.URL()+"/admin/zones", "application/json", strings.NewReader(adminZoneBody))
+	if err != nil {
+		t.Fatalf("failed to create admin zone: %v", err)
+	}
+	defer adminZoneResp.Body.Close()
+
+	var adminZone Zone
+	if err := json.NewDecoder(adminZoneResp.Body).Decode(&adminZone); err != nil {
+		t.Fatalf("failed to decode admin zone: %v", err)
+	}
+
+	// Create record via admin API
+	adminRecBody := `{"Type": 3, "Name": "test", "Value": "test-value", "Ttl": 300}`
+	adminRecResp, err := http.Post(
+		fmt.Sprintf("%s/admin/zones/%d/records", s.URL(), adminZone.ID),
+		"application/json",
+		strings.NewReader(adminRecBody),
+	)
+	if err != nil {
+		t.Fatalf("failed to create admin record: %v", err)
+	}
+	defer adminRecResp.Body.Close()
+
+	var adminRecord Record
+	if err := json.NewDecoder(adminRecResp.Body).Decode(&adminRecord); err != nil {
+		t.Fatalf("failed to decode admin record: %v", err)
+	}
+
+	// Create zone via DNS API
+	dnsZoneBody := `{"Domain": "dns.test.com"}`
+	dnsZoneResp, err := http.Post(s.URL()+"/dnszone", "application/json", strings.NewReader(dnsZoneBody))
+	if err != nil {
+		t.Fatalf("failed to create DNS zone: %v", err)
+	}
+	defer dnsZoneResp.Body.Close()
+
+	var dnsZone Zone
+	if err := json.NewDecoder(dnsZoneResp.Body).Decode(&dnsZone); err != nil {
+		t.Fatalf("failed to decode DNS zone: %v", err)
+	}
+
+	// Create record via DNS API (PUT request)
+	dnsRecBody := `{"Type": 3, "Name": "test", "Value": "test-value", "Ttl": 300}`
+	req, _ := http.NewRequest(http.MethodPut,
+		fmt.Sprintf("%s/dnszone/%d/records", s.URL(), dnsZone.ID),
+		strings.NewReader(dnsRecBody),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	client := &http.Client{}
+	dnsRecResp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("failed to create DNS record: %v", err)
+	}
+	defer dnsRecResp.Body.Close()
+
+	var dnsRecord Record
+	if err := json.NewDecoder(dnsRecResp.Body).Decode(&dnsRecord); err != nil {
+		t.Fatalf("failed to decode DNS record: %v", err)
+	}
+
+	// Compare critical default fields
+	if adminRecord.EnviromentalVariables == nil {
+		t.Errorf("admin record EnviromentalVariables is nil, expected []interface{}{}")
+	}
+	if dnsRecord.EnviromentalVariables == nil {
+		t.Errorf("DNS record EnviromentalVariables is nil, expected []interface{}{}")
+	}
+
+	if adminRecord.AutoSslIssuance != dnsRecord.AutoSslIssuance {
+		t.Errorf("AutoSslIssuance mismatch: admin=%v, dns=%v", adminRecord.AutoSslIssuance, dnsRecord.AutoSslIssuance)
+	}
+	if !dnsRecord.AutoSslIssuance {
+		t.Errorf("DNS record AutoSslIssuance should be true, got %v", dnsRecord.AutoSslIssuance)
+	}
+
+	if adminRecord.LinkName != dnsRecord.LinkName {
+		t.Errorf("LinkName mismatch: admin=%q, dns=%q", adminRecord.LinkName, dnsRecord.LinkName)
+	}
+
+	if adminRecord.MonitorStatus != dnsRecord.MonitorStatus {
+		t.Errorf("MonitorStatus mismatch: admin=%d, dns=%d", adminRecord.MonitorStatus, dnsRecord.MonitorStatus)
+	}
+
+	if adminRecord.MonitorType != dnsRecord.MonitorType {
+		t.Errorf("MonitorType mismatch: admin=%d, dns=%d", adminRecord.MonitorType, dnsRecord.MonitorType)
+	}
+
+	if adminRecord.SmartRoutingType != dnsRecord.SmartRoutingType {
+		t.Errorf("SmartRoutingType mismatch: admin=%d, dns=%d", adminRecord.SmartRoutingType, dnsRecord.SmartRoutingType)
+	}
+
+	if adminRecord.AccelerationStatus != dnsRecord.AccelerationStatus {
+		t.Errorf("AccelerationStatus mismatch: admin=%d, dns=%d", adminRecord.AccelerationStatus, dnsRecord.AccelerationStatus)
+	}
+}
