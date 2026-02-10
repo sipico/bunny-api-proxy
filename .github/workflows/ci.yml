@@ -22,19 +22,24 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Skip push-triggered runs when a PR exists (PR-triggered run handles it)
+  # Deduplicate push vs pull_request runs for the same branch.
+  # - Push events: wait 15s for a PR to appear, then skip if one exists.
+  # - PR events: cancel any in-progress push-triggered run for the same branch.
   preflight:
     name: Preflight
     runs-on: ubuntu-latest
     outputs:
       should_skip: ${{ steps.check.outputs.should_skip }}
     steps:
-      - name: Check for open PR on push
+      - name: Deduplicate CI runs
         id: check
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           if [ "$GITHUB_EVENT_NAME" = "push" ] && [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            # Wait for potential PR creation (sub-agents push then create PR within seconds)
+            echo "Waiting 15s for potential PR creation..."
+            sleep 15
             PR_COUNT=$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$GITHUB_REF_NAME" --state open --json number --jq length)
             if [ "$PR_COUNT" -gt 0 ]; then
               echo "should_skip=true" >> "$GITHUB_OUTPUT"
@@ -42,6 +47,18 @@ jobs:
               exit 0
             fi
           fi
+
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            # Cancel any in-progress push-triggered CI runs for this branch (PR run takes priority)
+            BRANCH="${{ github.head_ref }}"
+            echo "Checking for push-triggered runs on branch $BRANCH to cancel..."
+            PUSH_RUNS=$(gh run list --repo "$GITHUB_REPOSITORY" --branch "$BRANCH" --event push --workflow ci.yml --json databaseId,status --jq '.[] | select(.status == "in_progress" or .status == "queued") | .databaseId')
+            for RUN_ID in $PUSH_RUNS; do
+              echo "::notice::Cancelling push-triggered run $RUN_ID (PR run takes priority)"
+              gh run cancel "$RUN_ID" --repo "$GITHUB_REPOSITORY" || true
+            done
+          fi
+
           echo "should_skip=false" >> "$GITHUB_OUTPUT"
 
   test:
