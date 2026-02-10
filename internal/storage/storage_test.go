@@ -314,8 +314,8 @@ func TestConcurrentAccess(t *testing.T) {
 
 			// Each goroutine creates a scoped key
 			baseNum := index + 1 // 1-based for zone IDs
-			keyName := "Concurrent-Key-" + string(rune('0'+baseNum))
-			keyValue := "key-value-concurrent-" + string(rune('0'+baseNum))
+			keyName := fmt.Sprintf("Concurrent-Key-%d", baseNum)
+			keyValue := fmt.Sprintf("key-value-concurrent-%d", baseNum)
 			keyID, err := s.CreateScopedKey(ctx, keyName, keyValue)
 			if err != nil {
 				atomic.AddInt32(&errorCount, 1)
@@ -493,7 +493,7 @@ func TestDataPersistence(t *testing.T) {
 	// Create scoped keys with permissions
 	keyIDs := make([]int64, 3)
 	for i := 0; i < 3; i++ {
-		keyID, err := s.CreateScopedKey(ctx, "Key-"+string(rune(i)), "key-"+string(rune(i)))
+		keyID, err := s.CreateScopedKey(ctx, fmt.Sprintf("Key-%d", i), fmt.Sprintf("key-%d", i))
 		if err != nil {
 			t.Fatalf("CreateScopedKey failed: %v", err)
 		}
@@ -721,7 +721,7 @@ func TestLargeDataSet(t *testing.T) {
 	// Create many scoped keys with multiple permissions each
 	start := time.Now()
 	for i := 0; i < numKeys; i++ {
-		keyID, err := s.CreateScopedKey(ctx, "Key-"+string(rune('0'+i%10)), "key-"+string(rune('0'+i%10)))
+		keyID, err := s.CreateScopedKey(ctx, fmt.Sprintf("Key-%d", i), fmt.Sprintf("key-%d", i))
 		if err != nil {
 			t.Fatalf("CreateScopedKey failed: %v", err)
 		}
