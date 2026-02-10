@@ -187,13 +187,13 @@ func (e *TestEnv) CreateTestZones(t *testing.T, count int) []*bunny.Zone {
 func (e *TestEnv) Cleanup(t *testing.T) {
 	t.Helper()
 
-	// Delete all tracked zones
+	// Delete all tracked zones with retry logic
 	if e.ProxyURL != "" {
 		// E2E mode: Delete via proxy
 		for _, zone := range e.Zones {
 			if zone != nil {
-				if err := e.deleteZoneViaProxy(t, zone.ID); err != nil {
-					t.Logf("Warning: Failed to delete zone %d via proxy: %v", zone.ID, err)
+				if err := e.deleteZoneWithRetry(t, zone.ID, true); err != nil {
+					e.reportCleanupFailure(t, zone.ID, zone.Domain, err)
 				} else {
 					t.Logf("Deleted zone via proxy: %s (ID: %d)", zone.Domain, zone.ID)
 				}
@@ -203,8 +203,8 @@ func (e *TestEnv) Cleanup(t *testing.T) {
 		// Unit test mode: Delete via direct client
 		for _, zone := range e.Zones {
 			if zone != nil {
-				if err := e.Client.DeleteZone(e.ctx, zone.ID); err != nil {
-					t.Logf("Warning: Failed to delete zone %d: %v", zone.ID, err)
+				if err := e.deleteZoneWithRetry(t, zone.ID, false); err != nil {
+					e.reportCleanupFailure(t, zone.ID, zone.Domain, err)
 				} else {
 					t.Logf("Deleted zone directly: %s (ID: %d)", zone.Domain, zone.ID)
 				}
@@ -217,6 +217,61 @@ func (e *TestEnv) Cleanup(t *testing.T) {
 
 	if e.mockServer != nil {
 		e.mockServer.Close()
+	}
+}
+
+// deleteZoneWithRetry attempts to delete a zone with exponential backoff retry.
+// Retries up to 3 times for transient failures.
+func (e *TestEnv) deleteZoneWithRetry(t *testing.T, zoneID int64, viaProxy bool) error {
+	t.Helper()
+
+	const maxRetries = 3
+	var lastErr error
+
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		var err error
+		if viaProxy {
+			err = e.deleteZoneViaProxy(t, zoneID)
+		} else {
+			err = e.Client.DeleteZone(e.ctx, zoneID)
+		}
+
+		if err == nil {
+			if attempt > 1 {
+				t.Logf("Zone %d deleted successfully after %d attempt(s)", zoneID, attempt)
+			}
+			return nil
+		}
+
+		lastErr = err
+
+		// Don't retry on final attempt
+		if attempt < maxRetries {
+			backoff := time.Duration(attempt) * time.Second
+			t.Logf("Retry %d/%d: Failed to delete zone %d, retrying in %v: %v",
+				attempt, maxRetries, zoneID, backoff, err)
+			time.Sleep(backoff)
+		}
+	}
+
+	return fmt.Errorf("failed after %d attempts: %w", maxRetries, lastErr)
+}
+
+// reportCleanupFailure reports a cleanup failure appropriately based on test mode.
+// In real mode, failures are reported as errors (t.Errorf) to make them visible.
+// In mock mode, failures are logged as warnings (t.Logf) since they're non-critical.
+func (e *TestEnv) reportCleanupFailure(t *testing.T, zoneID int64, zoneDomain string, err error) {
+	t.Helper()
+
+	message := fmt.Sprintf("CLEANUP FAILED: zone %d (%s) not deleted: %v",
+		zoneID, zoneDomain, err)
+
+	if e.Mode == ModeReal {
+		// In real mode, cleanup failures are critical (can cause resource leaks)
+		t.Errorf("%s", message)
+	} else {
+		// In mock mode, cleanup failures are less critical
+		t.Logf("Warning: %s", message)
 	}
 }
 
