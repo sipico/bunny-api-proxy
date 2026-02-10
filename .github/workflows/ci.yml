@@ -340,6 +340,12 @@ jobs:
     needs: [test, lint, docker]  # Runs in parallel with mock E2E (separate runner, no interference)
     # Only run on PRs to main
     if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    # Serialize real API E2E tests — multiple runs hit the same bunny.net account
+    # and interfere with each other (zone creation/deletion conflicts).
+    # cancel-in-progress: true ensures newer runs take priority.
+    concurrency:
+      group: e2e-real-api
+      cancel-in-progress: true
 
     steps:
       - name: Checkout code
