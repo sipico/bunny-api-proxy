@@ -24,7 +24,7 @@ var (
 )
 
 func TestMain(m *testing.M) {
-	proxyURL = getEnv("PROXY_URL", "http://localhost:8080")
+	proxyURL = requireEnv("PROXY_URL")
 	adminPassword = getEnv("ADMIN_PASSWORD", "testpassword123")
 
 	// Wait for proxy to be ready
