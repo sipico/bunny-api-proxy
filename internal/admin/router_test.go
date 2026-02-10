@@ -28,7 +28,7 @@ func TestAdminEndpointsRequireAdminToken(t *testing.T) {
 	scopedTokenHash := auth.HashToken(scopedTokenSecret)
 
 	// Mock storage that returns both admin and scoped tokens
-	mock := &mockStorageWithToken{
+	mock := &mockstore.MockStorage{
 		MockStorage: &mockstore.MockStorage{},
 		getTokenByHash: func(ctx context.Context, keyHash string) (*storage.Token, error) {
 			switch keyHash {
@@ -211,7 +211,7 @@ func TestWhoamiEndpointAvailableToAllTokens(t *testing.T) {
 	scopedTokenSecret := "scoped-token-secret-67890"
 	scopedTokenHash := auth.HashToken(scopedTokenSecret)
 
-	mock := &mockStorageWithToken{
+	mock := &mockstore.MockStorage{
 		MockStorage: &mockstore.MockStorage{},
 		getTokenByHash: func(ctx context.Context, keyHash string) (*storage.Token, error) {
 			switch keyHash {

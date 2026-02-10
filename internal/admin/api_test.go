@@ -1000,7 +1000,7 @@ func TestHandleDeleteTokenPermission(t *testing.T) {
 				}
 				return tt.mockToken, nil
 			}
-			mock.removePermissionForToken = func(ctx context.Context, tokenID, permID int64) error {
+			mock.RemovePermissionForTokenFunc = func(ctx context.Context, tokenID, permID int64) error {
 				return tt.mockDelErr
 			}
 
@@ -1042,7 +1042,7 @@ func TestHandleDeleteTokenPermissionIDOR(t *testing.T) {
 		return nil, storage.ErrNotFound
 	}
 
-	mock.removePermissionForToken = func(ctx context.Context, tokenID, permID int64) error {
+	mock.RemovePermissionForTokenFunc = func(ctx context.Context, tokenID, permID int64) error {
 		// Check if the permission is actually owned by this token
 		if owningToken, exists := tokenIDToOwningTokenID[permID]; exists {
 			if owningToken != tokenID {
