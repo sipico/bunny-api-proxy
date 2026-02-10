@@ -1635,12 +1635,12 @@ func TestExportRecords(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name       string
-		zoneID     int64
-		handler    http.HandlerFunc
-		wantBody   string
-		wantErr    bool
-		cancelCtx  bool
+		name      string
+		zoneID    int64
+		handler   http.HandlerFunc
+		wantBody  string
+		wantErr   bool
+		cancelCtx bool
 	}{
 		{
 			name:   "successful export",
@@ -1735,11 +1735,11 @@ func TestEnableDNSSEC(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name       string
-		zoneID     int64
-		handler    http.HandlerFunc
-		wantErr    bool
-		cancelCtx  bool
+		name      string
+		zoneID    int64
+		handler   http.HandlerFunc
+		wantErr   bool
+		cancelCtx bool
 	}{
 		{
 			name:   "successful enable",
@@ -1762,7 +1762,7 @@ func TestEnableDNSSEC(t *testing.T) {
 			handler: func(w http.ResponseWriter, _ *http.Request) {
 				w.WriteHeader(http.StatusNotFound)
 			},
-			wantErr:    true,
+			wantErr: true,
 		},
 		{
 			name:   "unauthorized",
@@ -1770,7 +1770,7 @@ func TestEnableDNSSEC(t *testing.T) {
 			handler: func(w http.ResponseWriter, _ *http.Request) {
 				w.WriteHeader(http.StatusUnauthorized)
 			},
-			wantErr:    true,
+			wantErr: true,
 		},
 		{
 			name:   "server error",
@@ -1779,7 +1779,7 @@ func TestEnableDNSSEC(t *testing.T) {
 				w.WriteHeader(http.StatusBadRequest)
 				w.Write([]byte(`{"Message":"bad request"}`))
 			},
-			wantErr:    true,
+			wantErr: true,
 		},
 		{
 			name:      "context canceled",
@@ -1832,11 +1832,11 @@ func TestDisableDNSSEC(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name       string
-		zoneID     int64
-		handler    http.HandlerFunc
-		wantErr    bool
-		cancelCtx  bool
+		name      string
+		zoneID    int64
+		handler   http.HandlerFunc
+		wantErr   bool
+		cancelCtx bool
 	}{
 		{
 			name:   "successful disable",
@@ -1859,7 +1859,7 @@ func TestDisableDNSSEC(t *testing.T) {
 			handler: func(w http.ResponseWriter, _ *http.Request) {
 				w.WriteHeader(http.StatusNotFound)
 			},
-			wantErr:    true,
+			wantErr: true,
 		},
 		{
 			name:   "unauthorized",
@@ -1867,7 +1867,7 @@ func TestDisableDNSSEC(t *testing.T) {
 			handler: func(w http.ResponseWriter, _ *http.Request) {
 				w.WriteHeader(http.StatusUnauthorized)
 			},
-			wantErr:    true,
+			wantErr: true,
 		},
 		{
 			name:      "context canceled",
@@ -1920,12 +1920,12 @@ func TestIssueCertificate(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name       string
-		zoneID     int64
-		domain     string
-		handler    http.HandlerFunc
-		wantErr    bool
-		cancelCtx  bool
+		name      string
+		zoneID    int64
+		domain    string
+		handler   http.HandlerFunc
+		wantErr   bool
+		cancelCtx bool
 	}{
 		{
 			name:   "successful issue",
@@ -1951,7 +1951,7 @@ func TestIssueCertificate(t *testing.T) {
 			handler: func(w http.ResponseWriter, _ *http.Request) {
 				w.WriteHeader(http.StatusNotFound)
 			},
-			wantErr:    true,
+			wantErr: true,
 		},
 		{
 			name:   "unauthorized",
@@ -1960,7 +1960,7 @@ func TestIssueCertificate(t *testing.T) {
 			handler: func(w http.ResponseWriter, _ *http.Request) {
 				w.WriteHeader(http.StatusUnauthorized)
 			},
-			wantErr:    true,
+			wantErr: true,
 		},
 		{
 			name:   "bad request",
@@ -1970,7 +1970,7 @@ func TestIssueCertificate(t *testing.T) {
 				w.WriteHeader(http.StatusBadRequest)
 				w.Write([]byte(`{"Message":"invalid domain"}`))
 			},
-			wantErr:    true,
+			wantErr: true,
 		},
 		{
 			name:      "context canceled",
@@ -2020,13 +2020,13 @@ func TestGetZoneStatistics(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name       string
-		zoneID     int64
-		dateFrom   string
-		dateTo     string
-		handler    http.HandlerFunc
-		wantErr    bool
-		cancelCtx  bool
+		name      string
+		zoneID    int64
+		dateFrom  string
+		dateTo    string
+		handler   http.HandlerFunc
+		wantErr   bool
+		cancelCtx bool
 	}{
 		{
 			name:     "successful request",
@@ -2069,7 +2069,7 @@ func TestGetZoneStatistics(t *testing.T) {
 			handler: func(w http.ResponseWriter, _ *http.Request) {
 				w.WriteHeader(http.StatusNotFound)
 			},
-			wantErr:    true,
+			wantErr: true,
 		},
 		{
 			name:   "unauthorized",
@@ -2077,7 +2077,7 @@ func TestGetZoneStatistics(t *testing.T) {
 			handler: func(w http.ResponseWriter, _ *http.Request) {
 				w.WriteHeader(http.StatusUnauthorized)
 			},
-			wantErr:    true,
+			wantErr: true,
 		},
 		{
 			name:      "context canceled",
@@ -2130,11 +2130,11 @@ func TestTriggerDNSScan(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name       string
-		domain     string
-		handler    http.HandlerFunc
-		wantErr    bool
-		cancelCtx  bool
+		name      string
+		domain    string
+		handler   http.HandlerFunc
+		wantErr   bool
+		cancelCtx bool
 	}{
 		{
 			name:   "successful trigger",
@@ -2160,7 +2160,7 @@ func TestTriggerDNSScan(t *testing.T) {
 			handler: func(w http.ResponseWriter, _ *http.Request) {
 				w.WriteHeader(http.StatusNotFound)
 			},
-			wantErr:    true,
+			wantErr: true,
 		},
 		{
 			name:   "unauthorized",
@@ -2168,7 +2168,7 @@ func TestTriggerDNSScan(t *testing.T) {
 			handler: func(w http.ResponseWriter, _ *http.Request) {
 				w.WriteHeader(http.StatusUnauthorized)
 			},
-			wantErr:    true,
+			wantErr: true,
 		},
 		{
 			name:      "context canceled",
@@ -2224,11 +2224,11 @@ func TestGetDNSScanResult(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name       string
-		zoneID     int64
-		handler    http.HandlerFunc
-		wantErr    bool
-		cancelCtx  bool
+		name      string
+		zoneID    int64
+		handler   http.HandlerFunc
+		wantErr   bool
+		cancelCtx bool
 	}{
 		{
 			name:   "successful result",
@@ -2251,7 +2251,7 @@ func TestGetDNSScanResult(t *testing.T) {
 			handler: func(w http.ResponseWriter, _ *http.Request) {
 				w.WriteHeader(http.StatusNotFound)
 			},
-			wantErr:    true,
+			wantErr: true,
 		},
 		{
 			name:   "unauthorized",
@@ -2259,7 +2259,7 @@ func TestGetDNSScanResult(t *testing.T) {
 			handler: func(w http.ResponseWriter, _ *http.Request) {
 				w.WriteHeader(http.StatusUnauthorized)
 			},
-			wantErr:    true,
+			wantErr: true,
 		},
 		{
 			name:      "context canceled",
