@@ -97,3 +97,89 @@ func TestMockStorage_CustomBehavior(t *testing.T) {
 		t.Errorf("GetTokenByHash should return custom error %v, got %v", customErr, err)
 	}
 }
+
+// TestMockStorage_UnifiedTokenMethods verifies unified token methods work correctly.
+func TestMockStorage_UnifiedTokenMethods(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	mock := &MockStorage{}
+
+	// Test GetTokenByID default
+	_, err := mock.GetTokenByID(ctx, 123)
+	if err != storage.ErrNotFound {
+		t.Errorf("GetTokenByID default should return ErrNotFound, got %v", err)
+	}
+
+	// Test DeleteToken default
+	if err := mock.DeleteToken(ctx, 123); err != nil {
+		t.Errorf("DeleteToken default should not error, got %v", err)
+	}
+
+	// Test CountAdminTokens default
+	count, err := mock.CountAdminTokens(ctx)
+	if err != nil {
+		t.Errorf("CountAdminTokens default should not error, got %v", err)
+	}
+	if count != 0 {
+		t.Errorf("CountAdminTokens default should return 0, got %d", count)
+	}
+}
+
+// TestMockStorage_PermissionMethods verifies permission methods work correctly.
+func TestMockStorage_PermissionMethods(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	mock := &MockStorage{}
+
+	// Test AddPermissionForToken default
+	perm := &storage.Permission{ZoneID: 123, AllowedActions: []string{"list"}}
+	result, err := mock.AddPermissionForToken(ctx, 1, perm)
+	if err != nil {
+		t.Errorf("AddPermissionForToken default should not error, got %v", err)
+	}
+	if result == nil {
+		t.Fatal("AddPermissionForToken default should return permission")
+	}
+	if result.ID != 1 || result.TokenID != 1 {
+		t.Errorf("AddPermissionForToken should set ID and TokenID, got ID=%d TokenID=%d", result.ID, result.TokenID)
+	}
+
+	// Test RemovePermission default
+	if err := mock.RemovePermission(ctx, 1); err != nil {
+		t.Errorf("RemovePermission default should not error, got %v", err)
+	}
+
+	// Test RemovePermissionForToken default
+	if err := mock.RemovePermissionForToken(ctx, 1, 1); err != nil {
+		t.Errorf("RemovePermissionForToken default should not error, got %v", err)
+	}
+
+	// Test GetPermissionsForToken default
+	perms, err := mock.GetPermissionsForToken(ctx, 1)
+	if err != nil {
+		t.Errorf("GetPermissionsForToken default should not error, got %v", err)
+	}
+	if perms == nil {
+		t.Error("GetPermissionsForToken default should return slice, not nil")
+	}
+	if len(perms) != 0 {
+		t.Errorf("GetPermissionsForToken default should return empty slice, got %d items", len(perms))
+	}
+}
+
+// TestMockStorage_LifecycleMethods verifies lifecycle methods work correctly.
+func TestMockStorage_LifecycleMethods(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	mock := &MockStorage{}
+
+	// Test Ping default
+	if err := mock.Ping(ctx); err != nil {
+		t.Errorf("Ping default should not error, got %v", err)
+	}
+
+	// Test Close default
+	if err := mock.Close(); err != nil {
+		t.Errorf("Close default should not error, got %v", err)
+	}
+}
