@@ -818,6 +818,18 @@ func (s *Server) handleIssueCertificate(w http.ResponseWriter, r *http.Request) 
 }
 
 // handleGetStatistics handles GET /dnszone/{id}/statistics.
+// LIMITATION: Currently returns hardcoded statistics that do not reflect actual zone activity.
+// The TotalQueriesServed, date-based charts, and query type charts are fixed values.
+// dateFrom/dateTo query parameters are currently ignored.
+//
+// See issue #323 for planned improvements:
+// - Track operation counts per zone
+// - Respect dateFrom/dateTo query parameters
+// - Return realistic values based on actual zone activity
+//
+// For MVP scope: Acceptable as-is since the proxy passes statistics through
+// without modification. This limitation should be revisited when statistics
+// tracking becomes important for testing.
 func (s *Server) handleGetStatistics(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
