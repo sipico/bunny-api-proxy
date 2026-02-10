@@ -2,11 +2,19 @@ package storage
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"strings"
 	"testing"
 
 	_ "modernc.org/sqlite"
 )
+
+// hashToken creates a SHA256 hash of a token for storage.
+func hashToken(token string) string {
+	hash := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(hash[:])
+}
 
 // TestCreateToken verifies that CreateToken creates a token successfully.
 func TestCreateToken(t *testing.T) {
@@ -20,10 +28,7 @@ func TestCreateToken(t *testing.T) {
 	ctx := context.Background()
 
 	// Hash the key for storage
-	hash, err := HashKey("test-key-value")
-	if err != nil {
-		t.Fatalf("failed to hash key: %v", err)
-	}
+	hash := hashToken("test-key-value")
 
 	// Test 1: Create admin token successfully
 	token, err := s.CreateToken(ctx, "test-admin", true, hash)
@@ -66,10 +71,7 @@ func TestCreateTokenDuplicate(t *testing.T) {
 	ctx := context.Background()
 
 	// Create first token
-	hash, err := HashKey("test-key-123")
-	if err != nil {
-		t.Fatalf("failed to hash key: %v", err)
-	}
+	hash := hashToken("test-key-123")
 
 	_, err = s.CreateToken(ctx, "token-1", false, hash)
 	if err != nil {
@@ -110,10 +112,7 @@ func TestGetTokenByHash(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a token
-	hash, err := HashKey("my-secret-token-12345")
-	if err != nil {
-		t.Fatalf("failed to hash key: %v", err)
-	}
+	hash := hashToken("my-secret-token-12345")
 
 	createdToken, err := s.CreateToken(ctx, "test-token", true, hash)
 	if err != nil {
@@ -169,10 +168,7 @@ func TestGetTokenByID(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a token
-	hash, err := HashKey("test-key-abc")
-	if err != nil {
-		t.Fatalf("failed to hash key: %v", err)
-	}
+	hash := hashToken("test-key-abc")
 
 	createdToken, err := s.CreateToken(ctx, "test-token", false, hash)
 	if err != nil {
@@ -243,13 +239,13 @@ func TestListTokens(t *testing.T) {
 	}
 
 	// Test 2: Create tokens and list them
-	hash1, _ := HashKey("key1")
+	hash1, _ := hashToken("key1")
 	id1, err := s.CreateToken(ctx, "token-1", false, hash1)
 	if err != nil {
 		t.Fatalf("failed to create token 1: %v", err)
 	}
 
-	hash2, _ := HashKey("key2")
+	hash2, _ := hashToken("key2")
 	id2, err := s.CreateToken(ctx, "token-2", true, hash2)
 	if err != nil {
 		t.Fatalf("failed to create token 2: %v", err)
@@ -295,7 +291,7 @@ func TestDeleteToken(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a token
-	hash, _ := HashKey("test-key")
+	hash, _ := hashToken("test-key")
 	token, err := s.CreateToken(ctx, "test-token", false, hash)
 	if err != nil {
 		t.Fatalf("failed to create token: %v", err)
@@ -368,7 +364,7 @@ func TestHasAnyAdminToken(t *testing.T) {
 	}
 
 	// Test 2: Create a non-admin token
-	hash1, _ := HashKey("key1")
+	hash1, _ := hashToken("key1")
 	s.CreateToken(ctx, "non-admin", false, hash1)
 
 	hasAdmin, err = s.HasAnyAdminToken(ctx)
@@ -381,7 +377,7 @@ func TestHasAnyAdminToken(t *testing.T) {
 	}
 
 	// Test 3: Create an admin token
-	hash2, _ := HashKey("key2")
+	hash2, _ := hashToken("key2")
 	s.CreateToken(ctx, "admin", true, hash2)
 
 	hasAdmin, err = s.HasAnyAdminToken(ctx)
@@ -416,10 +412,10 @@ func TestCountAdminTokens(t *testing.T) {
 	}
 
 	// Test 2: Create multiple non-admin tokens
-	hash1, _ := HashKey("key1")
+	hash1, _ := hashToken("key1")
 	s.CreateToken(ctx, "token-1", false, hash1)
 
-	hash2, _ := HashKey("key2")
+	hash2, _ := hashToken("key2")
 	s.CreateToken(ctx, "token-2", false, hash2)
 
 	count, err = s.CountAdminTokens(ctx)
@@ -432,10 +428,10 @@ func TestCountAdminTokens(t *testing.T) {
 	}
 
 	// Test 3: Create admin tokens
-	hash3, _ := HashKey("key3")
+	hash3, _ := hashToken("key3")
 	s.CreateToken(ctx, "admin-1", true, hash3)
 
-	hash4, _ := HashKey("key4")
+	hash4, _ := hashToken("key4")
 	s.CreateToken(ctx, "admin-2", true, hash4)
 
 	count, err = s.CountAdminTokens(ctx)
@@ -460,7 +456,7 @@ func TestAddPermissionForToken(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a token
-	hash, _ := HashKey("test-key")
+	hash, _ := hashToken("test-key")
 	token, err := s.CreateToken(ctx, "test-token", false, hash)
 	if err != nil {
 		t.Fatalf("failed to create token: %v", err)
@@ -537,7 +533,7 @@ func TestRemovePermission(t *testing.T) {
 	ctx := context.Background()
 
 	// Create token and permission
-	hash, _ := HashKey("test-key")
+	hash, _ := hashToken("test-key")
 	token, _ := s.CreateToken(ctx, "test-token", false, hash)
 
 	perm := &Permission{
@@ -595,7 +591,7 @@ func TestGetPermissionsForToken(t *testing.T) {
 	ctx := context.Background()
 
 	// Create token
-	hash, _ := HashKey("test-key")
+	hash, _ := hashToken("test-key")
 	token, _ := s.CreateToken(ctx, "test-token", false, hash)
 
 	// Test 1: No permissions initially
@@ -672,10 +668,10 @@ func TestTokenWorkflow(t *testing.T) {
 	ctx := context.Background()
 
 	// 1. Create multiple tokens
-	hash1, _ := HashKey("acme-key-abc123")
+	hash1, _ := hashToken("acme-key-abc123")
 	token1, _ := s.CreateToken(ctx, "acme-dns", false, hash1)
 
-	hash2, _ := HashKey("admin-key-xyz789")
+	hash2, _ := hashToken("admin-key-xyz789")
 	token2, _ := s.CreateToken(ctx, "admin", true, hash2)
 
 	// 2. List all tokens
@@ -754,7 +750,7 @@ func TestTokenCascadeDelete(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a token with multiple permissions
-	hash, _ := HashKey("test-key")
+	hash, _ := hashToken("test-key")
 	token, _ := s.CreateToken(ctx, "test-token", false, hash)
 
 	perm1 := &Permission{
@@ -800,7 +796,7 @@ func TestCreateTokenWithCancelledContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	hash, _ := HashKey("test-key")
+	hash, _ := hashToken("test-key")
 	_, err = s.CreateToken(ctx, "test-token", false, hash)
 	if err == nil {
 		t.Errorf("expected error with cancelled context, got nil")
@@ -933,7 +929,7 @@ func TestAddPermissionInvalidZoneID(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a token
-	hash, _ := HashKey("test-key")
+	hash, _ := hashToken("test-key")
 	token, _ := s.CreateToken(ctx, "test-token", false, hash)
 
 	// Try to add permission with invalid ZoneID
@@ -965,7 +961,7 @@ func TestAddPermissionEmptyActions(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a token
-	hash, _ := HashKey("test-key")
+	hash, _ := hashToken("test-key")
 	token, _ := s.CreateToken(ctx, "test-token", false, hash)
 
 	// Try to add permission with empty AllowedActions
@@ -997,7 +993,7 @@ func TestAddPermissionEmptyRecordTypes(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a token
-	hash, _ := HashKey("test-key")
+	hash, _ := hashToken("test-key")
 	token, _ := s.CreateToken(ctx, "test-token", false, hash)
 
 	// Try to add permission with empty RecordTypes
@@ -1029,7 +1025,7 @@ func TestAddPermissionWithCancelledContext(t *testing.T) {
 
 	// Create a token in non-cancelled context first
 	ctx := context.Background()
-	hash, _ := HashKey("test-key")
+	hash, _ := hashToken("test-key")
 	token, _ := s.CreateToken(ctx, "test-token", false, hash)
 
 	// Then use cancelled context for AddPermission
@@ -1098,7 +1094,7 @@ func TestGetPermissionsEmptyList(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a token with no permissions
-	hash, _ := HashKey("test-key")
+	hash, _ := hashToken("test-key")
 	token, _ := s.CreateToken(ctx, "test-token", false, hash)
 
 	// Get permissions for token with no permissions
@@ -1129,10 +1125,10 @@ func TestRemovePermissionForToken(t *testing.T) {
 	ctx := context.Background()
 
 	// Create two tokens
-	hash1, _ := HashKey("test-key-1")
+	hash1, _ := hashToken("test-key-1")
 	token1, _ := s.CreateToken(ctx, "token-1", false, hash1)
 
-	hash2, _ := HashKey("test-key-2")
+	hash2, _ := hashToken("test-key-2")
 	token2, _ := s.CreateToken(ctx, "token-2", false, hash2)
 
 	// Add permissions to both tokens
@@ -1198,7 +1194,7 @@ func TestRemovePermissionForTokenNotFound(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a token
-	hash, _ := HashKey("test-key")
+	hash, _ := hashToken("test-key")
 	token, _ := s.CreateToken(ctx, "test-token", false, hash)
 
 	// Try to delete non-existent permission
