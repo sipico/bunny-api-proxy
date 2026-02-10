@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/sipico/bunny-api-proxy/internal/auth"
 	"github.com/sipico/bunny-api-proxy/internal/storage"
 	"github.com/sipico/bunny-api-proxy/internal/testutil/mockstore"
 )
@@ -619,11 +620,160 @@ func TestHandleWhoami(t *testing.T) {
 				}
 			},
 		},
+		{
+			name: "admin token",
+			setupCtx: func(ctx context.Context) context.Context {
+				token := &storage.Token{
+					ID:      42,
+					Name:    "test-admin-token",
+					IsAdmin: true,
+				}
+				ctx = auth.WithToken(ctx, token)
+				ctx = auth.WithAdmin(ctx, true)
+				return ctx
+			},
+			wantStatus: http.StatusOK,
+			checkResp: func(t *testing.T, resp WhoamiResponse) {
+				if resp.TokenID != 42 {
+					t.Errorf("TokenID = %d, want 42", resp.TokenID)
+				}
+				if resp.Name != "test-admin-token" {
+					t.Errorf("Name = %q, want %q", resp.Name, "test-admin-token")
+				}
+				if !resp.IsAdmin {
+					t.Error("IsAdmin = false, want true")
+				}
+				if resp.IsMasterKey {
+					t.Error("IsMasterKey = true, want false")
+				}
+			},
+		},
+		{
+			name: "scoped token with single permission",
+			setupCtx: func(ctx context.Context) context.Context {
+				token := &storage.Token{
+					ID:      123,
+					Name:    "test-scoped-token",
+					IsAdmin: false,
+				}
+				perms := []*storage.Permission{
+					{
+						ZoneID:         456,
+						AllowedActions: []string{"list_records", "add_record", "delete_record"},
+						RecordTypes:    []string{"TXT", "A"},
+					},
+				}
+				ctx = auth.WithToken(ctx, token)
+				ctx = auth.WithPermissions(ctx, perms)
+				return ctx
+			},
+			wantStatus: http.StatusOK,
+			checkResp: func(t *testing.T, resp WhoamiResponse) {
+				if resp.TokenID != 123 {
+					t.Errorf("TokenID = %d, want 123", resp.TokenID)
+				}
+				if resp.Name != "test-scoped-token" {
+					t.Errorf("Name = %q, want %q", resp.Name, "test-scoped-token")
+				}
+				if resp.IsAdmin {
+					t.Error("IsAdmin = true, want false")
+				}
+				if resp.IsMasterKey {
+					t.Error("IsMasterKey = true, want false")
+				}
+				if len(resp.Permissions) != 1 {
+					t.Fatalf("len(Permissions) = %d, want 1", len(resp.Permissions))
+				}
+				perm := resp.Permissions[0]
+				if perm.ZoneID != 456 {
+					t.Errorf("Permissions[0].ZoneID = %d, want 456", perm.ZoneID)
+				}
+				if len(perm.AllowedActions) != 3 {
+					t.Errorf("len(Permissions[0].AllowedActions) = %d, want 3", len(perm.AllowedActions))
+				}
+				if len(perm.RecordTypes) != 2 {
+					t.Errorf("len(Permissions[0].RecordTypes) = %d, want 2", len(perm.RecordTypes))
+				}
+			},
+		},
+		{
+			name: "scoped token with multiple permissions",
+			setupCtx: func(ctx context.Context) context.Context {
+				token := &storage.Token{
+					ID:      789,
+					Name:    "test-multi-scope-token",
+					IsAdmin: false,
+				}
+				perms := []*storage.Permission{
+					{
+						ZoneID:         100,
+						AllowedActions: []string{"list_records", "add_record"},
+						RecordTypes:    []string{"TXT"},
+					},
+					{
+						ZoneID:         200,
+						AllowedActions: []string{"list_records", "add_record", "delete_record", "edit_record"},
+						RecordTypes:    []string{"A", "AAAA", "CNAME"},
+					},
+				}
+				ctx = auth.WithToken(ctx, token)
+				ctx = auth.WithPermissions(ctx, perms)
+				return ctx
+			},
+			wantStatus: http.StatusOK,
+			checkResp: func(t *testing.T, resp WhoamiResponse) {
+				if resp.TokenID != 789 {
+					t.Errorf("TokenID = %d, want 789", resp.TokenID)
+				}
+				if resp.Name != "test-multi-scope-token" {
+					t.Errorf("Name = %q, want %q", resp.Name, "test-multi-scope-token")
+				}
+				if resp.IsAdmin {
+					t.Error("IsAdmin = true, want false")
+				}
+				if resp.IsMasterKey {
+					t.Error("IsMasterKey = true, want false")
+				}
+				if len(resp.Permissions) != 2 {
+					t.Fatalf("len(Permissions) = %d, want 2", len(resp.Permissions))
+				}
+				// Verify first permission
+				p0 := resp.Permissions[0]
+				if p0.ZoneID != 100 {
+					t.Errorf("Permissions[0].ZoneID = %d, want 100", p0.ZoneID)
+				}
+				if len(p0.AllowedActions) != 2 {
+					t.Errorf("len(Permissions[0].AllowedActions) = %d, want 2", len(p0.AllowedActions))
+				}
+				if len(p0.RecordTypes) != 1 {
+					t.Errorf("len(Permissions[0].RecordTypes) = %d, want 1", len(p0.RecordTypes))
+				}
+				// Verify second permission
+				p1 := resp.Permissions[1]
+				if p1.ZoneID != 200 {
+					t.Errorf("Permissions[1].ZoneID = %d, want 200", p1.ZoneID)
+				}
+				if len(p1.AllowedActions) != 4 {
+					t.Errorf("len(Permissions[1].AllowedActions) = %d, want 4", len(p1.AllowedActions))
+				}
+				if len(p1.RecordTypes) != 3 {
+					t.Errorf("len(Permissions[1].RecordTypes) = %d, want 3", len(p1.RecordTypes))
+				}
+			},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mock := newMockUnifiedStorage()
+
+			// Configure mock to return permissions from context
+			mock.getPermissionsForToken = func(ctx context.Context, tokenID int64) ([]*storage.Permission, error) {
+				// Return permissions from context if available
+				perms := auth.PermissionsFromContext(ctx)
+				return perms, nil
+			}
+
 			h := NewHandler(mock, new(slog.LevelVar), slog.Default())
 
 			req := httptest.NewRequest("GET", "/api/whoami", nil)
