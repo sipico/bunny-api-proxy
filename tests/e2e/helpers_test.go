@@ -143,6 +143,7 @@ func deleteTokenViaAdmin(t *testing.T, adminToken string, tokenID int64) {
 }
 
 // proxyRequest makes an authenticated HTTP request to the proxy with the given API key.
+// Callers are responsible for closing the response body when done.
 func proxyRequest(t *testing.T, method, path, apiKey string, body []byte) *http.Response {
 	t.Helper()
 
