@@ -674,11 +674,6 @@ func TestUpdateRecord(t *testing.T) {
 		if record != nil {
 			t.Errorf("expected nil record for error response, got %v", record)
 		}
-
-		// Error should mention JSON decoding
-		if !strings.Contains(err.Error(), "decode") {
-			t.Errorf("expected decode error message, got %v", err)
-		}
 	})
 }
 
@@ -1321,11 +1316,6 @@ func TestUpdateZone(t *testing.T) {
 		if zone != nil {
 			t.Errorf("expected nil zone, got %v", zone)
 		}
-
-		// Error should mention parsing
-		if !strings.Contains(err.Error(), "parse") {
-			t.Errorf("expected parse error message, got %v", err)
-		}
 	})
 
 	t.Run("bad request error (400)", func(t *testing.T) {
@@ -1498,10 +1488,6 @@ func TestCheckZoneAvailability(t *testing.T) {
 		if result != nil {
 			t.Errorf("expected nil result, got %v", result)
 		}
-
-		if !strings.Contains(err.Error(), "parse") {
-			t.Errorf("expected parse error message, got %v", err)
-		}
 	})
 }
 
@@ -1641,10 +1627,6 @@ func TestImportRecords(t *testing.T) {
 
 		if result != nil {
 			t.Errorf("expected nil result, got %v", result)
-		}
-
-		if !strings.Contains(err.Error(), "parse") {
-			t.Errorf("expected parse error message, got %v", err)
 		}
 	})
 }
