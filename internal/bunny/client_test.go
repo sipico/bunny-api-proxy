@@ -1659,6 +1659,7 @@ func TestExportRecords(t *testing.T) {
 		wantBody   string
 		wantErr    bool
 		wantErrMsg string
+		cancelCtx  bool
 	}{
 		{
 			name:   "successful export",
@@ -1705,8 +1706,9 @@ func TestExportRecords(t *testing.T) {
 			wantErrMsg: "bad request",
 		},
 		{
-			name:   "context canceled",
-			zoneID: 1,
+			name:      "context canceled",
+			zoneID:    1,
+			cancelCtx: true,
 			handler: func(w http.ResponseWriter, _ *http.Request) {
 				// Won't be reached because context is canceled
 				w.WriteHeader(http.StatusOK)
@@ -1725,7 +1727,7 @@ func TestExportRecords(t *testing.T) {
 			client := NewClient("test-key", WithBaseURL(ts.URL))
 
 			ctx := context.Background()
-			if tt.name == "context canceled" {
+			if tt.cancelCtx {
 				var cancel context.CancelFunc
 				ctx, cancel = context.WithCancel(ctx)
 				cancel()
@@ -1763,6 +1765,7 @@ func TestEnableDNSSEC(t *testing.T) {
 		handler    http.HandlerFunc
 		wantErr    bool
 		wantErrMsg string
+		cancelCtx  bool
 	}{
 		{
 			name:   "successful enable",
@@ -1808,8 +1811,9 @@ func TestEnableDNSSEC(t *testing.T) {
 			wantErrMsg: "bad request",
 		},
 		{
-			name:   "context canceled",
-			zoneID: 1,
+			name:      "context canceled",
+			zoneID:    1,
+			cancelCtx: true,
 			handler: func(w http.ResponseWriter, _ *http.Request) {
 				w.WriteHeader(http.StatusOK)
 			},
@@ -1827,7 +1831,7 @@ func TestEnableDNSSEC(t *testing.T) {
 			client := NewClient("test-key", WithBaseURL(ts.URL))
 
 			ctx := context.Background()
-			if tt.name == "context canceled" {
+			if tt.cancelCtx {
 				var cancel context.CancelFunc
 				ctx, cancel = context.WithCancel(ctx)
 				cancel()
@@ -1865,6 +1869,7 @@ func TestDisableDNSSEC(t *testing.T) {
 		handler    http.HandlerFunc
 		wantErr    bool
 		wantErrMsg string
+		cancelCtx  bool
 	}{
 		{
 			name:   "successful disable",
@@ -1900,8 +1905,9 @@ func TestDisableDNSSEC(t *testing.T) {
 			wantErrMsg: "unauthorized",
 		},
 		{
-			name:   "context canceled",
-			zoneID: 1,
+			name:      "context canceled",
+			zoneID:    1,
+			cancelCtx: true,
 			handler: func(w http.ResponseWriter, _ *http.Request) {
 				w.WriteHeader(http.StatusOK)
 			},
@@ -1919,7 +1925,7 @@ func TestDisableDNSSEC(t *testing.T) {
 			client := NewClient("test-key", WithBaseURL(ts.URL))
 
 			ctx := context.Background()
-			if tt.name == "context canceled" {
+			if tt.cancelCtx {
 				var cancel context.CancelFunc
 				ctx, cancel = context.WithCancel(ctx)
 				cancel()
@@ -1958,6 +1964,7 @@ func TestIssueCertificate(t *testing.T) {
 		handler    http.HandlerFunc
 		wantErr    bool
 		wantErrMsg string
+		cancelCtx  bool
 	}{
 		{
 			name:   "successful issue",
@@ -2008,9 +2015,10 @@ func TestIssueCertificate(t *testing.T) {
 			wantErrMsg: "invalid domain",
 		},
 		{
-			name:   "context canceled",
-			zoneID: 1,
-			domain: "*.test.com",
+			name:      "context canceled",
+			zoneID:    1,
+			domain:    "*.test.com",
+			cancelCtx: true,
 			handler: func(w http.ResponseWriter, _ *http.Request) {
 				w.WriteHeader(http.StatusOK)
 			},
@@ -2028,7 +2036,7 @@ func TestIssueCertificate(t *testing.T) {
 			client := NewClient("test-key", WithBaseURL(ts.URL))
 
 			ctx := context.Background()
-			if tt.name == "context canceled" {
+			if tt.cancelCtx {
 				var cancel context.CancelFunc
 				ctx, cancel = context.WithCancel(ctx)
 				cancel()
@@ -2064,6 +2072,7 @@ func TestGetZoneStatistics(t *testing.T) {
 		handler    http.HandlerFunc
 		wantErr    bool
 		wantErrMsg string
+		cancelCtx  bool
 	}{
 		{
 			name:     "successful request",
@@ -2119,8 +2128,9 @@ func TestGetZoneStatistics(t *testing.T) {
 			wantErrMsg: "unauthorized",
 		},
 		{
-			name:   "context canceled",
-			zoneID: 1,
+			name:      "context canceled",
+			zoneID:    1,
+			cancelCtx: true,
 			handler: func(w http.ResponseWriter, _ *http.Request) {
 				w.WriteHeader(http.StatusOK)
 			},
@@ -2138,7 +2148,7 @@ func TestGetZoneStatistics(t *testing.T) {
 			client := NewClient("test-key", WithBaseURL(ts.URL))
 
 			ctx := context.Background()
-			if tt.name == "context canceled" {
+			if tt.cancelCtx {
 				var cancel context.CancelFunc
 				ctx, cancel = context.WithCancel(ctx)
 				cancel()
@@ -2176,6 +2186,7 @@ func TestTriggerDNSScan(t *testing.T) {
 		handler    http.HandlerFunc
 		wantErr    bool
 		wantErrMsg string
+		cancelCtx  bool
 	}{
 		{
 			name:   "successful trigger",
@@ -2214,8 +2225,9 @@ func TestTriggerDNSScan(t *testing.T) {
 			wantErrMsg: "unauthorized",
 		},
 		{
-			name:   "context canceled",
-			domain: "test.com",
+			name:      "context canceled",
+			domain:    "test.com",
+			cancelCtx: true,
 			handler: func(w http.ResponseWriter, _ *http.Request) {
 				w.WriteHeader(http.StatusOK)
 			},
@@ -2233,7 +2245,7 @@ func TestTriggerDNSScan(t *testing.T) {
 			client := NewClient("test-key", WithBaseURL(ts.URL))
 
 			ctx := context.Background()
-			if tt.name == "context canceled" {
+			if tt.cancelCtx {
 				var cancel context.CancelFunc
 				ctx, cancel = context.WithCancel(ctx)
 				cancel()
@@ -2274,6 +2286,7 @@ func TestGetDNSScanResult(t *testing.T) {
 		handler    http.HandlerFunc
 		wantErr    bool
 		wantErrMsg string
+		cancelCtx  bool
 	}{
 		{
 			name:   "successful result",
@@ -2309,8 +2322,9 @@ func TestGetDNSScanResult(t *testing.T) {
 			wantErrMsg: "unauthorized",
 		},
 		{
-			name:   "context canceled",
-			zoneID: 1,
+			name:      "context canceled",
+			zoneID:    1,
+			cancelCtx: true,
 			handler: func(w http.ResponseWriter, _ *http.Request) {
 				w.WriteHeader(http.StatusOK)
 			},
@@ -2328,7 +2342,7 @@ func TestGetDNSScanResult(t *testing.T) {
 			client := NewClient("test-key", WithBaseURL(ts.URL))
 
 			ctx := context.Background()
-			if tt.name == "context canceled" {
+			if tt.cancelCtx {
 				var cancel context.CancelFunc
 				ctx, cancel = context.WithCancel(ctx)
 				cancel()
