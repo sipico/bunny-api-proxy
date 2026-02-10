@@ -1,10 +1,9 @@
-// Package storage provides SQLite-based persistence for scoped API keys and configuration.
+// Package storage provides SQLite-based persistence for tokens and permissions.
 //
 // It handles secure storage of:
 //   - Master bunny.net API key (encrypted with AES-256-GCM)
-//   - Scoped proxy API keys (hashed with bcrypt)
-//   - Permissions linking scoped keys to zones and operations
-//   - Admin API tokens (hashed with bcrypt)
+//   - Unified tokens (admin and scoped, hashed with SHA256)
+//   - Permissions linking tokens to zones and operations
 //
 // The Storage interface defines all CRUD operations. The SQLiteStorage implementation
 // uses sqlite3 with foreign key constraints enabled for data integrity.
@@ -18,7 +17,7 @@ import (
 // TokenStore defines the interface for token-related operations (admin and scoped tokens).
 // This interface is used by auth services to check token state without needing the full Storage interface.
 type TokenStore interface {
-	// CreateToken creates a new token (admin or scoped) with bcrypt hash.
+	// CreateToken creates a new token (admin or scoped) with the provided hash.
 	// Returns the new token and any error.
 	// Returns ErrDuplicate if a token with this hash already exists.
 	CreateToken(ctx context.Context, name string, isAdmin bool, keyHash string) (*Token, error)
@@ -49,24 +48,6 @@ type TokenStore interface {
 
 // Storage defines the interface for SQLite persistence operations.
 type Storage interface {
-	// Scoped key operations
-	CreateScopedKey(ctx context.Context, name string, key string) (int64, error)
-	GetScopedKeyByHash(ctx context.Context, keyHash string) (*ScopedKey, error)
-	GetScopedKey(ctx context.Context, id int64) (*ScopedKey, error)
-	ListScopedKeys(ctx context.Context) ([]*ScopedKey, error)
-	DeleteScopedKey(ctx context.Context, id int64) error
-
-	// Permission operations
-	AddPermission(ctx context.Context, scopedKeyID int64, perm *Permission) (int64, error)
-	GetPermissions(ctx context.Context, scopedKeyID int64) ([]*Permission, error)
-	DeletePermission(ctx context.Context, id int64) error
-
-	// AdminToken operations
-	CreateAdminToken(ctx context.Context, name, token string) (int64, error)
-	ValidateAdminToken(ctx context.Context, token string) (*AdminToken, error)
-	ListAdminTokens(ctx context.Context) ([]*AdminToken, error)
-	DeleteAdminToken(ctx context.Context, id int64) error
-
 	// Health checks
 	// Ping verifies database connectivity with a lightweight query.
 	// This is used by health check endpoints (/ready) to verify the database is accessible
@@ -78,4 +59,11 @@ type Storage interface {
 
 	// TokenStore is embedded to include all token-related operations
 	TokenStore
+
+	// Unified permission operations
+	AddPermissionForToken(ctx context.Context, tokenID int64, perm *Permission) (*Permission, error)
+	RemovePermission(ctx context.Context, permID int64) error
+	RemovePermissionForToken(ctx context.Context, tokenID, permID int64) error
+	GetPermissionsForToken(ctx context.Context, tokenID int64) ([]*Permission, error)
+	CountAdminTokens(ctx context.Context) (int, error)
 }

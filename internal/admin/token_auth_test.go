@@ -13,114 +13,6 @@ import (
 	"github.com/sipico/bunny-api-proxy/internal/testutil/mockstore"
 )
 
-// mockStorageWithToken extends mockstore.MockStorage with ValidateAdminToken
-type mockStorageWithToken struct {
-	*mockstore.MockStorage
-	validateToken  func(ctx context.Context, token string) (*storage.AdminToken, error)
-	getTokenByHash func(ctx context.Context, keyHash string) (*storage.Token, error)
-	listTokens     func(ctx context.Context) ([]*storage.Token, error)
-}
-
-func (m *mockStorageWithToken) ValidateAdminToken(ctx context.Context, token string) (*storage.AdminToken, error) {
-	if m.validateToken != nil {
-		return m.validateToken(ctx, token)
-	}
-	return nil, storage.ErrNotFound
-}
-
-func (m *mockStorageWithToken) CreateAdminToken(ctx context.Context, name, token string) (int64, error) {
-	return 0, nil
-}
-
-func (m *mockStorageWithToken) ListAdminTokens(ctx context.Context) ([]*storage.AdminToken, error) {
-	return make([]*storage.AdminToken, 0), nil
-}
-
-func (m *mockStorageWithToken) DeleteAdminToken(ctx context.Context, id int64) error {
-	return nil
-}
-
-func (m *mockStorageWithToken) ListScopedKeys(ctx context.Context) ([]*storage.ScopedKey, error) {
-	return make([]*storage.ScopedKey, 0), nil
-}
-
-func (m *mockStorageWithToken) GetScopedKey(ctx context.Context, id int64) (*storage.ScopedKey, error) {
-	return nil, storage.ErrNotFound
-}
-
-func (m *mockStorageWithToken) CreateScopedKey(ctx context.Context, name, apiKey string) (int64, error) {
-	return 0, nil
-}
-
-func (m *mockStorageWithToken) DeleteScopedKey(ctx context.Context, id int64) error {
-	return nil
-}
-
-func (m *mockStorageWithToken) GetPermissions(ctx context.Context, keyID int64) ([]*storage.Permission, error) {
-	return make([]*storage.Permission, 0), nil
-}
-
-func (m *mockStorageWithToken) AddPermission(ctx context.Context, scopedKeyID int64, perm *storage.Permission) (int64, error) {
-	return 0, nil
-}
-
-func (m *mockStorageWithToken) DeletePermission(ctx context.Context, id int64) error {
-	return nil
-}
-
-// Unified token operations (Issue 147)
-func (m *mockStorageWithToken) CreateToken(ctx context.Context, name string, isAdmin bool, keyHash string) (*storage.Token, error) {
-	return &storage.Token{ID: 1, Name: name, IsAdmin: isAdmin, KeyHash: keyHash}, nil
-}
-
-func (m *mockStorageWithToken) GetTokenByID(ctx context.Context, id int64) (*storage.Token, error) {
-	return nil, storage.ErrNotFound
-}
-
-func (m *mockStorageWithToken) ListTokens(ctx context.Context) ([]*storage.Token, error) {
-	if m.listTokens != nil {
-		return m.listTokens(ctx)
-	}
-	return make([]*storage.Token, 0), nil
-}
-
-func (m *mockStorageWithToken) DeleteToken(ctx context.Context, id int64) error {
-	return nil
-}
-
-func (m *mockStorageWithToken) CountAdminTokens(ctx context.Context) (int, error) {
-	return 1, nil
-}
-
-func (m *mockStorageWithToken) AddPermissionForToken(ctx context.Context, tokenID int64, perm *storage.Permission) (*storage.Permission, error) {
-	perm.ID = 1
-	perm.TokenID = tokenID
-	return perm, nil
-}
-
-func (m *mockStorageWithToken) RemovePermission(ctx context.Context, permID int64) error {
-	return nil
-}
-
-func (m *mockStorageWithToken) RemovePermissionForToken(ctx context.Context, tokenID, permID int64) error {
-	return nil
-}
-
-func (m *mockStorageWithToken) GetPermissionsForToken(ctx context.Context, tokenID int64) ([]*storage.Permission, error) {
-	return make([]*storage.Permission, 0), nil
-}
-
-func (m *mockStorageWithToken) HasAnyAdminToken(ctx context.Context) (bool, error) {
-	return false, nil
-}
-
-func (m *mockStorageWithToken) GetTokenByHash(ctx context.Context, keyHash string) (*storage.Token, error) {
-	if m.getTokenByHash != nil {
-		return m.getTokenByHash(ctx, keyHash)
-	}
-	return m.MockStorage.GetTokenByHash(ctx, keyHash)
-}
-
 func TestTokenAuthMiddleware(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -143,9 +35,7 @@ func TestTokenAuthMiddleware(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Setup mock storage
-			mock := &mockStorageWithToken{
-				MockStorage: &mockstore.MockStorage{},
-			}
+			mock := &mockstore.MockStorage{}
 
 			h := NewHandler(mock, new(slog.LevelVar), slog.Default())
 
@@ -179,9 +69,7 @@ func TestTokenAuthMiddlewareMasterKey(t *testing.T) {
 	t.Parallel()
 	t.Run("master key authentication", func(t *testing.T) {
 		// Setup mock storage
-		mock := &mockStorageWithToken{
-			MockStorage: &mockstore.MockStorage{},
-		}
+		mock := &mockstore.MockStorage{}
 
 		h := NewHandler(mock, new(slog.LevelVar), slog.Default())
 
@@ -260,14 +148,12 @@ func TestTokenAuthMiddlewareUnifiedToken(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Setup mock storage
-			mock := &mockStorageWithToken{
-				MockStorage: &mockstore.MockStorage{},
-				getTokenByHash: func(ctx context.Context, keyHash string) (*storage.Token, error) {
-					if len(tt.tokens) > 0 && keyHash == tt.tokens[0].KeyHash {
-						return tt.tokens[0], nil
-					}
-					return nil, storage.ErrNotFound
-				},
+			mock := &mockstore.MockStorage{GetTokenByHashFunc: func(ctx context.Context, keyHash string) (*storage.Token, error) {
+				if len(tt.tokens) > 0 && keyHash == tt.tokens[0].KeyHash {
+					return tt.tokens[0], nil
+				}
+				return nil, storage.ErrNotFound
+			},
 			}
 
 			h := NewHandler(mock, new(slog.LevelVar), slog.Default())
@@ -315,9 +201,7 @@ func TestTokenAuthMiddlewareUnifiedToken(t *testing.T) {
 func TestTokenAuthMiddlewareWhitespaceToken(t *testing.T) {
 	t.Parallel()
 	t.Run("token with only whitespace is rejected", func(t *testing.T) {
-		mock := &mockStorageWithToken{
-			MockStorage: &mockstore.MockStorage{},
-		}
+		mock := &mockstore.MockStorage{}
 
 		h := NewHandler(mock, new(slog.LevelVar), slog.Default())
 
@@ -346,11 +230,9 @@ func TestValidateUnifiedToken(t *testing.T) {
 	tokenHash := auth.HashToken(knownToken)
 
 	t.Run("returns error when GetTokenByHash fails", func(t *testing.T) {
-		mock := &mockStorageWithToken{
-			MockStorage: &mockstore.MockStorage{},
-			getTokenByHash: func(ctx context.Context, keyHash string) (*storage.Token, error) {
-				return nil, errors.New("database error")
-			},
+		mock := &mockstore.MockStorage{GetTokenByHashFunc: func(ctx context.Context, keyHash string) (*storage.Token, error) {
+			return nil, errors.New("database error")
+		},
 		}
 
 		h := NewHandler(mock, new(slog.LevelVar), slog.Default())
@@ -367,14 +249,12 @@ func TestValidateUnifiedToken(t *testing.T) {
 
 	t.Run("returns token when found", func(t *testing.T) {
 		expectedToken := &storage.Token{ID: 42, Name: "my-token", IsAdmin: true, KeyHash: tokenHash}
-		mock := &mockStorageWithToken{
-			MockStorage: &mockstore.MockStorage{},
-			getTokenByHash: func(ctx context.Context, keyHash string) (*storage.Token, error) {
-				if keyHash == tokenHash {
-					return expectedToken, nil
-				}
-				return nil, storage.ErrNotFound
-			},
+		mock := &mockstore.MockStorage{GetTokenByHashFunc: func(ctx context.Context, keyHash string) (*storage.Token, error) {
+			if keyHash == tokenHash {
+				return expectedToken, nil
+			}
+			return nil, storage.ErrNotFound
+		},
 		}
 
 		h := NewHandler(mock, new(slog.LevelVar), slog.Default())
@@ -392,11 +272,9 @@ func TestValidateUnifiedToken(t *testing.T) {
 	})
 
 	t.Run("returns ErrNotFound when token not found", func(t *testing.T) {
-		mock := &mockStorageWithToken{
-			MockStorage: &mockstore.MockStorage{},
-			getTokenByHash: func(ctx context.Context, keyHash string) (*storage.Token, error) {
-				return nil, storage.ErrNotFound
-			},
+		mock := &mockstore.MockStorage{GetTokenByHashFunc: func(ctx context.Context, keyHash string) (*storage.Token, error) {
+			return nil, storage.ErrNotFound
+		},
 		}
 
 		h := NewHandler(mock, new(slog.LevelVar), slog.Default())

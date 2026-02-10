@@ -27,38 +27,20 @@ type Handler struct {
 }
 
 // Storage interface for admin operations
-// Extended by later issues with additional methods
 type Storage interface {
 	// Health check
 	Ping(ctx context.Context) error
 	Close() error
 
-	// AdminToken operations (Issue 3)
-	ValidateAdminToken(ctx context.Context, token string) (*storage.AdminToken, error)
-
-	// AdminToken CRUD (Issue 4)
-	CreateAdminToken(ctx context.Context, name, token string) (int64, error)
-	ListAdminTokens(ctx context.Context) ([]*storage.AdminToken, error)
-	DeleteAdminToken(ctx context.Context, id int64) error
-
-	// Scoped key operations (Issue 91)
-	ListScopedKeys(ctx context.Context) ([]*storage.ScopedKey, error)
-	GetScopedKey(ctx context.Context, id int64) (*storage.ScopedKey, error)
-	CreateScopedKey(ctx context.Context, name, apiKey string) (int64, error)
-	DeleteScopedKey(ctx context.Context, id int64) error
-
-	// Permission operations (Issue 91)
-	GetPermissions(ctx context.Context, keyID int64) ([]*storage.Permission, error)
-	AddPermission(ctx context.Context, scopedKeyID int64, perm *storage.Permission) (int64, error)
-	DeletePermission(ctx context.Context, id int64) error
-
-	// Unified token operations (Issue 147)
+	// Unified token operations
 	CreateToken(ctx context.Context, name string, isAdmin bool, keyHash string) (*storage.Token, error)
 	GetTokenByID(ctx context.Context, id int64) (*storage.Token, error)
 	GetTokenByHash(ctx context.Context, keyHash string) (*storage.Token, error)
 	ListTokens(ctx context.Context) ([]*storage.Token, error)
 	DeleteToken(ctx context.Context, id int64) error
 	CountAdminTokens(ctx context.Context) (int, error)
+
+	// Unified permission operations
 	AddPermissionForToken(ctx context.Context, tokenID int64, perm *storage.Permission) (*storage.Permission, error)
 	RemovePermission(ctx context.Context, permID int64) error
 	RemovePermissionForToken(ctx context.Context, tokenID, permID int64) error

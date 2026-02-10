@@ -6,8 +6,6 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"io"
-
-	"golang.org/x/crypto/bcrypt"
 )
 
 // EncryptAPIKey encrypts an API key using AES-256-GCM.
@@ -73,15 +71,4 @@ func DecryptAPIKey(encrypted []byte, encryptionKey []byte) (string, error) {
 	}
 
 	return string(plaintext), nil
-}
-
-// HashKey creates a bcrypt hash of a key for storage.
-// Use this for scoped keys and admin tokens.
-func HashKey(key string) (string, error) {
-	// Use bcrypt cost 12
-	hash, err := bcrypt.GenerateFromPassword([]byte(key), 12)
-	if err != nil {
-		return "", err
-	}
-	return string(hash), nil
 }

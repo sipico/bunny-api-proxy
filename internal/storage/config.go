@@ -69,9 +69,3 @@ func (s *SQLiteStorage) Close() error {
 	}
 	return nil
 }
-
-// getDB returns the underlying database connection for testing purposes.
-// This method is intentionally unexported to discourage misuse outside of tests.
-func (s *SQLiteStorage) getDB() *sql.DB {
-	return s.db
-}

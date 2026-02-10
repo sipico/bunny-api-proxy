@@ -63,7 +63,8 @@ func TestIntegration_UpdateZone_AdminOnly(t *testing.T) {
 	bootstrapService := auth.NewBootstrapService(db, "master-key")
 
 	// Create admin token
-	_, err = db.CreateAdminToken(context.Background(), "Admin Key", "admin-test-key")
+	adminHash := hashTokenForTest("admin-test-key")
+	_, err = db.CreateToken(context.Background(), "Admin Key", true, adminHash)
 	if err != nil {
 		t.Fatalf("failed to create admin token: %v", err)
 	}
@@ -149,7 +150,8 @@ func TestIntegration_UpdateZone_Success(t *testing.T) {
 	bootstrapService := auth.NewBootstrapService(db, "master-key")
 
 	// Create admin token
-	_, err = db.CreateAdminToken(context.Background(), "Admin Key", "admin-test-key")
+	adminHash := hashTokenForTest("admin-test-key")
+	_, err = db.CreateToken(context.Background(), "Admin Key", true, adminHash)
 	if err != nil {
 		t.Fatalf("failed to create admin token: %v", err)
 	}
@@ -218,7 +220,8 @@ func TestIntegration_CheckAvailability_AdminOnly(t *testing.T) {
 
 	bootstrapService := auth.NewBootstrapService(db, "master-key")
 
-	_, err = db.CreateAdminToken(context.Background(), "Admin Key", "admin-test-key")
+	adminHash := hashTokenForTest("admin-test-key")
+	_, err = db.CreateToken(context.Background(), "Admin Key", true, adminHash)
 	if err != nil {
 		t.Fatalf("failed to create admin token: %v", err)
 	}
@@ -299,7 +302,8 @@ func TestIntegration_CheckAvailability_ExistingZone(t *testing.T) {
 
 	bootstrapService := auth.NewBootstrapService(db, "master-key")
 
-	_, err = db.CreateAdminToken(context.Background(), "Admin Key", "admin-test-key")
+	adminHash := hashTokenForTest("admin-test-key")
+	_, err = db.CreateToken(context.Background(), "Admin Key", true, adminHash)
 	if err != nil {
 		t.Fatalf("failed to create admin token: %v", err)
 	}
@@ -351,7 +355,8 @@ func TestIntegration_ImportRecords_AdminOnly(t *testing.T) {
 
 	bootstrapService := auth.NewBootstrapService(db, "master-key")
 
-	_, err = db.CreateAdminToken(context.Background(), "Admin Key", "admin-test-key")
+	adminHash := hashTokenForTest("admin-test-key")
+	_, err = db.CreateToken(context.Background(), "Admin Key", true, adminHash)
 	if err != nil {
 		t.Fatalf("failed to create admin token: %v", err)
 	}
@@ -429,7 +434,8 @@ func TestIntegration_ExportRecords_AdminOnly(t *testing.T) {
 	}
 
 	// Create admin token
-	_, err = db.CreateAdminToken(context.Background(), "admin-export", "admin-export-test-token")
+	adminHash := hashTokenForTest("admin-export-test-token")
+	_, err = db.CreateToken(context.Background(), "admin-export", true, adminHash)
 	if err != nil {
 		t.Fatalf("failed to create admin token: %v", err)
 	}
@@ -484,7 +490,8 @@ func TestIntegration_EnableDNSSEC_AdminOnly(t *testing.T) {
 		t.Fatalf("failed to create storage: %v", err)
 	}
 
-	_, err = db.CreateAdminToken(context.Background(), "admin-dnssec", "admin-dnssec-enable-token")
+	adminHash := hashTokenForTest("admin-dnssec-enable-token")
+	_, err = db.CreateToken(context.Background(), "admin-dnssec", true, adminHash)
 	if err != nil {
 		t.Fatalf("failed to create admin token: %v", err)
 	}
@@ -538,7 +545,8 @@ func TestIntegration_DisableDNSSEC_AdminOnly(t *testing.T) {
 		t.Fatalf("failed to create storage: %v", err)
 	}
 
-	_, err = db.CreateAdminToken(context.Background(), "admin-dnssec-d", "admin-dnssec-disable-token")
+	adminHash := hashTokenForTest("admin-dnssec-disable-token")
+	_, err = db.CreateToken(context.Background(), "admin-dnssec-d", true, adminHash)
 	if err != nil {
 		t.Fatalf("failed to create admin token: %v", err)
 	}
@@ -592,7 +600,8 @@ func TestIntegration_IssueCertificate_AdminOnly(t *testing.T) {
 		t.Fatalf("failed to create storage: %v", err)
 	}
 
-	_, err = db.CreateAdminToken(context.Background(), "admin-cert", "admin-cert-issue-token")
+	adminHash := hashTokenForTest("admin-cert-issue-token")
+	_, err = db.CreateToken(context.Background(), "admin-cert", true, adminHash)
 	if err != nil {
 		t.Fatalf("failed to create admin token: %v", err)
 	}
@@ -647,7 +656,8 @@ func TestIntegration_GetStatistics_AdminOnly(t *testing.T) {
 		t.Fatalf("failed to create storage: %v", err)
 	}
 
-	_, err = db.CreateAdminToken(context.Background(), "admin-stats", "admin-stats-token")
+	adminHash := hashTokenForTest("admin-stats-token")
+	_, err = db.CreateToken(context.Background(), "admin-stats", true, adminHash)
 	if err != nil {
 		t.Fatalf("failed to create admin token: %v", err)
 	}
