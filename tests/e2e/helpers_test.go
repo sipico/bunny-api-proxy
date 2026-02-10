@@ -21,6 +21,19 @@ func getEnv(key, fallback string) string {
 	return fallback
 }
 
+// requireEnv returns an environment variable or fails with a clear error message.
+// This is used for required configuration like PROXY_URL.
+func requireEnv(key string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	fmt.Fprintf(os.Stderr, "FATAL: required environment variable %s is not set\n", key)
+	fmt.Fprintf(os.Stderr, "Please set %s to the proxy URL (e.g., http://localhost:8080)\n", key)
+	fmt.Fprintf(os.Stderr, "This prevents accidental test failures due to port conflicts on commonly-used ports.\n")
+	os.Exit(1)
+	return "" // unreachable
+}
+
 // waitForService polls a URL until it's healthy or timeout is reached.
 func waitForService(url string, timeout time.Duration) error {
 	client := &http.Client{Timeout: 2 * time.Second}
