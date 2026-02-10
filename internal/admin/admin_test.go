@@ -73,49 +73,16 @@ func (m *mockStorageForAdminTest) Close() error {
 	return nil
 }
 
-func (m *mockStorageForAdminTest) ValidateAdminToken(ctx context.Context, token string) (*storage.AdminToken, error) {
-	return nil, nil
-}
 
-func (m *mockStorageForAdminTest) CreateAdminToken(ctx context.Context, name, token string) (int64, error) {
-	return 0, nil
-}
 
-func (m *mockStorageForAdminTest) ListAdminTokens(ctx context.Context) ([]*storage.AdminToken, error) {
-	return nil, nil
-}
 
-func (m *mockStorageForAdminTest) DeleteAdminToken(ctx context.Context, id int64) error {
-	return nil
-}
 
-func (m *mockStorageForAdminTest) ListScopedKeys(ctx context.Context) ([]*storage.ScopedKey, error) {
-	return nil, nil
-}
 
-func (m *mockStorageForAdminTest) GetScopedKey(ctx context.Context, id int64) (*storage.ScopedKey, error) {
-	return nil, nil
-}
 
-func (m *mockStorageForAdminTest) CreateScopedKey(ctx context.Context, name, apiKey string) (int64, error) {
-	return 0, nil
-}
 
-func (m *mockStorageForAdminTest) DeleteScopedKey(ctx context.Context, id int64) error {
-	return nil
-}
 
-func (m *mockStorageForAdminTest) GetPermissions(ctx context.Context, keyID int64) ([]*storage.Permission, error) {
-	return nil, nil
-}
 
-func (m *mockStorageForAdminTest) AddPermission(ctx context.Context, scopedKeyID int64, perm *storage.Permission) (int64, error) {
-	return 0, nil
-}
 
-func (m *mockStorageForAdminTest) DeletePermission(ctx context.Context, id int64) error {
-	return nil
-}
 
 // Unified token operations (Issue 147)
 func (m *mockStorageForAdminTest) CreateToken(ctx context.Context, name string, isAdmin bool, keyHash string) (*storage.Token, error) {

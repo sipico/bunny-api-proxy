@@ -21,52 +21,16 @@ type mockStorageWithToken struct {
 	listTokens     func(ctx context.Context) ([]*storage.Token, error)
 }
 
-func (m *mockStorageWithToken) ValidateAdminToken(ctx context.Context, token string) (*storage.AdminToken, error) {
-	if m.validateToken != nil {
-		return m.validateToken(ctx, token)
-	}
-	return nil, storage.ErrNotFound
-}
 
-func (m *mockStorageWithToken) CreateAdminToken(ctx context.Context, name, token string) (int64, error) {
-	return 0, nil
-}
 
-func (m *mockStorageWithToken) ListAdminTokens(ctx context.Context) ([]*storage.AdminToken, error) {
-	return make([]*storage.AdminToken, 0), nil
-}
 
-func (m *mockStorageWithToken) DeleteAdminToken(ctx context.Context, id int64) error {
-	return nil
-}
 
-func (m *mockStorageWithToken) ListScopedKeys(ctx context.Context) ([]*storage.ScopedKey, error) {
-	return make([]*storage.ScopedKey, 0), nil
-}
 
-func (m *mockStorageWithToken) GetScopedKey(ctx context.Context, id int64) (*storage.ScopedKey, error) {
-	return nil, storage.ErrNotFound
-}
 
-func (m *mockStorageWithToken) CreateScopedKey(ctx context.Context, name, apiKey string) (int64, error) {
-	return 0, nil
-}
 
-func (m *mockStorageWithToken) DeleteScopedKey(ctx context.Context, id int64) error {
-	return nil
-}
 
-func (m *mockStorageWithToken) GetPermissions(ctx context.Context, keyID int64) ([]*storage.Permission, error) {
-	return make([]*storage.Permission, 0), nil
-}
 
-func (m *mockStorageWithToken) AddPermission(ctx context.Context, scopedKeyID int64, perm *storage.Permission) (int64, error) {
-	return 0, nil
-}
 
-func (m *mockStorageWithToken) DeletePermission(ctx context.Context, id int64) error {
-	return nil
-}
 
 // Unified token operations (Issue 147)
 func (m *mockStorageWithToken) CreateToken(ctx context.Context, name string, isAdmin bool, keyHash string) (*storage.Token, error) {
