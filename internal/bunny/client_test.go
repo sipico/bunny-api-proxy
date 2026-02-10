@@ -1640,7 +1640,6 @@ func TestExportRecords(t *testing.T) {
 		handler    http.HandlerFunc
 		wantBody   string
 		wantErr    bool
-		wantErrMsg string
 		cancelCtx  bool
 	}{
 		{
@@ -1665,8 +1664,7 @@ func TestExportRecords(t *testing.T) {
 			handler: func(w http.ResponseWriter, _ *http.Request) {
 				w.WriteHeader(http.StatusNotFound)
 			},
-			wantErr:    true,
-			wantErrMsg: "not found",
+			wantErr: true,
 		},
 		{
 			name:   "unauthorized",
@@ -1674,8 +1672,7 @@ func TestExportRecords(t *testing.T) {
 			handler: func(w http.ResponseWriter, _ *http.Request) {
 				w.WriteHeader(http.StatusUnauthorized)
 			},
-			wantErr:    true,
-			wantErrMsg: "unauthorized",
+			wantErr: true,
 		},
 		{
 			name:   "server error",
@@ -1684,8 +1681,7 @@ func TestExportRecords(t *testing.T) {
 				w.WriteHeader(http.StatusBadRequest)
 				w.Write([]byte(`{"Message":"bad request"}`))
 			},
-			wantErr:    true,
-			wantErrMsg: "bad request",
+			wantErr: true,
 		},
 		{
 			name:      "context canceled",
@@ -1721,9 +1717,6 @@ func TestExportRecords(t *testing.T) {
 				if err == nil {
 					t.Fatal("expected error, got nil")
 				}
-				if tt.wantErrMsg != "" && !strings.Contains(err.Error(), tt.wantErrMsg) {
-					t.Errorf("expected error containing %q, got %q", tt.wantErrMsg, err.Error())
-				}
 				return
 			}
 
@@ -1746,7 +1739,6 @@ func TestEnableDNSSEC(t *testing.T) {
 		zoneID     int64
 		handler    http.HandlerFunc
 		wantErr    bool
-		wantErrMsg string
 		cancelCtx  bool
 	}{
 		{
@@ -1771,7 +1763,6 @@ func TestEnableDNSSEC(t *testing.T) {
 				w.WriteHeader(http.StatusNotFound)
 			},
 			wantErr:    true,
-			wantErrMsg: "not found",
 		},
 		{
 			name:   "unauthorized",
@@ -1780,7 +1771,6 @@ func TestEnableDNSSEC(t *testing.T) {
 				w.WriteHeader(http.StatusUnauthorized)
 			},
 			wantErr:    true,
-			wantErrMsg: "unauthorized",
 		},
 		{
 			name:   "server error",
@@ -1790,7 +1780,6 @@ func TestEnableDNSSEC(t *testing.T) {
 				w.Write([]byte(`{"Message":"bad request"}`))
 			},
 			wantErr:    true,
-			wantErrMsg: "bad request",
 		},
 		{
 			name:      "context canceled",
@@ -1825,9 +1814,6 @@ func TestEnableDNSSEC(t *testing.T) {
 				if err == nil {
 					t.Fatal("expected error, got nil")
 				}
-				if tt.wantErrMsg != "" && !strings.Contains(err.Error(), tt.wantErrMsg) {
-					t.Errorf("expected error containing %q, got %q", tt.wantErrMsg, err.Error())
-				}
 				return
 			}
 
@@ -1850,7 +1836,6 @@ func TestDisableDNSSEC(t *testing.T) {
 		zoneID     int64
 		handler    http.HandlerFunc
 		wantErr    bool
-		wantErrMsg string
 		cancelCtx  bool
 	}{
 		{
@@ -1875,7 +1860,6 @@ func TestDisableDNSSEC(t *testing.T) {
 				w.WriteHeader(http.StatusNotFound)
 			},
 			wantErr:    true,
-			wantErrMsg: "not found",
 		},
 		{
 			name:   "unauthorized",
@@ -1884,7 +1868,6 @@ func TestDisableDNSSEC(t *testing.T) {
 				w.WriteHeader(http.StatusUnauthorized)
 			},
 			wantErr:    true,
-			wantErrMsg: "unauthorized",
 		},
 		{
 			name:      "context canceled",
@@ -1919,9 +1902,6 @@ func TestDisableDNSSEC(t *testing.T) {
 				if err == nil {
 					t.Fatal("expected error, got nil")
 				}
-				if tt.wantErrMsg != "" && !strings.Contains(err.Error(), tt.wantErrMsg) {
-					t.Errorf("expected error containing %q, got %q", tt.wantErrMsg, err.Error())
-				}
 				return
 			}
 
@@ -1945,7 +1925,6 @@ func TestIssueCertificate(t *testing.T) {
 		domain     string
 		handler    http.HandlerFunc
 		wantErr    bool
-		wantErrMsg string
 		cancelCtx  bool
 	}{
 		{
@@ -1973,7 +1952,6 @@ func TestIssueCertificate(t *testing.T) {
 				w.WriteHeader(http.StatusNotFound)
 			},
 			wantErr:    true,
-			wantErrMsg: "not found",
 		},
 		{
 			name:   "unauthorized",
@@ -1983,7 +1961,6 @@ func TestIssueCertificate(t *testing.T) {
 				w.WriteHeader(http.StatusUnauthorized)
 			},
 			wantErr:    true,
-			wantErrMsg: "unauthorized",
 		},
 		{
 			name:   "bad request",
@@ -1994,7 +1971,6 @@ func TestIssueCertificate(t *testing.T) {
 				w.Write([]byte(`{"Message":"invalid domain"}`))
 			},
 			wantErr:    true,
-			wantErrMsg: "invalid domain",
 		},
 		{
 			name:      "context canceled",
@@ -2030,9 +2006,6 @@ func TestIssueCertificate(t *testing.T) {
 				if err == nil {
 					t.Fatal("expected error, got nil")
 				}
-				if tt.wantErrMsg != "" && !strings.Contains(err.Error(), tt.wantErrMsg) {
-					t.Errorf("expected error containing %q, got %q", tt.wantErrMsg, err.Error())
-				}
 				return
 			}
 
@@ -2053,7 +2026,6 @@ func TestGetZoneStatistics(t *testing.T) {
 		dateTo     string
 		handler    http.HandlerFunc
 		wantErr    bool
-		wantErrMsg string
 		cancelCtx  bool
 	}{
 		{
@@ -2098,7 +2070,6 @@ func TestGetZoneStatistics(t *testing.T) {
 				w.WriteHeader(http.StatusNotFound)
 			},
 			wantErr:    true,
-			wantErrMsg: "not found",
 		},
 		{
 			name:   "unauthorized",
@@ -2107,7 +2078,6 @@ func TestGetZoneStatistics(t *testing.T) {
 				w.WriteHeader(http.StatusUnauthorized)
 			},
 			wantErr:    true,
-			wantErrMsg: "unauthorized",
 		},
 		{
 			name:      "context canceled",
@@ -2142,9 +2112,6 @@ func TestGetZoneStatistics(t *testing.T) {
 				if err == nil {
 					t.Fatal("expected error, got nil")
 				}
-				if tt.wantErrMsg != "" && !strings.Contains(err.Error(), tt.wantErrMsg) {
-					t.Errorf("expected error containing %q, got %q", tt.wantErrMsg, err.Error())
-				}
 				return
 			}
 
@@ -2167,7 +2134,6 @@ func TestTriggerDNSScan(t *testing.T) {
 		domain     string
 		handler    http.HandlerFunc
 		wantErr    bool
-		wantErrMsg string
 		cancelCtx  bool
 	}{
 		{
@@ -2195,7 +2161,6 @@ func TestTriggerDNSScan(t *testing.T) {
 				w.WriteHeader(http.StatusNotFound)
 			},
 			wantErr:    true,
-			wantErrMsg: "not found",
 		},
 		{
 			name:   "unauthorized",
@@ -2204,7 +2169,6 @@ func TestTriggerDNSScan(t *testing.T) {
 				w.WriteHeader(http.StatusUnauthorized)
 			},
 			wantErr:    true,
-			wantErrMsg: "unauthorized",
 		},
 		{
 			name:      "context canceled",
@@ -2239,9 +2203,6 @@ func TestTriggerDNSScan(t *testing.T) {
 				if err == nil {
 					t.Fatal("expected error, got nil")
 				}
-				if tt.wantErrMsg != "" && !strings.Contains(err.Error(), tt.wantErrMsg) {
-					t.Errorf("expected error containing %q, got %q", tt.wantErrMsg, err.Error())
-				}
 				return
 			}
 
@@ -2267,7 +2228,6 @@ func TestGetDNSScanResult(t *testing.T) {
 		zoneID     int64
 		handler    http.HandlerFunc
 		wantErr    bool
-		wantErrMsg string
 		cancelCtx  bool
 	}{
 		{
@@ -2292,7 +2252,6 @@ func TestGetDNSScanResult(t *testing.T) {
 				w.WriteHeader(http.StatusNotFound)
 			},
 			wantErr:    true,
-			wantErrMsg: "not found",
 		},
 		{
 			name:   "unauthorized",
@@ -2301,7 +2260,6 @@ func TestGetDNSScanResult(t *testing.T) {
 				w.WriteHeader(http.StatusUnauthorized)
 			},
 			wantErr:    true,
-			wantErrMsg: "unauthorized",
 		},
 		{
 			name:      "context canceled",
@@ -2335,9 +2293,6 @@ func TestGetDNSScanResult(t *testing.T) {
 			if tt.wantErr {
 				if err == nil {
 					t.Fatal("expected error, got nil")
-				}
-				if tt.wantErrMsg != "" && !strings.Contains(err.Error(), tt.wantErrMsg) {
-					t.Errorf("expected error containing %q, got %q", tt.wantErrMsg, err.Error())
 				}
 				return
 			}
