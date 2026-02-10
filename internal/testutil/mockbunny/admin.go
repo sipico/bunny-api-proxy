@@ -115,7 +115,13 @@ func (s *Server) handleAdminState(w http.ResponseWriter, r *http.Request) {
 	s.state.mu.RLock()
 	zones := make([]Zone, 0, len(s.state.zones))
 	for _, z := range s.state.zones {
-		zones = append(zones, *z)
+		// Deep copy the zone including its Records slice
+		zoneCopy := *z
+		if z.Records != nil {
+			zoneCopy.Records = make([]Record, len(z.Records))
+			copy(zoneCopy.Records, z.Records)
+		}
+		zones = append(zones, zoneCopy)
 	}
 	nextZoneID := s.state.nextZoneID
 	nextRecordID := s.state.nextRecordID

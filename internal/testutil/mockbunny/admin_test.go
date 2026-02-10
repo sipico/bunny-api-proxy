@@ -750,3 +750,105 @@ func TestRecordDefaultsConsistency(t *testing.T) {
 		t.Errorf("AccelerationStatus mismatch: admin=%d, dns=%d", adminRecord.AccelerationStatus, dnsRecord.AccelerationStatus)
 	}
 }
+
+// TestAdminState_DeepCopyRecords verifies that the Records slice within each zone
+// in the /admin/state response is deeply copied, not shared with internal state.
+// This prevents test code from inadvertently corrupting the mock server's state.
+// Issue #320.
+func TestAdminState_DeepCopyRecords(t *testing.T) {
+	t.Parallel()
+	s := New()
+	defer s.Close()
+
+	// Create a zone with records through the HTTP endpoint
+	zoneBody := `{"domain": "test.com"}`
+	zoneResp, err := http.Post(s.URL()+"/admin/zones", "application/json", strings.NewReader(zoneBody))
+	if err != nil {
+		t.Fatalf("failed to create zone: %v", err)
+	}
+	defer zoneResp.Body.Close()
+
+	var zone Zone
+	if err := json.NewDecoder(zoneResp.Body).Decode(&zone); err != nil {
+		t.Fatalf("failed to decode zone: %v", err)
+	}
+	zoneID := zone.ID
+
+	// Add a record
+	recBody := `{"Type": 0, "Name": "test", "Value": "192.168.1.1", "Ttl": 300}`
+	recResp, err := http.Post(
+		fmt.Sprintf("%s/admin/zones/%d/records", s.URL(), zoneID),
+		"application/json",
+		strings.NewReader(recBody),
+	)
+	if err != nil {
+		t.Fatalf("failed to create record: %v", err)
+	}
+	defer recResp.Body.Close()
+
+	// Get the admin state
+	stateResp, err := http.Get(s.URL() + "/admin/state")
+	if err != nil {
+		t.Fatalf("failed to get admin state: %v", err)
+	}
+	defer stateResp.Body.Close()
+
+	var stateResp1 StateResponse
+	if err := json.NewDecoder(stateResp.Body).Decode(&stateResp1); err != nil {
+		t.Fatalf("failed to decode state response: %v", err)
+	}
+
+	// Verify we have 1 zone with 1 record
+	if len(stateResp1.Zones) != 1 || len(stateResp1.Zones[0].Records) != 1 {
+		t.Fatalf("expected 1 zone with 1 record, got %d zones with %d records",
+			len(stateResp1.Zones), len(stateResp1.Zones[0].Records))
+	}
+
+	// Now get a second state response to verify the data is independently copied
+	// (not sharing the same Records slice)
+	stateResp2Body, err := http.Get(s.URL() + "/admin/state")
+	if err != nil {
+		t.Fatalf("failed to get admin state again: %v", err)
+	}
+	defer stateResp2Body.Body.Close()
+
+	var stateResp2 StateResponse
+	if err := json.NewDecoder(stateResp2Body.Body).Decode(&stateResp2); err != nil {
+		t.Fatalf("failed to decode state response: %v", err)
+	}
+
+	// Modify an existing record in the first response (not append!)
+	// This tests if Records slices are truly independent
+	originalName := stateResp1.Zones[0].Records[0].Name
+	stateResp1.Zones[0].Records[0].Name = "MODIFIED_IN_RESP1"
+
+	// Verify the second response wasn't affected by modification to first
+	// With shallow copy, both would see "MODIFIED_IN_RESP1"
+	if stateResp2.Zones[0].Records[0].Name != originalName {
+		t.Errorf("second state response was affected by modification to first response: "+
+			"expected Name=%q, got %q (shallow copy detected)",
+			originalName, stateResp2.Zones[0].Records[0].Name)
+	}
+
+	// Get a third state response and verify the internal server state wasn't corrupted
+	stateResp3Body, err := http.Get(s.URL() + "/admin/state")
+	if err != nil {
+		t.Fatalf("failed to get admin state third time: %v", err)
+	}
+	defer stateResp3Body.Body.Close()
+
+	var stateResp3 StateResponse
+	if err := json.NewDecoder(stateResp3Body.Body).Decode(&stateResp3); err != nil {
+		t.Fatalf("failed to decode state response: %v", err)
+	}
+
+	// Internal state should still have only 1 record with original name
+	if len(stateResp3.Zones[0].Records) != 1 {
+		t.Errorf("internal server state was corrupted: expected 1 record, got %d",
+			len(stateResp3.Zones[0].Records))
+	}
+	if stateResp3.Zones[0].Records[0].Name != originalName {
+		t.Errorf("internal server state was corrupted: expected Name=%q, got %q",
+			originalName, stateResp3.Zones[0].Records[0].Name)
+	}
+}
