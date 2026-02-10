@@ -314,7 +314,7 @@ func TestHandleWhoami(t *testing.T) {
 			mock := newMockUnifiedStorage()
 
 			// Configure mock to return permissions from context
-			mock.getPermissionsForToken = func(ctx context.Context, tokenID int64) ([]*storage.Permission, error) {
+			mock.GetPermissionsForTokenFunc = func(ctx context.Context, tokenID int64) ([]*storage.Permission, error) {
 				// Return permissions from context if available
 				perms := auth.PermissionsFromContext(ctx)
 				return perms, nil
@@ -379,7 +379,7 @@ func TestHandleListUnifiedTokens(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mock := newMockUnifiedStorage()
-			mock.listUnifiedTokens = func(ctx context.Context) ([]*storage.Token, error) {
+			mock.ListTokensFunc = func(ctx context.Context) ([]*storage.Token, error) {
 				if tt.setupErr != nil {
 					return nil, tt.setupErr
 				}
@@ -525,13 +525,13 @@ func TestHandleCreateUnifiedToken(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mock := newMockUnifiedStorage()
-			mock.createUnifiedToken = func(ctx context.Context, name string, isAdmin bool, keyHash string) (*storage.Token, error) {
+			mock.CreateTokenFunc = func(ctx context.Context, name string, isAdmin bool, keyHash string) (*storage.Token, error) {
 				if tt.mockCreateErr != nil {
 					return nil, tt.mockCreateErr
 				}
 				return tt.mockToken, nil
 			}
-			mock.addPermissionForToken = func(ctx context.Context, tokenID int64, perm *storage.Permission) (*storage.Permission, error) {
+			mock.AddPermissionForTokenFunc = func(ctx context.Context, tokenID int64, perm *storage.Permission) (*storage.Permission, error) {
 				if tt.mockPermErr != nil {
 					return nil, tt.mockPermErr
 				}
@@ -539,7 +539,7 @@ func TestHandleCreateUnifiedToken(t *testing.T) {
 				perm.TokenID = tokenID
 				return perm, nil
 			}
-			mock.deleteUnifiedToken = func(ctx context.Context, id int64) error {
+			mock.DeleteTokenFunc = func(ctx context.Context, id int64) error {
 				return nil // Cleanup always succeeds
 			}
 
@@ -639,13 +639,13 @@ func TestHandleGetUnifiedToken(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mock := newMockUnifiedStorage()
-			mock.getTokenByID = func(ctx context.Context, id int64) (*storage.Token, error) {
+			mock.GetTokenByIDFunc = func(ctx context.Context, id int64) (*storage.Token, error) {
 				if tt.mockErr != nil {
 					return nil, tt.mockErr
 				}
 				return tt.mockToken, nil
 			}
-			mock.getPermissionsForToken = func(ctx context.Context, tokenID int64) ([]*storage.Permission, error) {
+			mock.GetPermissionsForTokenFunc = func(ctx context.Context, tokenID int64) ([]*storage.Permission, error) {
 				if tt.mockPermErr != nil {
 					return nil, tt.mockPermErr
 				}
@@ -747,16 +747,16 @@ func TestHandleDeleteUnifiedToken(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mock := newMockUnifiedStorage()
-			mock.getTokenByID = func(ctx context.Context, id int64) (*storage.Token, error) {
+			mock.GetTokenByIDFunc = func(ctx context.Context, id int64) (*storage.Token, error) {
 				if tt.mockGetErr != nil {
 					return nil, tt.mockGetErr
 				}
 				return tt.mockToken, nil
 			}
-			mock.deleteUnifiedToken = func(ctx context.Context, id int64) error {
+			mock.DeleteTokenFunc = func(ctx context.Context, id int64) error {
 				return tt.mockDelErr
 			}
-			mock.countAdminTokens = func(ctx context.Context) (int, error) {
+			mock.CountAdminTokensFunc = func(ctx context.Context) (int, error) {
 				if tt.countErr != nil {
 					return 0, tt.countErr
 				}
@@ -889,13 +889,13 @@ func TestHandleAddTokenPermission(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mock := newMockUnifiedStorage()
-			mock.getTokenByID = func(ctx context.Context, id int64) (*storage.Token, error) {
+			mock.GetTokenByIDFunc = func(ctx context.Context, id int64) (*storage.Token, error) {
 				if tt.mockGetErr != nil {
 					return nil, tt.mockGetErr
 				}
 				return tt.mockToken, nil
 			}
-			mock.addPermissionForToken = func(ctx context.Context, tokenID int64, perm *storage.Permission) (*storage.Permission, error) {
+			mock.AddPermissionForTokenFunc = func(ctx context.Context, tokenID int64, perm *storage.Permission) (*storage.Permission, error) {
 				if tt.mockAddErr != nil {
 					return nil, tt.mockAddErr
 				}
@@ -994,7 +994,7 @@ func TestHandleDeleteTokenPermission(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mock := newMockUnifiedStorage()
-			mock.getTokenByID = func(ctx context.Context, id int64) (*storage.Token, error) {
+			mock.GetTokenByIDFunc = func(ctx context.Context, id int64) (*storage.Token, error) {
 				if tt.mockGetErr != nil {
 					return nil, tt.mockGetErr
 				}
@@ -1034,7 +1034,7 @@ func TestHandleDeleteTokenPermissionIDOR(t *testing.T) {
 	// Token 2 owns permission 2
 	tokenIDToOwningTokenID := map[int64]int64{1: 1, 2: 2}
 
-	mock.getTokenByID = func(ctx context.Context, id int64) (*storage.Token, error) {
+	mock.GetTokenByIDFunc = func(ctx context.Context, id int64) (*storage.Token, error) {
 		// Both tokens exist
 		if id == 1 || id == 2 {
 			return &storage.Token{ID: id, Name: "token-" + fmt.Sprintf("%d", id), IsAdmin: false}, nil
