@@ -13,59 +13,6 @@ import (
 	"github.com/sipico/bunny-api-proxy/internal/testutil/mockstore"
 )
 
-// Unified token operations (Issue 147)
-func (m *mockStorageWithToken) CreateToken(ctx context.Context, name string, isAdmin bool, keyHash string) (*storage.Token, error) {
-	return &storage.Token{ID: 1, Name: name, IsAdmin: isAdmin, KeyHash: keyHash}, nil
-}
-
-func (m *mockStorageWithToken) GetTokenByID(ctx context.Context, id int64) (*storage.Token, error) {
-	return nil, storage.ErrNotFound
-}
-
-func (m *mockStorageWithToken) ListTokens(ctx context.Context) ([]*storage.Token, error) {
-	if m.listTokens != nil {
-		return m.listTokens(ctx)
-	}
-	return make([]*storage.Token, 0), nil
-}
-
-func (m *mockStorageWithToken) DeleteToken(ctx context.Context, id int64) error {
-	return nil
-}
-
-func (m *mockStorageWithToken) CountAdminTokens(ctx context.Context) (int, error) {
-	return 1, nil
-}
-
-func (m *mockStorageWithToken) AddPermissionForToken(ctx context.Context, tokenID int64, perm *storage.Permission) (*storage.Permission, error) {
-	perm.ID = 1
-	perm.TokenID = tokenID
-	return perm, nil
-}
-
-func (m *mockStorageWithToken) RemovePermission(ctx context.Context, permID int64) error {
-	return nil
-}
-
-func (m *mockStorageWithToken) RemovePermissionForToken(ctx context.Context, tokenID, permID int64) error {
-	return nil
-}
-
-func (m *mockStorageWithToken) GetPermissionsForToken(ctx context.Context, tokenID int64) ([]*storage.Permission, error) {
-	return make([]*storage.Permission, 0), nil
-}
-
-func (m *mockStorageWithToken) HasAnyAdminToken(ctx context.Context) (bool, error) {
-	return false, nil
-}
-
-func (m *mockStorageWithToken) GetTokenByHash(ctx context.Context, keyHash string) (*storage.Token, error) {
-	if m.getTokenByHash != nil {
-		return m.getTokenByHash(ctx, keyHash)
-	}
-	return m.MockStorage.GetTokenByHash(ctx, keyHash)
-}
-
 func TestTokenAuthMiddleware(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -124,9 +71,7 @@ func TestTokenAuthMiddlewareMasterKey(t *testing.T) {
 	t.Parallel()
 	t.Run("master key authentication", func(t *testing.T) {
 		// Setup mock storage
-		mock := &mockStorageWithToken{
-			MockStorage: &mockstore.MockStorage{},
-		}
+		mock := &mockstore.MockStorage{}
 
 		h := NewHandler(mock, new(slog.LevelVar), slog.Default())
 
@@ -260,9 +205,7 @@ func TestTokenAuthMiddlewareUnifiedToken(t *testing.T) {
 func TestTokenAuthMiddlewareWhitespaceToken(t *testing.T) {
 	t.Parallel()
 	t.Run("token with only whitespace is rejected", func(t *testing.T) {
-		mock := &mockStorageWithToken{
-			MockStorage: &mockstore.MockStorage{},
-		}
+		mock := &mockstore.MockStorage{}
 
 		h := NewHandler(mock, new(slog.LevelVar), slog.Default())
 
