@@ -2,19 +2,12 @@ package admin
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"strings"
 
 	"github.com/sipico/bunny-api-proxy/internal/auth"
 	"github.com/sipico/bunny-api-proxy/internal/storage"
 )
-
-// TokenInfo contains validated admin token information
-type TokenInfo struct {
-	ID   int64
-	Name string
-}
 
 // TokenAuthMiddleware validates AccessKey tokens for admin API
 // It accepts:
@@ -68,29 +61,9 @@ func (h *Handler) TokenAuthMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		// Validate token against legacy admin tokens
-		adminToken, err := h.storage.ValidateAdminToken(ctx, token)
-		if err != nil {
-			if errors.Is(err, storage.ErrNotFound) {
-				h.logger.Warn("invalid admin token attempt", "remote_addr", r.RemoteAddr)
-				http.Error(w, "Invalid token", http.StatusUnauthorized)
-				return
-			}
-			h.logger.Error("token validation error", "error", err)
-			http.Error(w, "Internal error", http.StatusInternalServerError)
-			return
-		}
-
-		// Add token info to context (legacy format)
-		tokenInfo := &TokenInfo{
-			ID:   adminToken.ID,
-			Name: adminToken.Name,
-		}
-		ctx = WithTokenInfo(ctx, tokenInfo)
-		ctx = auth.WithAdmin(ctx, true) // Legacy admin tokens are always admin
-
-		h.logger.Debug("admin API request via legacy token", "token_name", tokenInfo.Name)
-		next.ServeHTTP(w, r.WithContext(ctx))
+		// No valid token found
+		h.logger.Warn("invalid admin token attempt", "remote_addr", r.RemoteAddr)
+		http.Error(w, "Invalid token", http.StatusUnauthorized)
 	})
 }
 
@@ -99,20 +72,4 @@ func (h *Handler) TokenAuthMiddleware(next http.Handler) http.Handler {
 func (h *Handler) validateUnifiedToken(ctx context.Context, token string) (*storage.Token, error) {
 	keyHash := auth.HashToken(token)
 	return h.storage.GetTokenByHash(ctx, keyHash)
-}
-
-// GetTokenInfoFromContext retrieves token info from context
-// Returns nil if not found
-func GetTokenInfoFromContext(ctx context.Context) *TokenInfo {
-	info, ok := GetTokenInfo(ctx)
-	if !ok {
-		return nil
-	}
-
-	tokenInfo, ok := info.(*TokenInfo)
-	if !ok {
-		return nil
-	}
-
-	return tokenInfo
 }

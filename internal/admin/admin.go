@@ -86,22 +86,3 @@ func NewHandler(storage Storage, logLevel *slog.LevelVar, logger *slog.Logger) *
 func (h *Handler) SetBootstrapService(bs *auth.BootstrapService) {
 	h.bootstrap = bs
 }
-
-// Context helpers (used by later issues)
-
-type contextKey string
-
-const (
-	tokenInfoKey contextKey = "tokenInfo"
-)
-
-// WithTokenInfo attaches token info to context
-func WithTokenInfo(ctx context.Context, info any) context.Context {
-	return context.WithValue(ctx, tokenInfoKey, info)
-}
-
-// GetTokenInfo retrieves token info from context
-func GetTokenInfo(ctx context.Context) (any, bool) {
-	info := ctx.Value(tokenInfoKey)
-	return info, info != nil
-}

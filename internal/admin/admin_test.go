@@ -159,37 +159,3 @@ func (m *mockStorageForAdminTest) GetPermissionsForToken(ctx context.Context, to
 func (m *mockStorageForAdminTest) GetTokenByHash(ctx context.Context, keyHash string) (*storage.Token, error) {
 	return nil, storage.ErrNotFound
 }
-
-// TestContextHelpers tests the context helper functions
-func TestContextHelpers(t *testing.T) {
-	t.Parallel()
-	t.Run("WithTokenInfo and GetTokenInfo", func(t *testing.T) {
-		ctx := context.Background()
-		info := map[string]string{"token": "test-token"}
-
-		ctx = WithTokenInfo(ctx, info)
-		retrieved, ok := GetTokenInfo(ctx)
-
-		if !ok {
-			t.Error("expected to find token info in context")
-		}
-
-		retrievedMap, ok := retrieved.(map[string]string)
-		if !ok {
-			t.Error("expected retrieved info to be map[string]string")
-		}
-
-		if retrievedMap["token"] != "test-token" {
-			t.Errorf("expected token 'test-token', got %q", retrievedMap["token"])
-		}
-	})
-
-	t.Run("GetTokenInfo with no token", func(t *testing.T) {
-		ctx := context.Background()
-		_, ok := GetTokenInfo(ctx)
-
-		if ok {
-			t.Error("expected not to find token info in context")
-		}
-	})
-}
