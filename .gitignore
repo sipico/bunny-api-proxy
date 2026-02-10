@@ -44,3 +44,6 @@ Thumbs.db
 # Build artifacts
 dist/
 build/
+
+# Worktree directories
+bunny-*/
