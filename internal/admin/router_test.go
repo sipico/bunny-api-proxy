@@ -28,9 +28,7 @@ func TestAdminEndpointsRequireAdminToken(t *testing.T) {
 	scopedTokenHash := auth.HashToken(scopedTokenSecret)
 
 	// Mock storage that returns both admin and scoped tokens
-	mock := &mockstore.MockStorage{
-		MockStorage: &mockstore.MockStorage{},
-		getTokenByHash: func(ctx context.Context, keyHash string) (*storage.Token, error) {
+	mock := &mockstore.MockStorage{		GetTokenByHashFunc: func(ctx context.Context, keyHash string) (*storage.Token, error) {
 			switch keyHash {
 			case adminTokenHash:
 				return &storage.Token{
@@ -50,7 +48,7 @@ func TestAdminEndpointsRequireAdminToken(t *testing.T) {
 				return nil, storage.ErrNotFound
 			}
 		},
-		listTokens: func(ctx context.Context) ([]*storage.Token, error) {
+		ListTokensFunc: func(ctx context.Context) ([]*storage.Token, error) {
 			// Return some dummy tokens for listing endpoint
 			return []*storage.Token{
 				{ID: 1, Name: "admin-token", IsAdmin: true, KeyHash: adminTokenHash},
@@ -211,9 +209,7 @@ func TestWhoamiEndpointAvailableToAllTokens(t *testing.T) {
 	scopedTokenSecret := "scoped-token-secret-67890"
 	scopedTokenHash := auth.HashToken(scopedTokenSecret)
 
-	mock := &mockstore.MockStorage{
-		MockStorage: &mockstore.MockStorage{},
-		getTokenByHash: func(ctx context.Context, keyHash string) (*storage.Token, error) {
+	mock := &mockstore.MockStorage{		GetTokenByHashFunc: func(ctx context.Context, keyHash string) (*storage.Token, error) {
 			switch keyHash {
 			case adminTokenHash:
 				return &storage.Token{
