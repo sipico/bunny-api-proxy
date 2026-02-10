@@ -19,48 +19,6 @@ import (
 	"github.com/sipico/bunny-api-proxy/internal/testutil/mockstore"
 )
 
-// Unified token operations (Issue 147) - base implementations
-func (m *mockStorageWithTokenCRUD) CreateToken(ctx context.Context, name string, isAdmin bool, keyHash string) (*storage.Token, error) {
-	return &storage.Token{ID: 1, Name: name, IsAdmin: isAdmin, KeyHash: keyHash}, nil
-}
-
-func (m *mockStorageWithTokenCRUD) GetTokenByID(ctx context.Context, id int64) (*storage.Token, error) {
-	return nil, storage.ErrNotFound
-}
-
-func (m *mockStorageWithTokenCRUD) ListTokens(ctx context.Context) ([]*storage.Token, error) {
-	return make([]*storage.Token, 0), nil
-}
-
-func (m *mockStorageWithTokenCRUD) DeleteToken(ctx context.Context, id int64) error {
-	return nil
-}
-
-func (m *mockStorageWithTokenCRUD) CountAdminTokens(ctx context.Context) (int, error) {
-	return 1, nil
-}
-
-func (m *mockStorageWithTokenCRUD) AddPermissionForToken(ctx context.Context, tokenID int64, perm *storage.Permission) (*storage.Permission, error) {
-	perm.ID = 1
-	perm.TokenID = tokenID
-	return perm, nil
-}
-
-func (m *mockStorageWithTokenCRUD) RemovePermission(ctx context.Context, permID int64) error {
-	return nil
-}
-
-func (m *mockStorageWithTokenCRUD) RemovePermissionForToken(ctx context.Context, tokenID, permID int64) error {
-	return nil
-}
-
-func (m *mockStorageWithTokenCRUD) GetPermissionsForToken(ctx context.Context, tokenID int64) ([]*storage.Permission, error) {
-	return make([]*storage.Permission, 0), nil
-}
-
-func (m *mockStorageWithTokenCRUD) GetTokenByHash(ctx context.Context, keyHash string) (*storage.Token, error) {
-	return nil, storage.ErrNotFound
-}
 func TestHandleSetLogLevel(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -115,7 +73,7 @@ func TestHandleSetLogLevel(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			logLevel := new(slog.LevelVar)
-			mock := &mockStorageWithTokenCRUD{MockStorage: &mockstore.MockStorage{}}
+			mock := &mockstore.MockStorage{}
 			h := NewHandler(mock, logLevel, slog.Default())
 
 			// Encode body
@@ -180,22 +138,6 @@ func TestGenerateRandomKey(t *testing.T) {
 // =============================================================================
 // Unified Token API Tests (Issue 147)
 // =============================================================================
-
-// mockUnifiedStorage implements Storage interface for unified token tests
-type mockUnifiedStorage struct {
-	*mockStorageWithTokenCRUD
-
-	// Unified token operations
-	createUnifiedToken       func(ctx context.Context, name string, isAdmin bool, keyHash string) (*storage.Token, error)
-	getTokenByID             func(ctx context.Context, id int64) (*storage.Token, error)
-	listUnifiedTokens        func(ctx context.Context) ([]*storage.Token, error)
-	deleteUnifiedToken       func(ctx context.Context, id int64) error
-	countAdminTokens         func(ctx context.Context) (int, error)
-	addPermissionForToken    func(ctx context.Context, tokenID int64, perm *storage.Permission) (*storage.Permission, error)
-	removePermission         func(ctx context.Context, permID int64) error
-	removePermissionForToken func(ctx context.Context, tokenID, permID int64) error
-	getPermissionsForToken   func(ctx context.Context, tokenID int64) ([]*storage.Permission, error)
-}
 
 func (m *mockUnifiedStorage) CreateToken(ctx context.Context, name string, isAdmin bool, keyHash string) (*storage.Token, error) {
 	if m.createUnifiedToken != nil {
@@ -262,12 +204,8 @@ func (m *mockUnifiedStorage) GetPermissionsForToken(ctx context.Context, tokenID
 	return make([]*storage.Permission, 0), nil
 }
 
-func newMockUnifiedStorage() *mockUnifiedStorage {
-	return &mockUnifiedStorage{
-		mockStorageWithTokenCRUD: &mockStorageWithTokenCRUD{
-			MockStorage: &mockstore.MockStorage{},
-		},
-	}
+func newMockUnifiedStorage() *mockstore.MockStorage {
+	return &mockstore.MockStorage{}
 }
 
 func TestHandleWhoami(t *testing.T) {
