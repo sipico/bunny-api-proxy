@@ -817,19 +817,17 @@ func TestAdminState_DeepCopyRecords(t *testing.T) {
 		t.Fatalf("failed to decode state response: %v", err)
 	}
 
-	// Append a new record to the first response's Records slice
-	stateResp1.Zones[0].Records = append(stateResp1.Zones[0].Records, Record{
-		ID:    999,
-		Type:  0,
-		Name:  "added_to_resp1",
-		Value: "192.168.1.99",
-	})
+	// Modify an existing record in the first response (not append!)
+	// This tests if Records slices are truly independent
+	originalName := stateResp1.Zones[0].Records[0].Name
+	stateResp1.Zones[0].Records[0].Name = "MODIFIED_IN_RESP1"
 
-	// Verify the second response still has only 1 record
-	// This would fail with shallow copies if the Records slices pointed to the same array
-	if len(stateResp2.Zones[0].Records) != 1 {
-		t.Errorf("second state response was affected by modification to first response: expected 1 record, got %d",
-			len(stateResp2.Zones[0].Records))
+	// Verify the second response wasn't affected by modification to first
+	// With shallow copy, both would see "MODIFIED_IN_RESP1"
+	if stateResp2.Zones[0].Records[0].Name != originalName {
+		t.Errorf("second state response was affected by modification to first response: "+
+			"expected Name=%q, got %q (shallow copy detected)",
+			originalName, stateResp2.Zones[0].Records[0].Name)
 	}
 
 	// Get a third state response and verify the internal server state wasn't corrupted
@@ -844,9 +842,13 @@ func TestAdminState_DeepCopyRecords(t *testing.T) {
 		t.Fatalf("failed to decode state response: %v", err)
 	}
 
-	// Internal state should still have only 1 record
+	// Internal state should still have only 1 record with original name
 	if len(stateResp3.Zones[0].Records) != 1 {
 		t.Errorf("internal server state was corrupted: expected 1 record, got %d",
 			len(stateResp3.Zones[0].Records))
+	}
+	if stateResp3.Zones[0].Records[0].Name != originalName {
+		t.Errorf("internal server state was corrupted: expected Name=%q, got %q",
+			originalName, stateResp3.Zones[0].Records[0].Name)
 	}
 }
