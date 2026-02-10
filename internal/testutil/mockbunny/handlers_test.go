@@ -2164,6 +2164,34 @@ func TestHandleIssueCertificate_Success(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("expected status %d, got %d", http.StatusOK, resp.StatusCode)
 	}
+
+	// Verify response body contains certificate data
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("failed to read response body: %v", err)
+	}
+
+	if len(respBody) == 0 {
+		t.Errorf("expected non-empty response body, got empty")
+	}
+
+	var certResp struct {
+		Status      int    `json:"Status"`
+		Message     string `json:"Message"`
+		Certificate string `json:"Certificate"`
+		DateCreated string `json:"DateCreated"`
+		DateExpires string `json:"DateExpires"`
+		ThumbPrint  string `json:"ThumbPrint"`
+		CN          string `json:"CN"`
+	}
+	if err := json.Unmarshal(respBody, &certResp); err != nil {
+		t.Errorf("expected valid JSON response, got error: %v", err)
+	}
+
+	// Verify essential certificate fields are present
+	if certResp.Status == 0 && certResp.DateCreated == "" {
+		t.Errorf("expected certificate response with status and date fields")
+	}
 }
 
 func TestHandleIssueCertificate_ZoneNotFound(t *testing.T) {

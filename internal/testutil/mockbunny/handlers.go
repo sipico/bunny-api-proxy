@@ -767,11 +767,26 @@ func (s *Server) handleDisableDNSSEC(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleIssueCertificate handles POST /dnszone/{id}/certificate/issue.
+// NOTE: This is a stub implementation. It returns a mock certificate response with
+// realistic certificate fields (CN, ThumbPrint, DateCreated, DateExpires) but does
+// not actually generate or validate certificates. The Certificate field contains
+// placeholder data. For MVP, this stub behavior is sufficient as certificate
+// management is pass-through; when certificate tracking becomes critical, this
+// should be enhanced to track issued certificates and return real certificate data.
 func (s *Server) handleIssueCertificate(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
 		http.Error(w, "invalid zone ID", http.StatusBadRequest)
+		return
+	}
+
+	// Parse request body to extract domain
+	var req struct {
+		Domain string `json:"Domain"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
 
@@ -785,11 +800,21 @@ func (s *Server) handleIssueCertificate(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Read and discard body
-	//nolint:errcheck
-	io.ReadAll(r.Body)
+	// Return mock certificate response with realistic fields
+	now := time.Now().UTC()
+	expiry := now.AddDate(1, 0, 0) // Certificate expires in 1 year
 
-	w.WriteHeader(http.StatusOK)
+	certResp := CertificateIssueResponse{
+		Status:      1, // 1 = issued
+		Message:     "Certificate issued successfully",
+		Certificate: "-----BEGIN CERTIFICATE-----\nMIIC...\n-----END CERTIFICATE-----", // Placeholder PEM certificate
+		DateCreated: now.Format("2006-01-02T15:04:05.0000000Z"),
+		DateExpires: expiry.Format("2006-01-02T15:04:05.0000000Z"),
+		ThumbPrint:  "AABBCCDD11223344556677889900AABBCCDDEE",
+		CN:          req.Domain, // Common Name is the requested domain
+	}
+
+	writeJSON(w, http.StatusOK, certResp)
 }
 
 // handleGetStatistics handles GET /dnszone/{id}/statistics.
