@@ -9,6 +9,8 @@ import (
 )
 
 func TestMaxBodySize(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name          string
 		limit         int64
@@ -43,6 +45,8 @@ func TestMaxBodySize(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			// Create a test handler that reads the body
 			readError := false
 			handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -77,6 +81,8 @@ func TestMaxBodySize(t *testing.T) {
 }
 
 func TestMaxBodySizeAllowsSmallBodies(t *testing.T) {
+	t.Parallel()
+
 	// Test that small bodies pass through successfully
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		data, err := io.ReadAll(r.Body)
