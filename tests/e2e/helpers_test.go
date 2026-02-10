@@ -72,6 +72,7 @@ func createScopedKeyWithActions(t *testing.T, adminToken string, zoneID int64, a
 }
 
 // createScopedKeyInternal is a helper that creates a scoped API key with custom actions and record types.
+// It automatically registers cleanup to delete the token when the test completes.
 func createScopedKeyInternal(t *testing.T, adminToken string, zoneID int64, actions []string, recordTypes []string) string {
 	t.Helper()
 
@@ -101,12 +102,44 @@ func createScopedKeyInternal(t *testing.T, adminToken string, zoneID int64, acti
 	}
 
 	var result struct {
+		ID    int64  `json:"id"`
 		Token string `json:"token"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		t.Fatalf("Failed to decode token response: %v", err)
 	}
+
+	// Register cleanup to delete the token when the test completes
+	t.Cleanup(func() {
+		deleteTokenViaAdmin(t, adminToken, result.ID)
+	})
+
 	return result.Token
+}
+
+// deleteTokenViaAdmin deletes a token via the admin API.
+// Best-effort deletion - logs warnings but doesn't fail if deletion fails.
+func deleteTokenViaAdmin(t *testing.T, adminToken string, tokenID int64) {
+	t.Helper()
+
+	req, err := http.NewRequest("DELETE", fmt.Sprintf("%s/admin/api/tokens/%d", proxyURL, tokenID), nil)
+	if err != nil {
+		t.Logf("Warning: Failed to create delete request for token %d: %v", tokenID, err)
+		return
+	}
+	req.Header.Set("AccessKey", adminToken)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Logf("Warning: Failed to delete token %d: %v", tokenID, err)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
+		bodyContent, _ := io.ReadAll(resp.Body)
+		t.Logf("Warning: Failed to delete token %d, got status %d: %s", tokenID, resp.StatusCode, string(bodyContent))
+	}
 }
 
 // proxyRequest makes an authenticated HTTP request to the proxy with the given API key.
