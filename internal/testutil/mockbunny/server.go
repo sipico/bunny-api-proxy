@@ -279,3 +279,47 @@ func (s *Server) SetMalformedResponse(count int) {
 	s.state.failureInjection.malformedCount = count
 	s.state.failureInjection.malformedRemaining = count
 }
+
+// newRecord creates a Record with all default field values set consistently.
+// This ensures records created via different API paths have identical structure.
+// Caller must hold the state lock if accessing/modifying state concurrently.
+func (s *Server) newRecord(req addRecordRequestInput) Record {
+	return Record{
+		ID:                    s.state.nextRecordID,
+		Type:                  req.Type,
+		Name:                  req.Name,
+		Value:                 req.Value,
+		TTL:                   req.TTL,
+		Priority:              req.Priority,
+		Weight:                req.Weight,
+		Port:                  req.Port,
+		Flags:                 req.Flags,
+		Tag:                   req.Tag,
+		Disabled:              req.Disabled,
+		Comment:               req.Comment,
+		LinkName:              "",
+		IPGeoLocationInfo:     nil,
+		GeolocationInfo:       nil,
+		MonitorStatus:         0, // 0 = Unknown
+		MonitorType:           0, // 0 = None
+		EnviromentalVariables: []interface{}{},
+		SmartRoutingType:      0, // 0 = None
+		AutoSslIssuance:       true,
+		AccelerationStatus:    0,
+	}
+}
+
+// addRecordRequestInput contains the fields common to both admin and DNS API record creation requests.
+type addRecordRequestInput struct {
+	Type     int
+	Name     string
+	Value    string
+	TTL      int32
+	Priority int32
+	Weight   int32
+	Port     int32
+	Flags    int
+	Tag      string
+	Disabled bool
+	Comment  string
+}
