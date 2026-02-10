@@ -549,8 +549,12 @@ func TestE2E_GetScanResult_Success(t *testing.T) {
 	require.Equal(t, http.StatusOK, triggerResp.StatusCode)
 
 	// Poll for result — the scan is async, so we may need to wait
+	// Use exponential backoff to handle variable DNS scan times (especially on real API)
 	var finalStatus int
 	maxAttempts := 10
+	backoff := 500 * time.Millisecond
+	maxBackoff := 5 * time.Second
+
 	for i := 0; i < maxAttempts; i++ {
 		resp := proxyRequest(t, "GET", fmt.Sprintf("/dnszone/%d/records/scan", zone.ID), env.AdminToken, nil)
 
@@ -572,8 +576,15 @@ func TestE2E_GetScanResult_Success(t *testing.T) {
 			t.Logf("Scan completed after %d poll(s)", i+1)
 			break
 		}
-		// Wait before next poll
-		time.Sleep(500 * time.Millisecond)
+		// Wait before next poll with exponential backoff
+		time.Sleep(backoff)
+		// Double backoff for next iteration, capped at maxBackoff
+		if backoff < maxBackoff {
+			backoff = backoff * 2
+			if backoff > maxBackoff {
+				backoff = maxBackoff
+			}
+		}
 	}
 
 	// Status should reach 2 (Completed) or at least be non-zero
