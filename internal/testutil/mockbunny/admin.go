@@ -79,17 +79,13 @@ func (s *Server) handleAdminCreateRecord(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Create record with sensible defaults
-	record := Record{
-		ID:               s.state.nextRecordID,
-		Type:             req.Type,
-		Name:             req.Name,
-		Value:            req.Value,
-		TTL:              req.TTL,
-		MonitorStatus:    0, // 0 = Unknown
-		MonitorType:      0, // 0 = None
-		SmartRoutingType: 0, // 0 = None
-	}
+	// Create record with sensible defaults using shared helper
+	record := s.newRecord(addRecordRequestInput{
+		Type:  req.Type,
+		Name:  req.Name,
+		Value: req.Value,
+		TTL:   req.TTL,
+	})
 	s.state.nextRecordID++
 	zone.Records = append(zone.Records, record)
 

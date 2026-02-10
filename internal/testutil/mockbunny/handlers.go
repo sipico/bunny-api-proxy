@@ -278,30 +278,8 @@ func (s *Server) handleAddRecord(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Create record with defaults
-	record := Record{
-		ID:                    s.state.nextRecordID,
-		Type:                  req.Type,
-		Name:                  req.Name,
-		Value:                 req.Value,
-		TTL:                   req.TTL,
-		Priority:              req.Priority,
-		Weight:                req.Weight,
-		Port:                  req.Port,
-		Flags:                 req.Flags,
-		Tag:                   req.Tag,
-		Disabled:              req.Disabled,
-		Comment:               req.Comment,
-		LinkName:              "",
-		IPGeoLocationInfo:     nil,
-		GeolocationInfo:       nil,
-		MonitorStatus:         0, // 0 = Unknown
-		MonitorType:           0, // 0 = None
-		EnviromentalVariables: []interface{}{},
-		SmartRoutingType:      0, // 0 = None
-		AutoSslIssuance:       true,
-		AccelerationStatus:    0,
-	}
+	// Create record with defaults using shared helper
+	record := s.newRecord(addRecordRequestInput(req))
 	s.state.nextRecordID++
 
 	zone.Records = append(zone.Records, record)
@@ -600,30 +578,13 @@ func (s *Server) handleImportRecords(w http.ResponseWriter, r *http.Request) {
 		// Value is everything from parts[4] onward (joined with spaces)
 		value := strings.Join(parts[4:], " ")
 
-		// Create record with auto-incrementing ID
-		record := Record{
-			ID:                    s.state.nextRecordID,
-			Type:                  typeInt,
-			Name:                  name,
-			Value:                 value,
-			TTL:                   int32(ttl),
-			Weight:                0,
-			Priority:              0,
-			Port:                  0,
-			Flags:                 0,
-			Tag:                   "",
-			Disabled:              false,
-			Comment:               "",
-			LinkName:              "",
-			IPGeoLocationInfo:     nil,
-			GeolocationInfo:       nil,
-			MonitorStatus:         0,
-			MonitorType:           0,
-			EnviromentalVariables: []interface{}{},
-			SmartRoutingType:      0,
-			AutoSslIssuance:       true,
-			AccelerationStatus:    0,
-		}
+		// Create record with auto-incrementing ID using shared helper
+		record := s.newRecord(addRecordRequestInput{
+			Type:  typeInt,
+			Name:  name,
+			Value: value,
+			TTL:   int32(ttl),
+		})
 		s.state.nextRecordID++
 
 		zone.Records = append(zone.Records, record)
