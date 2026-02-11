@@ -3,18 +3,8 @@ name: CI
 on:
   push:
     branches: [ main, 'claude/**' ]
-    paths-ignore:
-      - '**/*.md'
-      - 'docs/**'
-      - '.gitignore'
-      - '.github/workflows/explore-api.yml'
   pull_request:
     branches: [ main ]
-    paths-ignore:
-      - '**/*.md'
-      - 'docs/**'
-      - '.gitignore'
-      - '.github/workflows/explore-api.yml'
 
 # Cancel in-progress CI for the same PR/branch when new commits are pushed
 concurrency:
@@ -22,14 +12,15 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Deduplicate push vs pull_request runs for the same branch.
+  # Preflight: deduplicate push/PR runs and detect docs-only changes.
   # - Push events: wait 15s for a PR to appear, then skip if one exists.
-  # - PR events: proceed normally (no active cancellation to avoid blocked merges).
+  # - Docs-only changes: skip all CI jobs (they report as "skipped" which satisfies required checks).
   preflight:
     name: Preflight
     runs-on: ubuntu-latest
     outputs:
       should_skip: ${{ steps.check.outputs.should_skip }}
+      docs_only: ${{ steps.changes.outputs.docs_only }}
     steps:
       - name: Deduplicate CI runs
         id: check
@@ -50,11 +41,55 @@ jobs:
 
           echo "should_skip=false" >> "$GITHUB_OUTPUT"
 
+      - name: Checkout code
+        if: steps.check.outputs.should_skip != 'true'
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Detect docs-only changes
+        id: changes
+        if: steps.check.outputs.should_skip != 'true'
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+            HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          else
+            BASE_SHA="${{ github.event.before }}"
+            HEAD_SHA="${{ github.sha }}"
+          fi
+
+          # Get list of changed files
+          CHANGED_FILES=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" 2>/dev/null || echo "UNKNOWN")
+
+          if [ "$CHANGED_FILES" = "UNKNOWN" ] || [ -z "$CHANGED_FILES" ]; then
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            echo "Could not determine changed files — running full CI"
+            exit 0
+          fi
+
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
+
+          # Check if ALL changed files are docs/non-code
+          DOCS_ONLY=true
+          while IFS= read -r file; do
+            case "$file" in
+              *.md|docs/*|.gitignore|.github/workflows/explore-api.yml) ;;
+              *) DOCS_ONLY=false; break ;;
+            esac
+          done <<< "$CHANGED_FILES"
+
+          echo "docs_only=$DOCS_ONLY" >> "$GITHUB_OUTPUT"
+          if [ "$DOCS_ONLY" = "true" ]; then
+            echo "::notice::Docs-only change detected — skipping CI jobs"
+          fi
+
   test:
     name: Test
     runs-on: ubuntu-latest
     needs: [preflight]
-    if: needs.preflight.outputs.should_skip != 'true'
+    if: needs.preflight.outputs.should_skip != 'true' && needs.preflight.outputs.docs_only != 'true'
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -80,7 +115,7 @@ jobs:
     name: Lint
     runs-on: ubuntu-latest
     needs: [preflight]
-    if: needs.preflight.outputs.should_skip != 'true'
+    if: needs.preflight.outputs.should_skip != 'true' && needs.preflight.outputs.docs_only != 'true'
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -112,7 +147,7 @@ jobs:
     name: Security Scan
     runs-on: ubuntu-latest
     needs: [preflight]
-    if: needs.preflight.outputs.should_skip != 'true'
+    if: needs.preflight.outputs.should_skip != 'true' && needs.preflight.outputs.docs_only != 'true'
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -342,6 +377,55 @@ jobs:
     if: github.event_name == 'pull_request' && github.base_ref == 'main'
 
     steps:
+      # Multiple PRs share one bunny.net account — serialize real API E2E to avoid
+      # zone creation/deletion conflicts. Uses FIFO ordering by run ID (lowest goes first).
+      # No concurrency group needed: no cancellation, no silent job dropping.
+      - name: Wait for exclusive real API access
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "Run $GITHUB_RUN_ID waiting for exclusive real API access..."
+          MAX_WAIT=900  # 15 minutes
+          WAITED=0
+          POLL=30
+
+          while [ $WAITED -lt $MAX_WAIT ]; do
+            # Find all in-progress CI runs with an active "E2E Tests (Real Bunny.net API)" job
+            ACTIVE_RUNS=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?status=in_progress" \
+              --jq '[.workflow_runs[].id]' 2>/dev/null || echo "[]")
+
+            MY_TURN=true
+            for RUN_ID in $(echo "$ACTIVE_RUNS" | jq -r '.[]'); do
+              [ "$RUN_ID" = "$GITHUB_RUN_ID" ] && continue
+
+              # Check if this other run has a real API E2E job that is in_progress
+              HAS_ACTIVE_E2E=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID/jobs" \
+                --jq '[.jobs[] | select(.name == "E2E Tests (Real Bunny.net API)" and .status == "in_progress")] | length' 2>/dev/null || echo "0")
+
+              if [ "$HAS_ACTIVE_E2E" -gt 0 ] && [ "$RUN_ID" -lt "$GITHUB_RUN_ID" ]; then
+                echo "Run $RUN_ID (lower ID) has active real API E2E — waiting... (${WAITED}s elapsed)"
+                MY_TURN=false
+                break
+              elif [ "$HAS_ACTIVE_E2E" -gt 0 ]; then
+                echo "Run $RUN_ID (higher ID) has active real API E2E — it should yield to us, waiting for it... (${WAITED}s elapsed)"
+                MY_TURN=false
+                break
+              fi
+            done
+
+            if [ "$MY_TURN" = "true" ]; then
+              echo "No other real API E2E active. Proceeding (run $GITHUB_RUN_ID)."
+              break
+            fi
+
+            sleep $POLL
+            WAITED=$((WAITED + POLL))
+          done
+
+          if [ $WAITED -ge $MAX_WAIT ]; then
+            echo "::warning::Timed out after ${MAX_WAIT}s waiting for exclusive access. Proceeding anyway."
+          fi
+
       - name: Checkout code
         uses: actions/checkout@v6
 
