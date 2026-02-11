@@ -2,6 +2,24 @@
 
 This document provides comprehensive security documentation for the Bunny API Proxy, including threat models, authentication mechanisms, data protection strategies, and deployment best practices.
 
+## Architectural Overview
+
+Bunny API Proxy is designed to operate **behind a reverse proxy** with TLS termination:
+
+```
+┌─────────────┐      ┌─────────────────────┐      ┌──────────────┐
+│   Client    │──TLS─│  Reverse Proxy      │──────│   Bunny API  │
+│             │      │  (nginx/Traefik)    │      │     Proxy    │
+└─────────────┘      └─────────────────────┘      └──────────────┘
+                     • TLS/HTTPS
+                     • Rate limiting
+                     • DDoS protection
+```
+
+**Key assumption**: Infrastructure concerns (TLS, rate limiting, DDoS) are handled by the reverse proxy layer, not by this application. The proxy only handles application logic: authentication, authorization, and API proxying.
+
+---
+
 ## 1. Security Model Overview
 
 The Bunny API Proxy implements a **two-tier authentication architecture** designed to protect both administrative access and API key usage:
@@ -516,15 +534,17 @@ providedHash := sha256.Sum256([]byte(providedToken))
 - Use valid HTTPS certificates (Let's Encrypt, commercial, etc.)
 - Proxy example: `nginx`, `Traefik`, `Cloudflare Tunnel`
 
-#### DDoS Attacks
+#### DDoS Attacks & Rate Limiting
 
-**Threat**: High-volume traffic overwhelming the service
+**Threat**: High-volume traffic or brute-force attacks on authentication
 
 **Mitigation** (user's responsibility):
-- Use CDN or WAF (Cloudflare, AWS WAF, etc.)
-- Implement rate limiting at reverse proxy
-- Monitor traffic patterns
-- Configure auto-scaling (if using Kubernetes)
+- Deploy behind a reverse proxy with rate limiting enabled (see [DEPLOYMENT.md](DEPLOYMENT.md#rate-limiting))
+- Apply recommended limits: 10 req/s on `/admin/api/*`, 50 req/s on `/dnszone/*`
+- Use a CDN or WAF for additional DDoS protection if needed
+- Never expose port 8080 directly to the internet
+
+Rate limiting is implemented at the reverse proxy layer, not in the application, because it's an infrastructure concern that's best handled by battle-tested reverse proxy tooling.
 
 #### Physical/Infrastructure Security
 
@@ -751,6 +771,16 @@ Use this checklist when deploying Bunny API Proxy to production:
 - **HashiCorp Vault**: https://www.vaultproject.io/ (secrets management)
 - **OWASP ZAP**: https://www.zaproxy.org/ (security scanning)
 - **Trivy**: https://github.com/aquasecurity/trivy (vulnerability scanning)
+
+---
+
+## Related Documentation
+
+- [SECURITY.md](SECURITY.md) — Threat model, authentication, data protection
+- [DEPLOYMENT.md](DEPLOYMENT.md) — Deployment patterns, configuration, monitoring
+- [ARCHITECTURE.md](../ARCHITECTURE.md) — Design decisions and technical architecture
+
+**Key principle**: This proxy runs **behind a reverse proxy**. Rate limiting, TLS, and DDoS protection are infrastructure concerns handled by the reverse proxy, not by this application.
 
 ---
 

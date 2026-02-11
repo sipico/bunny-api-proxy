@@ -2,6 +2,24 @@
 
 This guide covers deploying Bunny API Proxy in production environments. The proxy serves as an intermediary between clients (like ACME clients) and bunny.net, providing scoped API keys with granular permissions for DNS operations.
 
+## Architectural Overview
+
+Bunny API Proxy is designed to operate **behind a reverse proxy** with TLS termination:
+
+```
+┌─────────────┐      ┌─────────────────────┐      ┌──────────────┐
+│   Client    │──TLS─│  Reverse Proxy      │──────│   Bunny API  │
+│             │      │  (nginx/Traefik)    │      │     Proxy    │
+└─────────────┘      └─────────────────────┘      └──────────────┘
+                     • TLS/HTTPS
+                     • Rate limiting
+                     • DDoS protection
+```
+
+**Key assumption**: Infrastructure concerns (TLS, rate limiting, DDoS) are handled by the reverse proxy layer, not by this application. The proxy only handles application logic: authentication, authorization, and API proxying.
+
+---
+
 ## Table of Contents
 
 1. [Prerequisites](#prerequisites)
@@ -10,10 +28,11 @@ This guide covers deploying Bunny API Proxy in production environments. The prox
 4. [Initial Setup](#initial-setup)
 5. [Configuration Reference](#configuration-reference)
 6. [Security Recommendations](#security-recommendations)
-7. [Production Deployment Patterns](#production-deployment-patterns)
-8. [Backup and Recovery](#backup-and-recovery)
-9. [Upgrading](#upgrading)
-10. [Monitoring and Health Checks](#monitoring-and-health-checks)
+7. [Rate Limiting](#rate-limiting)
+8. [Production Deployment Patterns](#production-deployment-patterns)
+9. [Backup and Recovery](#backup-and-recovery)
+10. [Upgrading](#upgrading)
+11. [Monitoring and Health Checks](#monitoring-and-health-checks)
 
 ## Prerequisites
 
@@ -422,6 +441,24 @@ LOG_LEVEL=debug
     - Restrict file permissions: `chmod 600 /data/proxy.db`
     - Never backup credentials alongside unencrypted database files
     - Consider using encrypted volumes (LUKS, BitLocker, etc.)
+
+## Rate Limiting
+
+Rate limiting **must be configured at your reverse proxy** (nginx, Traefik, HAProxy, etc.) using these minimum recommended values:
+
+| Endpoint | Limit | Notes |
+|----------|-------|-------|
+| `/admin/api/*` | 10 req/s per IP | Protects against brute-force attacks |
+| `/dnszone/*` | 50 req/s per IP | Allows normal ACME client usage |
+| `/health`, `/ready` | Unlimited | Must not be rate limited |
+
+**Why not in the application?** Rate limiting belongs at the reverse proxy layer for:
+- Consistent protection across all endpoints without code duplication
+- Easier to tune without redeploying the application
+- Separation of concerns: proxy handles logic, reverse proxy handles infrastructure
+- Per-IP tracking is more accurate at the edge (before load balancers)
+
+Refer to your reverse proxy's documentation for implementation (e.g., nginx `limit_req`, Traefik `ratelimit` middleware). See [SECURITY.md](SECURITY.md#41-rate-limiting) for additional security rationale.
 
 ## Production Deployment Patterns
 
@@ -1062,9 +1099,18 @@ curl http://localhost:8080/health
 
 ---
 
+## Related Documentation
+
+- [SECURITY.md](SECURITY.md) — Threat model, authentication, data protection
+- [DEPLOYMENT.md](DEPLOYMENT.md) — Deployment patterns, configuration, monitoring
+- [ARCHITECTURE.md](../ARCHITECTURE.md) — Design decisions and technical architecture
+
+**Key principle**: This proxy runs **behind a reverse proxy**. Rate limiting, TLS, and DDoS protection are infrastructure concerns handled by the reverse proxy, not by this application.
+
+---
+
 ## Additional Resources
 
-- [ARCHITECTURE.md](../ARCHITECTURE.md) - Technical architecture and design decisions
 - [bunny.net API Docs](https://docs.bunny.net/reference/bunnynet-api-overview) - bunny.net API reference
 - [GitHub Repository](https://github.com/sipico/bunny-api-proxy) - Source code and issues
 - [Docker Documentation](https://docs.docker.com/) - Docker concepts and best practices
