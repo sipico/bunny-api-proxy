@@ -456,8 +456,9 @@ Rate limiting **must be configured at your reverse proxy** (nginx, Traefik, HAPr
 - Consistent protection across all endpoints without code duplication
 - Easier to tune without redeploying the application
 - Separation of concerns: proxy handles logic, reverse proxy handles infrastructure
+- Per-IP tracking is more accurate at the edge (before load balancers)
 
-Refer to your reverse proxy's documentation for implementation (e.g., nginx `limit_req`, Traefik `ratelimit` middleware).
+Refer to your reverse proxy's documentation for implementation (e.g., nginx `limit_req`, Traefik `ratelimit` middleware). See [SECURITY.md](SECURITY.md#41-rate-limiting) for additional security rationale.
 
 ## Production Deployment Patterns
 
