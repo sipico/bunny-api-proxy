@@ -1,7 +1,7 @@
 # Dockerfile.testrunner
 # Runs E2E tests inside the test network
 
-FROM golang:1.25.7-alpine
+FROM golang:1.26.0-alpine
 
 RUN apk add --no-cache git
 
