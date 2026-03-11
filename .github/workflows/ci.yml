@@ -237,7 +237,7 @@ jobs:
           file ci-build/proxy/bunny-api-proxy ci-build/mockbunny/mockbunny
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Build proxy Docker image (using pre-built binary)
         uses: docker/build-push-action@v6
