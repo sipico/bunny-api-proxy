@@ -2134,3 +2134,37 @@ func TestRunHealthCheckReadsListenAddr(t *testing.T) {
 		t.Errorf("expected runHealthCheck to return 0 for a server on port %s, got %d", port, result)
 	}
 }
+
+// TestMainRouterSetsSecurityHeaders verifies that the assembled main router
+// adds the security headers to every kind of response: health, the DNS proxy
+// and the admin API, including error responses (issue #398).
+func TestMainRouterSetsSecurityHeaders(t *testing.T) {
+	t.Setenv("DATABASE_PATH", ":memory:")
+	t.Setenv("LOG_LEVEL", "info")
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("failed to load config: %v", err)
+	}
+	components, err := initializeComponents(cfg)
+	if err != nil {
+		t.Fatalf("failed to initialize components: %v", err)
+	}
+	defer components.store.Close()
+
+	want := map[string]string{
+		"X-Content-Type-Options": "nosniff",
+		"X-Frame-Options":        "DENY",
+		"Cache-Control":          "no-store",
+	}
+	for _, path := range []string{"/health", "/dnszone", "/admin/api/whoami"} {
+		t.Run(path, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			components.mainRouter.ServeHTTP(w, httptest.NewRequest(http.MethodGet, path, nil))
+			for name, value := range want {
+				if got := w.Header().Get(name); got != value {
+					t.Errorf("%s %s = %q, want %q (status %d)", path, name, got, value, w.Code)
+				}
+			}
+		})
+	}
+}
