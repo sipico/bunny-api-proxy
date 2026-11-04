@@ -346,7 +346,6 @@ Common error codes:
 - `invalid_request` - Malformed request body or invalid parameters
 - `invalid_credentials` - Missing or invalid API key
 - `admin_required` - Endpoint requires an admin token
-- `master_key_locked` - Master key cannot be used after bootstrap
 - `not_found` - Resource not found
 - `cannot_delete_last_admin` - Cannot delete the only admin token
 - `no_admin_token_exists` - Must create admin token first during bootstrap

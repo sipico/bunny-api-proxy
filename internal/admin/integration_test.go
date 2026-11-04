@@ -208,13 +208,10 @@ func TestIntegration_BootstrapFlow(t *testing.T) {
 		}, ts.masterKey)
 		defer func() { _ = resp.Body.Close() }()
 
-		if resp.StatusCode != http.StatusForbidden {
-			t.Fatalf("expected 403, got %d", resp.StatusCode)
-		}
-
-		errResp := parseErrorResponse(t, resp)
-		if errResp.Error != ErrCodeMasterKeyLocked {
-			t.Errorf("expected error code %s, got %s", ErrCodeMasterKeyLocked, errResp.Error)
+		// Same response as any unknown key, so the master key cannot be
+		// identified by its error response (issue #391).
+		if resp.StatusCode != http.StatusUnauthorized {
+			t.Fatalf("expected 401, got %d", resp.StatusCode)
 		}
 	})
 

@@ -23,7 +23,7 @@ import (
 )
 
 // adminTokenCache caches the bootstrapped admin token across all tests in the suite.
-// This prevents "master_key_locked" errors when multiple tests run in sequence.
+// This prevents locked-master-key (401) errors when multiple tests run in sequence.
 var (
 	adminTokenCache   string
 	adminTokenCacheMu sync.Mutex

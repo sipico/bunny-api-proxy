@@ -289,3 +289,74 @@ func TestValidateUnifiedToken(t *testing.T) {
 		}
 	})
 }
+
+// TestTokenAuthMiddleware_LockedMasterKeyIndistinguishable verifies that, once
+// the system is configured, the master key gets exactly the same response as
+// any unknown key, and that both requests do the same storage work. A distinct
+// 403 "master_key_locked" response, or skipping lookups for one of the two,
+// let a caller tell whether a guessed key is the master key (issue #391).
+func TestTokenAuthMiddleware_LockedMasterKeyIndistinguishable(t *testing.T) {
+	t.Parallel()
+
+	const masterKey = "master-key-12345"
+
+	type result struct {
+		status       int
+		body         string
+		stateChecks  int
+		tokenLookups int
+	}
+
+	run := func(t *testing.T, key string) result {
+		t.Helper()
+		var res result
+		mock := &mockstore.MockStorage{
+			HasAnyAdminTokenFunc: func(ctx context.Context) (bool, error) {
+				res.stateChecks++
+				return true, nil // CONFIGURED: master key is locked
+			},
+			GetTokenByHashFunc: func(ctx context.Context, keyHash string) (*storage.Token, error) {
+				res.tokenLookups++
+				return nil, storage.ErrNotFound
+			},
+		}
+		h := NewHandler(mock, new(slog.LevelVar), slog.Default())
+		h.SetBootstrapService(auth.NewBootstrapService(mock, masterKey))
+
+		called := false
+		handler := h.TokenAuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			called = true
+		}))
+
+		req := httptest.NewRequest("GET", "/api/tokens", nil)
+		req.Header.Set("AccessKey", key)
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, req)
+
+		if called {
+			t.Errorf("next handler must not be called for key %q", key)
+		}
+		res.status = w.Code
+		res.body = w.Body.String()
+		return res
+	}
+
+	locked := run(t, masterKey)
+	unknown := run(t, "not-a-real-key")
+
+	if locked.status != http.StatusUnauthorized {
+		t.Errorf("locked master key: expected status 401, got %d", locked.status)
+	}
+	if locked.status != unknown.status || locked.body != unknown.body {
+		t.Errorf("locked master key response (%d %q) differs from unknown key response (%d %q)",
+			locked.status, locked.body, unknown.status, unknown.body)
+	}
+	if locked.stateChecks != 1 || unknown.stateChecks != 1 {
+		t.Errorf("expected 1 state lookup per request, got master=%d unknown=%d",
+			locked.stateChecks, unknown.stateChecks)
+	}
+	if locked.tokenLookups != 1 || unknown.tokenLookups != 1 {
+		t.Errorf("expected 1 token lookup per request, got master=%d unknown=%d",
+			locked.tokenLookups, unknown.tokenLookups)
+	}
+}

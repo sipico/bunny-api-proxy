@@ -49,7 +49,7 @@ For initial setup, use your bunny.net master API key with the bootstrap endpoint
 Create the first admin token using your bunny.net master API key. During bootstrap (when no admin tokens exist), use your master key and set `is_admin: true`.
 
 **Authentication:** bunny.net master API key in AccessKey header
-**Response:** 201 Created or 403 Forbidden (if master key locked out after admin exists)
+**Response:** 201 Created, or 401 Unauthorized if the master key is used after an admin token exists (the same response as any invalid key, so the master key cannot be identified)
 
 **Example Request:**
 ```bash

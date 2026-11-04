@@ -453,3 +453,32 @@ func TestBootstrapService_UnicodeKey(t *testing.T) {
 		t.Error("expected IsMasterKey to distinguish unicode from similar strings")
 	}
 }
+
+// TestValidateMasterKey_AlwaysChecksState verifies that ValidateMasterKey
+// performs the bootstrap state lookup for every key, not only for the master
+// key. Skipping the lookup for non-matching keys made the master key
+// distinguishable by response time (issue #391, CWE-208).
+func TestValidateMasterKey_AlwaysChecksState(t *testing.T) {
+	t.Parallel()
+
+	for _, key := range []string{"correct-key", "wrong-key"} {
+		t.Run(key, func(t *testing.T) {
+			t.Parallel()
+			stateChecks := 0
+			mock := &mockstore.MockStorage{
+				HasAnyAdminTokenFunc: func(ctx context.Context) (bool, error) {
+					stateChecks++
+					return true, nil
+				},
+			}
+			bs := NewBootstrapService(mock, "correct-key")
+
+			if _, err := bs.ValidateMasterKey(context.Background(), key); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if stateChecks != 1 {
+				t.Errorf("expected exactly 1 state lookup for key %q, got %d", key, stateChecks)
+			}
+		})
+	}
+}

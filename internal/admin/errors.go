@@ -16,9 +16,6 @@ const (
 	// ErrCodeAdminRequired indicates an admin token is required.
 	ErrCodeAdminRequired = "admin_required"
 
-	// ErrCodeMasterKeyLocked indicates master key is not allowed after bootstrap.
-	ErrCodeMasterKeyLocked = "master_key_locked"
-
 	// ErrCodeNotFound indicates a resource was not found.
 	ErrCodeNotFound = "not_found"
 
