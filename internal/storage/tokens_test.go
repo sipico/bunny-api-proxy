@@ -1265,3 +1265,57 @@ func TestPingWithCancelledContext(t *testing.T) {
 		t.Errorf("expected Ping to fail with cancelled context, got nil")
 	}
 }
+
+// TestTokenQueriesOnlyLoadKeyHashWhenNeeded verifies that only GetTokenByHash
+// (authentication) loads key_hash. GetTokenByID and ListTokens return the
+// token without it, so the hash cannot leak through a future API response
+// that serializes a Token (issue #397). The other fields must be unaffected.
+func TestTokenQueriesOnlyLoadKeyHashWhenNeeded(t *testing.T) {
+	t.Parallel()
+
+	s, err := New(":memory:")
+	if err != nil {
+		t.Fatalf("failed to create storage: %v", err)
+	}
+	defer func() { _ = s.Close() }()
+	ctx := context.Background()
+
+	hash := hashToken("key-hash-scope-test")
+	created, err := s.CreateToken(ctx, "scope-test", true, hash)
+	if err != nil {
+		t.Fatalf("failed to create token: %v", err)
+	}
+
+	byHash, err := s.GetTokenByHash(ctx, hash)
+	if err != nil {
+		t.Fatalf("GetTokenByHash: %v", err)
+	}
+	if byHash.KeyHash != hash {
+		t.Errorf("GetTokenByHash: expected key hash %q, got %q", hash, byHash.KeyHash)
+	}
+
+	byID, err := s.GetTokenByID(ctx, created.ID)
+	if err != nil {
+		t.Fatalf("GetTokenByID: %v", err)
+	}
+	if byID.KeyHash != "" {
+		t.Errorf("GetTokenByID: expected no key hash, got %q", byID.KeyHash)
+	}
+	if byID.ID != created.ID || byID.Name != "scope-test" || !byID.IsAdmin || byID.CreatedAt.IsZero() {
+		t.Errorf("GetTokenByID: unexpected token %+v", byID)
+	}
+
+	list, err := s.ListTokens(ctx)
+	if err != nil {
+		t.Fatalf("ListTokens: %v", err)
+	}
+	if len(list) != 1 {
+		t.Fatalf("ListTokens: expected 1 token, got %d", len(list))
+	}
+	if list[0].KeyHash != "" {
+		t.Errorf("ListTokens: expected no key hash, got %q", list[0].KeyHash)
+	}
+	if list[0].ID != created.ID || list[0].Name != "scope-test" || !list[0].IsAdmin || list[0].CreatedAt.IsZero() {
+		t.Errorf("ListTokens: unexpected token %+v", list[0])
+	}
+}
