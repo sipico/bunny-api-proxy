@@ -101,7 +101,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v7
         with:
-          go-version: '1.26.10'
+          go-version: '1.27.3'
 
       - name: Download dependencies
         run: go mod download
@@ -127,7 +127,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v7
         with:
-          go-version: '1.26.10'
+          go-version: '1.27.3'
 
       - name: Run gofmt
         run: |
@@ -159,7 +159,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v7
         with:
-          go-version: '1.26.10'
+          go-version: '1.27.3'
 
       - name: Run govulncheck
         run: |
@@ -179,7 +179,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v7
         with:
-          go-version: '1.26.10'
+          go-version: '1.27.3'
 
       - name: Build proxy binary
         env:
