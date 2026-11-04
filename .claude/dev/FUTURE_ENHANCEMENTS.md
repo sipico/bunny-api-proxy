@@ -95,6 +95,7 @@ _Note: Distroless base image already implemented in v2026.02.1. Traefik TLS exam
 - [ ] **Multi-arch builds** - ARM64 support (Raspberry Pi, M1 Mac, ARM servers)
 - [ ] **Docker Compose example with nginx** - Alternative to Traefik for TLS termination
 - [ ] **Kubernetes Helm chart** - Easy K8s deployment (K8s manifests exist in `examples/kubernetes/`)
+- [ ] **Ship `/data` in the image, owned by nonroot (65532)** - The image has no `/data` directory, so a new Docker-managed volume is created root-owned and the proxy cannot write to it without a manual `chown` (documented in `docker-compose.yml`, #401). Creating `/data` in the builder stage and copying it with `--chown=65532:65532` would make named volumes work out of the box. Needs a Docker build to verify.
 
 ### High Availability
 
