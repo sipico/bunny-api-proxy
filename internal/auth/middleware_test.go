@@ -1279,3 +1279,43 @@ func TestCheckPermissions_NoToken(t *testing.T) {
 		t.Errorf("status = %d, want 403", rec.Code)
 	}
 }
+
+// TestCheckPermissions_DeleteZoneRequiresAdmin verifies that deleting a zone
+// is admin-only: a scoped token gets 403 admin_required, even when one of its
+// permissions lists "delete_zone" for that zone. Before issue #396 the request
+// was not recognized at all and returned a confusing 400.
+func TestCheckPermissions_DeleteZoneRequiresAdmin(t *testing.T) {
+	t.Parallel()
+	tokenStore := newAuthTestTokenStore()
+	bootstrap := NewBootstrapService(tokenStore, "master-key")
+	authenticator := NewAuthenticator(tokenStore, bootstrap)
+
+	token := &storage.Token{ID: 1, Name: "scoped", IsAdmin: false}
+	perms := []*storage.Permission{
+		{ZoneID: 123, AllowedActions: []string{"delete_zone", "get_zone"}, RecordTypes: []string{"TXT"}},
+	}
+
+	handler := authenticator.CheckPermissions(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("handler should not be called")
+	}))
+
+	req := httptest.NewRequest("DELETE", "/dnszone/123", nil)
+	ctx := WithAdmin(req.Context(), false)
+	ctx = WithToken(ctx, token)
+	ctx = WithPermissions(ctx, perms)
+	req = req.WithContext(ctx)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want 403 (body: %s)", rec.Code, rec.Body.String())
+	}
+	var resp map[string]string
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("invalid JSON body: %v", err)
+	}
+	if resp["error"] != "admin_required" {
+		t.Errorf("error = %q, want admin_required", resp["error"])
+	}
+}

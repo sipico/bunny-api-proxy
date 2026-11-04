@@ -398,10 +398,10 @@ Delete a DNS zone.
 **Example Request:**
 ```bash
 curl -X DELETE http://localhost:8080/dnszone/123456 \
-  -H "AccessKey: your-scoped-api-key"
+  -H "AccessKey: your-admin-token"
 ```
 
-**Response:** 204 No Content
+**Response:** 204 No Content. Scoped tokens get `403 Forbidden` with `{"error":"admin_required"}`, even if a permission lists `delete_zone`.
 
 See [Official Documentation](bunny-api-official-docs/dnszone-delete.md) for complete specifications.
 

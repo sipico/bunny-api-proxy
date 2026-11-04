@@ -115,6 +115,18 @@ func ParseRequest(r *http.Request) (*Request, error) {
 			return &Request{Action: ActionDisableDNSSEC, ZoneID: zoneID}, nil
 		}
 	}
+
+	// DELETE /dnszone/{id} - delete zone (admin only). getZonePattern is
+	// anchored, so sub-resources like /records/{id} or /dnssec never match.
+	if r.Method == http.MethodDelete {
+		if matches := getZonePattern.FindStringSubmatch(path); matches != nil {
+			zoneID, err := strconv.ParseInt(matches[1], 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("invalid zone ID: %w", err)
+			}
+			return &Request{Action: ActionDeleteZone, ZoneID: zoneID}, nil
+		}
+	}
 	// POST /dnszone/{id}/certificate/issue - issue wildcard certificate (admin only)
 	if r.Method == http.MethodPost {
 		if matches := issueCertificatePattern.FindStringSubmatch(path); matches != nil {

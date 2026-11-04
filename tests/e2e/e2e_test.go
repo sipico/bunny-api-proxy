@@ -701,13 +701,19 @@ func TestE2E_ForbiddenWrongZone_AllEndpoints(t *testing.T) {
 		require.Equal(t, http.StatusForbidden, resp.StatusCode)
 	})
 
-	// Test: DeleteZone is not in MVP scope (no delete_zone action exists).
-	// ParseRequest returns "unrecognized endpoint" → 400 Bad Request.
-	t.Run("DeleteZone returns 400 (not in MVP scope)", func(t *testing.T) {
+	// Test: DeleteZone is admin-only. A scoped token gets 403 admin_required
+	// (before issue #396 it got a confusing 400 "unrecognized endpoint").
+	t.Run("DeleteZone returns 403 admin_required for scoped token", func(t *testing.T) {
 		resp := proxyRequest(t, "DELETE", fmt.Sprintf("/dnszone/%d", zone2.ID), apiKey, nil)
 		defer resp.Body.Close()
-		require.Equal(t, http.StatusBadRequest, resp.StatusCode,
-			"DELETE /dnszone/{id} is not in MVP scope, auth middleware rejects as unrecognized endpoint")
+		require.Equal(t, http.StatusForbidden, resp.StatusCode,
+			"DELETE /dnszone/{id} is admin-only")
+
+		var errResp struct {
+			Error string `json:"error"`
+		}
+		require.NoError(t, json.NewDecoder(resp.Body).Decode(&errResp))
+		require.Equal(t, "admin_required", errResp.Error)
 	})
 }
 
