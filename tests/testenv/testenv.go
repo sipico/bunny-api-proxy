@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -503,9 +504,25 @@ func getTestMode() TestMode {
 	return TestMode(mode)
 }
 
-// getCommitHash retrieves the short Git commit hash (7 characters).
-// Falls back to a timestamp-based ID if Git is unavailable.
+// runIDPattern limits E2E_RUN_ID to a short lowercase alphanumeric value, so it
+// is always a safe part of a DNS label and cannot break the
+// {index}-{id}-bap.xyz zone name format (no dashes, dots or whitespace).
+var runIDPattern = regexp.MustCompile(`^[a-z0-9]{1,20}$`)
+
+// getCommitHash returns the identifier used in test zone names.
+//
+// Order of precedence:
+//  1. E2E_RUN_ID environment variable (set by CI to a value that is unique per
+//     workflow run and attempt). The E2E test-runner container has no .git
+//     directory (.dockerignore excludes it), so git is unavailable there.
+//  2. The short Git commit hash (7 characters).
+//  3. A timestamp-based ID if Git is unavailable. This only has one-second
+//     resolution, so runs that start in the same second collide.
 func getCommitHash() string {
+	if runID := os.Getenv("E2E_RUN_ID"); runIDPattern.MatchString(runID) {
+		return runID
+	}
+
 	cmd := exec.Command("git", "rev-parse", "--short", "HEAD")
 	output, err := cmd.Output()
 	if err != nil {

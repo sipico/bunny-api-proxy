@@ -159,7 +159,7 @@ jobs:
 
       - name: Run govulncheck
         run: |
-          go install golang.org/x/vuln/cmd/govulncheck@latest
+          go install golang.org/x/vuln/cmd/govulncheck@v1.9.0
           govulncheck ./...
 
   build:
@@ -334,6 +334,8 @@ jobs:
       - name: Run E2E tests
         env:
           BUNNY_MASTER_API_KEY: ${{ secrets.MOCKBUNNY_API_TEST_KEY }}
+          # Unique per run + attempt; used in test zone names (see tests/testenv getCommitHash)
+          E2E_RUN_ID: r${{ github.run_id }}a${{ github.run_attempt }}
         run: |
           mkdir -p e2e-logs
           set -o pipefail
@@ -378,8 +380,17 @@ jobs:
 
     steps:
       # Multiple PRs share one bunny.net account — serialize real API E2E to avoid
-      # zone creation/deletion conflicts. Uses FIFO ordering by run ID (lowest goes first).
+      # zone creation/deletion conflicts. FIFO by run ID (lowest goes first).
       # No concurrency group needed: no cancellation, no silent job dropping.
+      #
+      # Another run's real-API job is in one of two states, read from the status
+      # of its own "Wait for exclusive real API access" step:
+      #   - HOLDER: lock step completed, job still in progress -> it is running
+      #     tests against bunny.net. Everyone waits, whatever its run ID.
+      #   - WAITER: lock step still running -> it is queued. Only runs with a
+      #     higher ID wait behind it; a lower-ID run never waits for a
+      #     higher-ID waiter (that was the deadlock: both sides waited for each
+      #     other until the timeout, then all ran at once).
       - name: Wait for exclusive real API access
         env:
           GH_TOKEN: ${{ github.token }}
@@ -388,33 +399,39 @@ jobs:
           MAX_WAIT=900  # 15 minutes
           WAITED=0
           POLL=30
+          LOCK_STEP="Wait for exclusive real API access"
+          E2E_JOB="E2E Tests (Real Bunny.net API)"
 
           while [ $WAITED -lt $MAX_WAIT ]; do
-            # Find all in-progress CI runs with an active "E2E Tests (Real Bunny.net API)" job
             ACTIVE_RUNS=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?status=in_progress" \
               --jq '[.workflow_runs[].id]' 2>/dev/null || echo "[]")
 
-            MY_TURN=true
+            HOLDER=""
+            LOWER_WAITER=""
             for RUN_ID in $(echo "$ACTIVE_RUNS" | jq -r '.[]'); do
               [ "$RUN_ID" = "$GITHUB_RUN_ID" ] && continue
 
-              # Check if this other run has a real API E2E job that is in_progress
-              HAS_ACTIVE_E2E=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID/jobs" \
-                --jq '[.jobs[] | select(.name == "E2E Tests (Real Bunny.net API)" and .status == "in_progress")] | length' 2>/dev/null || echo "0")
+              # Prints nothing if that run has no in-progress real API E2E job;
+              # otherwise the status of its lock step ("pending" if not reported yet).
+              LOCK_STATUS=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID/jobs" \
+                --jq "[.jobs[] | select(.name == \"$E2E_JOB\" and .status == \"in_progress\")][0] // empty
+                      | ([.steps[]? | select(.name == \"$LOCK_STEP\")][0].status // \"pending\")" \
+                2>/dev/null || echo "")
 
-              if [ "$HAS_ACTIVE_E2E" -gt 0 ] && [ "$RUN_ID" -lt "$GITHUB_RUN_ID" ]; then
-                echo "Run $RUN_ID (lower ID) has active real API E2E — waiting... (${WAITED}s elapsed)"
-                MY_TURN=false
+              if [ "$LOCK_STATUS" = "completed" ]; then
+                HOLDER=$RUN_ID
                 break
-              elif [ "$HAS_ACTIVE_E2E" -gt 0 ]; then
-                echo "Run $RUN_ID (higher ID) has active real API E2E — it should yield to us, waiting for it... (${WAITED}s elapsed)"
-                MY_TURN=false
-                break
+              elif [ -n "$LOCK_STATUS" ] && [ "$RUN_ID" -lt "$GITHUB_RUN_ID" ]; then
+                LOWER_WAITER=$RUN_ID
               fi
             done
 
-            if [ "$MY_TURN" = "true" ]; then
-              echo "No other real API E2E active. Proceeding (run $GITHUB_RUN_ID)."
+            if [ -n "$HOLDER" ]; then
+              echo "Run $HOLDER is running real API E2E — waiting... (${WAITED}s elapsed)"
+            elif [ -n "$LOWER_WAITER" ]; then
+              echo "Run $LOWER_WAITER (lower ID) is queued ahead of us — waiting... (${WAITED}s elapsed)"
+            else
+              echo "No run holds the lock and none is queued ahead. Proceeding (run $GITHUB_RUN_ID)."
               break
             fi
 
@@ -467,6 +484,8 @@ jobs:
       - name: Run E2E tests against real API
         env:
           BUNNY_MASTER_API_KEY: ${{ secrets.BUNNY_API_TEST_KEY }}
+          # Unique per run + attempt; used in test zone names (see tests/testenv getCommitHash)
+          E2E_RUN_ID: r${{ github.run_id }}a${{ github.run_attempt }}
         run: |
           mkdir -p e2e-logs
           set -o pipefail

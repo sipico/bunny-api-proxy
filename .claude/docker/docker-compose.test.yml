@@ -54,6 +54,7 @@ services:
     environment:
       - PROXY_URL=http://proxy:8080
       - BUNNY_MASTER_API_KEY=${BUNNY_MASTER_API_KEY}  # Master key for bootstrap
+      - E2E_RUN_ID=${E2E_RUN_ID:-}  # Unique zone-name ID per CI run (no .git in this container)
     depends_on:
       proxy:
         condition: service_healthy

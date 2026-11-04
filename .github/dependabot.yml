@@ -7,7 +7,7 @@ updates:
       interval: "weekly"
     # Auto-assign PRs to make them more visible
     assignees:
-      - "sipico"
+      - "kduvekot"
     # Group minor and patch updates to reduce PR noise
     groups:
       go-dependencies:
@@ -23,7 +23,7 @@ updates:
     schedule:
       interval: "weekly"
     assignees:
-      - "sipico"
+      - "kduvekot"
 
   # Docker images in .claude/docker/ directory
   - package-ecosystem: "docker"
@@ -31,7 +31,7 @@ updates:
     schedule:
       interval: "weekly"
     assignees:
-      - "sipico"
+      - "kduvekot"
 
   # GitHub Actions versions
   - package-ecosystem: "github-actions"
@@ -39,7 +39,7 @@ updates:
     schedule:
       interval: "weekly"
     assignees:
-      - "sipico"
+      - "kduvekot"
     groups:
       github-actions:
         patterns:
