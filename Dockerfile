@@ -29,7 +29,8 @@ COPY --from=builder /app/bunny-api-proxy .
 # Expose port
 EXPOSE 8080
 
-# Health check using built-in health subcommand (no shell/wget needed)
+# Health check using built-in health subcommand (no shell/wget needed).
+# It reads LISTEN_ADDR for the port (default: 8080) and always connects to localhost.
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD ["/app/bunny-api-proxy", "health"]
 

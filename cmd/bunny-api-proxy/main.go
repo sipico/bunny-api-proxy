@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -42,8 +43,25 @@ func main() {
 
 // runHealthCheck performs an HTTP health check against the local server.
 // Returns 0 on success, 1 on failure. Used by container HEALTHCHECK.
+// The port comes from LISTEN_ADDR, the same variable the server reads.
 func runHealthCheck() int {
-	return doHealthCheck("http://localhost:8080/health")
+	return doHealthCheck(healthCheckURL(os.Getenv("LISTEN_ADDR")))
+}
+
+// healthCheckURL returns the /health URL for the given listen address.
+// Only the port is taken from listenAddr: the check always connects to
+// localhost, because inside the container the server is reachable there
+// whatever host it binds to. Accepts ":8080", "0.0.0.0:8080", "[::]:8080"
+// and a bare "8080"; an empty address means the default ":8080".
+func healthCheckURL(listenAddr string) string {
+	if listenAddr == "" {
+		listenAddr = ":8080"
+	}
+	_, port, err := net.SplitHostPort(listenAddr)
+	if err != nil {
+		port = strings.TrimPrefix(listenAddr, ":")
+	}
+	return fmt.Sprintf("http://localhost:%s/health", port)
 }
 
 // doHealthCheck performs the actual health check HTTP request.

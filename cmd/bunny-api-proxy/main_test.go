@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -2082,5 +2083,54 @@ func TestInitializeComponentsProducesValidMetricsHandler(t *testing.T) {
 	// Should have body with metrics data
 	if w.Body.Len() == 0 {
 		t.Error("expected metrics data in response body")
+	}
+}
+
+// TestHealthCheckURL verifies that the health check targets the port from
+// LISTEN_ADDR and always connects to localhost (issue #402).
+func TestHealthCheckURL(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		listenAddr string
+		want       string
+	}{
+		{"", "http://localhost:8080/health"},
+		{":8080", "http://localhost:8080/health"},
+		{":9090", "http://localhost:9090/health"},
+		{"0.0.0.0:3000", "http://localhost:3000/health"},
+		{"127.0.0.1:4000", "http://localhost:4000/health"},
+		{"[::]:5000", "http://localhost:5000/health"},
+		{"7000", "http://localhost:7000/health"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.listenAddr, func(t *testing.T) {
+			t.Parallel()
+			if got := healthCheckURL(tt.listenAddr); got != tt.want {
+				t.Errorf("healthCheckURL(%q) = %q, want %q", tt.listenAddr, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestRunHealthCheckReadsListenAddr verifies that runHealthCheck uses the
+// port from LISTEN_ADDR: it succeeds against a server on a random port.
+func TestRunHealthCheckReadsListenAddr(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/health" {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	_, port, err := net.SplitHostPort(server.Listener.Addr().String())
+	if err != nil {
+		t.Fatalf("unexpected listener address: %v", err)
+	}
+	t.Setenv("LISTEN_ADDR", ":"+port)
+
+	if result := runHealthCheck(); result != 0 {
+		t.Errorf("expected runHealthCheck to return 0 for a server on port %s, got %d", port, result)
 	}
 }
