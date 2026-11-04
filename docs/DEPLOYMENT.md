@@ -43,7 +43,7 @@ Bunny API Proxy is designed to operate **behind a reverse proxy** with TLS termi
 
 ### Go (Source Build)
 
-- Go 1.25 or later
+- Go 1.26 or later
 - No CGO required (uses pure Go SQLite driver: modernc.org/sqlite)
 - For testing: golangci-lint, govulncheck
 
