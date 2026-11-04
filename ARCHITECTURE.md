@@ -23,7 +23,7 @@ An API proxy for bunny.net that allows creating scoped/limited API keys. Sits be
 
 | Component | Choice | Rationale |
 |-----------|--------|-----------|
-| Language | Go 1.25 | Aligns with bunny.net's Terraform provider, single binary, excellent for proxies |
+| Language | Go 1.26 | Aligns with bunny.net's Terraform provider, single binary, excellent for proxies |
 | Web Framework | Chi | Lightweight, idiomatic Go, 100% net/http compatible |
 | Database | SQLite | Zero config, single file, perfect for single-container deployment |
 | SQLite Driver | modernc.org/sqlite | Pure Go, no CGO required, enables simpler builds and cross-compilation |
@@ -257,7 +257,7 @@ Mirror bunny.net DNS API structure (MVP endpoints listed above).
 
 ```dockerfile
 # Stage 1: Build
-FROM golang:1.25.7-alpine AS builder
+FROM golang:1.26.10-alpine AS builder
 WORKDIR /app
 COPY . .
 RUN go build -o bunny-api-proxy ./cmd/bunny-api-proxy
