@@ -52,16 +52,26 @@ func (h *Handler) HandleSetLogLevel(w http.ResponseWriter, r *http.Request) {
 	h.logLevel.Set(level)
 	h.logger.Info("log level changed", "new_level", req.Level)
 
+	resp := map[string]string{"level": req.Level}
+	if level == slog.LevelDebug {
+		// Debug logs request/response bodies (masked by allowlist, but DNS
+		// record values and bunny.net payloads are visible) (issue #399).
+		h.logger.Warn("Debug logging enabled: request/response bodies will be logged. " +
+			"Do not use in production, sensitive data may be exposed.")
+		resp["warning"] = debugLogWarning
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	err := json.NewEncoder(w).Encode(map[string]string{
-		"level": req.Level,
-	})
+	err := json.NewEncoder(w).Encode(resp)
 	if err != nil {
 		// Encoding errors are not critical for loglevel response
 		_ = err
 	}
 }
+
+// debugLogWarning is returned by POST /api/loglevel when debug is enabled.
+const debugLogWarning = "Debug logging will expose request/response bodies. Not recommended for production."
 
 // validatePermissionValues rejects actions and record types that the
 // permission check would never match, so a typo fails loudly at creation
