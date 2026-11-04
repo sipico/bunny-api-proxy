@@ -19,13 +19,11 @@ import (
 )
 
 var (
-	proxyURL      string
-	adminPassword string
+	proxyURL string
 )
 
 func TestMain(m *testing.M) {
 	proxyURL = requireEnv("PROXY_URL")
-	adminPassword = getEnv("ADMIN_PASSWORD", "testpassword123")
 
 	// Wait for proxy to be ready
 	if err := waitForService(proxyURL+"/health", 30*time.Second); err != nil {

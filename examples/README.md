@@ -120,7 +120,7 @@ For running directly on Linux without containers:
 - Linux system (Ubuntu 20.04+, CentOS 8+, etc.)
 - `curl` utility for health checks
 - 500MB free disk space
-- Port 8080 available (or configure HTTP_PORT)
+- Port 8080 available (or configure LISTEN_ADDR)
 
 ### Installation Steps
 
