@@ -1022,3 +1022,80 @@ func TestIntegration_FailureInjection_Latency(t *testing.T) {
 		t.Errorf("expected valid zone response, got error: %v", err)
 	}
 }
+
+// TestIntegration_DeleteZone_AdminOnly verifies DELETE /dnszone/{id} through
+// the same auth chain as production (Authenticate -> CheckPermissions, see
+// cmd/bunny-api-proxy/main.go). A scoped token must get 403 admin_required,
+// even with an explicit "delete_zone" permission on the zone, and the zone
+// must survive. Before issue #396 it got a 400 "unrecognized endpoint".
+func TestIntegration_DeleteZone_AdminOnly(t *testing.T) {
+	t.Parallel()
+	mockServer := mockbunny.New()
+	defer mockServer.Close()
+
+	zoneID := mockServer.AddZone("delete-me.example")
+
+	db, err := storage.New(":memory:")
+	if err != nil {
+		t.Fatalf("failed to create storage: %v", err)
+	}
+
+	adminToken := "admin-delete-zone-token"
+	if _, err := db.CreateToken(context.Background(), "admin-delete", true, hashTokenForTest(adminToken)); err != nil {
+		t.Fatalf("failed to create admin token: %v", err)
+	}
+
+	scopedToken := "scoped-delete-zone-token"
+	scoped, err := db.CreateToken(context.Background(), "scoped-delete", false, hashTokenForTest(scopedToken))
+	if err != nil {
+		t.Fatalf("failed to create scoped token: %v", err)
+	}
+	if _, err := db.AddPermissionForToken(context.Background(), scoped.ID, &storage.Permission{
+		ZoneID:         zoneID,
+		AllowedActions: []string{"delete_zone", "get_zone"},
+		RecordTypes:    []string{"TXT"},
+	}); err != nil {
+		t.Fatalf("failed to add permission: %v", err)
+	}
+
+	client := bunny.NewClient("test-key", bunny.WithBaseURL(mockServer.URL()))
+	handler := NewHandler(client, testLogger())
+	bootstrapService := auth.NewBootstrapService(db, "master-key")
+	authenticator := auth.NewAuthenticator(db, bootstrapService)
+	authChain := func(next http.Handler) http.Handler {
+		return authenticator.Authenticate(authenticator.CheckPermissions(next))
+	}
+	router := NewRouter(handler, authChain, testLogger())
+
+	doDelete := func(token string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/dnszone/%d", zoneID), nil)
+		req.Header.Set("AccessKey", token)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		return w
+	}
+
+	// Scoped token: 403 admin_required, zone untouched
+	w := doDelete(scopedToken)
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("scoped token: expected 403, got %d (body: %s)", w.Code, w.Body.String())
+	}
+	var errResp map[string]string
+	if err := json.Unmarshal(w.Body.Bytes(), &errResp); err != nil {
+		t.Fatalf("scoped token: invalid JSON body: %v", err)
+	}
+	if errResp["error"] != "admin_required" {
+		t.Errorf("scoped token: expected error admin_required, got %q", errResp["error"])
+	}
+	if mockServer.GetZone(zoneID) == nil {
+		t.Fatal("zone was deleted by a scoped token")
+	}
+
+	// Admin token: deletes the zone
+	if w := doDelete(adminToken); w.Code != http.StatusNoContent {
+		t.Fatalf("admin token: expected 204, got %d (body: %s)", w.Code, w.Body.String())
+	}
+	if mockServer.GetZone(zoneID) != nil {
+		t.Error("zone still exists after admin delete")
+	}
+}

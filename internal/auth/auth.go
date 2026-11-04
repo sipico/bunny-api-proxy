@@ -35,6 +35,8 @@ const (
 	ActionCreateZone Action = "create_zone"
 	// ActionUpdateZone updates zone-level settings (admin only).
 	ActionUpdateZone Action = "update_zone"
+	// ActionDeleteZone deletes a DNS zone (admin only).
+	ActionDeleteZone Action = "delete_zone"
 	// ActionCheckAvailability checks DNS zone availability (admin only).
 	ActionCheckAvailability Action = "check_availability"
 	// ActionImportRecords imports DNS records (admin only).

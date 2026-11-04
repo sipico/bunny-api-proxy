@@ -227,6 +227,26 @@ func TestParseRequest(t *testing.T) {
 			wantAction: ActionDeleteRecord,
 			wantZoneID: 456,
 		},
+		{
+			name:       "delete zone",
+			method:     "DELETE",
+			path:       "/dnszone/123",
+			wantAction: ActionDeleteZone,
+			wantZoneID: 123,
+		},
+		{
+			name:       "delete zone with trailing slash",
+			method:     "DELETE",
+			path:       "/dnszone/123/",
+			wantAction: ActionDeleteZone,
+			wantZoneID: 123,
+		},
+		{
+			name:    "delete zone with overflowing zone ID",
+			method:  "DELETE",
+			path:    "/dnszone/99999999999999999999",
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {

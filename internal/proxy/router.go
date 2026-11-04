@@ -34,7 +34,7 @@ func NewRouter(handler *Handler, authMiddleware func(http.Handler) http.Handler,
 	r.With(requireAdmin).Post("/dnszone/records/scan", handler.HandleTriggerScan)
 	r.With(requireAdmin).Post("/dnszone/{zoneID}", handler.HandleUpdateZone)
 	r.Get("/dnszone/{zoneID}", handler.HandleGetZone)
-	r.Delete("/dnszone/{zoneID}", handler.HandleDeleteZone)
+	r.With(requireAdmin).Delete("/dnszone/{zoneID}", handler.HandleDeleteZone)
 	r.With(requireAdmin).Get("/dnszone/{zoneID}/records/scan", handler.HandleGetScanResult)
 	r.Get("/dnszone/{zoneID}/records", handler.HandleListRecords)
 	r.Post("/dnszone/{zoneID}/records", handler.HandleAddRecord)
