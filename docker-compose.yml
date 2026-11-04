@@ -18,7 +18,8 @@ services:
     container_name: bunny-api-proxy
 
     # Load environment variables from .env file
-    # Variables defined here: ADMIN_PASSWORD, ENCRYPTION_KEY, LOG_LEVEL, HTTP_PORT, DATA_PATH
+    # Variables defined there: BUNNY_API_KEY (required), LOG_LEVEL, LISTEN_ADDR,
+    # DATABASE_PATH, METRICS_LISTEN_ADDR, BUNNY_API_URL (see .env.example)
     env_file: .env
 
     # Port mapping: HOST:CONTAINER

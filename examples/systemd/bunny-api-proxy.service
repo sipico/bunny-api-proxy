@@ -15,7 +15,7 @@
 #    sudo cp .env.example /etc/bunny-api-proxy/.env
 #    sudo chown root:bunny-proxy /etc/bunny-api-proxy/.env
 #    sudo chmod 640 /etc/bunny-api-proxy/.env
-#    (Edit /etc/bunny-api-proxy/.env and change DATA_PATH=/var/lib/bunny-api-proxy/proxy.db)
+#    (Edit /etc/bunny-api-proxy/.env: set BUNNY_API_KEY and DATABASE_PATH=/var/lib/bunny-api-proxy/proxy.db)
 #
 # 4. Download/build the binary:
 #    sudo wget https://github.com/sipico/bunny-api-proxy/releases/download/v2026.01.2/bunny-api-proxy-linux-amd64 \
