@@ -668,10 +668,10 @@ func (s *Server) handleExportRecords(w http.ResponseWriter, r *http.Request) {
 
 	// Build BIND zone file format (while still holding lock)
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf(";; Zone: %s\n", zone.Domain))
+	fmt.Fprintf(&sb, ";; Zone: %s\n", zone.Domain)
 	for _, rec := range zone.Records {
 		typeName := recordTypeName(rec.Type)
-		sb.WriteString(fmt.Sprintf("%s\t%d\tIN\t%s\t%s\n", rec.Name, rec.TTL, typeName, rec.Value))
+		fmt.Fprintf(&sb, "%s\t%d\tIN\t%s\t%s\n", rec.Name, rec.TTL, typeName, rec.Value)
 	}
 
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
