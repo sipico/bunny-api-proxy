@@ -47,7 +47,7 @@ jobs:
 
       - name: Checkout code
         if: steps.check.outputs.should_skip != 'true'
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           fetch-depth: 0
 
@@ -96,10 +96,10 @@ jobs:
     if: needs.preflight.outputs.should_skip != 'true' && needs.preflight.outputs.docs_only != 'true'
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
       - name: Set up Go
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
         with:
           go-version: '1.27.3'
 
@@ -122,10 +122,10 @@ jobs:
     if: needs.preflight.outputs.should_skip != 'true' && needs.preflight.outputs.docs_only != 'true'
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
       - name: Set up Go
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
         with:
           go-version: '1.27.3'
 
@@ -143,7 +143,7 @@ jobs:
           git diff --exit-code go.mod go.sum
 
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v9
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a  # v9.3.0
         with:
           version: v2.15.0
 
@@ -154,10 +154,10 @@ jobs:
     if: needs.preflight.outputs.should_skip != 'true' && needs.preflight.outputs.docs_only != 'true'
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
       - name: Set up Go
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
         with:
           go-version: '1.27.3'
 
@@ -174,10 +174,10 @@ jobs:
     if: github.ref != 'refs/heads/main'
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
       - name: Set up Go
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
         with:
           go-version: '1.27.3'
 
@@ -192,14 +192,14 @@ jobs:
         run: go build -o mockbunny ./cmd/mockbunny
 
       - name: Upload proxy binary artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
           name: bunny-api-proxy
           path: bunny-api-proxy
           retention-days: 7
 
       - name: Upload mockbunny binary artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
           name: mockbunny
           path: mockbunny
@@ -211,7 +211,7 @@ jobs:
     needs: [test, lint, build]  # Wait for binary to be built
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
       - name: Create build contexts for pre-built binaries
         run: |
@@ -219,13 +219,13 @@ jobs:
           mkdir -p ci-build/proxy ci-build/mockbunny
 
       - name: Download binary artifact
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
         with:
           name: bunny-api-proxy
           path: ci-build/proxy
 
       - name: Download mockbunny binary artifact
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
         with:
           name: mockbunny
           path: ci-build/mockbunny
@@ -241,10 +241,10 @@ jobs:
           file ci-build/proxy/bunny-api-proxy ci-build/mockbunny/mockbunny
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069  # v4.4.1
 
       - name: Build proxy Docker image (using pre-built binary)
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc  # v7.4.0
         with:
           context: ci-build/proxy
           file: .claude/docker/Dockerfile.prebuilt
@@ -253,7 +253,7 @@ jobs:
           tags: bunny-api-proxy:test
 
       - name: Build mockbunny Docker image (using pre-built binary)
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc  # v7.4.0
         with:
           context: ci-build/mockbunny
           file: .claude/docker/Dockerfile.mockbunny.prebuilt
@@ -262,7 +262,7 @@ jobs:
           tags: mockbunny:test
 
       - name: Build test-runner Docker image
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc  # v7.4.0
         with:
           context: .
           file: .claude/docker/Dockerfile.testrunner
@@ -280,7 +280,7 @@ jobs:
           ls -lh /tmp/*.tar
 
       - name: Upload Docker images
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
           name: docker-images
           path: |
@@ -301,10 +301,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
       - name: Download Docker images
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
         with:
           name: docker-images
           path: /tmp
@@ -367,7 +367,7 @@ jobs:
 
       - name: Upload E2E logs
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
           name: e2e-logs
           path: e2e-logs/
@@ -458,10 +458,10 @@ jobs:
           fi
 
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
       - name: Download Docker images
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
         with:
           name: docker-images
           path: /tmp
@@ -521,7 +521,7 @@ jobs:
 
       - name: Upload E2E logs (Real API)
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
           name: e2e-logs-real-api
           path: e2e-logs/
