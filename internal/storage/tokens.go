@@ -11,7 +11,7 @@ import (
 	sqlite3 "modernc.org/sqlite/lib"
 )
 
-// CreateToken creates a new token (admin or scoped) with bcrypt hash.
+// CreateToken creates a new token (admin or scoped). keyHash is the SHA-256 hash of the token.
 // Returns the new token and any error.
 // Returns ErrDuplicate if a token with this hash already exists.
 func (s *SQLiteStorage) CreateToken(ctx context.Context, name string, isAdmin bool, keyHash string) (*Token, error) {
