@@ -7,7 +7,7 @@ import (
 
 // SchemaVersion is the current version of the database schema.
 // Update this when making schema changes.
-const SchemaVersion = 2
+const SchemaVersion = 3
 
 // InitSchema creates all required tables and indexes.
 // This is idempotent - safe to call multiple times.
@@ -31,7 +31,8 @@ func InitSchema(db *sql.DB) error {
 			key_hash TEXT NOT NULL UNIQUE,
 			name TEXT NOT NULL,
 			is_admin BOOLEAN NOT NULL DEFAULT FALSE,
-			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			expires_at TIMESTAMP DEFAULT NULL
 		)`,
 
 		// Index on key_hash for fast lookups
@@ -59,6 +60,43 @@ func InitSchema(db *sql.DB) error {
 		}
 	}
 
+	// Schema v3 (issue #400): databases created before token expiry have no
+	// expires_at column. CREATE TABLE IF NOT EXISTS does not change existing
+	// tables, so add the column when it is missing. NULL = never expires.
+	if err := addColumnIfMissing(db, "tokens", "expires_at", "TIMESTAMP DEFAULT NULL"); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// addColumnIfMissing adds a column to an existing table unless it is already
+// there. A single ALTER TABLE ADD COLUMN is atomic in SQLite.
+func addColumnIfMissing(db *sql.DB, table, column, definition string) error {
+	rows, err := db.Query("SELECT name FROM pragma_table_info(?)", table)
+	if err != nil {
+		return fmt.Errorf("failed to inspect table %s: %w", table, err)
+	}
+	defer rows.Close() //nolint:errcheck
+
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return fmt.Errorf("failed to inspect table %s: %w", table, err)
+		}
+		if name == column {
+			return nil
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("failed to inspect table %s: %w", table, err)
+	}
+	_ = rows.Close() //nolint:errcheck
+
+	// table, column and definition are compile-time constants, never user input.
+	if _, err := db.Exec(fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", table, column, definition)); err != nil {
+		return fmt.Errorf("failed to add column %s.%s: %w", table, column, err)
+	}
 	return nil
 }
 

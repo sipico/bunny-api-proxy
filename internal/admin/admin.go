@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"time"
 
 	"github.com/sipico/bunny-api-proxy/internal/auth"
 	"github.com/sipico/bunny-api-proxy/internal/storage"
@@ -34,6 +35,7 @@ type Storage interface {
 
 	// Unified token operations
 	CreateToken(ctx context.Context, name string, isAdmin bool, keyHash string) (*storage.Token, error)
+	CreateTokenWithExpiry(ctx context.Context, name string, isAdmin bool, keyHash string, expiresAt *time.Time) (*storage.Token, error)
 	GetTokenByID(ctx context.Context, id int64) (*storage.Token, error)
 	GetTokenByHash(ctx context.Context, keyHash string) (*storage.Token, error)
 	ListTokens(ctx context.Context) ([]*storage.Token, error)

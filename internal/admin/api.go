@@ -70,6 +70,16 @@ func (h *Handler) HandleSetLogLevel(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// formatExpiry formats an optional expiry as RFC 3339 (UTC), or nil if the
+// token never expires, so the field is omitted from JSON responses.
+func formatExpiry(expiresAt *time.Time) *string {
+	if expiresAt == nil {
+		return nil
+	}
+	s := expiresAt.UTC().Format(time.RFC3339)
+	return &s
+}
+
 // debugLogWarning is returned by POST /api/loglevel when debug is enabled.
 const debugLogWarning = "Debug logging will expose request/response bodies. Not recommended for production."
 
@@ -154,10 +164,11 @@ func (h *Handler) HandleWhoami(w http.ResponseWriter, r *http.Request) {
 
 // UnifiedTokenResponse represents a token in API responses (never includes key).
 type UnifiedTokenResponse struct {
-	ID        int64  `json:"id"`
-	Name      string `json:"name"`
-	IsAdmin   bool   `json:"is_admin"`
-	CreatedAt string `json:"created_at"`
+	ID        int64   `json:"id"`
+	Name      string  `json:"name"`
+	IsAdmin   bool    `json:"is_admin"`
+	CreatedAt string  `json:"created_at"`
+	ExpiresAt *string `json:"expires_at,omitempty"`
 }
 
 // HandleListUnifiedTokens returns all tokens (unified model).
@@ -177,6 +188,7 @@ func (h *Handler) HandleListUnifiedTokens(w http.ResponseWriter, r *http.Request
 			Name:      t.Name,
 			IsAdmin:   t.IsAdmin,
 			CreatedAt: t.CreatedAt.Format(time.RFC3339),
+			ExpiresAt: formatExpiry(t.ExpiresAt),
 		}
 	}
 
@@ -194,14 +206,18 @@ type CreateUnifiedTokenRequest struct {
 	Zones       []int64  `json:"zones,omitempty"`
 	Actions     []string `json:"actions,omitempty"`
 	RecordTypes []string `json:"record_types,omitempty"`
+	// ExpiresAt is an optional expiry time (RFC 3339). Omit it for a token
+	// that never expires; it must lie in the future (issue #400).
+	ExpiresAt *time.Time `json:"expires_at,omitempty"`
 }
 
 // CreateUnifiedTokenResponse includes the token (shown only once).
 type CreateUnifiedTokenResponse struct {
-	ID      int64  `json:"id"`
-	Name    string `json:"name"`
-	Token   string `json:"token"` // Plain token, shown once
-	IsAdmin bool   `json:"is_admin"`
+	ID        int64   `json:"id"`
+	Name      string  `json:"name"`
+	Token     string  `json:"token"` // Plain token, shown once
+	IsAdmin   bool    `json:"is_admin"`
+	ExpiresAt *string `json:"expires_at,omitempty"`
 }
 
 // HandleCreateUnifiedToken creates a new token (admin or scoped).
@@ -223,6 +239,13 @@ func (h *Handler) HandleCreateUnifiedToken(w http.ResponseWriter, r *http.Reques
 
 	if req.Name == "" {
 		WriteError(w, http.StatusBadRequest, ErrCodeInvalidRequest, "Token name is required")
+		return
+	}
+
+	if req.ExpiresAt != nil && !req.ExpiresAt.After(time.Now()) {
+		WriteErrorWithHint(w, http.StatusBadRequest, ErrCodeInvalidRequest,
+			"expires_at must be in the future",
+			"Omit expires_at for a token that never expires.")
 		return
 	}
 
@@ -287,7 +310,7 @@ func (h *Handler) HandleCreateUnifiedToken(w http.ResponseWriter, r *http.Reques
 	keyHash := hex.EncodeToString(hash[:])
 
 	// Create the token
-	token, err := h.storage.CreateToken(ctx, req.Name, req.IsAdmin, keyHash)
+	token, err := h.storage.CreateTokenWithExpiry(ctx, req.Name, req.IsAdmin, keyHash, req.ExpiresAt)
 	if err != nil {
 		if errors.Is(err, storage.ErrDuplicate) {
 			WriteErrorWithHint(w, http.StatusConflict, "duplicate_token",
@@ -324,10 +347,11 @@ func (h *Handler) HandleCreateUnifiedToken(w http.ResponseWriter, r *http.Reques
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	encErr := json.NewEncoder(w).Encode(CreateUnifiedTokenResponse{
-		ID:      token.ID,
-		Name:    req.Name,
-		Token:   plainToken, // Return plaintext once
-		IsAdmin: req.IsAdmin,
+		ID:        token.ID,
+		Name:      req.Name,
+		Token:     plainToken, // Return plaintext once
+		IsAdmin:   req.IsAdmin,
+		ExpiresAt: formatExpiry(token.ExpiresAt),
 	})
 	if encErr != nil {
 		_ = encErr
@@ -340,6 +364,7 @@ type UnifiedTokenDetailResponse struct {
 	Name        string                `json:"name"`
 	IsAdmin     bool                  `json:"is_admin"`
 	CreatedAt   string                `json:"created_at"`
+	ExpiresAt   *string               `json:"expires_at,omitempty"`
 	Permissions []*storage.Permission `json:"permissions,omitempty"`
 }
 
@@ -371,6 +396,7 @@ func (h *Handler) HandleGetUnifiedToken(w http.ResponseWriter, r *http.Request) 
 		Name:      token.Name,
 		IsAdmin:   token.IsAdmin,
 		CreatedAt: token.CreatedAt.Format(time.RFC3339),
+		ExpiresAt: formatExpiry(token.ExpiresAt),
 	}
 
 	// Get permissions for scoped tokens

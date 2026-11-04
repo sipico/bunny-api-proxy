@@ -6,19 +6,32 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"modernc.org/sqlite"
 	sqlite3 "modernc.org/sqlite/lib"
 )
 
-// CreateToken creates a new token (admin or scoped). keyHash is the SHA-256 hash of the token.
-// Returns the new token and any error.
+// CreateToken creates a new token (admin or scoped) that never expires.
+// keyHash is the SHA-256 hash of the token.
 // Returns ErrDuplicate if a token with this hash already exists.
 func (s *SQLiteStorage) CreateToken(ctx context.Context, name string, isAdmin bool, keyHash string) (*Token, error) {
+	return s.CreateTokenWithExpiry(ctx, name, isAdmin, keyHash, nil)
+}
+
+// CreateTokenWithExpiry creates a new token with an optional expiry time
+// (nil means never expires) in a single insert (issue #400).
+// Returns ErrDuplicate if a token with this hash already exists.
+func (s *SQLiteStorage) CreateTokenWithExpiry(ctx context.Context, name string, isAdmin bool, keyHash string, expiresAt *time.Time) (*Token, error) {
+	var expires sql.NullTime
+	if expiresAt != nil {
+		expires = sql.NullTime{Time: expiresAt.UTC(), Valid: true}
+	}
+
 	// Insert into tokens table
 	result, err := s.db.ExecContext(ctx,
-		"INSERT INTO tokens (key_hash, name, is_admin) VALUES (?, ?, ?)",
-		keyHash, name, isAdmin)
+		"INSERT INTO tokens (key_hash, name, is_admin, expires_at) VALUES (?, ?, ?, ?)",
+		keyHash, name, isAdmin, expires)
 
 	if err != nil {
 		// Check if this is a UNIQUE constraint violation
@@ -41,11 +54,17 @@ func (s *SQLiteStorage) CreateToken(ctx context.Context, name string, isAdmin bo
 	}
 
 	// Return the created token
+	var exp *time.Time
+	if expires.Valid {
+		t := expires.Time
+		exp = &t
+	}
 	return &Token{
-		ID:      id,
-		KeyHash: keyHash,
-		Name:    name,
-		IsAdmin: isAdmin,
+		ID:        id,
+		KeyHash:   keyHash,
+		Name:      name,
+		IsAdmin:   isAdmin,
+		ExpiresAt: exp,
 	}, nil
 }
 
@@ -56,9 +75,9 @@ func (s *SQLiteStorage) GetTokenByHash(ctx context.Context, keyHash string) (*To
 	var t Token
 
 	err := s.db.QueryRowContext(ctx,
-		"SELECT id, key_hash, name, is_admin, created_at FROM tokens WHERE key_hash = ?",
+		"SELECT id, key_hash, name, is_admin, created_at, expires_at FROM tokens WHERE key_hash = ?",
 		keyHash).
-		Scan(&t.ID, &t.KeyHash, &t.Name, &t.IsAdmin, &t.CreatedAt)
+		Scan(&t.ID, &t.KeyHash, &t.Name, &t.IsAdmin, &t.CreatedAt, expiryScanner{&t.ExpiresAt})
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -79,9 +98,9 @@ func (s *SQLiteStorage) GetTokenByID(ctx context.Context, id int64) (*Token, err
 	err := s.db.QueryRowContext(ctx,
 		// key_hash is deliberately not loaded: only authentication
 		// (GetTokenByHash) needs it (issue #397).
-		"SELECT id, name, is_admin, created_at FROM tokens WHERE id = ?",
+		"SELECT id, name, is_admin, created_at, expires_at FROM tokens WHERE id = ?",
 		id).
-		Scan(&t.ID, &t.Name, &t.IsAdmin, &t.CreatedAt)
+		Scan(&t.ID, &t.Name, &t.IsAdmin, &t.CreatedAt, expiryScanner{&t.ExpiresAt})
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -99,7 +118,7 @@ func (s *SQLiteStorage) ListTokens(ctx context.Context) ([]*Token, error) {
 	rows, err := s.db.QueryContext(ctx,
 		// key_hash is deliberately not loaded: only authentication
 		// (GetTokenByHash) needs it (issue #397).
-		"SELECT id, name, is_admin, created_at FROM tokens ORDER BY created_at DESC, id DESC")
+		"SELECT id, name, is_admin, created_at, expires_at FROM tokens ORDER BY created_at DESC, id DESC")
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to query tokens: %w", err)
@@ -110,7 +129,7 @@ func (s *SQLiteStorage) ListTokens(ctx context.Context) ([]*Token, error) {
 
 	for rows.Next() {
 		var t Token
-		err := rows.Scan(&t.ID, &t.Name, &t.IsAdmin, &t.CreatedAt)
+		err := rows.Scan(&t.ID, &t.Name, &t.IsAdmin, &t.CreatedAt, expiryScanner{&t.ExpiresAt})
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan token row: %w", err)
 		}
@@ -326,4 +345,23 @@ func marshalStringArray(arr []string) ([]byte, error) {
 // unmarshalStringArray is a helper to unmarshal a JSON string array.
 func unmarshalStringArray(data string, arr *[]string) error {
 	return json.Unmarshal([]byte(data), arr)
+}
+
+// expiryScanner scans a nullable expires_at column into a *time.Time field:
+// NULL becomes nil (never expires), any other value a pointer to the time.
+type expiryScanner struct{ dst **time.Time }
+
+// Scan implements sql.Scanner.
+func (e expiryScanner) Scan(src any) error {
+	var nt sql.NullTime
+	if err := nt.Scan(src); err != nil {
+		return err
+	}
+	if !nt.Valid {
+		*e.dst = nil
+		return nil
+	}
+	t := nt.Time
+	*e.dst = &t
+	return nil
 }

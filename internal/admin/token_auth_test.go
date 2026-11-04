@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/sipico/bunny-api-proxy/internal/auth"
 	"github.com/sipico/bunny-api-proxy/internal/storage"
@@ -358,5 +359,53 @@ func TestTokenAuthMiddleware_LockedMasterKeyIndistinguishable(t *testing.T) {
 	if locked.tokenLookups != 1 || unknown.tokenLookups != 1 {
 		t.Errorf("expected 1 token lookup per request, got master=%d unknown=%d",
 			locked.tokenLookups, unknown.tokenLookups)
+	}
+}
+
+// TestTokenAuthMiddleware_TokenExpiry verifies that the admin API rejects
+// expired tokens and accepts tokens without expiry or with a future expiry
+// (issue #400).
+func TestTokenAuthMiddleware_TokenExpiry(t *testing.T) {
+	t.Parallel()
+	past := time.Now().Add(-time.Hour)
+	future := time.Now().Add(time.Hour)
+	tests := []struct {
+		name       string
+		expiresAt  *time.Time
+		wantStatus int
+	}{
+		{"no expiry", nil, http.StatusOK},
+		{"future expiry", &future, http.StatusOK},
+		{"expired", &past, http.StatusUnauthorized},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			mock := &mockstore.MockStorage{
+				HasAnyAdminTokenFunc: func(ctx context.Context) (bool, error) { return true, nil },
+				GetTokenByHashFunc: func(ctx context.Context, keyHash string) (*storage.Token, error) {
+					return &storage.Token{ID: 1, Name: "admin", IsAdmin: true, ExpiresAt: tt.expiresAt}, nil
+				},
+			}
+			h := NewHandler(mock, new(slog.LevelVar), slog.Default())
+			h.SetBootstrapService(auth.NewBootstrapService(mock, "master-key"))
+
+			called := false
+			handler := h.TokenAuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				called = true
+				w.WriteHeader(http.StatusOK)
+			}))
+			req := httptest.NewRequest("GET", "/api/tokens", nil)
+			req.Header.Set("AccessKey", "some-admin-token")
+			w := httptest.NewRecorder()
+			handler.ServeHTTP(w, req)
+
+			if w.Code != tt.wantStatus {
+				t.Errorf("status = %d, want %d (body: %s)", w.Code, tt.wantStatus, w.Body.String())
+			}
+			if called != (tt.wantStatus == http.StatusOK) {
+				t.Errorf("next handler called = %v, want %v", called, tt.wantStatus == http.StatusOK)
+			}
+		})
 	}
 }

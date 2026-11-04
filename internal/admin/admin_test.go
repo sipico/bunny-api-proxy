@@ -5,6 +5,7 @@ import (
 	"io"
 	"log/slog"
 	"testing"
+	"time"
 
 	"github.com/sipico/bunny-api-proxy/internal/storage"
 )
@@ -76,6 +77,15 @@ func (m *mockStorageForAdminTest) Close() error {
 // Unified token operations (Issue 147)
 func (m *mockStorageForAdminTest) CreateToken(ctx context.Context, name string, isAdmin bool, keyHash string) (*storage.Token, error) {
 	return &storage.Token{ID: 1, Name: name, IsAdmin: isAdmin, KeyHash: keyHash}, nil
+}
+
+func (m *mockStorageForAdminTest) CreateTokenWithExpiry(ctx context.Context, name string, isAdmin bool, keyHash string, expiresAt *time.Time) (*storage.Token, error) {
+	token, err := m.CreateToken(ctx, name, isAdmin, keyHash)
+	if err != nil {
+		return nil, err
+	}
+	token.ExpiresAt = expiresAt
+	return token, nil
 }
 
 func (m *mockStorageForAdminTest) GetTokenByID(ctx context.Context, id int64) (*storage.Token, error) {

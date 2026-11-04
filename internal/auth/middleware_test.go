@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/sipico/bunny-api-proxy/internal/storage"
 )
@@ -1317,5 +1318,51 @@ func TestCheckPermissions_DeleteZoneRequiresAdmin(t *testing.T) {
 	}
 	if resp["error"] != "admin_required" {
 		t.Errorf("error = %q, want admin_required", resp["error"])
+	}
+}
+
+// TestAuthenticate_TokenExpiry verifies that the DNS proxy rejects expired
+// tokens and accepts tokens without expiry or with a future expiry (issue #400).
+func TestAuthenticate_TokenExpiry(t *testing.T) {
+	t.Parallel()
+	past := time.Now().Add(-time.Hour)
+	future := time.Now().Add(time.Hour)
+	tests := []struct {
+		name       string
+		expiresAt  *time.Time
+		isAdmin    bool
+		wantStatus int
+	}{
+		{"scoped, no expiry", nil, false, http.StatusOK},
+		{"scoped, future expiry", &future, false, http.StatusOK},
+		{"scoped, expired", &past, false, http.StatusUnauthorized},
+		{"admin, expired", &past, true, http.StatusUnauthorized},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			store := newAuthTestTokenStore()
+			store.hasAdminToken = true
+			tok := store.addToken(1, "token", tt.isAdmin, "the-key")
+			tok.ExpiresAt = tt.expiresAt
+			authenticator := NewAuthenticator(store, NewBootstrapService(store, "master-key"))
+
+			called := false
+			handler := authenticator.Authenticate(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				called = true
+				w.WriteHeader(http.StatusOK)
+			}))
+			req := httptest.NewRequest("GET", "/dnszone", nil)
+			req.Header.Set("AccessKey", "the-key")
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, req)
+
+			if rec.Code != tt.wantStatus {
+				t.Errorf("status = %d, want %d (body: %s)", rec.Code, tt.wantStatus, rec.Body.String())
+			}
+			if called != (tt.wantStatus == http.StatusOK) {
+				t.Errorf("next handler called = %v, want %v", called, tt.wantStatus == http.StatusOK)
+			}
+		})
 	}
 }

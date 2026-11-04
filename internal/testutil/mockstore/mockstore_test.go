@@ -3,6 +3,7 @@ package mockstore
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/sipico/bunny-api-proxy/internal/storage"
 )
@@ -272,5 +273,36 @@ func TestMockStorage_CustomFunctions(t *testing.T) {
 
 	if has, err := mock.HasAnyAdminToken(ctx); !has || err != customErr {
 		t.Error("HasAnyAdminToken custom function not called")
+	}
+}
+
+func TestCreateTokenWithExpiry(t *testing.T) {
+	t.Parallel()
+	expires := time.Now().Add(time.Hour)
+
+	// Custom function is used when set.
+	m := &MockStorage{CreateTokenWithExpiryFunc: func(ctx context.Context, name string, isAdmin bool, keyHash string, expiresAt *time.Time) (*storage.Token, error) {
+		return &storage.Token{ID: 42, ExpiresAt: expiresAt}, nil
+	}}
+	tok, err := m.CreateTokenWithExpiry(context.Background(), "n", true, "h", &expires)
+	if err != nil || tok.ID != 42 || tok.ExpiresAt != &expires {
+		t.Errorf("custom func not used: tok=%+v err=%v", tok, err)
+	}
+
+	// Without it, CreateToken (and its CreateTokenFunc) is used and the expiry is set.
+	m = &MockStorage{CreateTokenFunc: func(ctx context.Context, name string, isAdmin bool, keyHash string) (*storage.Token, error) {
+		return &storage.Token{ID: 7, Name: name}, nil
+	}}
+	tok, err = m.CreateTokenWithExpiry(context.Background(), "n", false, "h", &expires)
+	if err != nil || tok.ID != 7 || tok.ExpiresAt != &expires {
+		t.Errorf("fallback failed: tok=%+v err=%v", tok, err)
+	}
+
+	// Errors from the fallback are returned.
+	m = &MockStorage{CreateTokenFunc: func(ctx context.Context, name string, isAdmin bool, keyHash string) (*storage.Token, error) {
+		return nil, storage.ErrDuplicate
+	}}
+	if _, err := m.CreateTokenWithExpiry(context.Background(), "n", false, "h", nil); err != storage.ErrDuplicate {
+		t.Errorf("expected ErrDuplicate, got %v", err)
 	}
 }
