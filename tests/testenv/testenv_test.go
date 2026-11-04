@@ -365,6 +365,41 @@ func TestCreateTestZones_ZoneNaming(t *testing.T) {
 	}
 }
 
+// TestGetCommitHash_RunIDOverride verifies that E2E_RUN_ID takes precedence
+// over git. CI sets it because the test-runner container has no .git
+// directory (excluded by .dockerignore), so git-based naming is unavailable.
+func TestGetCommitHash_RunIDOverride(t *testing.T) {
+	t.Setenv("E2E_RUN_ID", "r41898647859a1")
+
+	if got := getCommitHash(); got != "r41898647859a1" {
+		t.Errorf("Expected E2E_RUN_ID to be used, got %q", got)
+	}
+}
+
+// TestGetCommitHash_InvalidRunIDIgnored verifies that values which would
+// produce an invalid or surprising DNS label are ignored in favour of the
+// normal git/timestamp fallback.
+func TestGetCommitHash_InvalidRunIDIgnored(t *testing.T) {
+	invalid := []string{
+		"",                           // empty
+		"UPPER",                      // uppercase
+		"has-dash",                   // dash would break the {index}-{id}-bap.xyz format
+		"has.dot",                    // dot would create a subdomain
+		"has space",                  // whitespace
+		"r123456789012345678901234a", // longer than 20 characters
+	}
+
+	for _, value := range invalid {
+		t.Run(value, func(t *testing.T) {
+			t.Setenv("E2E_RUN_ID", value)
+
+			if got := getCommitHash(); got == value && value != "" {
+				t.Errorf("Expected invalid E2E_RUN_ID %q to be ignored", value)
+			}
+		})
+	}
+}
+
 // TestGetCommitHash_FallbackBehavior verifies commit hash is never empty.
 func TestGetCommitHash_FallbackBehavior(t *testing.T) {
 	hash := getCommitHash()
