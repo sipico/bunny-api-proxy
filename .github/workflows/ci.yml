@@ -5,6 +5,10 @@ on:
     branches: [ main, 'claude/**' ]
   pull_request:
     branches: [ main ]
+  # Manual run (Actions -> CI -> Run workflow, pick a branch). Runs as the
+  # person who starts it, with Actions secrets. Used to run real-API E2E on
+  # Dependabot PRs, where that job is skipped automatically (see below).
+  workflow_dispatch:
 
 # Cancel in-progress CI for the same PR/branch when new commits are pushed
 concurrency:
@@ -289,6 +293,11 @@ jobs:
     name: E2E Tests (Mock)
     runs-on: ubuntu-latest
     needs: [test, lint, docker]  # Wait for Docker images to be built
+    env:
+      # Not a secret: proxy, mockbunny and the test runner only need to agree
+      # on the same non-empty value, and mockbunny protects nothing. A fixed
+      # value lets mock E2E run on Dependabot PRs, which get no Actions secrets.
+      MOCK_E2E_KEY: mock-e2e-not-a-secret
 
     steps:
       - name: Checkout code
@@ -319,13 +328,13 @@ jobs:
 
       - name: Start services (Mock Mode - using pre-built images)
         env:
-          BUNNY_MASTER_API_KEY: ${{ secrets.MOCKBUNNY_API_TEST_KEY }}
+          BUNNY_MASTER_API_KEY: ${{ env.MOCK_E2E_KEY }}
         run: |
           docker compose -f .claude/docker/docker-compose.test.yml --profile mock up -d
 
       - name: Wait for services to be healthy
         env:
-          BUNNY_MASTER_API_KEY: ${{ secrets.MOCKBUNNY_API_TEST_KEY }}
+          BUNNY_MASTER_API_KEY: ${{ env.MOCK_E2E_KEY }}
         run: |
           echo "Waiting for services..."
           timeout 60 bash -c 'until docker compose -f .claude/docker/docker-compose.test.yml ps | grep -q "healthy"; do sleep 2; done'
@@ -333,7 +342,7 @@ jobs:
 
       - name: Run E2E tests
         env:
-          BUNNY_MASTER_API_KEY: ${{ secrets.MOCKBUNNY_API_TEST_KEY }}
+          BUNNY_MASTER_API_KEY: ${{ env.MOCK_E2E_KEY }}
           # Unique per run + attempt; used in test zone names (see tests/testenv getCommitHash)
           E2E_RUN_ID: r${{ github.run_id }}a${{ github.run_attempt }}
         run: |
@@ -344,7 +353,7 @@ jobs:
       - name: Collect logs
         if: always()
         env:
-          BUNNY_MASTER_API_KEY: ${{ secrets.MOCKBUNNY_API_TEST_KEY }}
+          BUNNY_MASTER_API_KEY: ${{ env.MOCK_E2E_KEY }}
         run: |
           mkdir -p e2e-logs
           docker compose -f .claude/docker/docker-compose.test.yml logs proxy > e2e-logs/proxy.log 2>&1 || true
@@ -367,7 +376,7 @@ jobs:
       - name: Cleanup
         if: always()
         env:
-          BUNNY_MASTER_API_KEY: ${{ secrets.MOCKBUNNY_API_TEST_KEY }}
+          BUNNY_MASTER_API_KEY: ${{ env.MOCK_E2E_KEY }}
         run: |
           docker compose -f .claude/docker/docker-compose.test.yml down -v
 
@@ -375,8 +384,13 @@ jobs:
     name: E2E Tests (Real Bunny.net API)
     runs-on: ubuntu-latest
     needs: [test, lint, docker]  # Runs in parallel with mock E2E (separate runner, no interference)
-    # Only run on PRs to main
-    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    # Runs on PRs to main and on manual runs (workflow_dispatch).
+    # Skipped for Dependabot: the real bunny.net key is never exposed to a run
+    # Dependabot started. Run it yourself on a Dependabot branch via
+    # Actions -> CI -> Run workflow. A skipped check counts as passing.
+    if: >-
+      (github.event_name == 'pull_request' && github.base_ref == 'main' && github.actor != 'dependabot[bot]')
+      || github.event_name == 'workflow_dispatch'
 
     steps:
       # Multiple PRs share one bunny.net account — serialize real API E2E to avoid
