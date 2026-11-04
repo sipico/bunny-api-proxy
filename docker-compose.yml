@@ -94,6 +94,24 @@ services:
       com.example.description: "API proxy for bunny.net with scoped API keys"
 
 # Named volume for persistent data storage
+# The SQLite database contains token hashes: restrict access to it.
+# The container runs as the distroless "nonroot" user (UID/GID 65532), which
+# must own the data directory, or the proxy cannot create its database.
+#
+# Option B (default below): host bind mount, for direct access to the file.
+# One-time setup, before the first `docker compose up`:
+#   mkdir -p ./data
+#   sudo chown 65532:65532 ./data   # nonroot user UID/GID from the distroless image
+#   chmod 700 ./data                # owner-only access
+#
+# Option A: Docker-managed volume (no host directory to manage).
+# Remove the driver_opts block below. The image has no /data directory, so
+# Docker creates the new volume owned by root; give it to UID 65532 once:
+#   docker volume create bunny-api-proxy_bunny_data
+#   docker run --rm -v bunny-api-proxy_bunny_data:/data alpine chown 65532:65532 /data
+#   (the volume name is <project>_bunny_data; check with `docker volume ls`)
+#
+# Never share the database volume between multiple containers.
 volumes:
   bunny_data:
     # Use local driver (data on host machine)
@@ -102,6 +120,7 @@ volumes:
     # - NFS mount for distributed deployments
     # - Block storage services (EBS, GCE Persistent Disks)
     # - Managed storage (Docker Enterprise, cloud providers)
+    # Option B: host bind mount (remove these four lines for Option A)
     driver_opts:
       type: none
       o: bind

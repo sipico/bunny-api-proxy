@@ -389,6 +389,14 @@ The master key comparison hashes the provided key with SHA-256 and compares it a
    - Survives container restarts
    - Can be backed up independently
 
+4. **Volume Permissions**
+   - The SQLite database contains token hashes: restrict access to it
+   - The container runs as the distroless `nonroot` user (UID/GID 65532), which must own the data directory
+   - **Bind mounts:** `chown 65532:65532` and `chmod 700` the host directory before the first start
+   - **Docker-managed volumes:** the image has no `/data` directory, so Docker creates a new volume owned by root. Give it to UID 65532 once, for example `docker run --rm -v <volume>:/data alpine chown 65532:65532 /data`
+   - Never share the database volume between multiple containers
+   - See the comments in `docker-compose.yml` for both setups
+
 #### Container Orchestration (Kubernetes)
 
 1. **Secrets**
