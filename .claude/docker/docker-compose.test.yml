@@ -29,7 +29,7 @@ services:
       - HTTP_PORT=8080
       - DATA_PATH=/data/proxy.db
       - BUNNY_API_URL=${BUNNY_API_URL-http://mockbunny:8081}  # Default to mock only if unset (not if empty)
-      - BUNNY_API_KEY=${BUNNY_MASTER_API_KEY}  # Master key (MOCKBUNNY_API_TEST_KEY or BUNNY_API_TEST_KEY)
+      - BUNNY_API_KEY=${BUNNY_MASTER_API_KEY}  # Master key (fixed dummy value in mock mode, BUNNY_API_TEST_KEY for real API)
     depends_on:
       mockbunny:
         condition: service_healthy
