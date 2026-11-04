@@ -94,9 +94,15 @@ func (b *BootstrapService) CanUseMasterKey(ctx context.Context) (bool, error) {
 
 // ValidateMasterKey checks if the key is valid AND can be used
 // Returns true only if: key matches AND system is UNCONFIGURED
+//
+// SECURITY: Both checks always run, whatever the key. Skipping the state
+// lookup for non-matching keys made the master key distinguishable by
+// response time (CWE-208, issue #391).
 func (b *BootstrapService) ValidateMasterKey(ctx context.Context, key string) (bool, error) {
-	if !b.IsMasterKey(key) {
-		return false, nil
+	isMaster := b.IsMasterKey(key)
+	canUse, err := b.CanUseMasterKey(ctx)
+	if err != nil {
+		return false, err
 	}
-	return b.CanUseMasterKey(ctx)
+	return isMaster && canUse, nil
 }

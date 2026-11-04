@@ -28,21 +28,29 @@ func (h *Handler) TokenAuthMiddleware(next http.Handler) http.Handler {
 
 		ctx := r.Context()
 
-		// First, check if this is the master API key using the bootstrap service
-		if h.bootstrap != nil && h.bootstrap.IsMasterKey(token) {
-			// Master key is allowed only during bootstrap (UNCONFIGURED state)
-			canUse, err := h.bootstrap.CanUseMasterKey(ctx)
+		// SECURITY: Every request performs the same work (master key check,
+		// bootstrap state lookup and token lookup), and a locked master key
+		// gets exactly the same response as an unknown key. Otherwise the
+		// master key could be identified by response time or by a distinct
+		// error (CWE-208, issue #391).
+		isMasterKey := false
+		canUseMasterKey := false
+		if h.bootstrap != nil {
+			isMasterKey = h.bootstrap.IsMasterKey(token)
+			var err error
+			canUseMasterKey, err = h.bootstrap.CanUseMasterKey(ctx)
 			if err != nil {
 				h.logger.Error("failed to check bootstrap state", "error", err)
 				http.Error(w, "Internal error", http.StatusInternalServerError)
 				return
 			}
-			if !canUse {
-				WriteError(w, http.StatusForbidden, ErrCodeMasterKeyLocked,
-					"Master API key is locked. Use an admin token instead.")
-				return
-			}
-			// Master key authenticated - set context flags
+		}
+
+		// Check against unified tokens (Issue 147)
+		unifiedToken, err := h.validateUnifiedToken(ctx, token)
+
+		// Master key is allowed only during bootstrap (UNCONFIGURED state)
+		if isMasterKey && canUseMasterKey {
 			ctx = auth.WithMasterKey(ctx, true)
 			ctx = auth.WithAdmin(ctx, true)
 			h.logger.Debug("admin API request via master key")
@@ -50,8 +58,15 @@ func (h *Handler) TokenAuthMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		// Check against unified tokens (Issue 147)
-		unifiedToken, err := h.validateUnifiedToken(ctx, token)
+		if isMasterKey {
+			// Locked master key: the hint goes to the server log only. The
+			// client gets the same 401 as any invalid token below.
+			h.logger.Warn("master API key used after bootstrap; it is locked, use an admin token instead",
+				"remote_addr", r.RemoteAddr)
+			http.Error(w, "Invalid token", http.StatusUnauthorized)
+			return
+		}
+
 		if err == nil && unifiedToken != nil {
 			// Add token and admin status to context
 			ctx = auth.WithToken(ctx, unifiedToken)

@@ -74,7 +74,7 @@ Example permission model:
 **Security notes**:
 - Bootstrap requires the bunny.net master API key
 - The master key hash is stored when setting up the proxy
-- Once an admin token exists, master key returns 403 Forbidden
+- Once an admin token exists, master key returns 401 Unauthorized, identical to any invalid key, and every request performs the same checks, so the master key cannot be identified by response or timing (CWE-208)
 
 ### 2.2 Admin API Authentication
 

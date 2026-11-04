@@ -1279,16 +1279,15 @@ func TestE2E_BootstrapFlowFresh(t *testing.T) {
 		resp := env.MakeRequestWithMasterKey(t, "POST", "/admin/api/tokens", tokenBody)
 		defer resp.Body.Close()
 
-		require.Equal(t, http.StatusForbidden, resp.StatusCode,
+		// A locked master key gets the same response as any unknown key, so
+		// it cannot be identified by its error response (issue #391).
+		require.Equal(t, http.StatusUnauthorized, resp.StatusCode,
 			"master key should be locked out after first admin token is created")
 
-		var errResp struct {
-			Error string `json:"error"`
-		}
-		err := json.NewDecoder(resp.Body).Decode(&errResp)
+		body, err := io.ReadAll(resp.Body)
 		require.NoError(t, err)
-		require.Equal(t, "master_key_locked", errResp.Error,
-			"error should indicate master key is locked")
+		require.Equal(t, "Invalid token\n", string(body),
+			"locked master key should get the same body as an invalid token")
 	})
 
 	// Step 4: Create test zones for DNS operations
