@@ -47,7 +47,7 @@ jobs:
 
       - name: Checkout code
         if: steps.check.outputs.should_skip != 'true'
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -96,7 +96,7 @@ jobs:
     if: needs.preflight.outputs.should_skip != 'true' && needs.preflight.outputs.docs_only != 'true'
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set up Go
         uses: actions/setup-go@v7
@@ -122,7 +122,7 @@ jobs:
     if: needs.preflight.outputs.should_skip != 'true' && needs.preflight.outputs.docs_only != 'true'
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set up Go
         uses: actions/setup-go@v7
@@ -154,7 +154,7 @@ jobs:
     if: needs.preflight.outputs.should_skip != 'true' && needs.preflight.outputs.docs_only != 'true'
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set up Go
         uses: actions/setup-go@v7
@@ -174,7 +174,7 @@ jobs:
     if: github.ref != 'refs/heads/main'
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set up Go
         uses: actions/setup-go@v7
@@ -211,7 +211,7 @@ jobs:
     needs: [test, lint, build]  # Wait for binary to be built
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Create build contexts for pre-built binaries
         run: |
@@ -301,7 +301,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Download Docker images
         uses: actions/download-artifact@v8
@@ -458,7 +458,7 @@ jobs:
           fi
 
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Download Docker images
         uses: actions/download-artifact@v8
