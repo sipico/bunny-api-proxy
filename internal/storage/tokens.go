@@ -77,9 +77,11 @@ func (s *SQLiteStorage) GetTokenByID(ctx context.Context, id int64) (*Token, err
 	var t Token
 
 	err := s.db.QueryRowContext(ctx,
-		"SELECT id, key_hash, name, is_admin, created_at FROM tokens WHERE id = ?",
+		// key_hash is deliberately not loaded: only authentication
+		// (GetTokenByHash) needs it (issue #397).
+		"SELECT id, name, is_admin, created_at FROM tokens WHERE id = ?",
 		id).
-		Scan(&t.ID, &t.KeyHash, &t.Name, &t.IsAdmin, &t.CreatedAt)
+		Scan(&t.ID, &t.Name, &t.IsAdmin, &t.CreatedAt)
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -95,7 +97,9 @@ func (s *SQLiteStorage) GetTokenByID(ctx context.Context, id int64) (*Token, err
 // Returns empty slice if no tokens exist.
 func (s *SQLiteStorage) ListTokens(ctx context.Context) ([]*Token, error) {
 	rows, err := s.db.QueryContext(ctx,
-		"SELECT id, key_hash, name, is_admin, created_at FROM tokens ORDER BY created_at DESC, id DESC")
+		// key_hash is deliberately not loaded: only authentication
+		// (GetTokenByHash) needs it (issue #397).
+		"SELECT id, name, is_admin, created_at FROM tokens ORDER BY created_at DESC, id DESC")
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to query tokens: %w", err)
@@ -106,7 +110,7 @@ func (s *SQLiteStorage) ListTokens(ctx context.Context) ([]*Token, error) {
 
 	for rows.Next() {
 		var t Token
-		err := rows.Scan(&t.ID, &t.KeyHash, &t.Name, &t.IsAdmin, &t.CreatedAt)
+		err := rows.Scan(&t.ID, &t.Name, &t.IsAdmin, &t.CreatedAt)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan token row: %w", err)
 		}

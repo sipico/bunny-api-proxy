@@ -4,7 +4,9 @@ import "time"
 
 // Token represents a unified token for admin or scoped access.
 type Token struct {
-	ID        int64
+	ID int64
+	// KeyHash is the SHA-256 hash of the token. SECURITY: only populated by
+	// GetTokenByHash (authentication); never include it in API responses.
 	KeyHash   string
 	Name      string
 	IsAdmin   bool
