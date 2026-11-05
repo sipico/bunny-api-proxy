@@ -1,10 +1,32 @@
 name: bunny.net API probe
 
-# TEMPORARY on branch claude/upbeat-shannon-gqlzcc only: PUT retry
-# experiment (_experiments/putretry). Reverted after the run; main keeps
-# the real probe workflow.
+# Checks the real bunny.net DNS API against its published documentation:
+#   1. downloads the live OpenAPI spec and lists what changed since the
+#      snapshot in docs/bunny-api-official-docs/openapi-v3.json
+#   2. runs a scenario on ONE temporary zone (<run>-bapprobe.xyz) that it
+#      creates and deletes itself, and validates every real response against
+#      the live spec
+# Results: job summary (report.md) and the "api-probe" artifact
+# (report, sanitised recordings.json, live-spec.json).
+#
+# The probe only deletes zones ending in -bapprobe.xyz (its own, including
+# leftovers of earlier runs). E2E test zones (-bap.xyz) are never touched, so
+# it does not need the E2E real-API lock.
+#
+# Runs monthly and fails when bunny.net changed its spec since the snapshot,
+# or a real response differs from the docs in a way that is not a known
+# deviation (docs/bunny-api-official-docs/known-deviations.json). A failed
+# scheduled run e-mails the repository owner. What to do then:
+#   - spec changes: download the live spec (artifact live-spec.json) into
+#     docs/bunny-api-official-docs/openapi-v3.json and adapt the proxy and
+#     mockbunny where needed (TestMockbunnyConformsToSpec checks the mock);
+#   - a new difference that is a confirmed bunny.net mistake: add it to
+#     known-deviations.json with the evidence;
+#   - a known deviation "not seen": bunny.net fixed it; remove the entry.
 
 on:
+  schedule:
+    - cron: '41 3 4 * *'  # 4th of every month, 03:41 UTC
   workflow_dispatch:
 
 permissions:
@@ -15,10 +37,10 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  experiment:
-    name: PUT retry experiment
+  probe:
+    name: Probe real API
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
@@ -28,9 +50,30 @@ jobs:
         with:
           go-version: '1.27.3'
 
-      - name: Run experiment
+      - name: Run probe
         env:
           BUNNY_API_KEY: ${{ secrets.BUNNY_API_TEST_KEY }}
         run: |
-          go run ./_experiments/putretry -run-id "x${GITHUB_RUN_ID}" | tee result.md
-          cat result.md >> "$GITHUB_STEP_SUMMARY"
+          go run ./cmd/apiprobe \
+            -base-url https://api.bunny.net \
+            -out probe-out \
+            -run-id "r${GITHUB_RUN_ID}a${GITHUB_RUN_ATTEMPT}" \
+            -fail-on-findings
+
+      - name: Job summary
+        if: always()
+        run: |
+          if [ -f probe-out/report.md ]; then
+            cat probe-out/report.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "The probe did not produce a report; see the 'Run probe' log." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: api-probe
+          path: probe-out/
+          retention-days: 90
+          if-no-files-found: warn
