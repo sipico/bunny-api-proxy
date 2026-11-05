@@ -23,6 +23,7 @@ import (
 	"github.com/sipico/bunny-api-proxy/internal/bunny"
 	"github.com/sipico/bunny-api-proxy/internal/config"
 	"github.com/sipico/bunny-api-proxy/internal/metrics"
+	appmiddleware "github.com/sipico/bunny-api-proxy/internal/middleware"
 	"github.com/sipico/bunny-api-proxy/internal/proxy"
 	"github.com/sipico/bunny-api-proxy/internal/storage"
 )
@@ -175,6 +176,7 @@ func initializeComponents(cfg *config.Config) (*serverComponents, error) {
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 	r.Use(metrics.Middleware)
+	r.Use(appmiddleware.SecurityHeaders)
 
 	r.Get("/health", healthHandler)
 	r.Get("/ready", readyHandler(store))

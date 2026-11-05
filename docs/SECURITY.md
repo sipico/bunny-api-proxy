@@ -567,16 +567,23 @@ Rate limiting is implemented at the reverse proxy layer, not in the application,
 
 ## 6. Security Headers
 
-The Bunny API Proxy sets security-focused HTTP headers on responses:
+The Bunny API Proxy sets security-focused HTTP headers on every response, including errors (`internal/middleware/security_headers.go`):
 
-### JSON Responses (API)
 ```http
-Content-Type: application/json
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+Cache-Control: no-store
 ```
+
+- `nosniff` prevents MIME type sniffing
+- `DENY` prevents responses from being framed (clickjacking)
+- `no-store` keeps API responses, which can contain tokens or zone data, out of caches
+
+JSON responses also carry `Content-Type: application/json`.
 
 ### Recommended Reverse Proxy Headers
 
-The proxy runs behind a reverse proxy, which should add:
+The proxy runs behind a reverse proxy. Repeating the headers above there is harmless; the reverse proxy should additionally set the transport and browser hardening headers the application cannot know about, such as HSTS:
 
 ```http
 Strict-Transport-Security: max-age=31536000; includeSubDomains
