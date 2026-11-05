@@ -206,8 +206,8 @@ type CreateUnifiedTokenRequest struct {
 	Zones       []int64  `json:"zones,omitempty"`
 	Actions     []string `json:"actions,omitempty"`
 	RecordTypes []string `json:"record_types,omitempty"`
-	// ExpiresAt is an optional expiry time (RFC 3339). Omit it for a token
-	// that never expires; it must lie in the future (issue #400).
+	// ExpiresAt is an optional expiry time (RFC 3339), scoped tokens only.
+	// Omit it for a token that never expires; it must lie in the future (issue #400).
 	ExpiresAt *time.Time `json:"expires_at,omitempty"`
 }
 
@@ -239,6 +239,16 @@ func (h *Handler) HandleCreateUnifiedToken(w http.ResponseWriter, r *http.Reques
 
 	if req.Name == "" {
 		WriteError(w, http.StatusBadRequest, ErrCodeInvalidRequest, "Token name is required")
+		return
+	}
+
+	// Expiry is only supported for scoped tokens. If the last admin token
+	// expired, nobody could manage tokens anymore: the master key stays
+	// locked while any admin token exists (issue #400, option C).
+	if req.ExpiresAt != nil && req.IsAdmin {
+		WriteErrorWithHint(w, http.StatusBadRequest, ErrCodeInvalidRequest,
+			"expires_at is only supported for scoped tokens",
+			"Omit expires_at for admin tokens; revoke them by deleting them instead.")
 		return
 	}
 

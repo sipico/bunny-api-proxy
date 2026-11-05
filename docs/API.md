@@ -189,7 +189,7 @@ Create a new admin or scoped token.
 }
 ```
 
-**Optional expiry:** add `"expires_at": "2027-01-01T00:00:00Z"` (RFC 3339) to either body. The token is rejected with `401 Token expired` after that time. Omit it for a token that never expires (the default). An `expires_at` that is not in the future gets `400 invalid_request`. Token list, detail and creation responses include `expires_at` when it is set.
+**Optional expiry (scoped tokens only):** add `"expires_at": "2027-01-01T00:00:00Z"` (RFC 3339) to a scoped token request. The token is rejected with `401 Token expired` after that time. Omit it for a token that never expires (the default). An `expires_at` that is not in the future, or one on an admin token, gets `400 invalid_request`. Admin tokens cannot expire: if the last admin token expired, nobody could manage tokens, because the master key stays locked while an admin token exists. Revoke admin tokens by deleting them. Token list, detail and creation responses include `expires_at` when it is set.
 
 **Example Request (Create Admin Token):**
 ```bash

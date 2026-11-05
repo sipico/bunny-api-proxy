@@ -1274,15 +1274,20 @@ func TestHandleCreateUnifiedToken_ExpiresAt(t *testing.T) {
 
 	tests := []struct {
 		name        string
+		isAdmin     bool
 		expiresAt   *time.Time
 		wantStatus  int
 		wantStored  *time.Time
 		wantInBody  string
 		wantNoField bool
 	}{
-		{"future expiry", &future, http.StatusCreated, &future, `"expires_at":"` + future.Format(time.RFC3339) + `"`, false},
-		{"past expiry rejected", &past, http.StatusBadRequest, nil, "expires_at", false},
-		{"no expiry", nil, http.StatusCreated, nil, `"is_admin":true`, true},
+		{"scoped, future expiry", false, &future, http.StatusCreated, &future, `"expires_at":"` + future.Format(time.RFC3339) + `"`, false},
+		{"scoped, past expiry rejected", false, &past, http.StatusBadRequest, nil, "expires_at", false},
+		{"scoped, no expiry", false, nil, http.StatusCreated, nil, `"is_admin":false`, true},
+		// Expiry is only for scoped tokens: an expired last admin token would
+		// lock everyone out, because the master key stays locked (issue #400).
+		{"admin, expiry rejected", true, &future, http.StatusBadRequest, nil, "scoped tokens", false},
+		{"admin, no expiry", true, nil, http.StatusCreated, nil, `"is_admin":true`, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1298,7 +1303,13 @@ func TestHandleCreateUnifiedToken_ExpiresAt(t *testing.T) {
 			}
 			h := NewHandler(mock, new(slog.LevelVar), slog.Default())
 
-			body, _ := json.Marshal(CreateUnifiedTokenRequest{Name: "admin", IsAdmin: true, ExpiresAt: tt.expiresAt})
+			req := CreateUnifiedTokenRequest{Name: "token", IsAdmin: tt.isAdmin, ExpiresAt: tt.expiresAt}
+			if !tt.isAdmin {
+				req.Zones = []int64{123}
+				req.Actions = []string{"add_record"}
+				req.RecordTypes = []string{"TXT"}
+			}
+			body, _ := json.Marshal(req)
 			w := httptest.NewRecorder()
 			h.HandleCreateUnifiedToken(w, httptest.NewRequest(http.MethodPost, "/api/tokens", bytes.NewReader(body)))
 
