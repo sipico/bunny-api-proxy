@@ -107,6 +107,20 @@ func (s *Server) handleGetZone(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, shortZone)
 }
 
+// acceptedRecordType reports whether the real API accepts a record of this
+// type when it is added. The API probe showed that it rejects types outside
+// 0-15 and also Flatten (6), although the spec still lists 6, with 400
+// validation_error, Field "Type", "Unknown record type".
+func acceptedRecordType(t int) bool {
+	return t >= 0 && t <= 15 && t != 6
+}
+
+// handleListPullZones handles GET /pullzone. mockbunny has no pull zones, so
+// the list is always empty; with perPage the real API returns a plain array.
+func (s *Server) handleListPullZones(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, []struct{}{})
+}
+
 // handleListRecords handles GET /dnszone/{zoneId}/records like bunny.net:
 // a paginated list (CurrentPage, TotalItems, HasMoreItems, Items) with the
 // optional query parameters page (>= 1, default 1), perPage (5-1000,
@@ -319,7 +333,10 @@ func (s *Server) handleAddRecord(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Validate required fields
-	// Type is validated implicitly (must be provided as int 0-12)
+	if !acceptedRecordType(req.Type) {
+		s.writeError(w, http.StatusBadRequest, "validation_error", "Type", "Unknown record type")
+		return
+	}
 	if req.Value == "" {
 		s.writeError(w, http.StatusBadRequest, "validation_error", "Value", "Value is required")
 		return
@@ -742,7 +759,7 @@ func (s *Server) handleExportRecords(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(&sb, "%s\t%d\tIN\t%s\t%s\n", rec.Name, rec.TTL, typeName, rec.Value)
 	}
 
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("Content-Type", "text/plain") // exactly what the real API sends (API probe)
 	w.WriteHeader(http.StatusOK)
 	//nolint:errcheck
 	w.Write([]byte(sb.String()))

@@ -13,10 +13,20 @@ name: bunny.net API probe
 # leftovers of earlier runs). E2E test zones (-bap.xyz) are never touched, so
 # it does not need the E2E real-API lock.
 #
-# Manual only for now. A monthly schedule follows once the first real runs
-# show which differences between the docs and the real API are expected.
+# Runs monthly and fails when bunny.net changed its spec since the snapshot,
+# or a real response differs from the docs in a way that is not a known
+# deviation (docs/bunny-api-official-docs/known-deviations.json). A failed
+# scheduled run e-mails the repository owner. What to do then:
+#   - spec changes: download the live spec (artifact live-spec.json) into
+#     docs/bunny-api-official-docs/openapi-v3.json and adapt the proxy and
+#     mockbunny where needed (TestMockbunnyConformsToSpec checks the mock);
+#   - a new difference that is a confirmed bunny.net mistake: add it to
+#     known-deviations.json with the evidence;
+#   - a known deviation "not seen": bunny.net fixed it; remove the entry.
 
 on:
+  schedule:
+    - cron: '41 3 4 * *'  # 4th of every month, 03:41 UTC
   workflow_dispatch:
 
 permissions:
@@ -47,7 +57,8 @@ jobs:
           go run ./cmd/apiprobe \
             -base-url https://api.bunny.net \
             -out probe-out \
-            -run-id "r${GITHUB_RUN_ID}a${GITHUB_RUN_ATTEMPT}"
+            -run-id "r${GITHUB_RUN_ID}a${GITHUB_RUN_ATTEMPT}" \
+            -fail-on-findings
 
       - name: Job summary
         if: always()

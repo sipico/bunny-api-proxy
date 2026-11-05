@@ -1891,8 +1891,8 @@ func TestHandleExportRecords_Success(t *testing.T) {
 	}
 
 	ct := resp.Header.Get("Content-Type")
-	if ct != "text/plain; charset=utf-8" {
-		t.Errorf("expected Content-Type text/plain; charset=utf-8, got %s", ct)
+	if ct != "text/plain" { // what the real API sends
+		t.Errorf("expected Content-Type text/plain, got %s", ct)
 	}
 
 	body, _ := io.ReadAll(resp.Body)

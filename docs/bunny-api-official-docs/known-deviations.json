@@ -1,0 +1,13 @@
+[
+  {
+    "id": "date-time-without-zone",
+    "match": "doesn't match the format \"date-time\"",
+    "reason": "GET /dnszone and GET /dnszone/{id} return DateCreated, DateModified and NameserversNextCheck without a time zone (for example 2026-11-05T06:28:35), while the spec says date-time (RFC 3339). Creating a zone does return RFC 3339 (2026-11-05T06:27:51.5193271Z). Seen in every API probe run since 2026-11-05 and in the real-API E2E debug logs. The proxy accepts both forms (bunny.BunnyTime); mockbunny copies the behaviour."
+  },
+  {
+    "id": "export-content-type",
+    "step": "export records",
+    "match": "response header Content-Type has unexpected value: \"text/plain\"",
+    "reason": "GET /dnszone/{id}/export returns a BIND zone file as text/plain; the spec documents application/octet-stream. Seen in every API probe run since 2026-11-05 and in the real-API E2E debug logs. mockbunny copies the behaviour."
+  }
+]
