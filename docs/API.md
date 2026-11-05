@@ -328,7 +328,7 @@ The proxy currently implements 7 endpoints for DNS zone and record management. F
 | Get DNS Zone Details | GET | `/dnszone/{zoneID}` |
 | Delete DNS Zone | DELETE | `/dnszone/{zoneID}` |
 | List DNS Records | GET | `/dnszone/{zoneID}/records` |
-| Add DNS Record | POST | `/dnszone/{zoneID}/records` |
+| Add DNS Record | PUT (POST also accepted) | `/dnszone/{zoneID}/records` |
 | Delete DNS Record | DELETE | `/dnszone/{zoneID}/records/{recordID}` |
 
 For details on request/response formats and full specifications for all bunny.net endpoints, refer to the [Official bunny.net DNS Zone API Documentation](bunny-api-official-docs/).
@@ -421,15 +421,24 @@ See [Official Documentation](bunny-api-official-docs/dnszone-delete.md) for comp
 
 ### GET /dnszone/{zoneID}/records
 
-List all DNS records in a zone.
+List the DNS records of a zone, exactly like bunny.net's `GET /dnszone/{zoneId}/records`: a paginated list.
 
 **Authentication:** AccessKey required
 **Permissions Required:** `list_records` action
 **Path Parameters:** `zoneID` - The zone ID
+**Query Parameters (all optional):**
+- `page` - page number, at least 1 (default 1)
+- `perPage` - records per page, 5 to 1000 (default 1000)
+- `type` - only records of this bunny.net record type (0-15, for example `3` for TXT)
+- `search` - only records whose name contains this text
+
+Invalid values get `400`.
+
+**Scoped tokens** only see the record types they may access. `TotalItems`, `HasMoreItems` and the pages count only those records, so the number of hidden records cannot be inferred. Asking for a `type` the token may not see returns an empty list.
 
 **Example Request:**
 ```bash
-curl -X GET http://localhost:8080/dnszone/123456/records \
+curl "http://localhost:8080/dnszone/123456/records?type=3&perPage=50" \
   -H "AccessKey: your-scoped-api-key"
 ```
 
@@ -444,15 +453,18 @@ curl -X GET http://localhost:8080/dnszone/123456/records \
       "Value": "validation-token",
       "Ttl": 300
     }
-  ]
+  ],
+  "CurrentPage": 1,
+  "TotalItems": 1,
+  "HasMoreItems": false
 }
 ```
 
 ---
 
-### POST /dnszone/{zoneID}/records
+### PUT /dnszone/{zoneID}/records
 
-Create a new DNS record in the specified zone.
+Create a new DNS record in the specified zone. `PUT` is bunny.net's method; `POST` to the same path works too, for clients of older proxy versions.
 
 **Authentication:** AccessKey required
 **Permissions Required:** `add_record` action
@@ -467,7 +479,7 @@ Create a new DNS record in the specified zone.
 
 **Example Request (ACME DNS-01):**
 ```bash
-curl -X POST http://localhost:8080/dnszone/123456/records \
+curl -X PUT http://localhost:8080/dnszone/123456/records \
   -H "AccessKey: your-scoped-api-key" \
   -H "Content-Type: application/json" \
   -d '{
@@ -665,7 +677,7 @@ PROXY_URL="http://localhost:8080"
 
 if [ "$CERTBOT_AUTH_OUTPUT" ]; then
   # Add validation record
-  curl -X POST "$PROXY_URL/dnszone/$ZONE_ID/records" \
+  curl -X PUT "$PROXY_URL/dnszone/$ZONE_ID/records" \
     -H "AccessKey: $ACME_TOKEN" \
     -H "Content-Type: application/json" \
     -d "{

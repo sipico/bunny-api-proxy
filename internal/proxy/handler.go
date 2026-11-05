@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -26,6 +27,9 @@ type BunnyClient interface {
 
 	// GetZone retrieves a single zone by ID, including all records.
 	GetZone(ctx context.Context, id int64) (*bunny.Zone, error)
+
+	// ListRecords retrieves one page of a zone's records (GET /dnszone/{id}/records).
+	ListRecords(ctx context.Context, zoneID int64, opts *bunny.ListRecordsOptions) (*bunny.ListRecordsResponse, error)
 
 	// DeleteZone deletes a DNS zone by ID.
 	DeleteZone(ctx context.Context, id int64) error
@@ -588,36 +592,91 @@ func (h *Handler) HandleGetScanResult(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, result)
 }
 
-// HandleListRecords lists all DNS records for a zone.
-func (h *Handler) HandleListRecords(w http.ResponseWriter, r *http.Request) {
-	zoneIDStr := chi.URLParam(r, "zoneID")
-	if zoneIDStr == "" {
-		writeError(w, http.StatusBadRequest, "missing zone ID")
-		return
-	}
+// Paging limits of bunny.net's GET /dnszone/{zoneId}/records.
+const (
+	recordsDefaultPerPage = 1000
+	recordsMinPerPage     = 5
+	recordsMaxPerPage     = 1000
+	// recordsMaxPages bounds how many bunny.net pages one request reads
+	// (1000 records each), as a guard against a runaway HasMoreItems.
+	recordsMaxPages = 100
+)
 
-	zoneID, err := strconv.ParseInt(zoneIDStr, 10, 64)
+// HandleListRecords implements bunny.net's GET /dnszone/{zoneId}/records:
+// a paginated list (CurrentPage, TotalItems, HasMoreItems, Items) with the
+// optional query parameters page, perPage, type and search.
+//
+// Scoped tokens only see the record types they may access. Filtering one
+// bunny.net page would give short pages and a TotalItems that counts hidden
+// records, so the proxy reads every matching record from bunny.net, filters
+// them, and pages the result itself: TotalItems and HasMoreItems describe
+// only what the token may see.
+func (h *Handler) HandleListRecords(w http.ResponseWriter, r *http.Request) {
+	zoneID, err := strconv.ParseInt(chi.URLParam(r, "zoneID"), 10, 64)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "invalid zone ID")
 		return
 	}
 
-	// Call client to get zone (which includes records)
-	zone, err := h.client.GetZone(r.Context(), zoneID)
-	if err != nil {
-		handleBunnyError(w, err)
-		return
+	q := r.URL.Query()
+	page, perPage := 1, recordsDefaultPerPage
+	if v := q.Get("page"); v != "" {
+		if page, err = strconv.Atoi(v); err != nil || page < 1 {
+			writeError(w, http.StatusBadRequest, "invalid page parameter: must be a number of at least 1")
+			return
+		}
+	}
+	if v := q.Get("perPage"); v != "" {
+		if perPage, err = strconv.Atoi(v); err != nil || perPage < recordsMinPerPage || perPage > recordsMaxPerPage {
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid perPage parameter: must be between %d and %d", recordsMinPerPage, recordsMaxPerPage))
+			return
+		}
+	}
+	upstream := bunny.ListRecordsOptions{PerPage: recordsMaxPerPage, Search: q.Get("search")}
+	if v := q.Get("type"); v != "" {
+		t, err := strconv.Atoi(v)
+		if err != nil || auth.MapRecordTypeToString(t) == "" {
+			writeError(w, http.StatusBadRequest, "invalid type parameter: must be a bunny.net record type (0-15)")
+			return
+		}
+		upstream.Type = &t
 	}
 
-	// Filter records by record type if scoped key
-	keyInfo := auth.GetKeyInfo(r.Context())
-	zone.Records = filterRecordsByPermission(zone.Records, keyInfo, zoneID)
+	// Read every matching record from bunny.net.
+	var all []bunny.Record
+	for p := 1; p <= recordsMaxPages; p++ {
+		upstream.Page = p
+		resp, err := h.client.ListRecords(r.Context(), zoneID, &upstream)
+		if err != nil {
+			handleBunnyError(w, err)
+			return
+		}
+		all = append(all, resp.Items...)
+		if !resp.HasMoreItems || len(resp.Items) == 0 {
+			break
+		}
+	}
 
-	// Log the request
-	h.logger.Info("list records", "zone_id", zoneID)
+	visible := filterRecordsByPermission(all, auth.GetKeyInfo(r.Context()), zoneID)
+	if visible == nil {
+		visible = []bunny.Record{} // Items is always a list, never null
+	}
 
-	// Return only the records array
-	writeJSON(w, http.StatusOK, zone.Records)
+	from := (page - 1) * perPage
+	if from > len(visible) {
+		from = len(visible)
+	}
+	to := from + perPage
+	if to > len(visible) {
+		to = len(visible)
+	}
+	h.logger.Info("list records", "zone_id", zoneID, "visible", len(visible), "page", page)
+	writeJSON(w, http.StatusOK, bunny.ListRecordsResponse{
+		CurrentPage:  page,
+		TotalItems:   len(visible),
+		HasMoreItems: to < len(visible),
+		Items:        visible[from:to],
+	})
 }
 
 // HandleAddRecord creates a new DNS record in the specified zone.

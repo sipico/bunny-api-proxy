@@ -164,3 +164,19 @@ func proxyRequest(t *testing.T, method, path, apiKey string, body []byte) *http.
 	}
 	return resp
 }
+
+// decodeRecordList decodes the paginated GET /dnszone/{id}/records response
+// (bunny.net's PaginationListModelOfDnsRecordModel) and stores its Items in
+// out, which must point to a slice.
+func decodeRecordList(r io.Reader, out any) error {
+	var page struct {
+		Items json.RawMessage `json:"Items"`
+	}
+	if err := json.NewDecoder(r).Decode(&page); err != nil {
+		return err
+	}
+	if page.Items == nil {
+		return fmt.Errorf("response has no Items field")
+	}
+	return json.Unmarshal(page.Items, out)
+}

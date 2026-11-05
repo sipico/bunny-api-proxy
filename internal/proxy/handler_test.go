@@ -22,6 +22,7 @@ type mockBunnyClient struct {
 	listZonesFunc             func(context.Context, *bunny.ListZonesOptions) (*bunny.ListZonesResponse, error)
 	createZoneFunc            func(context.Context, string) (*bunny.Zone, error)
 	getZoneFunc               func(context.Context, int64) (*bunny.Zone, error)
+	listRecordsFunc           func(context.Context, int64, *bunny.ListRecordsOptions) (*bunny.ListRecordsResponse, error)
 	deleteZoneFunc            func(context.Context, int64) error
 	updateZoneFunc            func(context.Context, int64, *bunny.UpdateZoneRequest) (*bunny.Zone, error)
 	addRecordFunc             func(context.Context, int64, *bunny.AddRecordRequest) (*bunny.Record, error)
@@ -57,6 +58,13 @@ func (m *mockBunnyClient) GetZone(ctx context.Context, id int64) (*bunny.Zone, e
 		return m.getZoneFunc(ctx, id)
 	}
 	return nil, nil
+}
+
+func (m *mockBunnyClient) ListRecords(ctx context.Context, zoneID int64, opts *bunny.ListRecordsOptions) (*bunny.ListRecordsResponse, error) {
+	if m.listRecordsFunc != nil {
+		return m.listRecordsFunc(ctx, zoneID, opts)
+	}
+	return &bunny.ListRecordsResponse{}, nil
 }
 
 func (m *mockBunnyClient) DeleteZone(ctx context.Context, id int64) error {
@@ -932,111 +940,6 @@ func TestHandleUpdateZone_ClientError(t *testing.T) {
 	}
 }
 
-// TestHandleListRecords_Success tests successful records listing
-func TestHandleListRecords_Success(t *testing.T) {
-	t.Parallel()
-	zone := &bunny.Zone{
-		ID:      123,
-		Domain:  "example.com",
-		Records: []bunny.Record{{ID: 1, Type: 0}, {ID: 2, Type: 2}}, // A, CNAME
-	}
-
-	client := &mockBunnyClient{
-		getZoneFunc: func(ctx context.Context, id int64) (*bunny.Zone, error) {
-			return zone, nil
-		},
-	}
-
-	handler := NewHandler(client, slog.New(slog.NewTextHandler(io.Discard, nil)))
-	w := httptest.NewRecorder()
-	r := newTestRequest(http.MethodGet, "/dnszone/123/records", nil, map[string]string{"zoneID": "123"})
-
-	handler.HandleListRecords(w, r)
-
-	if w.Code != http.StatusOK {
-		t.Errorf("expected status %d, got %d", http.StatusOK, w.Code)
-	}
-
-	var result []bunny.Record
-	if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
-		t.Fatalf("failed to unmarshal response: %v", err)
-	}
-
-	if len(result) != 2 {
-		t.Errorf("expected 2 records, got %d", len(result))
-	}
-}
-
-// TestHandleListRecords_EmptyZone tests zone with no records
-func TestHandleListRecords_EmptyZone(t *testing.T) {
-	t.Parallel()
-	zone := &bunny.Zone{
-		ID:      123,
-		Domain:  "example.com",
-		Records: []bunny.Record{},
-	}
-
-	client := &mockBunnyClient{
-		getZoneFunc: func(ctx context.Context, id int64) (*bunny.Zone, error) {
-			return zone, nil
-		},
-	}
-
-	handler := NewHandler(client, slog.New(slog.NewTextHandler(io.Discard, nil)))
-	w := httptest.NewRecorder()
-	r := newTestRequest(http.MethodGet, "/dnszone/123/records", nil, map[string]string{"zoneID": "123"})
-
-	handler.HandleListRecords(w, r)
-
-	if w.Code != http.StatusOK {
-		t.Errorf("expected status %d, got %d", http.StatusOK, w.Code)
-	}
-
-	var result []bunny.Record
-	if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
-		t.Fatalf("failed to unmarshal response: %v", err)
-	}
-
-	if len(result) != 0 {
-		t.Errorf("expected empty records array, got %d items", len(result))
-	}
-}
-
-// TestHandleListRecords_InvalidID tests invalid zone ID
-func TestHandleListRecords_InvalidID(t *testing.T) {
-	t.Parallel()
-	client := &mockBunnyClient{}
-	handler := NewHandler(client, slog.New(slog.NewTextHandler(io.Discard, nil)))
-	w := httptest.NewRecorder()
-	r := newTestRequest(http.MethodGet, "/dnszone/invalid/records", nil, map[string]string{"zoneID": "invalid"})
-
-	handler.HandleListRecords(w, r)
-
-	if w.Code != http.StatusBadRequest {
-		t.Errorf("expected status %d, got %d", http.StatusBadRequest, w.Code)
-	}
-}
-
-// TestHandleListRecords_NotFound tests ErrNotFound response
-func TestHandleListRecords_NotFound(t *testing.T) {
-	t.Parallel()
-	client := &mockBunnyClient{
-		getZoneFunc: func(ctx context.Context, id int64) (*bunny.Zone, error) {
-			return nil, bunny.ErrNotFound
-		},
-	}
-
-	handler := NewHandler(client, slog.New(slog.NewTextHandler(io.Discard, nil)))
-	w := httptest.NewRecorder()
-	r := newTestRequest(http.MethodGet, "/dnszone/999/records", nil, map[string]string{"zoneID": "999"})
-
-	handler.HandleListRecords(w, r)
-
-	if w.Code != http.StatusNotFound {
-		t.Errorf("expected status %d, got %d", http.StatusNotFound, w.Code)
-	}
-}
-
 // TestHandleAddRecord_Success tests successful record creation
 func TestHandleAddRecord_Success(t *testing.T) {
 	t.Parallel()
@@ -1779,117 +1682,6 @@ func TestHandleGetZone_EmptyRecordsAfterFilter(t *testing.T) {
 	}
 }
 
-// TestHandleListRecords_FiltersRecordTypes tests filtering records in list endpoint.
-func TestHandleListRecords_FiltersRecordTypes(t *testing.T) {
-	t.Parallel()
-	zone := &bunny.Zone{
-		ID:     123,
-		Domain: "example.com",
-		Records: []bunny.Record{
-			{ID: 1, Type: 3, Name: "_acme-challenge"}, // TXT
-			{ID: 2, Type: 0, Name: "www"},             // A
-			{ID: 3, Type: 3, Name: "_dnsauth"},        // TXT
-		},
-	}
-
-	client := &mockBunnyClient{
-		getZoneFunc: func(ctx context.Context, id int64) (*bunny.Zone, error) {
-			return zone, nil
-		},
-	}
-
-	// Key with permission for TXT records only
-	keyInfo := &auth.KeyInfo{
-		KeyID:   1,
-		KeyName: "test-key",
-		Permissions: []*storage.Permission{
-			{
-				ID:          1,
-				TokenID:     1,
-				ZoneID:      123,
-				RecordTypes: []string{"TXT"},
-			},
-		},
-	}
-
-	handler := NewHandler(client, slog.New(slog.NewTextHandler(io.Discard, nil)))
-	w := httptest.NewRecorder()
-	r := newTestRequestWithKeyInfo("/dnszone/123/records", map[string]string{"zoneID": "123"}, keyInfo)
-
-	handler.HandleListRecords(w, r)
-
-	if w.Code != http.StatusOK {
-		t.Errorf("expected status %d, got %d", http.StatusOK, w.Code)
-	}
-
-	var result []bunny.Record
-	if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
-		t.Fatalf("failed to unmarshal response: %v", err)
-	}
-
-	if len(result) != 2 {
-		t.Errorf("expected 2 TXT records after filtering, got %d", len(result))
-	}
-
-	for _, record := range result {
-		if record.Type != 3 { // TXT
-			t.Errorf("unexpected record type %d in filtered results", record.Type)
-		}
-	}
-}
-
-// TestHandleListRecords_EmptyAfterFilter tests filtering that results in empty records.
-func TestHandleListRecords_EmptyAfterFilter(t *testing.T) {
-	t.Parallel()
-	zone := &bunny.Zone{
-		ID:     123,
-		Domain: "example.com",
-		Records: []bunny.Record{
-			{ID: 1, Type: 0, Name: "www"}, // A
-			{ID: 2, Type: 1, Name: "www"}, // AAAA
-		},
-	}
-
-	client := &mockBunnyClient{
-		getZoneFunc: func(ctx context.Context, id int64) (*bunny.Zone, error) {
-			return zone, nil
-		},
-	}
-
-	// Key with permission for CNAME records only (none exist)
-	keyInfo := &auth.KeyInfo{
-		KeyID:   1,
-		KeyName: "test-key",
-		Permissions: []*storage.Permission{
-			{
-				ID:          1,
-				TokenID:     1,
-				ZoneID:      123,
-				RecordTypes: []string{"CNAME"},
-			},
-		},
-	}
-
-	handler := NewHandler(client, slog.New(slog.NewTextHandler(io.Discard, nil)))
-	w := httptest.NewRecorder()
-	r := newTestRequestWithKeyInfo("/dnszone/123/records", map[string]string{"zoneID": "123"}, keyInfo)
-
-	handler.HandleListRecords(w, r)
-
-	if w.Code != http.StatusOK {
-		t.Errorf("expected status %d, got %d", http.StatusOK, w.Code)
-	}
-
-	var result []bunny.Record
-	if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
-		t.Fatalf("failed to unmarshal response: %v", err)
-	}
-
-	if len(result) != 0 {
-		t.Errorf("expected 0 records after filtering, got %d", len(result))
-	}
-}
-
 // TestHandleListZones_InvalidPerPage tests handling of invalid perPage parameter
 func TestHandleListZones_InvalidPerPage(t *testing.T) {
 	t.Parallel()
@@ -1910,29 +1702,6 @@ func TestHandleListZones_InvalidPerPage(t *testing.T) {
 	}
 	if result["error"] != "invalid perPage parameter" {
 		t.Errorf("expected error message 'invalid perPage parameter', got %q", result["error"])
-	}
-}
-
-// TestHandleListRecords_MissingZoneID tests handling of missing zone ID parameter
-func TestHandleListRecords_MissingZoneID(t *testing.T) {
-	t.Parallel()
-	client := &mockBunnyClient{}
-	handler := NewHandler(client, slog.New(slog.NewTextHandler(io.Discard, nil)))
-	w := httptest.NewRecorder()
-	r := newTestRequest(http.MethodGet, "/dnszone/records", nil, map[string]string{})
-
-	handler.HandleListRecords(w, r)
-
-	if w.Code != http.StatusBadRequest {
-		t.Errorf("expected status %d, got %d", http.StatusBadRequest, w.Code)
-	}
-
-	var result map[string]string
-	if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
-		t.Fatalf("failed to unmarshal response: %v", err)
-	}
-	if result["error"] != "missing zone ID" {
-		t.Errorf("expected error message 'missing zone ID', got %q", result["error"])
 	}
 }
 

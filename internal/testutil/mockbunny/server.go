@@ -84,6 +84,7 @@ func New() *Server {
 		r.Post("/dnszone/records/scan", server.handleTriggerScan)
 		r.Get("/dnszone/{id}/records/scan", server.handleGetScanResult)
 		r.Post("/dnszone/{id}", server.handleUpdateZone)
+		r.Get("/dnszone/{zoneId}/records", server.handleListRecords)
 		r.Put("/dnszone/{zoneId}/records", server.handleAddRecord)
 		r.Post("/dnszone/{zoneId}/records/{id}", server.handleUpdateRecord)
 		r.Delete("/dnszone/{zoneId}/records/{id}", server.handleDeleteRecord)
