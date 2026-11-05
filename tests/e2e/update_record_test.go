@@ -77,7 +77,7 @@ func TestE2E_UpdateRecord_Success(t *testing.T) {
 		Value string `json:"Value"`
 		TTL   int32  `json:"Ttl"`
 	}
-	require.NoError(t, json.NewDecoder(getResp.Body).Decode(&records))
+	require.NoError(t, decodeRecordList(getResp.Body, &records))
 
 	var found bool
 	for _, rec := range records {
@@ -132,7 +132,7 @@ func TestE2E_UpdateRecord_PreservesRecordID(t *testing.T) {
 		ID    int64  `json:"Id"`
 		Value string `json:"Value"`
 	}
-	require.NoError(t, json.NewDecoder(listResp.Body).Decode(&records))
+	require.NoError(t, decodeRecordList(listResp.Body, &records))
 
 	var found bool
 	for _, rec := range records {
@@ -192,7 +192,7 @@ func TestE2E_UpdateRecord_DoesNotAffectOtherRecords(t *testing.T) {
 		Name  string `json:"Name"`
 		Value string `json:"Value"`
 	}
-	require.NoError(t, json.NewDecoder(listResp.Body).Decode(&records))
+	require.NoError(t, decodeRecordList(listResp.Body, &records))
 
 	for _, rec := range records {
 		if rec.ID == rec2.ID {
@@ -543,7 +543,7 @@ func TestE2E_UpdateRecord_ChangeRecordType(t *testing.T) {
 		Type  int    `json:"Type"`
 		Value string `json:"Value"`
 	}
-	require.NoError(t, json.NewDecoder(listResp.Body).Decode(&records))
+	require.NoError(t, decodeRecordList(listResp.Body, &records))
 
 	for _, rec := range records {
 		if rec.ID == created.ID {
@@ -608,7 +608,7 @@ func TestE2E_UpdateRecord_SRVFields(t *testing.T) {
 		Weight   int32  `json:"Weight"`
 		Port     int32  `json:"Port"`
 	}
-	require.NoError(t, json.NewDecoder(listResp.Body).Decode(&records))
+	require.NoError(t, decodeRecordList(listResp.Body, &records))
 
 	for _, rec := range records {
 		if rec.ID == created.ID {
@@ -712,7 +712,7 @@ func TestE2E_UpdateRecord_CAAFields(t *testing.T) {
 		Flags int    `json:"Flags"`
 		Tag   string `json:"Tag"`
 	}
-	require.NoError(t, json.NewDecoder(listResp.Body).Decode(&records))
+	require.NoError(t, decodeRecordList(listResp.Body, &records))
 
 	for _, rec := range records {
 		if rec.ID == created.ID {
@@ -760,7 +760,7 @@ func TestE2E_UpdateRecord_DisabledField(t *testing.T) {
 		ID       int64 `json:"Id"`
 		Disabled bool  `json:"Disabled"`
 	}
-	require.NoError(t, json.NewDecoder(listResp.Body).Decode(&records))
+	require.NoError(t, decodeRecordList(listResp.Body, &records))
 
 	for _, rec := range records {
 		if rec.ID == created.ID {
@@ -805,7 +805,7 @@ func TestE2E_UpdateRecord_CommentField(t *testing.T) {
 		ID      int64  `json:"Id"`
 		Comment string `json:"Comment"`
 	}
-	require.NoError(t, json.NewDecoder(listResp.Body).Decode(&records))
+	require.NoError(t, decodeRecordList(listResp.Body, &records))
 
 	for _, rec := range records {
 		if rec.ID == created.ID {
@@ -874,7 +874,7 @@ func TestE2E_UpdateRecord_ACMETokenRotation(t *testing.T) {
 		Name  string `json:"Name"`
 		Value string `json:"Value"`
 	}
-	require.NoError(t, json.NewDecoder(listResp.Body).Decode(&records))
+	require.NoError(t, decodeRecordList(listResp.Body, &records))
 
 	var found bool
 	for _, rec := range records {
@@ -937,7 +937,7 @@ func TestE2E_UpdateRecord_CreateUpdateDelete_FullLifecycle(t *testing.T) {
 		Value string `json:"Value"`
 		TTL   int32  `json:"Ttl"`
 	}
-	require.NoError(t, json.NewDecoder(listResp2.Body).Decode(&records))
+	require.NoError(t, decodeRecordList(listResp2.Body, &records))
 	for _, rec := range records {
 		if rec.ID == created.ID {
 			assert.Equal(t, "2.2.2.2", rec.Value)
@@ -958,7 +958,7 @@ func TestE2E_UpdateRecord_CreateUpdateDelete_FullLifecycle(t *testing.T) {
 	var recordsAfter []struct {
 		ID int64 `json:"Id"`
 	}
-	require.NoError(t, json.NewDecoder(listResp3.Body).Decode(&recordsAfter))
+	require.NoError(t, decodeRecordList(listResp3.Body, &recordsAfter))
 	for _, rec := range recordsAfter {
 		assert.NotEqual(t, created.ID, rec.ID, "deleted record should not appear in list")
 	}

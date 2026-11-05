@@ -316,7 +316,7 @@ curl -H "AccessKey: YOUR_TOKEN" http://localhost:8080/dnszone/12345/records
 Add a record to a zone.
 
 ```bash
-curl -X POST http://localhost:8080/dnszone/12345/records \
+curl -X PUT http://localhost:8080/dnszone/12345/records \
   -H "AccessKey: YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"Type": 3, "Name": "_acme-challenge", "Value": "validation-token", "Ttl": 300}'

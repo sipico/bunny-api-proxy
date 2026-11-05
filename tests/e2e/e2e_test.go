@@ -322,7 +322,7 @@ func TestE2E_ListRecords(t *testing.T) {
 		Name  string `json:"Name"`
 		Value string `json:"Value"`
 	}
-	err := json.NewDecoder(resp.Body).Decode(&records)
+	err := decodeRecordList(resp.Body, &records)
 	require.NoError(t, err)
 	require.GreaterOrEqual(t, len(records), 2)
 }
@@ -765,11 +765,8 @@ func TestE2E_MultiKeyIsolation(t *testing.T) {
 // TestE2E_RecordTypeEnforcement verifies that record type restrictions are
 // enforced at the write level - a TXT-only key cannot add A records but can add TXT.
 //
-// Note: Read-level record type filtering (filtering responses to only show permitted
-// types) depends on GetKeyInfo() which requires the legacy Middleware to set
-// KeyInfoContextKey. The new Authenticator.CheckPermissions doesn't set this context
-// key, so read-level filtering is currently bypassed. This test verifies write-level
-// enforcement which works correctly through the CheckPermissions middleware.
+// Read-level filtering (a scoped token only sees its permitted record types
+// when listing) is covered by TestE2E_ListRecords_PaginatedPerSpec.
 func TestE2E_RecordTypeEnforcement(t *testing.T) {
 	env := testenv.Setup(t)
 
@@ -1034,7 +1031,7 @@ func TestE2E_ACMEWorkflowSimulation(t *testing.T) {
 		ID    int64  `json:"Id"`
 		Value string `json:"Value"`
 	}
-	err = json.NewDecoder(listResp.Body).Decode(&records)
+	err = decodeRecordList(listResp.Body, &records)
 	require.NoError(t, err)
 
 	foundRecord := false
@@ -1059,7 +1056,7 @@ func TestE2E_ACMEWorkflowSimulation(t *testing.T) {
 	var recordsAfter []struct {
 		ID int64 `json:"Id"`
 	}
-	err = json.NewDecoder(listResp2.Body).Decode(&recordsAfter)
+	err = decodeRecordList(listResp2.Body, &recordsAfter)
 	require.NoError(t, err)
 
 	for _, rec := range recordsAfter {
@@ -1393,7 +1390,7 @@ func TestE2E_BootstrapFlowFresh(t *testing.T) {
 			ID    int64  `json:"Id"`
 			Value string `json:"Value"`
 		}
-		err = json.NewDecoder(resp4.Body).Decode(&records)
+		err = decodeRecordList(resp4.Body, &records)
 		require.NoError(t, err)
 		require.GreaterOrEqual(t, len(records), 1, "should have at least one record")
 

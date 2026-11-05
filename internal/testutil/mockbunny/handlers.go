@@ -107,6 +107,67 @@ func (s *Server) handleGetZone(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, shortZone)
 }
 
+// handleListRecords handles GET /dnszone/{zoneId}/records like bunny.net:
+// a paginated list (CurrentPage, TotalItems, HasMoreItems, Items) with the
+// optional query parameters page (>= 1, default 1), perPage (5-1000,
+// default 1000), type (record type 0-15) and search (substring of the name,
+// case-insensitive). Verified against the real API by the API probe.
+func (s *Server) handleListRecords(w http.ResponseWriter, r *http.Request) {
+	zoneID, err := strconv.ParseInt(chi.URLParam(r, "zoneId"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid zone ID", http.StatusBadRequest)
+		return
+	}
+	q := r.URL.Query()
+	page, perPage := 1, 1000
+	if v := q.Get("page"); v != "" {
+		if page, err = strconv.Atoi(v); err != nil || page < 1 {
+			s.writeError(w, http.StatusBadRequest, "validation_error", "page", "The page must be at least 1")
+			return
+		}
+	}
+	if v := q.Get("perPage"); v != "" {
+		if perPage, err = strconv.Atoi(v); err != nil || perPage < 5 || perPage > 1000 {
+			s.writeError(w, http.StatusBadRequest, "validation_error", "perPage", "The perPage must be between 5 and 1000")
+			return
+		}
+	}
+	typeFilter := -1
+	if v := q.Get("type"); v != "" {
+		if typeFilter, err = strconv.Atoi(v); err != nil || typeFilter < 0 || typeFilter > 15 {
+			s.writeError(w, http.StatusBadRequest, "validation_error", "type", "Unknown record type")
+			return
+		}
+	}
+	search := strings.ToLower(q.Get("search"))
+
+	s.state.mu.RLock()
+	defer s.state.mu.RUnlock()
+	zone, ok := s.state.zones[zoneID]
+	if !ok {
+		s.writeError(w, http.StatusNotFound, "dnszone.zone.not_found", "Id", "The requested DNS zone was not found")
+		return
+	}
+	matching := make([]Record, 0, len(zone.Records))
+	for _, rec := range zone.Records {
+		if typeFilter >= 0 && rec.Type != typeFilter {
+			continue
+		}
+		if search != "" && !strings.Contains(strings.ToLower(rec.Name), search) {
+			continue
+		}
+		matching = append(matching, rec)
+	}
+	from := min((page-1)*perPage, len(matching))
+	to := min(from+perPage, len(matching))
+	writeJSON(w, http.StatusOK, struct {
+		Items        []Record `json:"Items"`
+		CurrentPage  int      `json:"CurrentPage"`
+		TotalItems   int      `json:"TotalItems"`
+		HasMoreItems bool     `json:"HasMoreItems"`
+	}{Items: matching[from:to], CurrentPage: page, TotalItems: len(matching), HasMoreItems: to < len(matching)})
+}
+
 // handleDeleteRecord handles DELETE /dnszone/{zoneId}/records/{id}
 // Returns 204 No Content on success, 404 if zone or record not found, 400 for invalid IDs.
 func (s *Server) handleDeleteRecord(w http.ResponseWriter, r *http.Request) {

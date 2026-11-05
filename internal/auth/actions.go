@@ -172,8 +172,9 @@ func ParseRequest(r *http.Request) (*Request, error) {
 		}
 	}
 
-	// POST /dnszone/{id}/records - add record
-	if r.Method == http.MethodPost && recordsPattern.MatchString(path) {
+	// PUT /dnszone/{id}/records - add record (bunny.net's method; POST is
+	// accepted too, for clients of older proxy versions)
+	if (r.Method == http.MethodPut || r.Method == http.MethodPost) && recordsPattern.MatchString(path) {
 		matches := recordsPattern.FindStringSubmatch(path)
 		zoneID, err := strconv.ParseInt(matches[1], 10, 64)
 		if err != nil {

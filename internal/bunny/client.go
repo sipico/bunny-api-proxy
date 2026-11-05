@@ -123,6 +123,61 @@ func (c *Client) ListZones(ctx context.Context, opts *ListZonesOptions) (*ListZo
 	return &result, nil
 }
 
+// ListRecords retrieves one page of a zone's DNS records with bunny.net's
+// GET /dnszone/{zoneId}/records, optionally filtered by type and search text.
+func (c *Client) ListRecords(ctx context.Context, zoneID int64, opts *ListRecordsOptions) (*ListRecordsResponse, error) {
+	if opts == nil {
+		opts = &ListRecordsOptions{}
+	}
+	query := url.Values{}
+	if opts.Page > 0 {
+		query.Set("page", strconv.Itoa(opts.Page))
+	}
+	if opts.PerPage > 0 {
+		query.Set("perPage", strconv.Itoa(opts.PerPage))
+	}
+	if opts.Type != nil {
+		query.Set("type", strconv.Itoa(*opts.Type))
+	}
+	if opts.Search != "" {
+		query.Set("search", opts.Search)
+	}
+	endpoint := fmt.Sprintf("%s/dnszone/%d/records", c.baseURL, zoneID)
+	if len(query) > 0 {
+		endpoint += "?" + query.Encode()
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("AccessKey", c.apiKey)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		//nolint:errcheck
+		resp.Body.Close()
+	}()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil { // coverage-ignore: needs a connection that breaks mid-body
+		return nil, err
+	}
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, ErrNotFound
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, parseError(resp.StatusCode, body)
+	}
+	var result ListRecordsResponse
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+	return &result, nil
+}
+
 // GetZone retrieves a single DNS zone by ID, including all its records.
 func (c *Client) GetZone(ctx context.Context, id int64) (*Zone, error) {
 	url := fmt.Sprintf("%s/dnszone/%d", c.baseURL, id)

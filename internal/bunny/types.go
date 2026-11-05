@@ -91,6 +91,24 @@ type ListZonesResponse struct {
 	Items        []Zone `json:"Items"`
 }
 
+// ListRecordsResponse is bunny.net's PaginationListModelOfDnsRecordModel,
+// returned by GET /dnszone/{zoneId}/records.
+type ListRecordsResponse struct {
+	CurrentPage  int      `json:"CurrentPage"`
+	TotalItems   int      `json:"TotalItems"`
+	HasMoreItems bool     `json:"HasMoreItems"`
+	Items        []Record `json:"Items"`
+}
+
+// ListRecordsOptions contains the optional query parameters of
+// GET /dnszone/{zoneId}/records. Type nil means all record types.
+type ListRecordsOptions struct {
+	Page    int
+	PerPage int
+	Type    *int
+	Search  string
+}
+
 // ListZonesOptions contains optional parameters for ListZones.
 type ListZonesOptions struct {
 	Page    int

@@ -37,6 +37,9 @@ func NewRouter(handler *Handler, authMiddleware func(http.Handler) http.Handler,
 	r.With(requireAdmin).Delete("/dnszone/{zoneID}", handler.HandleDeleteZone)
 	r.With(requireAdmin).Get("/dnszone/{zoneID}/records/scan", handler.HandleGetScanResult)
 	r.Get("/dnszone/{zoneID}/records", handler.HandleListRecords)
+	// bunny.net adds records with PUT; POST is kept for clients of older
+	// proxy versions.
+	r.Put("/dnszone/{zoneID}/records", handler.HandleAddRecord)
 	r.Post("/dnszone/{zoneID}/records", handler.HandleAddRecord)
 	r.Post("/dnszone/{zoneID}/records/{recordID}", handler.HandleUpdateRecord)
 	r.Delete("/dnszone/{zoneID}/records/{recordID}", handler.HandleDeleteRecord)
