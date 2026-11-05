@@ -2,7 +2,7 @@
 
 This document tracks features and improvements deferred from MVP to keep scope manageable. Items here may migrate to GitHub Issues for better tracking.
 
-**Last Updated:** 2026-02-06
+**Last Updated:** 2026-11-05
 
 ---
 
@@ -19,7 +19,7 @@ _Note: These are out of MVP scope. The project focuses on DNS operations only._
 
 ### Additional DNS Operations
 
-_Tracked in GitHub Issues: Update DNS Record (#235), Zone Scoped Actions (#246), Import/Export (#238, #239)_
+_Tracked in GitHub Issues: Update DNS Record (#235), Import/Export (#238, #239). Opening zone-level operations to scoped keys depends on the permission groups design below (#246)._
 
 ---
 
@@ -37,6 +37,24 @@ _Tracked in GitHub Issues: Update DNS Record (#235), Zone Scoped Actions (#246),
 - [ ] **IP allowlisting** - Restrict scoped key usage to specific IPs
 - [ ] **Rate limiting per scoped key** - Prevent abuse
 - [ ] **Request count limits** - Max N requests per key
+
+### Permission Groups (design parked, was #246)
+
+_Parked until a real use case needs scoped keys for more than record operations. The target use case (ACME DNS-01) only needs record permissions, which already work. Zone-level endpoints stay admin-only until then._
+
+- [ ] **Decide how permissions express non-record operations.** Proposed groups: `records` (per zone, record-type filtered), `zone_admin` (zone settings, DNSSEC, delete zone, scan, statistics), `certificate` (wildcard certificate), `global` (create zone, check availability; no zone ID yet).
+  - Option A: `group` column on `permissions`, `record_types` nullable
+  - Option B: separate table per group
+  - Option C: keep the flat `allowed_actions` list and add non-record actions (simplest; builds on the action validation from #392)
+  - Constraints: existing permissions keep working (default to `records`); storage currently requires `zone_id > 0` and non-empty record types; any schema change is a new versioned migration step (#301)
+  - Open: should import/export be allowed for scoped keys (needs BIND parsing and record-type filtering)?
+  - Full discussion and the list of blocked endpoints: #246
+
+---
+
+## Upstream Resilience
+
+- [ ] **Read-after-write verification for POST retries (was #343)** - Today a 5xx on a POST to bunny.net is not retried, because the write may have happened (timeouts and network errors are retried). Instead: after a 5xx, check with the matching GET (for example `GetZone` after `CreateZone`, or match the record by name+type+value after `AddRecord`). If the write happened, return success; if not, retry with backoff; if the check also fails, give up as today. Costs an extra API call per 5xx and needs a mapping per write operation. Only worth it if production use shows POST failures during bunny.net outages. Alternative: idempotency keys, if bunny.net ever adds them.
 
 ---
 
