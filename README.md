@@ -306,20 +306,30 @@ curl -X DELETE -H "AccessKey: YOUR_TOKEN" \
 ```
 
 #### GET /dnszone/{zoneID}/records
-List records in a zone.
+List records in a zone, as a paginated list like bunny.net's endpoint (`Items`, `CurrentPage`, `TotalItems`, `HasMoreItems`). Optional query parameters: `page`, `perPage` (5-1000), `type` (record type number) and `search`. Scoped tokens only see their permitted record types.
 
 ```bash
-curl -H "AccessKey: YOUR_TOKEN" http://localhost:8080/dnszone/12345/records
+curl -H "AccessKey: YOUR_TOKEN" "http://localhost:8080/dnszone/12345/records?type=3"
 ```
 
-#### POST /dnszone/{zoneID}/records
-Add a record to a zone.
+#### PUT /dnszone/{zoneID}/records
+Add a record to a zone (`POST` also works).
 
 ```bash
 curl -X PUT http://localhost:8080/dnszone/12345/records \
   -H "AccessKey: YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"Type": 3, "Name": "_acme-challenge", "Value": "validation-token", "Ttl": 300}'
+```
+
+#### POST /dnszone/{zoneID}/records/{recordID}
+Update a record (requires `update_record` and the record type).
+
+```bash
+curl -X POST http://localhost:8080/dnszone/12345/records/67890 \
+  -H "AccessKey: YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"Type": 3, "Name": "_acme-challenge", "Value": "new-token", "Ttl": 300}'
 ```
 
 #### DELETE /dnszone/{zoneID}/records/{recordID}
@@ -329,6 +339,8 @@ Delete a record from a zone.
 curl -X DELETE -H "AccessKey: YOUR_TOKEN" \
   http://localhost:8080/dnszone/12345/records/67890
 ```
+
+The other bunny.net DNS endpoints (zone settings, DNSSEC, import/export, statistics, scans, certificates) are available to admin tokens; see [docs/API.md](docs/API.md#implemented-endpoints).
 
 ## Error Responses
 

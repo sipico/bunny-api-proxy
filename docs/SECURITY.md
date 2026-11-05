@@ -67,13 +67,13 @@ Example permission model:
 #### Bootstrap Mechanism
 - **Endpoint**: `POST /admin/api/tokens` with `is_admin: true`
 - **Input**: bunny.net master API key in `AccessKey` header
-- **Validation**: The proxy checks if the key matches the stored master key hash
+- **Validation**: The proxy compares the SHA-256 of the key with the SHA-256 of `BUNNY_API_KEY`, computed in memory at startup (constant-time comparison)
 - **Availability**: Master key authentication only works when no admin tokens exist
 - **Prevention**: Once an admin token exists, master key is locked out
 
 **Security notes**:
 - Bootstrap requires the bunny.net master API key
-- The master key hash is stored when setting up the proxy
+- The master key is never written to the database; it only comes from the `BUNNY_API_KEY` environment variable
 - Once an admin token exists, master key returns 401 Unauthorized, identical to any invalid key, and every request performs the same checks, so the master key cannot be identified by response or timing (CWE-208)
 
 ### 2.2 Admin API Authentication
@@ -91,7 +91,7 @@ Example permission model:
 #### Token Management
 - **Creation**: Via Admin API (admin generates new token, receives once)
 - **Storage**: SHA-256 hash in database (plaintext never stored)
-- **No rotation**: Tokens have no expiration; revocation requires deletion via API
+- **Expiry**: Scoped tokens can get an optional `expires_at`; after it they are rejected with `401 Token expired`. Admin tokens do not expire (an expired last admin token would lock everyone out); revoke them by deleting them via the API
 - **Audit trail**: Token name stored for logging
 
 **Security notes**:
@@ -303,7 +303,8 @@ The master key comparison hashes the provided key with SHA-256 and compares it a
 #### Database Backups
 
 1. **Backup Strategy**
-   - Back up `/data/proxy.db` to secure storage (S3, Vault, encrypted drive)
+   - Make backups with `bunny-api-proxy backup <file>` (consistent while the proxy runs; a plain copy of `proxy.db` can miss recent writes, see `docs/DEPLOYMENT.md`) and store them securely (S3, Vault, encrypted drive)
+   - Backups contain token hashes and permissions, not the master key. The proxy also writes `proxy.db.v<version>-backup-*` files next to the database before schema migrations; treat them like the database
    - Backup frequency: At least weekly
    - Test restore process quarterly
 

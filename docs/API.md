@@ -311,6 +311,8 @@ Each scoped API key has associated permissions that define:
 - `update_record` - Update DNS records
 - `delete_record` - Delete DNS records
 
+`list_zones` and `get_zone` are accepted but not required: any scoped token may list zones (it only sees zones it has a permission for), and any permission for a zone allows reading that zone. The record actions are checked per zone, together with the record type.
+
 **Available Record Types** (case-sensitive, the names from bunny.net's API spec): `A`, `AAAA`, `CNAME`, `TXT`, `MX`, `Redirect`, `Flatten`, `PullZone`, `SRV`, `CAA`, `PTR`, `Script`, `NS`, `SVCB`, `HTTPS`, `TLSA`
 
 **`SPF` is no longer accepted.** Older versions called bunny.net record type 5 "SPF"; bunny.net calls it `Redirect` (an HTTP redirect, served through a pull zone that bunny.net creates automatically). SPF records are `TXT` records. A new grant with `SPF` gets `400` with that explanation. Permissions that already contain `SPF` are kept, but `SPF` matches nothing, so it no longer grants access to type 5 records. They are listed under `warnings` in `GET /admin/api/tokens/{id}` and `GET /admin/api/whoami`, and logged once at startup. Grant `TXT` or `Redirect` explicitly, whichever was intended.
@@ -319,17 +321,30 @@ Both lists are validated when a token or permission is created: an unknown value
 
 ### Implemented Endpoints
 
-The proxy currently implements 7 endpoints for DNS zone and record management. For complete specifications and all 17 bunny.net DNS Zone API endpoints, see the [Official bunny.net API Documentation](bunny-api-official-docs/).
+The proxy implements all 18 DNS zone endpoints of bunny.net's API, at the same paths. Scoped tokens can use the endpoints marked **scoped**, within their permissions (zone, action and record type). The others need an admin token. For the full request and response specifications, see the [Official bunny.net API Documentation](bunny-api-official-docs/).
 
-| Operation | Method | Path |
-|-----------|--------|------|
-| List DNS Zones | GET | `/dnszone` |
-| Create DNS Zone | POST | `/dnszone` |
-| Get DNS Zone Details | GET | `/dnszone/{zoneID}` |
-| Delete DNS Zone | DELETE | `/dnszone/{zoneID}` |
-| List DNS Records | GET | `/dnszone/{zoneID}/records` |
-| Add DNS Record | PUT (POST also accepted) | `/dnszone/{zoneID}/records` |
-| Delete DNS Record | DELETE | `/dnszone/{zoneID}/records/{recordID}` |
+| Operation | Method | Path | Access |
+|-----------|--------|------|--------|
+| List DNS Zones | GET | `/dnszone` | scoped (any scoped token; lists only zones it has a permission for) |
+| Get DNS Zone Details | GET | `/dnszone/{zoneID}` | scoped (any permission for that zone) |
+| List DNS Records | GET | `/dnszone/{zoneID}/records` | scoped (`list_records`) |
+| Add DNS Record | PUT (POST also accepted) | `/dnszone/{zoneID}/records` | scoped (`add_record` + record type) |
+| Update DNS Record | POST | `/dnszone/{zoneID}/records/{recordID}` | scoped (`update_record` + record type) |
+| Delete DNS Record | DELETE | `/dnszone/{zoneID}/records/{recordID}` | scoped (`delete_record`) |
+| Create DNS Zone | POST | `/dnszone` | admin |
+| Update DNS Zone | POST | `/dnszone/{zoneID}` | admin |
+| Delete DNS Zone | DELETE | `/dnszone/{zoneID}` | admin |
+| Check Zone Availability | POST | `/dnszone/checkavailability` | admin |
+| Import DNS Records | POST | `/dnszone/{zoneID}/import` | admin |
+| Export DNS Records | GET | `/dnszone/{zoneID}/export` | admin |
+| Enable DNSSEC | POST | `/dnszone/{zoneID}/dnssec` | admin |
+| Disable DNSSEC | DELETE | `/dnszone/{zoneID}/dnssec` | admin |
+| Issue Wildcard Certificate | POST | `/dnszone/{zoneID}/certificate/issue` | admin |
+| Get DNS Query Statistics | GET | `/dnszone/{zoneID}/statistics` | admin |
+| Trigger DNS Record Scan | POST | `/dnszone/records/scan` | admin |
+| Get DNS Record Scan Result | GET | `/dnszone/{zoneID}/records/scan` | admin |
+
+Admin-only endpoints answer a scoped token with `403`. Opening them to scoped tokens needs a permission model beyond record permissions; see "Permission Groups" in `.claude/dev/FUTURE_ENHANCEMENTS.md`.
 
 For details on request/response formats and full specifications for all bunny.net endpoints, refer to the [Official bunny.net DNS Zone API Documentation](bunny-api-official-docs/).
 
@@ -491,6 +506,27 @@ curl -X PUT http://localhost:8080/dnszone/123456/records \
 ```
 
 See [Official Documentation](bunny-api-official-docs/dnszone-add-record.md) for complete request/response schema.
+
+---
+
+### POST /dnszone/{zoneID}/records/{recordID}
+
+Update an existing DNS record, like bunny.net's endpoint of the same path.
+
+**Authentication:** AccessKey required
+**Permissions Required:** `update_record` action, and the record type in the request body must be one of the token's record types
+**Path Parameters:** `zoneID` - The zone ID, `recordID` - The record ID
+**Body:** the same fields as adding a record (`Type`, `Name`, `Value`, `Ttl`, `Priority`, ...)
+
+**Example Request (rotate an ACME challenge value):**
+```bash
+curl -X POST http://localhost:8080/dnszone/123456/records/789012 \
+  -H "AccessKey: your-scoped-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{"Type": 3, "Name": "_acme-challenge", "Value": "new-validation-token", "Ttl": 300}'
+```
+
+**Response:** `204 No Content` on success. `403` if the token lacks `update_record` or the record type, `404` if the zone or record does not exist.
 
 ---
 
@@ -725,7 +761,7 @@ For complete specifications of all bunny.net DNS Zone API endpoints (both implem
 - **[Official API Docs](bunny-api-official-docs/)** - All 17 endpoints with complete OpenAPI specifications and reference material
 - **[OpenAPI Specification](bunny-api-official-docs/openapi-v3.json)** - Machine-readable format for tools and code generation
 
-The proxy currently implements **7 endpoints** shown above. Additional bunny.net endpoints can be integrated into the proxy by:
+The proxy implements the DNS zone endpoints shown above. Other bunny.net APIs (pull zones, storage, ...) are out of scope. A new bunny.net DNS endpoint can be integrated by:
 
 1. Adding the endpoint to the proxy's routing configuration
 2. Applying permission checks (zone access, allowed actions, record types)
