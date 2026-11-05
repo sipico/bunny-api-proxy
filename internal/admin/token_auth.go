@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/sipico/bunny-api-proxy/internal/auth"
 	"github.com/sipico/bunny-api-proxy/internal/storage"
@@ -64,6 +65,14 @@ func (h *Handler) TokenAuthMiddleware(next http.Handler) http.Handler {
 			h.logger.Warn("master API key used after bootstrap; it is locked, use an admin token instead",
 				"remote_addr", r.RemoteAddr)
 			http.Error(w, "Invalid token", http.StatusUnauthorized)
+			return
+		}
+
+		if err == nil && unifiedToken != nil && unifiedToken.IsExpired(time.Now()) {
+			// Optional expiry (issue #400)
+			h.logger.Warn("expired token used", "token_name", unifiedToken.Name,
+				"expired_at", unifiedToken.ExpiresAt, "remote_addr", r.RemoteAddr)
+			http.Error(w, "Token expired", http.StatusUnauthorized)
 			return
 		}
 

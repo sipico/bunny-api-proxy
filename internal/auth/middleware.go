@@ -8,6 +8,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/sipico/bunny-api-proxy/internal/storage"
 )
@@ -75,6 +76,12 @@ func (m *Authenticator) Authenticate(next http.Handler) http.Handler {
 				return
 			}
 			writeJSONError(w, http.StatusInternalServerError, "internal error")
+			return
+		}
+
+		// Optional expiry (issue #400): an expired token is rejected
+		if token.IsExpired(time.Now()) {
+			writeJSONError(w, http.StatusUnauthorized, "token expired")
 			return
 		}
 

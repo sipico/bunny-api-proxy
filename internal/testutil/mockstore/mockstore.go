@@ -6,6 +6,7 @@ package mockstore
 
 import (
 	"context"
+	"time"
 
 	"github.com/sipico/bunny-api-proxy/internal/storage"
 )
@@ -15,12 +16,15 @@ import (
 // If a function field is nil, the method returns a sensible default value.
 type MockStorage struct {
 	// Token operations (storage.TokenStore interface)
-	CreateTokenFunc      func(ctx context.Context, name string, isAdmin bool, keyHash string) (*storage.Token, error)
-	GetTokenByHashFunc   func(ctx context.Context, keyHash string) (*storage.Token, error)
-	GetTokenByIDFunc     func(ctx context.Context, id int64) (*storage.Token, error)
-	ListTokensFunc       func(ctx context.Context) ([]*storage.Token, error)
-	DeleteTokenFunc      func(ctx context.Context, id int64) error
-	HasAnyAdminTokenFunc func(ctx context.Context) (bool, error)
+	CreateTokenFunc func(ctx context.Context, name string, isAdmin bool, keyHash string) (*storage.Token, error)
+	// CreateTokenWithExpiryFunc overrides CreateTokenWithExpiry. If nil,
+	// CreateTokenWithExpiry falls back to CreateToken and sets ExpiresAt.
+	CreateTokenWithExpiryFunc func(ctx context.Context, name string, isAdmin bool, keyHash string, expiresAt *time.Time) (*storage.Token, error)
+	GetTokenByHashFunc        func(ctx context.Context, keyHash string) (*storage.Token, error)
+	GetTokenByIDFunc          func(ctx context.Context, id int64) (*storage.Token, error)
+	ListTokensFunc            func(ctx context.Context) ([]*storage.Token, error)
+	DeleteTokenFunc           func(ctx context.Context, id int64) error
+	HasAnyAdminTokenFunc      func(ctx context.Context) (bool, error)
 
 	// Unified token operations
 	CountAdminTokensFunc         func(ctx context.Context) (int, error)
@@ -40,6 +44,19 @@ func (m *MockStorage) CreateToken(ctx context.Context, name string, isAdmin bool
 		return m.CreateTokenFunc(ctx, name, isAdmin, keyHash)
 	}
 	return &storage.Token{ID: 1, Name: name, IsAdmin: isAdmin, KeyHash: keyHash}, nil
+}
+
+// CreateTokenWithExpiry creates a new token with an optional expiry.
+func (m *MockStorage) CreateTokenWithExpiry(ctx context.Context, name string, isAdmin bool, keyHash string, expiresAt *time.Time) (*storage.Token, error) {
+	if m.CreateTokenWithExpiryFunc != nil {
+		return m.CreateTokenWithExpiryFunc(ctx, name, isAdmin, keyHash, expiresAt)
+	}
+	token, err := m.CreateToken(ctx, name, isAdmin, keyHash)
+	if err != nil {
+		return nil, err
+	}
+	token.ExpiresAt = expiresAt
+	return token, nil
 }
 
 // GetTokenByHash retrieves a token by its hash.

@@ -1263,3 +1263,122 @@ func TestAdminRouter_DebugLogsDoNotContainPlaintextToken(t *testing.T) {
 		t.Errorf("master key found in debug logs:\n%s", logs.String())
 	}
 }
+
+// TestHandleCreateUnifiedToken_ExpiresAt verifies the optional token expiry:
+// a past expiry is rejected, a future one is stored and returned, and
+// omitting it keeps the token non-expiring (issue #400).
+func TestHandleCreateUnifiedToken_ExpiresAt(t *testing.T) {
+	t.Parallel()
+	future := time.Now().Add(48 * time.Hour).UTC().Truncate(time.Second)
+	past := time.Now().Add(-time.Hour).UTC().Truncate(time.Second)
+
+	tests := []struct {
+		name        string
+		isAdmin     bool
+		expiresAt   *time.Time
+		wantStatus  int
+		wantStored  *time.Time
+		wantInBody  string
+		wantNoField bool
+	}{
+		{"scoped, future expiry", false, &future, http.StatusCreated, &future, `"expires_at":"` + future.Format(time.RFC3339) + `"`, false},
+		{"scoped, past expiry rejected", false, &past, http.StatusBadRequest, nil, "expires_at", false},
+		{"scoped, no expiry", false, nil, http.StatusCreated, nil, `"is_admin":false`, true},
+		// Expiry is only for scoped tokens: an expired last admin token would
+		// lock everyone out, because the master key stays locked (issue #400).
+		{"admin, expiry rejected", true, &future, http.StatusBadRequest, nil, "scoped tokens", false},
+		{"admin, no expiry", true, nil, http.StatusCreated, nil, `"is_admin":true`, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			var stored *time.Time
+			created := false
+			mock := &mockstore.MockStorage{
+				CreateTokenWithExpiryFunc: func(ctx context.Context, name string, isAdmin bool, keyHash string, expiresAt *time.Time) (*storage.Token, error) {
+					created = true
+					stored = expiresAt
+					return &storage.Token{ID: 7, Name: name, IsAdmin: isAdmin, ExpiresAt: expiresAt}, nil
+				},
+			}
+			h := NewHandler(mock, new(slog.LevelVar), slog.Default())
+
+			req := CreateUnifiedTokenRequest{Name: "token", IsAdmin: tt.isAdmin, ExpiresAt: tt.expiresAt}
+			if !tt.isAdmin {
+				req.Zones = []int64{123}
+				req.Actions = []string{"add_record"}
+				req.RecordTypes = []string{"TXT"}
+			}
+			body, _ := json.Marshal(req)
+			w := httptest.NewRecorder()
+			h.HandleCreateUnifiedToken(w, httptest.NewRequest(http.MethodPost, "/api/tokens", bytes.NewReader(body)))
+
+			if w.Code != tt.wantStatus {
+				t.Fatalf("status = %d, want %d (body: %s)", w.Code, tt.wantStatus, w.Body.String())
+			}
+			if !strings.Contains(w.Body.String(), tt.wantInBody) {
+				t.Errorf("body %s does not contain %s", w.Body.String(), tt.wantInBody)
+			}
+			if tt.wantNoField && strings.Contains(w.Body.String(), "expires_at") {
+				t.Errorf("body should not contain expires_at: %s", w.Body.String())
+			}
+			if tt.wantStatus != http.StatusCreated {
+				if created {
+					t.Error("token must not be created when expires_at is invalid")
+				}
+				return
+			}
+			switch {
+			case tt.wantStored == nil && stored != nil:
+				t.Errorf("stored expiry = %v, want nil", stored)
+			case tt.wantStored != nil && (stored == nil || !stored.Equal(*tt.wantStored)):
+				t.Errorf("stored expiry = %v, want %v", stored, *tt.wantStored)
+			}
+		})
+	}
+}
+
+// TestTokenResponses_IncludeExpiresAt verifies that list and detail
+// responses show expires_at when set and omit it otherwise (issue #400).
+func TestTokenResponses_IncludeExpiresAt(t *testing.T) {
+	t.Parallel()
+	expires := time.Date(2030, 1, 2, 3, 4, 5, 0, time.UTC)
+	tokens := []*storage.Token{
+		{ID: 1, Name: "expiring", IsAdmin: true, CreatedAt: time.Now(), ExpiresAt: &expires},
+		{ID: 2, Name: "forever", IsAdmin: true, CreatedAt: time.Now()},
+	}
+	mock := &mockstore.MockStorage{
+		ListTokensFunc: func(ctx context.Context) ([]*storage.Token, error) { return tokens, nil },
+		GetTokenByIDFunc: func(ctx context.Context, id int64) (*storage.Token, error) {
+			return tokens[id-1], nil
+		},
+	}
+	h := NewHandler(mock, new(slog.LevelVar), slog.Default())
+
+	w := httptest.NewRecorder()
+	h.HandleListUnifiedTokens(w, httptest.NewRequest(http.MethodGet, "/api/tokens", nil))
+	var list []map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &list); err != nil || len(list) != 2 {
+		t.Fatalf("unexpected list response: %s", w.Body.String())
+	}
+	if list[0]["expires_at"] != "2030-01-02T03:04:05Z" {
+		t.Errorf("list[0].expires_at = %v, want 2030-01-02T03:04:05Z", list[0]["expires_at"])
+	}
+	if _, ok := list[1]["expires_at"]; ok {
+		t.Errorf("list[1] should omit expires_at, got %v", list[1]["expires_at"])
+	}
+
+	for id, want := range map[string]string{"1": `"expires_at":"2030-01-02T03:04:05Z"`, "2": ""} {
+		r := chi.NewRouter()
+		r.Get("/api/tokens/{id}", h.HandleGetUnifiedToken)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/tokens/"+id, nil))
+		has := strings.Contains(w.Body.String(), "expires_at")
+		if want == "" && has {
+			t.Errorf("detail %s should omit expires_at: %s", id, w.Body.String())
+		}
+		if want != "" && !strings.Contains(w.Body.String(), want) {
+			t.Errorf("detail %s: body %s does not contain %s", id, w.Body.String(), want)
+		}
+	}
+}

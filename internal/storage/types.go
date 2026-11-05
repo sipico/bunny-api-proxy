@@ -11,6 +11,14 @@ type Token struct {
 	Name      string
 	IsAdmin   bool
 	CreatedAt time.Time
+	// ExpiresAt is the optional expiry time; nil means the token never expires.
+	ExpiresAt *time.Time
+}
+
+// IsExpired reports whether the token has an expiry time that lies before now.
+// A token without an expiry never expires.
+func (t *Token) IsExpired(now time.Time) bool {
+	return t.ExpiresAt != nil && now.After(*t.ExpiresAt)
 }
 
 // Permission represents access rules for a token.
