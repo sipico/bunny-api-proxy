@@ -345,6 +345,8 @@ jobs:
           BUNNY_MASTER_API_KEY: ${{ env.MOCK_E2E_KEY }}
           # Unique per run + attempt; used in test zone names (see tests/testenv getCommitHash)
           E2E_RUN_ID: r${{ github.run_id }}a${{ github.run_attempt }}
+          # Empty second proxy (proxy-fresh) for TestE2E_BootstrapFlowFresh
+          BUNNY_FRESH_PROXY_URL: http://proxy-fresh:8080
         run: |
           mkdir -p e2e-logs
           set -o pipefail
@@ -358,6 +360,7 @@ jobs:
           mkdir -p e2e-logs
           docker compose -f .claude/docker/docker-compose.test.yml logs proxy > e2e-logs/proxy.log 2>&1 || true
           docker compose -f .claude/docker/docker-compose.test.yml logs mockbunny > e2e-logs/mockbunny.log 2>&1 || true
+          docker compose -f .claude/docker/docker-compose.test.yml logs proxy-fresh > e2e-logs/proxy-fresh.log 2>&1 || true
           docker compose -f .claude/docker/docker-compose.test.yml ps > e2e-logs/services.log 2>&1 || true
 
       - name: Analyze E2E logs for hidden problems

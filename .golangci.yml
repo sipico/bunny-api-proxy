@@ -3,6 +3,10 @@ version: "2"
 run:
   timeout: 5m
   modules-download-mode: readonly
+  # Also lint the E2E tests (tests/e2e, //go:build e2e); without this tag
+  # they were never linted.
+  build-tags:
+    - e2e
 
 linters:
   enable:

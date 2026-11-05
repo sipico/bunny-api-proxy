@@ -580,7 +580,7 @@ func TestE2E_GetScanResult_Success(t *testing.T) {
 		time.Sleep(backoff)
 		// Double backoff for next iteration, capped at maxBackoff
 		if backoff < maxBackoff {
-			backoff = backoff * 2
+			backoff *= 2
 			if backoff > maxBackoff {
 				backoff = maxBackoff
 			}

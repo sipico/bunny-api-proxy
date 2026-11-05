@@ -43,6 +43,31 @@ services:
     volumes:
       - /tmp/proxy-data:/data
 
+  # Second proxy with an empty database, only in mock mode, for
+  # TestE2E_BootstrapFlowFresh (master key -> first admin token -> master key
+  # locked). The database is in /tmp inside the container, so every start is
+  # fresh. The shared proxy above is already bootstrapped by the other tests.
+  proxy-fresh:
+    profiles: ["mock"]
+    image: bunny-api-proxy:test
+    environment:
+      - LOG_LEVEL=debug
+      - LISTEN_ADDR=:8080
+      - DATABASE_PATH=/tmp/proxy-fresh.db
+      - BUNNY_API_URL=http://mockbunny:8081
+      - BUNNY_API_KEY=${BUNNY_MASTER_API_KEY}
+    depends_on:
+      mockbunny:
+        condition: service_healthy
+    networks:
+      - test-network
+    healthcheck:
+      test: ["CMD", "/app/bunny-api-proxy", "health"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
   test-runner:
     profiles: ["manual"]  # Don't auto-start; only run via 'docker compose run'
     image: test-runner:test  # Pre-built image tag
@@ -53,6 +78,7 @@ services:
       - PROXY_URL=http://proxy:8080
       - BUNNY_MASTER_API_KEY=${BUNNY_MASTER_API_KEY}  # Master key for bootstrap
       - E2E_RUN_ID=${E2E_RUN_ID:-}  # Unique zone-name ID per CI run (no .git in this container)
+      - BUNNY_FRESH_PROXY_URL=${BUNNY_FRESH_PROXY_URL:-}  # Set in mock mode only (proxy-fresh)
     depends_on:
       proxy:
         condition: service_healthy
