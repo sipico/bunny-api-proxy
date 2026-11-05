@@ -20,6 +20,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 	"time"
 )
@@ -161,8 +162,11 @@ func recordSamples() []recordSample {
 		rec(9, "caa", "letsencrypt.org", map[string]any{"Flags": 0, "Tag": "issue"}),
 		rec(10, "ptr", "host.example.com", nil),
 		rec(12, "sub", "ns1.example.com", nil),
-		rec(13, "_svc", "1 svc.example.com. alpn=h2", nil),
-		rec(14, "https", "1 . alpn=h2,h3", nil),
+		// The first run's values ("1 svc.example.com. alpn=h2", "1 . alpn=h2,h3")
+		// were rejected with "The requested target is not valid": try a target
+		// without the trailing dot and no alias-mode ".".
+		rec(13, "_svc", "1 svc.example.com alpn=h2", nil),
+		rec(14, "https", "1 web.example.com alpn=h2", nil),
 		rec(15, "_443._tcp", "3 1 1 "+strings.Repeat("ab", 32), nil),
 	}
 }
@@ -183,12 +187,18 @@ func (p *Prober) Run(ctx context.Context) {
 		return
 	}
 	zone := fmt.Sprintf("/dnszone/%d", zoneID)
+	// Pull zones bunny.net created for accelerated records (a Redirect record
+	// gets one automatically), with whether they belong to the probe.
+	pullZones := map[int64]bool{}
 	defer func() {
 		// Fresh context: the caller's may be cancelled by now.
 		cctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 		defer cancel()
 		p.do(cctx, "delete zone", http.MethodDelete, zone, nil, nil, "")
 		p.do(cctx, "delete zone again", http.MethodDelete, zone, nil, nil, "")
+		for _, id := range sortedIDs(pullZones) {
+			p.cleanupPullZone(cctx, id, pullZones[id])
+		}
 	}()
 
 	p.do(ctx, "get zone", http.MethodGet, zone, nil, nil, "")
@@ -203,6 +213,10 @@ func (p *Prober) Run(ctx context.Context) {
 			if s.typ == 3 {
 				txtID = id
 			}
+		}
+		if pz := acceleratedPullZone(ex); pz != 0 {
+			got := p.do(ctx, "get accelerated pull zone", http.MethodGet, fmt.Sprintf("/pullzone/%d", pz), nil, nil, "")
+			pullZones[pz] = got.Status == http.StatusOK && probeOwnedPullZone(got.rawBody)
 		}
 	}
 	p.do(ctx, "add record with invalid type", http.MethodPut, zone+"/records", nil,
@@ -235,9 +249,98 @@ func (p *Prober) Run(ctx context.Context) {
 	}
 }
 
-// cleanupStale deletes zones left behind by earlier probe runs. Only zones
-// with the probe suffix are touched.
+// cleanupPullZone deletes a pull zone bunny.net created for one of the
+// probe's records, if it still exists. ownedEarlier is the ownership seen
+// while the record existed; the zone is also checked again now.
+func (p *Prober) cleanupPullZone(ctx context.Context, id int64, ownedEarlier bool) {
+	path := fmt.Sprintf("/pullzone/%d", id)
+	ex := p.do(ctx, "check accelerated pull zone after cleanup", http.MethodGet, path, nil, nil, "")
+	if ex.Status != http.StatusOK {
+		ex.Note = fmt.Sprintf("pull zone %d is gone (status %d): bunny.net removed it with the record or zone", id, ex.Status)
+		return
+	}
+	if !ownedEarlier && !probeOwnedPullZone(ex.rawBody) {
+		ex.Note = fmt.Sprintf("pull zone %d still exists but its hostnames are not the probe's; left alone", id)
+		return
+	}
+	ex.Note = fmt.Sprintf("pull zone %d was left behind by the record; deleting it", id)
+	p.do(ctx, "delete accelerated pull zone", http.MethodDelete, path, nil, nil, "")
+	p.do(ctx, "check pull zone deleted", http.MethodGet, path, nil, nil, "")
+}
+
+// acceleratedPullZone returns the pull zone ID of an accelerated record.
+func acceleratedPullZone(ex *Exchange) int64 {
+	var v struct {
+		Accelerated bool  `json:"Accelerated"`
+		PullZoneID  int64 `json:"AcceleratedPullZoneId"`
+	}
+	if json.Unmarshal(ex.rawBody, &v) != nil || !v.Accelerated {
+		return 0
+	}
+	return v.PullZoneID
+}
+
+// pullZone is the part of bunny.net's PullZoneModel the probe needs.
+type pullZone struct {
+	ID        int64 `json:"Id"`
+	Hostnames []struct {
+		Value            string `json:"Value"`
+		IsSystemHostname bool   `json:"IsSystemHostname"`
+	} `json:"Hostnames"`
+}
+
+// owned reports whether the pull zone belongs to the probe: it has at least
+// one hostname of its own, and every hostname that is not bunny.net's system
+// hostname (*.b-cdn.net) is under a probe zone (*-bapprobe.xyz).
+func (z pullZone) owned() bool {
+	custom := 0
+	for _, h := range z.Hostnames {
+		if h.IsSystemHostname {
+			continue
+		}
+		if !strings.HasSuffix(h.Value, ZoneSuffix) {
+			return false
+		}
+		custom++
+	}
+	return custom > 0
+}
+
+func probeOwnedPullZone(body []byte) bool {
+	var z pullZone
+	return json.Unmarshal(body, &z) == nil && z.owned()
+}
+
+func sortedIDs(m map[int64]bool) []int64 {
+	ids := make([]int64, 0, len(m))
+	for id := range m {
+		ids = append(ids, id)
+	}
+	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+	return ids
+}
+
+// cleanupStale deletes zones and pull zones left behind by earlier probe
+// runs. Only zones with the probe suffix, and pull zones whose own hostnames
+// are all under probe zones, are touched.
 func (p *Prober) cleanupStale(ctx context.Context) {
+	pz := p.do(ctx, "find stale probe pull zones", http.MethodGet, "/pullzone", url.Values{"search": {"bapprobe"}}, nil, "")
+	if pz.Status == http.StatusOK {
+		var zones []pullZone
+		if json.Unmarshal(pz.rawBody, &zones) != nil {
+			var paged struct {
+				Items []pullZone `json:"Items"`
+			}
+			_ = json.Unmarshal(pz.rawBody, &paged) //nolint:errcheck // nothing to clean up if neither shape matches
+			zones = paged.Items
+		}
+		for _, z := range zones {
+			if z.owned() {
+				p.do(ctx, "delete stale probe pull zone", http.MethodDelete, fmt.Sprintf("/pullzone/%d", z.ID), nil, nil, "")
+			}
+		}
+	}
+
 	ex := p.do(ctx, "find stale probe zones", http.MethodGet, "/dnszone", url.Values{"search": {"bapprobe"}}, nil, "")
 	var list struct {
 		Items []struct {
