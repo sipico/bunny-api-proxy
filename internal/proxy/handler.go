@@ -8,7 +8,9 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
+	"net/url"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
@@ -112,6 +114,22 @@ func handleBunnyError(w http.ResponseWriter, err error) {
 		// Master key issue - proxy's bunny.net credentials are invalid
 		slog.Default().Error("upstream authentication failed", "error", err)
 		writeError(w, http.StatusBadGateway, "upstream authentication failed")
+	case isUpstreamTimeout(err):
+		// The request may have reached bunny.net and been applied: measured
+		// against the real API, PUTs whose client timed out had created
+		// their record. Writes are not retried (see bunny.RetryTransport).
+		slog.Default().Error("bunny.net did not answer in time", "error", err)
+		writeError(w, http.StatusGatewayTimeout,
+			"bunny.net did not answer in time. "+mayHaveBeenApplied)
+	case isUpstreamServerError(err):
+		// bunny.net's own 5xx text goes to the log only.
+		slog.Default().Error("bunny.net server error", "error", err)
+		writeError(w, http.StatusBadGateway,
+			fmt.Sprintf("bunny.net returned an error (HTTP %d). %s", upstreamStatus(err), mayHaveBeenApplied))
+	case isUpstreamUnreachable(err):
+		slog.Default().Error("bunny.net unreachable", "error", err)
+		writeError(w, http.StatusBadGateway,
+			"could not reach bunny.net or the connection broke. "+mayHaveBeenApplied)
 	default:
 		// Check if it's a structured APIError with a specific status code
 		var apiErr *bunny.APIError
@@ -120,10 +138,50 @@ func handleBunnyError(w http.ResponseWriter, err error) {
 			writeError(w, apiErr.StatusCode, apiErr.Message)
 			return
 		}
-		// Generic errors (network, parsing, etc.) - log for debugging
+		// Generic errors (parsing, etc.) - log for debugging
 		slog.Default().Error("bunny.net API error", "error", err)
 		writeError(w, http.StatusInternalServerError, "internal server error")
 	}
+}
+
+// mayHaveBeenApplied is added to every upstream failure: bunny.net may have
+// applied a change although it did not confirm it.
+const mayHaveBeenApplied = "If this request changes data, it may have been applied: check before retrying."
+
+// isUpstreamTimeout reports a timeout while waiting for bunny.net,
+// including the proxy's own client timeout.
+func isUpstreamTimeout(err error) bool {
+	if errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+	var netErr net.Error
+	return errors.As(err, &netErr) && netErr.Timeout()
+}
+
+// isUpstreamServerError reports a 5xx answer from bunny.net, with or without
+// a structured body.
+func isUpstreamServerError(err error) bool {
+	return upstreamStatus(err) >= 500
+}
+
+// upstreamStatus returns bunny.net's status code for a 5xx error, or 0.
+func upstreamStatus(err error) int {
+	var serverErr *bunny.ServerError
+	if errors.As(err, &serverErr) {
+		return serverErr.StatusCode
+	}
+	var apiErr *bunny.APIError
+	if errors.As(err, &apiErr) && apiErr.StatusCode >= 500 {
+		return apiErr.StatusCode
+	}
+	return 0
+}
+
+// isUpstreamUnreachable reports a transport failure talking to bunny.net
+// (connection refused, DNS, connection reset).
+func isUpstreamUnreachable(err error) bool {
+	var urlErr *url.Error
+	return errors.As(err, &urlErr)
 }
 
 // filterRecordsByPermission filters zone records based on the scoped key's permitted record types.

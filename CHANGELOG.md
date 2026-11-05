@@ -1,10 +1,15 @@
 # Changelog
 
-## Unreleased
+## Release 2026.11.1
+
+**Release Date:** November 5, 2026
 
 Everything since 2026.02.2. Read **Breaking changes** and **Upgrading** before you upgrade.
 
 ### Breaking changes
+- **Failures of bunny.net itself get `502` or `504`** instead of `500` (or bunny.net's 5xx status): `502 Bad Gateway` for a 5xx answer or when bunny.net cannot be reached, `504 Gateway Timeout` when it does not answer within 30 seconds. The message says that a change may have been applied anyway; check before retrying a write. bunny.net's 5xx text is no longer passed to clients, only logged. 4xx errors are unchanged.
+- **`/metrics` moved off the public port.** Prometheus metrics are served by a separate listener, `METRICS_LISTEN_ADDR` (default `localhost:9090`); `GET /metrics` on the proxy port now returns 404. Inside a container `localhost` is not reachable from outside: set `METRICS_LISTEN_ADDR=:9090` and expose that port only to your monitoring network.
+- **The admin API requires an admin token.** Scoped tokens get `403 admin_required` on `/admin/api/tokens...` and `/admin/api/loglevel`; `/admin/api/whoami` stays available to every token. In 2026.02.2 any valid token could manage tokens (see **Security**).
 - **`GET /dnszone/{id}/records` returns bunny.net's paginated list** (`Items`, `CurrentPage`, `TotalItems`, `HasMoreItems`) instead of a plain array, and supports `page`, `perPage`, `type` and `search` like bunny.net's endpoint. Scoped tokens only see, and only count, their permitted record types.
 - **Record type `SPF` no longer grants anything.** bunny.net's API names type 5 `Redirect` (an HTTP redirect with an automatically created pull zone), not SPF; SPF records are `TXT` records. Existing permissions containing `SPF` are kept but match nothing (fail closed, no silent conversion to `Redirect`). They are logged as a warning at startup and listed under `warnings` in the admin API. New grants with `SPF` are rejected with an explanation. Grant `TXT` or `Redirect` explicitly.
 - **Invalid permission values are rejected.** Creating a token or permission with an unknown action or record type (including a different spelling or case) now gets `400 invalid_request` that names the value. Before, it was stored and silently matched nothing.
@@ -21,6 +26,9 @@ Everything since 2026.02.2. Read **Breaking changes** and **Upgrading** before y
 - **`bunny-api-proxy backup <file>`** writes a consistent copy of the database while the proxy runs (`docker exec bunny-api-proxy /app/bunny-api-proxy backup /data/proxy-backup.db`). A plain file copy can miss recent writes.
 
 ### Security
+- **Scoped tokens could use the admin API in 2026.02.2**, including creating tokens and permissions. Admin rights are now checked on every admin endpoint except `whoami`. If you gave scoped tokens to clients you do not fully trust, review your tokens after upgrading (`GET /admin/api/tokens`).
+- Deleting a permission checks that it belongs to the token in the URL; before, any permission ID could be deleted through any token's URL.
+- A client-supplied `X-Request-ID` is only used when it has at most 128 characters from `A-Z a-z 0-9 - _ .`; otherwise a new ID is generated (prevents log injection).
 - Security headers on every response: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Cache-Control: no-store`.
 - The master key cannot be recognised by response time or error message after bootstrap (see above).
 - `DELETE /dnszone/{id}` is explicitly admin-only.
@@ -29,6 +37,9 @@ Everything since 2026.02.2. Read **Breaking changes** and **Upgrading** before y
 - Go 1.27.3; GitHub Actions pinned to commit SHAs; weekly `govulncheck` on `main`.
 
 ### Fixes
+- Requests to bunny.net time out after 30 seconds. Reads and deletes (GET, HEAD, OPTIONS, DELETE) are retried on 5xx responses and timeouts with exponential backoff (1s, 2s, 4s). Writes (POST, PUT, PATCH) are never retried: bunny.net may already have applied them, and adding a record twice creates two records.
+- SQLite memory mapping is disabled, which fixes crashes (SIGBUS) on Docker bind mounts.
+- The readiness check (`/ready`) uses a lightweight database ping.
 - The container health check uses the port from `LISTEN_ADDR` instead of always `:8080`.
 - Documentation: SHA-256 instead of bcrypt in the security docs, environment variable names in `.env.example` and the examples, data volume permissions, safe backups.
 
@@ -37,6 +48,7 @@ Everything since 2026.02.2. Read **Breaking changes** and **Upgrading** before y
 - **A backup is written first**, next to the database: `proxy.db.v<old version>-backup-<UTC time>`. If it cannot be written, nothing is migrated.
 - **Downgrading is refused** by this and later versions. Releases 2026.02.x cannot detect a newer database: to go back, restore the backup instead of starting the old image on the migrated database. See `docs/DEPLOYMENT.md`.
 - **Check the log** after upgrading for `permission contains a record type that no longer exists` (the `SPF` change).
+- **Metrics:** if you scrape `/metrics`, point Prometheus at `METRICS_LISTEN_ADDR` (see **Breaking changes**).
 
 ## Release 2026.02.2
 

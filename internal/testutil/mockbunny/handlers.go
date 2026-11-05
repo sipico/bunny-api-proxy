@@ -390,7 +390,13 @@ func (s *Server) handleCreateZone(w http.ResponseWriter, r *http.Request) {
 	// Check if domain already exists
 	for _, zone := range s.state.zones {
 		if zone.Domain == req.Domain {
-			s.writeError(w, http.StatusConflict, "conflict", "", "Zone already exists")
+			// Like the real API (observed 2026-11-05): 400, and unlike
+			// most errors no trailing \r in Message, so not writeError.
+			writeJSON(w, http.StatusBadRequest, ErrorResponse{
+				ErrorKey: "dnszone.name_taken",
+				Field:    "Name",
+				Message:  "The DNS zone domain is already taken.",
+			})
 			return
 		}
 	}

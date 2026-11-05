@@ -4,11 +4,14 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
@@ -2632,5 +2635,50 @@ func TestHandleGetScanResult_BunnyError(t *testing.T) {
 
 	if w.Code != http.StatusInternalServerError {
 		t.Errorf("expected status %d, got %d", http.StatusInternalServerError, w.Code)
+	}
+}
+
+// TestHandleBunnyError_UpstreamFailures checks how failures of bunny.net
+// itself reach the client: 502 for 5xx answers and unreachable bunny.net,
+// 504 for timeouts, always with the hint that a change may have been
+// applied (a timed-out PUT can create its record anyway; measured against
+// the real API), and never with the upstream 5xx text.
+func TestHandleBunnyError_UpstreamFailures(t *testing.T) {
+	t.Parallel()
+	timeout := &url.Error{Op: "Put", URL: "https://api.bunny.net/dnszone/1/records", Err: context.DeadlineExceeded}
+	tests := []struct {
+		name       string
+		err        error
+		wantStatus int
+	}{
+		{"5xx with structured body", &bunny.APIError{StatusCode: http.StatusInternalServerError, ErrorKey: "error", Message: "internal stack trace secret"}, http.StatusBadGateway},
+		{"503 with structured body", &bunny.APIError{StatusCode: http.StatusServiceUnavailable, Message: "secret maintenance note"}, http.StatusBadGateway},
+		{"5xx without body", &bunny.ServerError{StatusCode: http.StatusBadGateway}, http.StatusBadGateway},
+		{"wrapped 5xx", fmt.Errorf("failed to update zone: %w", &bunny.ServerError{StatusCode: http.StatusGatewayTimeout}), http.StatusBadGateway},
+		{"client timeout", timeout, http.StatusGatewayTimeout},
+		{"wrapped timeout", fmt.Errorf("failed to import records: %w", timeout), http.StatusGatewayTimeout},
+		{"deadline exceeded", context.DeadlineExceeded, http.StatusGatewayTimeout},
+		{"connection refused", &url.Error{Op: "Get", URL: "https://api.bunny.net/dnszone", Err: errors.New("dial tcp: connection refused")}, http.StatusBadGateway},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			w := httptest.NewRecorder()
+			handleBunnyError(w, tt.err)
+
+			if w.Code != tt.wantStatus {
+				t.Errorf("status = %d, want %d", w.Code, tt.wantStatus)
+			}
+			var body map[string]string
+			if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+				t.Fatalf("body is not JSON: %v (%s)", err, w.Body.String())
+			}
+			if !strings.Contains(body["error"], "may have been applied") {
+				t.Errorf("error = %q, want the hint that a change may have been applied", body["error"])
+			}
+			if strings.Contains(w.Body.String(), "secret") {
+				t.Errorf("upstream 5xx text reached the client: %s", w.Body.String())
+			}
+		})
 	}
 }

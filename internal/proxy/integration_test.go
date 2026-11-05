@@ -10,6 +10,8 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -849,9 +851,13 @@ func TestIntegration_FailureInjection_5xxError(t *testing.T) {
 
 	router.ServeHTTP(w, req)
 
-	// Proxy should propagate the 503 error
-	if w.Code != http.StatusServiceUnavailable {
-		t.Errorf("expected status %d, got %d", http.StatusServiceUnavailable, w.Code)
+	// An upstream 5xx becomes 502 Bad Gateway with the hint that a change
+	// may have been applied; bunny.net's own text stays in the log.
+	if w.Code != http.StatusBadGateway {
+		t.Errorf("expected status %d, got %d", http.StatusBadGateway, w.Code)
+	}
+	if body := w.Body.String(); !strings.Contains(body, "HTTP 503") || !strings.Contains(body, "may have been applied") || strings.Contains(body, "Service Unavailable") {
+		t.Errorf("unexpected body: %s", body)
 	}
 
 	// Next request should succeed (error injection consumed)
@@ -1097,5 +1103,53 @@ func TestIntegration_DeleteZone_AdminOnly(t *testing.T) {
 	}
 	if mockServer.GetZone(zoneID) != nil {
 		t.Error("zone still exists after admin delete")
+	}
+}
+
+// TestIntegration_UpstreamTimeout_AddRecord checks a real client timeout end
+// to end: the proxy answers 504 with the hint that the record may exist,
+// and sends the PUT only once (writes are never retried).
+func TestIntegration_UpstreamTimeout_AddRecord(t *testing.T) {
+	t.Parallel()
+	var puts atomic.Int32
+	slow := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPut {
+			puts.Add(1)
+		}
+		time.Sleep(300 * time.Millisecond) // bunny.net does the work, the answer is late
+		w.WriteHeader(http.StatusCreated)
+	}))
+	defer slow.Close()
+
+	httpClient := &http.Client{
+		Timeout:   100 * time.Millisecond,
+		Transport: &bunny.RetryTransport{Transport: http.DefaultTransport, Logger: testLogger()},
+	}
+	client := bunny.NewClient("test-key", bunny.WithBaseURL(slow.URL), bunny.WithHTTPClient(httpClient))
+	handler := NewHandler(client, testLogger())
+	db := newMemoryStorage(t)
+	authenticator := auth.NewAuthenticator(db, auth.NewBootstrapService(db, "master-key"))
+	testToken := "test-key-timeout"
+	if _, err := db.CreateToken(context.Background(), "Admin", true, hashTokenForTest(testToken)); err != nil {
+		t.Fatalf("failed to create token: %v", err)
+	}
+	router := NewRouter(handler, authenticator.Authenticate, testLogger())
+
+	req := httptest.NewRequest(http.MethodPut, "/dnszone/1/records",
+		strings.NewReader(`{"Type":3,"Name":"_acme-challenge","Value":"v","Ttl":300}`))
+	req.Header.Set("AccessKey", testToken)
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusGatewayTimeout {
+		t.Errorf("status = %d, want 504 (body %s)", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "may have been applied") {
+		t.Errorf("missing hint: %s", w.Body.String())
+	}
+	time.Sleep(400 * time.Millisecond)
+	if n := puts.Load(); n != 1 {
+		t.Errorf("PUT reached bunny.net %d times, want 1", n)
 	}
 }

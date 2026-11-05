@@ -174,7 +174,8 @@ func initializeComponents(cfg *config.Config) (*serverComponents, error) {
 		Logger:    logger,
 		Prefix:    "BUNNY",
 	}
-	// Wrap with RetryTransport to retry on timeout errors
+	// Wrap with RetryTransport: retries reads and deletes on timeouts and 5xx;
+	// writes are never retried (they may have been applied)
 	retryTransport := &bunny.RetryTransport{
 		Transport: loggingTransport,
 		Logger:    logger,

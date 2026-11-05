@@ -202,6 +202,8 @@ func (p *Prober) Run(ctx context.Context) {
 		}
 	}()
 
+	// The real API answers 400 dnszone.name_taken; the spec documents 400.
+	p.do(ctx, "create zone again", http.MethodPost, "/dnszone", nil, map[string]any{"Domain": p.Domain()}, "")
 	p.do(ctx, "get zone", http.MethodGet, zone, nil, nil, "")
 	p.do(ctx, "get zone (view=Lite)", http.MethodGet, zone, url.Values{"view": {"1"}}, nil, "")
 

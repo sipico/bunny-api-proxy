@@ -681,22 +681,19 @@ func TestHandleCreateZone_DuplicateDomain(t *testing.T) {
 	}
 	defer resp2.Body.Close()
 
-	// Verify 409 Conflict
-	if resp2.StatusCode != http.StatusConflict {
-		t.Errorf("expected status %d, got %d", http.StatusConflict, resp2.StatusCode)
+	// The real API answers 400 dnszone.name_taken (observed 2026-11-05,
+	// actions run 42025298723), without a trailing \r in Message.
+	if resp2.StatusCode != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d", http.StatusBadRequest, resp2.StatusCode)
 	}
 
-	// Verify error response
 	var errResp ErrorResponse
 	if err := json.NewDecoder(resp2.Body).Decode(&errResp); err != nil {
 		t.Fatalf("failed to decode error response: %v", err)
 	}
-
-	if errResp.ErrorKey != "conflict" {
-		t.Errorf("expected error key conflict, got %s", errResp.ErrorKey)
-	}
-	if errResp.Message != "Zone already exists\r" {
-		t.Errorf("expected message 'Zone already exists', got %s", errResp.Message)
+	want := ErrorResponse{ErrorKey: "dnszone.name_taken", Field: "Name", Message: "The DNS zone domain is already taken."}
+	if errResp != want {
+		t.Errorf("error response = %+v, want %+v", errResp, want)
 	}
 }
 
@@ -1207,7 +1204,8 @@ func TestErrorResponsesHaveTrailingCR(t *testing.T) {
 		t.Errorf("expected Message to end with \\r, got: %q", errResp.Message)
 	}
 
-	// Test 3: AddZone with duplicate should include \r in error message
+	// Test 3: a duplicate zone is the exception: the real API's
+	// dnszone.name_taken message has no trailing \r (observed 2026-11-05).
 	s.AddZone("example.com")
 	reqBody = `{"Domain":"example.com"}`
 	req, _ = http.NewRequest(http.MethodPost, fmt.Sprintf("%s/dnszone", s.URL()), strings.NewReader(reqBody))
@@ -1222,8 +1220,8 @@ func TestErrorResponsesHaveTrailingCR(t *testing.T) {
 		t.Fatalf("failed to decode error response: %v", err)
 	}
 
-	if !strings.HasSuffix(errResp.Message, "\r") {
-		t.Errorf("expected Message to end with \\r, got: %q", errResp.Message)
+	if strings.HasSuffix(errResp.Message, "\r") {
+		t.Errorf("duplicate zone: expected no trailing \\r (like the real API), got: %q", errResp.Message)
 	}
 }
 

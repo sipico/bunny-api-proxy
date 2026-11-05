@@ -815,8 +815,8 @@ func parseError(statusCode int, body []byte) error {
 			apiErr.StatusCode = statusCode
 			return &apiErr
 		}
-		// Fall back to generic error
-		return fmt.Errorf("bunny: server error (status %d)", statusCode)
+		// Fall back to a server error without details
+		return &ServerError{StatusCode: statusCode}
 	default:
 		// Try to parse as structured error
 		var apiErr APIError
@@ -824,7 +824,10 @@ func parseError(statusCode int, body []byte) error {
 			apiErr.StatusCode = statusCode
 			return &apiErr
 		}
-		// Fall back to generic error
+		// Fall back to generic error (any other 5xx is a server error)
+		if statusCode >= 500 {
+			return &ServerError{StatusCode: statusCode}
+		}
 		return fmt.Errorf("bunny: request failed (status %d)", statusCode)
 	}
 }

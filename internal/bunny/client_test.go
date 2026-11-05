@@ -2366,3 +2366,28 @@ func TestHTTPClientTimeout(t *testing.T) {
 		t.Logf("Request correctly timed out after %v with error: %v", duration, err)
 	})
 }
+
+// TestParseError_ServerErrorWithoutJSON checks that every 5xx without a
+// structured body becomes a *ServerError, so the proxy can answer 502.
+func TestParseError_ServerErrorWithoutJSON(t *testing.T) {
+	t.Parallel()
+	for _, status := range []int{http.StatusInternalServerError, http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout} {
+		err := parseError(status, []byte(`<html>Bad Gateway</html>`))
+		var se *ServerError
+		if !errors.As(err, &se) {
+			t.Errorf("status %d: got %T (%v), want *ServerError", status, err, err)
+			continue
+		}
+		if se.StatusCode != status {
+			t.Errorf("status %d: StatusCode = %d", status, se.StatusCode)
+		}
+		if want := fmt.Sprintf("bunny: server error (status %d)", status); err.Error() != want {
+			t.Errorf("status %d: Error() = %q, want %q", status, err.Error(), want)
+		}
+	}
+	// A 4xx without a structured body stays a plain error.
+	var se *ServerError
+	if errors.As(parseError(http.StatusTeapot, nil), &se) {
+		t.Error("418: unexpected *ServerError")
+	}
+}

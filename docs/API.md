@@ -647,7 +647,20 @@ All endpoints that return JSON will include error information in the response bo
 When the proxy receives an error from the bunny.net API:
 - **401 Unauthorized** (from bunny) → Returns `502 Bad Gateway` (indicates master key issue)
 - **404 Not Found** (from bunny) → Returns `404 Not Found`
+- **Other 4xx** (from bunny, e.g. validation errors) → Returns the same status with bunny.net's message
+- **5xx** (from bunny), or bunny.net unreachable → Returns `502 Bad Gateway`. bunny.net's own error text is only logged.
+- **No answer within 30 seconds** → Returns `504 Gateway Timeout`
 - **Other errors** → Returns `500 Internal Server Error`
+
+**A 502 or 504 does not mean nothing happened.** bunny.net may have applied a change without confirming it: measured against the real API, record additions whose answer timed out had created the record anyway. The message says so:
+
+```json
+{
+  "error": "bunny.net did not answer in time. If this request changes data, it may have been applied: check before retrying."
+}
+```
+
+The proxy retries reads and deletes itself, but never writes (adding a record twice creates two records). Before retrying a write, check whether it was applied, for example by listing the records (`GET /dnszone/{zoneID}/records?type=3&search=_acme-challenge`).
 
 ---
 

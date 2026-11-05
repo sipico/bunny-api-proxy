@@ -1115,27 +1115,30 @@ func TestLoggingTransport_BuffersAtDebugLevel(t *testing.T) {
 }
 
 // TestRetryTransport_IdempotentMethodDetection tests the idempotent method detection.
-func TestRetryTransport_IdempotentMethodDetection(t *testing.T) {
+func TestRetryTransport_RetryableMethodDetection(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		name         string
-		method       string
-		isIdempotent bool
+		name      string
+		method    string
+		retryable bool
 	}{
-		{"GET is idempotent", http.MethodGet, true},
-		{"HEAD is idempotent", http.MethodHead, true},
-		{"OPTIONS is idempotent", http.MethodOptions, true},
-		{"DELETE is idempotent", http.MethodDelete, true},
-		{"PUT is idempotent", http.MethodPut, true},
-		{"POST is not idempotent", http.MethodPost, false},
-		{"PATCH is not idempotent", http.MethodPatch, false},
+		{"GET is retried", http.MethodGet, true},
+		{"HEAD is retried", http.MethodHead, true},
+		{"OPTIONS is retried", http.MethodOptions, true},
+		{"DELETE is retried", http.MethodDelete, true},
+		// bunny.net's PUT /dnszone/{id}/records creates a new record each
+		// time (verified against the real API: two identical PUTs gave two
+		// records), so PUT is not idempotent there.
+		{"PUT is not retried", http.MethodPut, false},
+		{"POST is not retried", http.MethodPost, false},
+		{"PATCH is not retried", http.MethodPatch, false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := isIdempotentMethod(tt.method)
-			if result != tt.isIdempotent {
-				t.Errorf("isIdempotentMethod(%q) = %v, want %v", tt.method, result, tt.isIdempotent)
+			result := isRetryableMethod(tt.method)
+			if result != tt.retryable {
+				t.Errorf("isRetryableMethod(%q) = %v, want %v", tt.method, result, tt.retryable)
 			}
 		})
 	}
@@ -1166,49 +1169,59 @@ func TestRetryTransport_TimeoutErrorDetection(t *testing.T) {
 	}
 }
 
-// TestRetryTransport_RetriesTimeoutForAllMethods tests that timeout errors are retried even for non-idempotent methods.
-// Timeout means the request likely didn't reach the server, so it's safe to retry.
-func TestRetryTransport_RetriesTimeoutForAllMethods(t *testing.T) {
+// TestRetryTransport_NoRetryOnTimeoutForWrites checks that a timed-out
+// write is not sent again. A timeout does not mean the request missed the
+// server: against the real bunny.net API, PUTs whose client gave up after
+// 50-500 ms had all created their record.
+func TestRetryTransport_NoRetryOnTimeoutForWrites(t *testing.T) {
 	t.Parallel()
-	var buf bytes.Buffer
-	logger := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelWarn}))
+	for _, method := range []string{http.MethodPost, http.MethodPut, http.MethodPatch} {
+		t.Run(method, func(t *testing.T) {
+			t.Parallel()
+			var buf bytes.Buffer
+			logger := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelWarn}))
+			timeoutErr := fmt.Errorf("%s \"https://api.bunny.net/test\": context deadline exceeded (Client.Timeout exceeded while awaiting headers)", method)
+			inner := &countingTransport{err: timeoutErr}
+			rt := &RetryTransport{Transport: inner, Logger: logger}
 
-	timeoutErr := fmt.Errorf("Post \"https://api.bunny.net/test\": context deadline exceeded (Client.Timeout exceeded while awaiting headers)")
-	successResp := &http.Response{
-		StatusCode: http.StatusCreated,
-		Body:       io.NopCloser(strings.NewReader(`{"id":123}`)),
+			req, _ := http.NewRequest(method, "https://api.bunny.net/test", strings.NewReader(`{"Name":"x"}`))
+			resp, err := rt.RoundTrip(req)
+			if resp != nil && resp.Body != nil {
+				_ = resp.Body.Close()
+			}
+
+			if err == nil {
+				t.Error("expected the timeout error to be returned")
+			}
+			if inner.calls != 1 {
+				t.Errorf("%s was sent %d times, want 1 (a timed-out write may have been applied)", method, inner.calls)
+			}
+			if strings.Contains(buf.String(), "retrying") {
+				t.Errorf("unexpected retry log for %s: %s", method, buf.String())
+			}
+		})
+	}
+}
+
+// countingTransport always returns err (or status when err is nil) and
+// counts the calls.
+type countingTransport struct {
+	calls  int
+	err    error
+	status int
+}
+
+func (t *countingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	t.calls++
+	if t.err != nil {
+		return nil, t.err
+	}
+	return &http.Response{
+		StatusCode: t.status,
+		Body:       io.NopCloser(strings.NewReader(`{"Message":"server error"}`)),
 		Header:     make(http.Header),
-	}
-
-	rt := &RetryTransport{
-		Transport: &failOnceThenSucceedTransport{
-			failOnce:    true,
-			failErr:     timeoutErr,
-			successResp: successResp,
-		},
-		Logger: logger,
-	}
-
-	// Create POST request (non-idempotent)
-	req, _ := http.NewRequest(http.MethodPost, "https://api.bunny.net/test", nil)
-	resp, err := rt.RoundTrip(req)
-
-	// Should succeed after retry (timeout is safe to retry)
-	if err != nil {
-		t.Errorf("Expected no error after retry, got %v", err)
-	}
-	if resp == nil {
-		t.Fatal("Expected response after retry")
-	}
-	if resp.StatusCode != http.StatusCreated {
-		t.Errorf("Expected status 201, got %d", resp.StatusCode)
-	}
-
-	// Verify retry logs
-	logOutput := buf.String()
-	if !strings.Contains(logOutput, "retrying") {
-		t.Error("Expected retry log message for timeout on POST")
-	}
+		Request:    req,
+	}, nil
 }
 
 // failOnceThenSucceedTransport is a test helper that fails once with timeout, then succeeds.
@@ -1618,44 +1631,30 @@ func TestRetryTransport_ContextCancellation(t *testing.T) {
 	}
 }
 
-// TestRetryTransport_RetryPUTOn5xx tests that PUT (AddRecord) is retried on 5xx.
-func TestRetryTransport_RetryPUTOn5xx(t *testing.T) {
+// TestRetryTransport_NoRetryPUTOn5xx checks that adding a record is not
+// sent again after a 5xx: bunny.net may have created the record already,
+// and a second PUT creates a duplicate (verified against the real API).
+func TestRetryTransport_NoRetryPUTOn5xx(t *testing.T) {
 	t.Parallel()
 	var buf bytes.Buffer
 	logger := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelWarn}))
-
-	successResp := &http.Response{
-		StatusCode: http.StatusCreated,
-		Body:       io.NopCloser(strings.NewReader(`{"id":123}`)),
-		Header:     make(http.Header),
-	}
-
-	rt := &RetryTransport{
-		Transport: &fail5xxThenSucceedTransport{
-			failCount:   1,
-			statusCode:  http.StatusBadGateway,
-			successResp: successResp,
-		},
-		Logger: logger,
-	}
+	inner := &countingTransport{status: http.StatusBadGateway}
+	rt := &RetryTransport{Transport: inner, Logger: logger}
 
 	req, _ := http.NewRequest(http.MethodPut, "https://api.bunny.net/dnszone/1/records", strings.NewReader(`{"Name":"test"}`))
 	resp, err := rt.RoundTrip(req)
-
-	// Should succeed after retry
 	if err != nil {
-		t.Errorf("Expected no error after retry, got %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
-	if resp == nil {
-		t.Fatal("Expected response after retry")
-	}
-	if resp.StatusCode != http.StatusCreated {
-		t.Errorf("Expected status 201, got %d", resp.StatusCode)
-	}
+	defer resp.Body.Close()
 
-	// Verify retry logs
-	logOutput := buf.String()
-	if !strings.Contains(logOutput, "retrying") {
-		t.Error("Expected retry log message for 502 error on PUT")
+	if resp.StatusCode != http.StatusBadGateway {
+		t.Errorf("status = %d, want the upstream 502", resp.StatusCode)
+	}
+	if inner.calls != 1 {
+		t.Errorf("PUT was sent %d times, want 1 (a second PUT creates a duplicate record)", inner.calls)
+	}
+	if strings.Contains(buf.String(), "retrying") {
+		t.Errorf("unexpected retry log: %s", buf.String())
 	}
 }
