@@ -11,8 +11,9 @@ version: '3.9'
 
 services:
   bunny-api-proxy:
-    # Use official image from registry (version pinned for reproducibility)
-    image: sipico/bunny-api-proxy:latest
+    # Official image. :latest follows main; pin a release tag (e.g. :2026.02.2,
+    # no "v") for reproducible deployments.
+    image: ghcr.io/sipico/bunny-api-proxy:latest
 
     # Container name for easy reference
     container_name: bunny-api-proxy

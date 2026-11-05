@@ -56,7 +56,9 @@ spec:
 
       containers:
       - name: bunny-api-proxy
-        image: sipico/bunny-api-proxy:latest
+        # Pin a release tag (e.g. :2026.02.2, no "v"): with :latest and
+        # IfNotPresent, nodes keep whatever image they pulled first.
+        image: ghcr.io/sipico/bunny-api-proxy:latest
         imagePullPolicy: IfNotPresent
 
         # Security context (container-level)
