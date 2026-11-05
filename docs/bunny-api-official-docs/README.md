@@ -95,7 +95,8 @@ The complete official bunny.net API specification is also available in machine-r
 - **[openapi-v3.json](openapi-v3.json)** - Full OpenAPI 3.0.0 specification (507 KB), downloaded unchanged
   - Original source: https://core-api-public-docs.b-cdn.net/docs/v3/public.json
   - Last updated: 2026-11-05. The previous snapshot (2026-01-27) referred to a schema it did not contain (`ApiErrorData`).
-  - The API probe (`cmd/apiprobe`, workflow "bunny.net API probe") compares this snapshot with the live spec and checks real API responses against it. When it reports spec changes, replace this file with the new download.
+  - The API probe (`cmd/apiprobe`, workflow "bunny.net API probe", monthly) compares this snapshot with the live spec and checks real API responses against it. When it reports spec changes, replace this file with the new download.
+- **[known-deviations.json](known-deviations.json)** - Confirmed places where the real API differs from this spec (for example dates without a time zone), each with its evidence. The probe reports them separately instead of failing. `TestMockbunnyConformsToSpec` runs the same probe against mockbunny in normal CI, so the mock follows the spec and these deviations exactly.
 
 The per-endpoint markdown files below are from 2026-01-27 and do not cover changes since then (for example the new `GET /dnszone/{zoneId}/records` list endpoint and record types SVCB, HTTPS and TLSA). The OpenAPI file is the reference.
 

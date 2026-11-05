@@ -50,7 +50,8 @@ func run(args []string, getenv func(string) string, stdout, stderr io.Writer) in
 	snapshot := fs.String("snapshot", "docs/bunny-api-official-docs/openapi-v3.json", "committed spec snapshot to compare with")
 	outDir := fs.String("out", "probe-out", "output directory")
 	runID := fs.String("run-id", "", "unique run ID, part of the zone name (default: random)")
-	failOnFindings := fs.Bool("fail-on-findings", false, "exit 1 when responses differ from the docs or the spec changed")
+	deviations := fs.String("deviations", "docs/bunny-api-official-docs/known-deviations.json", "known, accepted spec deviations (empty: none)")
+	failOnFindings := fs.Bool("fail-on-findings", false, "exit 1 when responses differ from the docs (other than known deviations) or the spec changed")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -82,6 +83,12 @@ func run(args []string, getenv func(string) string, stdout, stderr io.Writer) in
 	if err != nil {
 		return fail("%v", err)
 	}
+	var known []apiprobe.Deviation
+	if *deviations != "" {
+		if known, err = apiprobe.LoadDeviations(*deviations); err != nil {
+			return fail("%v", err)
+		}
+	}
 
 	report := &apiprobe.Report{Target: *baseURL}
 	if old, err := os.ReadFile(*snapshot); err != nil {
@@ -101,6 +108,9 @@ func run(args []string, getenv func(string) string, stdout, stderr io.Writer) in
 		apiprobe.Sanitize(ex)
 	}
 	report.Exchanges = prober.Exchanges()
+	if known != nil {
+		report.UnusedDeviations = apiprobe.ApplyDeviations(report.Exchanges, known)
+	}
 
 	recordings, _ := json.MarshalIndent(report.Exchanges, "", "  ")                                    //nolint:errcheck // plain structs
 	if err := os.WriteFile(filepath.Join(*outDir, "recordings.json"), recordings, 0o600); err != nil { // coverage-ignore: the directory was just created

@@ -15,6 +15,9 @@ import (
 // specFile is the committed snapshot; the probe validates against it in tests.
 const specFile = "../../docs/bunny-api-official-docs/openapi-v3.json"
 
+// deviationsFile lists the confirmed mistakes in bunny.net's spec.
+const deviationsFile = "../../docs/bunny-api-official-docs/known-deviations.json"
+
 func env(m map[string]string) func(string) string {
 	return func(k string) string { return m[k] }
 }
@@ -27,7 +30,7 @@ func TestRun_AgainstMock(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 	code := run([]string{"-base-url", mock.URL(), "-spec-file", specFile, "-snapshot", specFile,
-		"-out", out, "-run-id", "cmdtest"}, env(map[string]string{"BUNNY_API_KEY": "mock-key"}), &stdout, &stderr)
+		"-deviations", "", "-out", out, "-run-id", "cmdtest"}, env(map[string]string{"BUNNY_API_KEY": "mock-key"}), &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("exit %d, stderr: %s", code, stderr.String())
 	}
@@ -48,11 +51,12 @@ func TestRun_AgainstMock(t *testing.T) {
 		t.Errorf("stdout = %q", stdout.String())
 	}
 
-	// mockbunny differs from the spec (see report), so -fail-on-findings exits 1.
+	// Without the known deviations, mockbunny's spec-conform-but-real dates
+	// count as findings, so -fail-on-findings exits 1.
 	code = run([]string{"-base-url", mock.URL(), "-spec-file", specFile, "-snapshot", "/no/snapshot",
-		"-out", t.TempDir(), "-fail-on-findings"}, env(map[string]string{"BUNNY_API_KEY": "mock-key"}), &stdout, &stderr)
+		"-deviations", "", "-out", t.TempDir(), "-fail-on-findings"}, env(map[string]string{"BUNNY_API_KEY": "mock-key"}), &stdout, &stderr)
 	if code != 1 {
-		t.Errorf("-fail-on-findings: exit %d, want 1", code)
+		t.Errorf("-fail-on-findings without deviations: exit %d, want 1", code)
 	}
 }
 
@@ -77,7 +81,7 @@ func TestRun_DownloadsSpec(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	keys := env(map[string]string{"BUNNY_API_KEY": "k"})
 	if code := run([]string{"-base-url", api.URL, "-spec-url", specSrv.URL + "/spec.json", "-snapshot", specFile,
-		"-out", t.TempDir()}, keys, &stdout, &stderr); code != 0 {
+		"-deviations", deviationsFile, "-out", t.TempDir()}, keys, &stdout, &stderr); code != 0 {
 		t.Errorf("download: exit %d, stderr %s", code, stderr.String())
 	}
 	if code := run([]string{"-spec-url", specSrv.URL + "/missing", "-out", t.TempDir()}, keys, &stdout, &stderr); code != 2 {
@@ -109,12 +113,13 @@ func TestRun_SetupErrors(t *testing.T) {
 		env  func(string) string
 		want int
 	}{
-		"no key":           {[]string{"-spec-file", specFile}, env(nil), 2},
-		"bad flag":         {[]string{"-nope"}, keys, 2},
-		"missing spec":     {[]string{"-spec-file", "/no/spec.json", "-out", t.TempDir()}, keys, 2},
-		"invalid spec":     {[]string{"-spec-file", notJSON, "-out", t.TempDir()}, keys, 2},
-		"out not a dir":    {[]string{"-spec-file", specFile, "-out", filepath.Join(blocker, "x")}, keys, 2},
-		"invalid snapshot": {[]string{"-base-url", "http://127.0.0.1:1", "-spec-file", specFile, "-snapshot", invalidSnapshot, "-out", t.TempDir()}, keys, 0},
+		"no key":             {[]string{"-spec-file", specFile}, env(nil), 2},
+		"bad flag":           {[]string{"-nope"}, keys, 2},
+		"missing spec":       {[]string{"-spec-file", "/no/spec.json", "-out", t.TempDir()}, keys, 2},
+		"invalid spec":       {[]string{"-spec-file", notJSON, "-out", t.TempDir()}, keys, 2},
+		"out not a dir":      {[]string{"-spec-file", specFile, "-out", filepath.Join(blocker, "x")}, keys, 2},
+		"invalid snapshot":   {[]string{"-base-url", "http://127.0.0.1:1", "-spec-file", specFile, "-snapshot", invalidSnapshot, "-deviations", "", "-out", t.TempDir()}, keys, 0},
+		"missing deviations": {[]string{"-spec-file", specFile, "-deviations", "/no/deviations.json", "-out", t.TempDir()}, keys, 2},
 	} {
 		if got := run(tc.args, tc.env, &stdout, &stderr); got != tc.want {
 			t.Errorf("%s: exit %d, want %d (stderr %s)", name, got, tc.want, stderr.String())
@@ -127,5 +132,25 @@ func TestRandomID(t *testing.T) {
 	a, b := randomID(), randomID()
 	if a == b || len(a) != 9 || !strings.HasPrefix(a, "p") {
 		t.Errorf("randomID() = %q, %q", a, b)
+	}
+}
+
+// TestMockbunnyConformsToSpec is the contract test for mockbunny: the API
+// probe runs its full scenario against mockbunny and every response must
+// match bunny.net's spec, apart from the known deviations, which the real
+// API shows too. A mockbunny change that drifts from the real API, or a new
+// spec snapshot the mock does not follow, fails this test in normal CI.
+func TestMockbunnyConformsToSpec(t *testing.T) {
+	t.Setenv("BUNNY_API_KEY", "mock-key")
+	mock := mockbunny.New()
+	defer mock.Close()
+	out := t.TempDir()
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"-base-url", mock.URL(), "-spec-file", specFile, "-snapshot", specFile,
+		"-deviations", deviationsFile, "-out", out, "-run-id", "contract", "-fail-on-findings"},
+		env(map[string]string{"BUNNY_API_KEY": "mock-key"}), &stdout, &stderr)
+	if code != 0 {
+		report, _ := os.ReadFile(filepath.Join(out, "report.md"))
+		t.Fatalf("mockbunny differs from the spec (exit %d):\n%s", code, report)
 	}
 }

@@ -40,6 +40,7 @@ type Exchange struct {
 	ResponseBody json.RawMessage `json:"response_body,omitempty"` // JSON, or a JSON string for non-JSON bodies
 	Error        string          `json:"error,omitempty"`         // transport error
 	Findings     []string        `json:"findings,omitempty"`      // differences from the spec
+	Accepted     []string        `json:"accepted,omitempty"`      // differences that are known deviations
 	Note         string          `json:"note,omitempty"`
 
 	rawBody []byte // unsanitised body, used for validation only

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 )
 
@@ -88,5 +89,43 @@ func TestHandleListRecords(t *testing.T) {
 	_ = resp.Body.Close()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Errorf("invalid zone ID: %d, want 400", resp.StatusCode)
+	}
+}
+
+// TestHandleAddRecord_RejectsTypesLikeRealAPI mirrors what the API probe saw:
+// types outside 0-15 and Flatten (6) get 400 "Unknown record type".
+func TestHandleAddRecord_RejectsTypesLikeRealAPI(t *testing.T) {
+	s := New()
+	defer s.Close()
+	zoneID := s.AddZone("types.example")
+	put := func(typ int) int {
+		body := fmt.Sprintf(`{"Type":%d,"Name":"x","Value":"v","Ttl":300}`, typ)
+		req, _ := http.NewRequest(http.MethodPut, fmt.Sprintf("%s/dnszone/%d/records", s.URL(), zoneID), strings.NewReader(body))
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = resp.Body.Close()
+		return resp.StatusCode
+	}
+	for _, typ := range []int{-1, 6, 16, 99} {
+		if got := put(typ); got != http.StatusBadRequest {
+			t.Errorf("type %d: status %d, want 400", typ, got)
+		}
+	}
+	for _, typ := range []int{0, 3, 5, 13, 15} {
+		if got := put(typ); got != http.StatusCreated {
+			t.Errorf("type %d: status %d, want 201", typ, got)
+		}
+	}
+
+	resp, err := http.Get(s.URL() + "/pullzone?perPage=1000")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	var list []any
+	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil || len(list) != 0 {
+		t.Errorf("GET /pullzone: %v %v, want an empty array", list, err)
 	}
 }
