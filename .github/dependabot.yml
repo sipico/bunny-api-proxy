@@ -1,14 +1,18 @@
 version: 2
+# Dependabot is tuned for low noise: monthly runs, one PR per ecosystem where
+# possible. Every PR is assigned so it shows up in notifications.
+#
+# Note: Dependabot PRs skip the real-API E2E job (no secrets). Before merging
+# one, run it via Actions -> CI -> Run workflow on the Dependabot branch.
 updates:
-  # Go modules (go.mod)
+  # Go modules (go.mod): one grouped PR for all minor and patch updates.
+  # Major updates (new import paths) still arrive as separate PRs.
   - package-ecosystem: "gomod"
     directory: "/"
     schedule:
-      interval: "weekly"
-    # Auto-assign PRs to make them more visible
+      interval: "monthly"
     assignees:
       - "kduvekot"
-    # Group minor and patch updates to reduce PR noise
     groups:
       go-dependencies:
         patterns:
@@ -17,27 +21,34 @@ updates:
           - "minor"
           - "patch"
 
-  # Docker base images (Dockerfile)
+  # Docker base images in both Dockerfile locations.
+  # The golang image is ignored on purpose: Dependabot can only bump the
+  # Dockerfiles, not go.mod or setup-go in the workflows, so its golang PRs
+  # left images and CI on different Go versions. Go is upgraded in one
+  # coordinated PR instead (go.mod, workflows and all Dockerfiles together).
+  # govulncheck in CI flags Go releases with security fixes that matter.
   - package-ecosystem: "docker"
-    directory: "/"
+    directories:
+      - "/"
+      - "/.claude/docker"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
     assignees:
       - "kduvekot"
+    ignore:
+      - dependency-name: "golang"
+    groups:
+      docker-images:
+        patterns:
+          - "*"
 
-  # Docker images in .claude/docker/ directory
-  - package-ecosystem: "docker"
-    directory: "/.claude/docker"
-    schedule:
-      interval: "weekly"
-    assignees:
-      - "kduvekot"
-
-  # GitHub Actions versions
+  # GitHub Actions (pinned to commit SHAs, see #393): one grouped PR for all
+  # updates, including major versions. Dependabot updates the SHA and the
+  # version comment together.
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
     assignees:
       - "kduvekot"
     groups:
@@ -45,5 +56,6 @@ updates:
         patterns:
           - "*"
         update-types:
+          - "major"
           - "minor"
           - "patch"
