@@ -29,7 +29,11 @@ import (
 	"github.com/sipico/bunny-api-proxy/internal/storage"
 )
 
-const version = "2026.01.2"
+// version is logged at startup. It is set at build time by the release and
+// image workflows (go build -ldflags "-X main.version=2026.11.1"); a plain
+// go build reports "dev".
+var version = "dev"
+
 const serverShutdownTimeout = 30 * time.Second
 
 func main() {

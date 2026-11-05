@@ -26,16 +26,23 @@ jobs:
         with:
           go-version: '1.27.3'
 
-      - name: Build proxy binary
+      - name: Build proxy binaries (linux amd64 + arm64)
         env:
           CGO_ENABLED: 0
-        run: go build -o bunny-api-proxy ./cmd/bunny-api-proxy
+          GOOS: linux
+        run: |
+          # One directory per architecture, the layout Dockerfile.prebuilt expects
+          for arch in amd64 arm64; do
+            GOARCH=$arch go build -trimpath -ldflags "-X main.version=main-${GITHUB_SHA::7}" \
+              -o dist/$arch/bunny-api-proxy ./cmd/bunny-api-proxy
+          done
+          file dist/*/bunny-api-proxy
 
       - name: Upload binary artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
           name: bunny-api-proxy
-          path: bunny-api-proxy
+          path: dist/
           retention-days: 1
 
   publish:
@@ -56,7 +63,7 @@ jobs:
           path: ci-build/proxy
 
       - name: Make binary executable
-        run: chmod +x ci-build/proxy/bunny-api-proxy
+        run: chmod +x ci-build/proxy/*/bunny-api-proxy
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069  # v4.4.1
@@ -77,6 +84,7 @@ jobs:
         with:
           context: ci-build/proxy
           file: .claude/docker/Dockerfile.prebuilt
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: |
             ghcr.io/sipico/bunny-api-proxy:latest
@@ -92,6 +100,8 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- \`ghcr.io/sipico/bunny-api-proxy:latest\`" >> $GITHUB_STEP_SUMMARY
           echo "- \`ghcr.io/sipico/bunny-api-proxy:main-${{ steps.git.outputs.sha_short }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Platforms: linux/amd64, linux/arm64" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo '```bash' >> $GITHUB_STEP_SUMMARY
           echo "docker pull ghcr.io/sipico/bunny-api-proxy:latest" >> $GITHUB_STEP_SUMMARY
