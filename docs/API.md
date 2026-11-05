@@ -498,12 +498,14 @@ curl -X PUT http://localhost:8080/dnszone/123456/records \
   -H "AccessKey: your-scoped-api-key" \
   -H "Content-Type: application/json" \
   -d '{
-    "Type": "TXT",
+    "Type": 3,
     "Name": "_acme-challenge",
     "Value": "validation-string",
     "Ttl": 300
   }'
 ```
+
+`Type` is bunny.net's record type number (3 = TXT; see `DnsRecordTypes` in the [OpenAPI spec](bunny-api-official-docs/openapi-v3.json)). A name like `"TXT"` is rejected with `400`.
 
 See [Official Documentation](bunny-api-official-docs/dnszone-add-record.md) for complete request/response schema.
 
@@ -715,28 +717,10 @@ curl -X POST http://localhost:8080/admin/api/tokens \
 #   "is_admin": false
 # }
 
-# 3. Configure ACME client to use this token
-# Example for Certbot with a DNS hook script:
-
-#!/bin/bash
-# dns-hook.sh
-ACME_TOKEN="a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6"
-ZONE_ID="123456"
-PROXY_URL="http://localhost:8080"
-
-if [ "$CERTBOT_AUTH_OUTPUT" ]; then
-  # Add validation record
-  curl -X PUT "$PROXY_URL/dnszone/$ZONE_ID/records" \
-    -H "AccessKey: $ACME_TOKEN" \
-    -H "Content-Type: application/json" \
-    -d "{
-      \"Type\": \"TXT\",
-      \"Name\": \"_acme-challenge\",
-      \"Value\": \"$CERTBOT_VALIDATION\",
-      \"Ttl\": 300
-    }"
-fi
+# 3. Configure the ACME client with this token
 ```
+
+For certbot, use [`examples/certbot/bunny-proxy-hook.sh`](../examples/certbot/bunny-proxy-hook.sh): it adds the `_acme-challenge` TXT record for the domain (also subdomains and wildcards), waits for propagation, and removes exactly that record afterwards. The README's Quick Start shows the whole setup; both are run as written by the tests in `cmd/bunny-api-proxy/getting_started_test.go`.
 
 ---
 
@@ -744,10 +728,12 @@ fi
 
 | Variable | Description | Default |
 |---|---|---|
+| `BUNNY_API_KEY` | Your bunny.net API key (required). Used to call bunny.net and, once, to create the first admin token; never stored | (none) |
 | `LISTEN_ADDR` | Address and port to listen on | :8080 |
 | `DATABASE_PATH` | SQLite database file path | /data/proxy.db |
 | `LOG_LEVEL` | Default log level | info |
 | `BUNNY_API_URL` | bunny.net API URL (for testing/mocking) | https://api.bunny.net |
+| `METRICS_LISTEN_ADDR` | Address of the Prometheus metrics endpoint (`/metrics`); `:9090` to scrape it from outside a container | localhost:9090 |
 
 ---
 

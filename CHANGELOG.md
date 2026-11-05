@@ -23,6 +23,7 @@ Everything since 2026.02.2. Read **Breaking changes** and **Upgrading** before y
 - **Admin-only DNS endpoints:** update zone, check availability, import and export records, enable and disable DNSSEC, issue a wildcard certificate, zone statistics, trigger and read a record scan. See `docs/API.md`.
 - **Raspberry Pi and other arm64 hosts:** the image is published for `linux/amd64` and `linux/arm64`, and releases attach binaries for both with a `SHA256SUMS` file (see `docs/DEPLOYMENT.md`). The release workflow runs the tests on arm64 and starts each binary on its own architecture before publishing.
 - **The startup log shows the real version** (`main-<commit>` for images built from `main`). It was fixed at `2026.01.2`.
+- **certbot hook** (`examples/certbot/bunny-proxy-hook.sh`) for DNS-01 with a scoped token: finds the zone for the domain (subdomains and wildcards too), waits for propagation and removes exactly the record it added. Needs bash, curl and python3.
 - **`bunny-api-proxy backup <file>`** writes a consistent copy of the database while the proxy runs (`docker exec bunny-api-proxy /app/bunny-api-proxy backup /data/proxy-backup.db`). A plain file copy can miss recent writes.
 
 ### Security
@@ -42,6 +43,7 @@ Everything since 2026.02.2. Read **Breaking changes** and **Upgrading** before y
 - SQLite memory mapping is disabled, which fixes crashes (SIGBUS) on Docker bind mounts.
 - The readiness check (`/ready`) uses a lightweight database ping.
 - The container health check uses the port from `LISTEN_ADDR` instead of always `:8080`.
+- **The README Quick Start works as written**: it was missing `BUNNY_API_KEY`, without which the proxy does not start, and the certbot example in `docs/API.md` sent `"Type": "TXT"` (rejected; bunny.net uses numbers) and added the record only in the cleanup hook. Both are now run as written by the tests.
 - Documentation: SHA-256 instead of bcrypt in the security docs, environment variable names in `.env.example` and the examples, data volume permissions, safe backups.
 
 ### Upgrading
