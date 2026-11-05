@@ -169,6 +169,8 @@ func initializeComponents(cfg *config.Config) (*serverComponents, error) {
 	// 7. Create admin handler and router
 	adminHandler := admin.NewHandler(store, logLevel, logger)
 	adminHandler.SetBootstrapService(bootstrapService)
+	// Warn about permissions with record types bunny.net no longer has (e.g. "SPF")
+	adminHandler.LogDeprecatedPermissions(context.Background())
 	adminRouter := adminHandler.NewRouter()
 
 	// 8. Assemble main router

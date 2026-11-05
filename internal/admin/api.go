@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
@@ -95,12 +96,59 @@ func validatePermissionValues(w http.ResponseWriter, actions, recordTypes []stri
 		return false
 	}
 	if invalid := auth.ValidateRecordTypes(recordTypes); invalid != "" {
+		if why, deprecated := auth.DeprecatedRecordTypes[invalid]; deprecated {
+			WriteErrorWithHint(w, http.StatusBadRequest, ErrCodeInvalidRequest,
+				fmt.Sprintf("Record type %q can no longer be granted", invalid), why)
+			return false
+		}
 		WriteErrorWithHint(w, http.StatusBadRequest, ErrCodeInvalidRequest,
 			fmt.Sprintf("Invalid record type: %q", invalid),
 			"Valid record types are: "+strings.Join(auth.ValidRecordTypesList(), ", "))
 		return false
 	}
 	return true
+}
+
+// permissionWarnings explains stored permissions that contain record types
+// which no longer exist in bunny.net's API (see auth.DeprecatedRecordTypes).
+// Such entries match nothing; the warning tells the admin what to grant.
+func permissionWarnings(perms []*storage.Permission) []string {
+	var out []string
+	for _, p := range perms {
+		for _, why := range auth.DeprecatedRecordTypeWarnings(p.RecordTypes) {
+			out = append(out, fmt.Sprintf("permission %d (zone %d): %s", p.ID, p.ZoneID, why))
+		}
+	}
+	return out
+}
+
+// LogDeprecatedPermissions writes a warning to the log for every stored
+// permission that contains a record type which no longer exists in
+// bunny.net's API. It is called once at startup so the admin notices after
+// an upgrade. Errors are logged, never fatal: the proxy must still start.
+func (h *Handler) LogDeprecatedPermissions(ctx context.Context) {
+	tokens, err := h.storage.ListTokens(ctx)
+	if err != nil {
+		h.logger.Error("failed to check permissions for deprecated record types", "error", err)
+		return
+	}
+	for _, t := range tokens {
+		if t.IsAdmin {
+			continue
+		}
+		perms, err := h.storage.GetPermissionsForToken(ctx, t.ID)
+		if err != nil {
+			h.logger.Error("failed to check permissions for deprecated record types", "error", err, "token_id", t.ID)
+			continue
+		}
+		for _, p := range perms {
+			for _, why := range auth.DeprecatedRecordTypeWarnings(p.RecordTypes) {
+				h.logger.Warn("permission contains a record type that no longer exists",
+					"token_id", t.ID, "token_name", t.Name, "permission_id", p.ID, "zone_id", p.ZoneID,
+					"detail", why)
+			}
+		}
+	}
 }
 
 // generateRandomKey generates a random hex string of the given length.
@@ -124,6 +172,7 @@ type WhoamiResponse struct {
 	IsAdmin     bool                  `json:"is_admin"`
 	IsMasterKey bool                  `json:"is_master_key"`
 	Permissions []*storage.Permission `json:"permissions,omitempty"`
+	Warnings    []string              `json:"warnings,omitempty"`
 }
 
 // HandleWhoami returns the current token's identity and permissions.
@@ -152,6 +201,7 @@ func (h *Handler) HandleWhoami(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			resp.Permissions = perms
+			resp.Warnings = permissionWarnings(perms)
 		}
 	}
 
@@ -376,6 +426,7 @@ type UnifiedTokenDetailResponse struct {
 	CreatedAt   string                `json:"created_at"`
 	ExpiresAt   *string               `json:"expires_at,omitempty"`
 	Permissions []*storage.Permission `json:"permissions,omitempty"`
+	Warnings    []string              `json:"warnings,omitempty"`
 }
 
 // HandleGetUnifiedToken returns token details.
@@ -418,6 +469,7 @@ func (h *Handler) HandleGetUnifiedToken(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 		resp.Permissions = perms
+		resp.Warnings = permissionWarnings(perms)
 	}
 
 	w.Header().Set("Content-Type", "application/json")

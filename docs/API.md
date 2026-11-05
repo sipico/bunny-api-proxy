@@ -311,7 +311,9 @@ Each scoped API key has associated permissions that define:
 - `update_record` - Update DNS records
 - `delete_record` - Delete DNS records
 
-**Available Record Types** (case-sensitive): `A`, `AAAA`, `CNAME`, `TXT`, `MX`, `SPF`, `Flatten`, `PullZone`, `SRV`, `CAA`, `PTR`, `Script`, `NS`
+**Available Record Types** (case-sensitive, the names from bunny.net's API spec): `A`, `AAAA`, `CNAME`, `TXT`, `MX`, `Redirect`, `Flatten`, `PullZone`, `SRV`, `CAA`, `PTR`, `Script`, `NS`, `SVCB`, `HTTPS`, `TLSA`
+
+**`SPF` is no longer accepted.** Older versions called bunny.net record type 5 "SPF"; bunny.net calls it `Redirect` (an HTTP redirect, served through a pull zone that bunny.net creates automatically). SPF records are `TXT` records. A new grant with `SPF` gets `400` with that explanation. Permissions that already contain `SPF` are kept, but `SPF` matches nothing, so it no longer grants access to type 5 records. They are listed under `warnings` in `GET /admin/api/tokens/{id}` and `GET /admin/api/whoami`, and logged once at startup. Grant `TXT` or `Redirect` explicitly, whichever was intended.
 
 Both lists are validated when a token or permission is created: an unknown value, a different spelling or case, or an admin-only action gets `400 invalid_request`. The error message names the invalid value, and the hint lists the valid ones.
 

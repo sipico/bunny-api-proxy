@@ -264,7 +264,10 @@ func ParseRequest(r *http.Request) (*Request, error) {
 }
 
 // MapRecordTypeToString converts a bunny.net record type integer to its string name.
-// Record types: 0 = A, 1 = AAAA, 2 = CNAME, 3 = TXT, 4 = MX, 5 = SPF, 6 = Flatten, 7 = PullZone, 8 = SRV, 9 = CAA, 10 = PTR, 11 = Script, 12 = NS
+// Names follow DnsRecordTypes in bunny.net's OpenAPI spec: 0 = A, 1 = AAAA,
+// 2 = CNAME, 3 = TXT, 4 = MX, 5 = Redirect, 6 = Flatten, 7 = PullZone, 8 = SRV,
+// 9 = CAA, 10 = PTR, 11 = Script, 12 = NS, 13 = SVCB, 14 = HTTPS, 15 = TLSA.
+// Unknown types map to "", which no permission can grant.
 func MapRecordTypeToString(typeInt int) string {
 	switch typeInt {
 	case 0:
@@ -278,7 +281,7 @@ func MapRecordTypeToString(typeInt int) string {
 	case 4:
 		return "MX"
 	case 5:
-		return "SPF"
+		return "Redirect"
 	case 6:
 		return "Flatten"
 	case 7:
@@ -293,6 +296,12 @@ func MapRecordTypeToString(typeInt int) string {
 		return "Script"
 	case 12:
 		return "NS"
+	case 13:
+		return "SVCB"
+	case 14:
+		return "HTTPS"
+	case 15:
+		return "TLSA"
 	default:
 		return "" // Unknown type
 	}

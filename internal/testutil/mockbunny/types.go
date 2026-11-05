@@ -99,7 +99,7 @@ func (t *MockBunnyTime) UnmarshalJSON(b []byte) error {
 // Record represents a DNS record within a zone.
 type Record struct {
 	ID                    int64         `json:"Id"`
-	Type                  int           `json:"Type"` // 0 = A, 1 = AAAA, 2 = CNAME, 3 = TXT, 4 = MX, 5 = SPF, 6 = Flatten, 7 = PullZone, 8 = SRV, 9 = CAA, 10 = PTR, 11 = Script, 12 = NS
+	Type                  int           `json:"Type"` // 0 = A, 1 = AAAA, 2 = CNAME, 3 = TXT, 4 = MX, 5 = Redirect, 6 = Flatten, 7 = PullZone, 8 = SRV, 9 = CAA, 10 = PTR, 11 = Script, 12 = NS, 13 = SVCB, 14 = HTTPS, 15 = TLSA
 	TTL                   int32         `json:"Ttl"`
 	Value                 string        `json:"Value"`
 	Name                  string        `json:"Name"`

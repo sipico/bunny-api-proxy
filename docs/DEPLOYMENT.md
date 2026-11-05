@@ -830,6 +830,8 @@ Upgrades are safe and straightforward. The database schema is migrated automatic
 - **Downgrades are refused.** A release started on a database written by a newer release stops with `database schema is newer than this version of bunny-api-proxy supports`. Releases before version tracking (2026.02.1 and 2026.02.2) cannot detect this, so do not start them on a migrated database.
 - The log shows what happened: `database schema migrated from_version=2 to_version=4 backup=...`.
 
+**Check the log after upgrading** for `permission contains a record type that no longer exists`. Since this release, record type `SPF` grants nothing (bunny.net calls type 5 `Redirect`); see [API.md](API.md) for what to grant instead.
+
 **Rolling back an upgrade:** stop the proxy, replace `proxy.db` with the backup file (and delete `proxy.db-wal` and `proxy.db-shm` if present), then start the previous image. Tokens created after the upgrade are not in the backup.
 
 ### Docker Upgrade

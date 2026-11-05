@@ -73,14 +73,15 @@ var ValidActions = map[string]bool{
 
 // ValidRecordTypes is the set of DNS record type names that can be granted.
 // They are exactly the names MapRecordTypeToString produces, which is what
-// CheckPermission compares against (case-sensitive).
+// CheckPermission compares against (case-sensitive), and they follow the
+// x-enumNames of DnsRecordTypes in bunny.net's OpenAPI spec.
 var ValidRecordTypes = map[string]bool{
 	"A":        true,
 	"AAAA":     true,
 	"CNAME":    true,
 	"TXT":      true,
 	"MX":       true,
-	"SPF":      true,
+	"Redirect": true,
 	"Flatten":  true,
 	"PullZone": true,
 	"SRV":      true,
@@ -88,6 +89,32 @@ var ValidRecordTypes = map[string]bool{
 	"PTR":      true,
 	"Script":   true,
 	"NS":       true,
+	"SVCB":     true,
+	"HTTPS":    true,
+	"TLSA":     true,
+}
+
+// DeprecatedRecordTypes are names that older versions accepted but that no
+// longer exist in bunny.net's API, with the reason. They can no longer be
+// granted. Permissions that still contain them keep them in storage but they
+// match nothing (fail closed): there is no silent conversion, because that
+// could grant more than the admin intended.
+var DeprecatedRecordTypes = map[string]string{
+	"SPF": `"SPF" has no effect anymore: bunny.net record type 5 is now "Redirect" (an HTTP redirect, ` +
+		`served through an automatically created pull zone). SPF records are TXT records. ` +
+		`Grant "TXT" for SPF records, or "Redirect" if redirects are really intended.`,
+}
+
+// DeprecatedRecordTypeWarnings returns one warning per deprecated record type
+// in types, in the order they appear.
+func DeprecatedRecordTypeWarnings(types []string) []string {
+	var out []string
+	for _, t := range types {
+		if why, ok := DeprecatedRecordTypes[t]; ok {
+			out = append(out, why)
+		}
+	}
+	return out
 }
 
 // ValidateActions returns the first action that is not in ValidActions,

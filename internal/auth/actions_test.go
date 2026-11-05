@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"fmt"
 	"io"
 	"net/http/httptest"
 	"strings"
@@ -328,7 +329,8 @@ func TestMapRecordTypeToString(t *testing.T) {
 		{2, "CNAME"},
 		{3, "TXT"},
 		{4, "MX"},
-		{5, "SPF"},
+		{5, "Redirect"}, // was "SPF" before the spec renamed it
+
 		{6, "Flatten"},
 		{7, "PullZone"},
 		{8, "SRV"},
@@ -336,13 +338,16 @@ func TestMapRecordTypeToString(t *testing.T) {
 		{10, "PTR"},
 		{11, "Script"},
 		{12, "NS"},
-		{13, ""},  // Unknown type
+		{13, "SVCB"},
+		{14, "HTTPS"},
+		{15, "TLSA"},
+		{16, ""},  // Unknown type
 		{-1, ""},  // Invalid type
 		{999, ""}, // Out of range
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.want, func(t *testing.T) {
+		t.Run(fmt.Sprint(tt.typeInt), func(t *testing.T) {
 			t.Parallel()
 			got := MapRecordTypeToString(tt.typeInt)
 			if got != tt.want {

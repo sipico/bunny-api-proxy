@@ -1776,14 +1776,17 @@ ipv6 300 IN AAAA 2001:db8::1
 alias 300 IN CNAME target.example.com.
 txt 300 IN TXT "v=spf1 ~all"
 mail 300 IN MX 10 mail.example.com.
-spf 300 IN SPF "v=spf1 -all"
-redirect 300 IN REDIRECT example.com.
+redirect 300 IN REDIRECT https://example.com/
+flatten 300 IN FLATTEN example.com.
 pullzone 300 IN PULLZONE pullzone.bunny.net.
 srv 300 IN SRV 10 20 5060 sipserver.example.com.
 caa 300 IN CAA 0 issue "letsencrypt.org"
 ptr 300 IN PTR mail.example.com.
 script 300 IN SCRIPT "var x = 1;"
-ns 300 IN NS ns1.example.com.`
+ns 300 IN NS ns1.example.com.
+svcb 300 IN SVCB 1 svc.example.com.
+https 300 IN HTTPS 1 web.example.com.
+_443._tcp 300 IN TLSA 3 1 1 abcdef`
 
 	req, _ := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/dnszone/%d/import", s.URL(), zoneID), strings.NewReader(importData))
 	client := &http.Client{}
@@ -1804,8 +1807,8 @@ ns 300 IN NS ns1.example.com.`
 		t.Fatalf("failed to decode import response: %v", err)
 	}
 
-	if importResult.Created != 13 {
-		t.Errorf("expected 13 created records, got %d", importResult.Created)
+	if importResult.Created != 16 {
+		t.Errorf("expected 16 created records, got %d", importResult.Created)
 	}
 
 	// Read the zone and verify all record types were created
@@ -1820,8 +1823,8 @@ ns 300 IN NS ns1.example.com.`
 		t.Fatalf("failed to decode zone: %v", err)
 	}
 
-	if len(zone.Records) != 13 {
-		t.Errorf("expected 13 records in zone, got %d", len(zone.Records))
+	if len(zone.Records) != 16 {
+		t.Errorf("expected 16 records in zone, got %d", len(zone.Records))
 	}
 
 	// Verify each record type
@@ -1836,14 +1839,17 @@ ns 300 IN NS ns1.example.com.`
 		2:  "CNAME",
 		3:  "TXT",
 		4:  "MX",
-		5:  "SPF",
-		6:  "REDIRECT",
+		5:  "REDIRECT",
+		6:  "FLATTEN",
 		7:  "PULLZONE",
 		8:  "SRV",
 		9:  "CAA",
 		10: "PTR",
 		11: "SCRIPT",
 		12: "NS",
+		13: "SVCB",
+		14: "HTTPS",
+		15: "TLSA",
 	}
 
 	for typeInt, typeName := range expectedTypes {

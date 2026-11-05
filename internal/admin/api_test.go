@@ -481,7 +481,7 @@ func TestHandleCreateUnifiedToken(t *testing.T) {
 			body: CreateUnifiedTokenRequest{
 				Name: "scoped-all", Zones: []int64{123},
 				Actions:     []string{"list_zones", "get_zone", "list_records", "add_record", "update_record", "delete_record"},
-				RecordTypes: []string{"A", "AAAA", "CNAME", "TXT", "MX", "SPF", "Flatten", "PullZone", "SRV", "CAA", "PTR", "Script", "NS"},
+				RecordTypes: []string{"A", "AAAA", "CNAME", "TXT", "MX", "Redirect", "Flatten", "PullZone", "SRV", "CAA", "PTR", "Script", "NS", "SVCB", "HTTPS", "TLSA"},
 			},
 			mockToken:  &storage.Token{ID: 3, Name: "scoped-all", IsAdmin: false},
 			wantStatus: http.StatusCreated,
