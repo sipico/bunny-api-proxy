@@ -893,13 +893,11 @@ func TestServerShutdownTimeoutConstant(t *testing.T) {
 	}
 }
 
-// TestVersionConstant validates the version string is set
-func TestVersionConstant(t *testing.T) {
-	if version == "" {
-		t.Error("version constant should not be empty")
-	}
-	if version != "2026.01.2" {
-		t.Errorf("expected version 2026.01.2, got %s", version)
+// TestVersionDefault checks the version of a plain `go build`: "dev". Release
+// and image builds set the real version with -ldflags "-X main.version=...".
+func TestVersionDefault(t *testing.T) {
+	if version != "dev" {
+		t.Errorf("version = %q, want \"dev\" (set at build time only)", version)
 	}
 }
 

@@ -4,8 +4,12 @@ FROM gcr.io/distroless/static:nonroot
 
 WORKDIR /app
 
-# Copy pre-built binary (expected to be in build context as "bunny-api-proxy")
-COPY bunny-api-proxy .
+# Copy the pre-built binary for the target platform. The build context holds
+# one directory per architecture: amd64/bunny-api-proxy, arm64/bunny-api-proxy.
+# BuildKit sets TARGETARCH per platform, so a multi-platform build
+# (--platform linux/amd64,linux/arm64) needs no emulation: nothing runs here.
+ARG TARGETARCH
+COPY ${TARGETARCH}/bunny-api-proxy ./bunny-api-proxy
 
 # Expose port
 EXPOSE 8080

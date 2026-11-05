@@ -166,13 +166,18 @@ sudo nano /etc/bunny-api-proxy/.env
 **6. Download binary:**
 
 ```bash
-# Releases publish container images, not separate binaries.
-
-# Option A: Copy the binary out of the release image (linux/amd64)
-docker create --name bunny-api-proxy-bin ghcr.io/sipico/bunny-api-proxy:<version>
-sudo docker cp bunny-api-proxy-bin:/app/bunny-api-proxy /usr/local/bin/bunny-api-proxy
-docker rm bunny-api-proxy-bin
-sudo chmod 755 /usr/local/bin/bunny-api-proxy
+# Option A: Download a release binary (linux amd64 or arm64, from 2026.11.1)
+VERSION=2026.11.1   # pick a release: https://github.com/sipico/bunny-api-proxy/releases
+case "$(uname -m)" in
+  x86_64)  ARCH=amd64 ;;
+  aarch64) ARCH=arm64 ;;   # Raspberry Pi 3/4/5 with a 64-bit OS
+  *) echo "unsupported architecture: $(uname -m)" ;;
+esac
+BASE=https://github.com/sipico/bunny-api-proxy/releases/download/$VERSION
+curl -fLO "$BASE/bunny-api-proxy-$VERSION-linux-$ARCH"
+curl -fLO "$BASE/SHA256SUMS"
+sha256sum --check --ignore-missing SHA256SUMS   # must print: OK
+sudo install -m 755 "bunny-api-proxy-$VERSION-linux-$ARCH" /usr/local/bin/bunny-api-proxy
 
 # Option B: Build from source (Go version as in go.mod)
 git clone https://github.com/sipico/bunny-api-proxy.git
@@ -752,7 +757,8 @@ See `../.env.example` for complete configuration options:
 ### Version Information
 
 - Docker image: `ghcr.io/sipico/bunny-api-proxy:latest` (built from `main`) or a release tag such as `ghcr.io/sipico/bunny-api-proxy:2026.02.2` (release tags have no "v")
-- Release notes: https://github.com/sipico/bunny-api-proxy/releases (releases publish container images only, no separate binaries)
+- Releases: https://github.com/sipico/bunny-api-proxy/releases (release notes, and from 2026.11.1 binaries for linux amd64 and arm64 with `SHA256SUMS`)
+- Platforms: images and binaries for `linux/amd64` and `linux/arm64` (64-bit Raspberry Pi OS works; 32-bit ARM does not)
 
 ## Next Steps
 

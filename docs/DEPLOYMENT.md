@@ -581,9 +581,24 @@ spec:
 
 ### Pattern 2: systemd Service (Bare Metal)
 
-For running on Linux servers without containers:
+For running on Linux servers without containers, including a Raspberry Pi with a 64-bit OS.
 
-**Build from source:**
+**Download a release binary** (linux amd64 and arm64, from release 2026.11.1):
+```bash
+VERSION=2026.11.1   # pick a release: https://github.com/sipico/bunny-api-proxy/releases
+case "$(uname -m)" in
+  x86_64)  ARCH=amd64 ;;
+  aarch64) ARCH=arm64 ;;   # Raspberry Pi 3/4/5 with a 64-bit OS
+  *) echo "unsupported architecture: $(uname -m)" ;;
+esac
+BASE=https://github.com/sipico/bunny-api-proxy/releases/download/$VERSION
+curl -fLO "$BASE/bunny-api-proxy-$VERSION-linux-$ARCH"
+curl -fLO "$BASE/SHA256SUMS"
+sha256sum --check --ignore-missing SHA256SUMS   # must print: OK
+sudo install -m 755 "bunny-api-proxy-$VERSION-linux-$ARCH" /usr/local/bin/bunny-api-proxy
+```
+
+**Or build from source:**
 ```bash
 git clone https://github.com/sipico/bunny-api-proxy.git
 cd bunny-api-proxy
