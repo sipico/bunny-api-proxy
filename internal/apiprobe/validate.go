@@ -149,6 +149,10 @@ func dedupe(in []string) []string {
 // sensitiveKey matches JSON field names whose values must never be recorded.
 var sensitiveKey = regexp.MustCompile(`(?i)(key|token|secret|password|email|userid|accountid)`)
 
+// notSensitive are field names that match sensitiveKey but only hold
+// bunny.net error codes, which the report needs.
+var notSensitive = map[string]bool{"ErrorKey": true}
+
 // Sanitize fills ex.ResponseBody from the raw body with sensitive values
 // replaced. Non-JSON bodies are stored as a JSON string, truncated to 64 KiB.
 func Sanitize(ex *Exchange) {
@@ -173,7 +177,7 @@ func redact(v any) any {
 	switch t := v.(type) {
 	case map[string]any:
 		for k, val := range t {
-			if s, ok := val.(string); ok && s != "" && sensitiveKey.MatchString(k) {
+			if s, ok := val.(string); ok && s != "" && sensitiveKey.MatchString(k) && !notSensitive[k] {
 				t[k] = "REDACTED"
 				continue
 			}

@@ -3,9 +3,11 @@ package apiprobe
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/sipico/bunny-api-proxy/internal/testutil/mockbunny"
@@ -288,5 +290,169 @@ func TestProber_TransportError(t *testing.T) {
 	bad := New(Config{BaseURL: "http://bad host", APIKey: "k"})
 	if ex := bad.do(context.Background(), "x", http.MethodGet, "/", nil, nil, ""); ex.Error == "" {
 		t.Error("expected an error for an invalid URL")
+	}
+}
+
+func TestPullZoneOwned(t *testing.T) {
+	t.Parallel()
+	type h = struct {
+		Value            string `json:"Value"`
+		IsSystemHostname bool   `json:"IsSystemHostname"`
+	}
+	for name, tc := range map[string]struct {
+		hosts []h
+		want  bool
+	}{
+		"probe hostname":        {[]h{{"x.b-cdn.net", true}, {"redirect.r1" + ZoneSuffix, false}}, true},
+		"only system hostname":  {[]h{{"x.b-cdn.net", true}}, false},
+		"foreign hostname":      {[]h{{"redirect.r1" + ZoneSuffix, false}, {"www.example.com", false}}, false},
+		"e2e zone hostname":     {[]h{{"a.1-abc-bap.xyz", false}}, false},
+		"no hostnames":          {nil, false},
+		"suffix only in middle": {[]h{{"r1" + ZoneSuffix + ".evil.com", false}}, false},
+	} {
+		if got := (pullZone{Hostnames: tc.hosts}).owned(); got != tc.want {
+			t.Errorf("%s: owned() = %v, want %v", name, got, tc.want)
+		}
+	}
+	if probeOwnedPullZone([]byte("not json")) {
+		t.Error("invalid JSON must not count as owned")
+	}
+}
+
+func TestSanitize_KeepsErrorKey(t *testing.T) {
+	t.Parallel()
+	ex := &Exchange{rawBody: []byte(`{"ErrorKey":"dnsrecord.invalid","Field":"Type","CertificateKey":"pem"}`)}
+	Sanitize(ex)
+	if !strings.Contains(string(ex.ResponseBody), "dnsrecord.invalid") || strings.Contains(string(ex.ResponseBody), "pem") {
+		t.Errorf("sanitised = %s", ex.ResponseBody)
+	}
+}
+
+// fakeBunny is a minimal bunny.net with accelerated Redirect records and
+// pull zones, to test the pull zone cleanup.
+type fakeBunny struct {
+	mu        sync.Mutex
+	pullZones map[int64]string // id -> custom hostname
+	deleted   []int64
+	keepPZ    bool // false: bunny.net removes the pull zone with the zone
+}
+
+func (f *fakeBunny) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	w.Header().Set("Content-Type", "application/json")
+	var id int64
+	switch {
+	case r.Method == http.MethodGet && r.URL.Path == "/pullzone":
+		list := make([]string, 0, len(f.pullZones))
+		for pid, host := range f.pullZones {
+			list = append(list, fmt.Sprintf(`{"Id":%d,"Hostnames":[{"Value":"p.b-cdn.net","IsSystemHostname":true},{"Value":%q}]}`, pid, host))
+		}
+		_, _ = fmt.Fprintf(w, "[%s]", strings.Join(list, ","))
+	case r.Method == http.MethodPost && r.URL.Path == "/dnszone":
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"Id":7,"Domain":"z"}`))
+	case r.Method == http.MethodPut && r.URL.Path == "/dnszone/7/records":
+		var body struct{ Type int }
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		w.WriteHeader(http.StatusCreated)
+		if body.Type == 5 {
+			f.pullZones[500] = "redirect.t5" + ZoneSuffix
+			_, _ = w.Write([]byte(`{"Id":55,"Accelerated":true,"AcceleratedPullZoneId":500}`))
+			return
+		}
+		_, _ = fmt.Fprintf(w, `{"Id":%d,"Accelerated":false}`, 100+body.Type)
+	case r.Method == http.MethodDelete && r.URL.Path == "/dnszone/7":
+		if !f.keepPZ {
+			delete(f.pullZones, 500)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	default:
+		if _, err := fmt.Sscanf(r.URL.Path, "/pullzone/%d", &id); err == nil {
+			host, ok := f.pullZones[id]
+			switch {
+			case !ok:
+				w.WriteHeader(http.StatusNotFound)
+			case r.Method == http.MethodDelete:
+				delete(f.pullZones, id)
+				f.deleted = append(f.deleted, id)
+				w.WriteHeader(http.StatusNoContent)
+			default:
+				_, _ = fmt.Fprintf(w, `{"Id":%d,"Hostnames":[{"Value":"p.b-cdn.net","IsSystemHostname":true},{"Value":%q}]}`, id, host)
+			}
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{}`))
+	}
+}
+
+func TestProber_PullZoneCleanup(t *testing.T) {
+	t.Parallel()
+	for name, tc := range map[string]struct {
+		keep        bool
+		stale       map[int64]string
+		wantDeleted []int64
+		wantNote    string
+	}{
+		"bunny.net removes it":    {keep: false, wantNote: "is gone"},
+		"left behind, deleted":    {keep: true, wantDeleted: []int64{500}, wantNote: "deleting it"},
+		"stale probe pull zone":   {keep: false, stale: map[int64]string{9: "redirect.old" + ZoneSuffix}, wantDeleted: []int64{9}, wantNote: "is gone"},
+		"stale foreign untouched": {keep: false, stale: map[int64]string{8: "cdn.example.com"}, wantNote: "is gone"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			f := &fakeBunny{pullZones: map[int64]string{}, keepPZ: tc.keep}
+			for id, host := range tc.stale {
+				f.pullZones[id] = host
+			}
+			srv := httptest.NewServer(f)
+			defer srv.Close()
+			p := New(Config{BaseURL: srv.URL, APIKey: "k", RunID: "t5"})
+			p.Run(context.Background())
+
+			f.mu.Lock()
+			defer f.mu.Unlock()
+			if fmt.Sprint(f.deleted) != fmt.Sprint(tc.wantDeleted) {
+				t.Errorf("deleted pull zones = %v, want %v", f.deleted, tc.wantDeleted)
+			}
+			if _, ok := f.pullZones[8]; tc.stale[8] != "" && !ok {
+				t.Error("foreign pull zone was deleted")
+			}
+			var notes []string
+			for _, ex := range p.Exchanges() {
+				if ex.Note != "" {
+					notes = append(notes, ex.Note)
+				}
+			}
+			if !strings.Contains(strings.Join(notes, "\n"), tc.wantNote) {
+				t.Errorf("notes = %q, want one containing %q", notes, tc.wantNote)
+			}
+		})
+	}
+}
+
+func TestProber_CleanupPullZoneNotOwned(t *testing.T) {
+	t.Parallel()
+	f := &fakeBunny{pullZones: map[int64]string{42: "www.example.com"}}
+	srv := httptest.NewServer(f)
+	defer srv.Close()
+	p := New(Config{BaseURL: srv.URL, APIKey: "k"})
+	p.cleanupPullZone(context.Background(), 42, false)
+	if len(f.deleted) != 0 || !strings.Contains(p.Exchanges()[0].Note, "left alone") {
+		t.Errorf("foreign pull zone handled wrongly: deleted %v, note %q", f.deleted, p.Exchanges()[0].Note)
+	}
+}
+
+func TestAcceleratedPullZone(t *testing.T) {
+	t.Parallel()
+	for body, want := range map[string]int64{
+		`{"Accelerated":true,"AcceleratedPullZoneId":12}`:  12,
+		`{"Accelerated":false,"AcceleratedPullZoneId":12}`: 0,
+		`not json`: 0,
+	} {
+		if got := acceleratedPullZone(&Exchange{rawBody: []byte(body)}); got != want {
+			t.Errorf("acceleratedPullZone(%s) = %d, want %d", body, got, want)
+		}
 	}
 }
