@@ -92,6 +92,36 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Check the image can be pulled without a login (amd64 + arm64)
+        # External users pull anonymously; CI's own login would hide a
+        # private package (as before 2026.11.1). Fails the run instead.
+        env:
+          TAGS: latest main-${{ steps.git.outputs.sha_short }}
+        run: |
+          set -euo pipefail
+          # Anonymous, like an external user: no credentials, no docker login.
+          repo=sipico/bunny-api-proxy
+          want="linux/amd64 linux/arm64"
+          for tag in $TAGS; do
+            ok=""
+            for attempt in 1 2 3; do
+              token=$(curl -fsS "https://ghcr.io/token?scope=repository:$repo:pull&service=ghcr.io" | jq -r .token) || token=""
+              if [ -n "$token" ] && [ "$token" != "null" ]; then
+                got=$(curl -fsS -H "Authorization: Bearer $token" \
+                  -H "Accept: application/vnd.oci.image.index.v1+json,application/vnd.docker.distribution.manifest.list.v2+json" \
+                  "https://ghcr.io/v2/$repo/manifests/$tag" \
+                  | jq -r '[.manifests[]?.platform | select(.architecture != "unknown") | .os + "/" + .architecture] | sort | join(" ")') || got=""
+                if [ "$got" = "$want" ]; then ok=1; break; fi
+              fi
+              sleep 10
+            done
+            if [ -z "$ok" ]; then
+              echo "::error::ghcr.io/$repo:$tag cannot be pulled anonymously for $want (pull token: $([ -n "$token" ] && echo granted || echo refused), platforms: '${got:-none}'). Is the package public?"
+              exit 1
+            fi
+            echo "ghcr.io/$repo:$tag: public, $got"
+          done
+
       - name: Image info
         run: |
           echo "### 🐳 Docker Images Published" >> $GITHUB_STEP_SUMMARY
