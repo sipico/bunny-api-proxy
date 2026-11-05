@@ -191,18 +191,22 @@ func (m *Authenticator) CheckPermissions(next http.Handler) http.Handler {
 	})
 }
 
-// GetKeyInfo retrieves KeyInfo from request context by reconstructing it from Token and Permissions.
-// Returns nil if no token is present in the context.
-// This is for backward compatibility with code that expects KeyInfo.
+// GetKeyInfo returns the scope of a scoped token: its permissions, which
+// handlers use to filter zones and records.
+//
+// It returns nil for admin tokens and when no token is in the context; nil
+// means "not restricted". An admin token has no permissions of its own, so
+// a KeyInfo for it would have an empty scope and filter everything away
+// (admins saw no zones in GET /dnszone; caught by the authorization matrix).
 func GetKeyInfo(ctx context.Context) *KeyInfo {
 	token := TokenFromContext(ctx)
-	if token == nil {
+	if token == nil || token.IsAdmin || IsAdminFromContext(ctx) {
 		return nil
 	}
 
 	perms := PermissionsFromContext(ctx)
 	if perms == nil {
-		perms = []*storage.Permission{} // Empty permissions for admin tokens
+		perms = []*storage.Permission{} // a scoped token without permissions sees nothing
 	}
 
 	return &KeyInfo{

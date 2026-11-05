@@ -1366,3 +1366,33 @@ func TestAuthenticate_TokenExpiry(t *testing.T) {
 		})
 	}
 }
+
+// TestGetKeyInfo_AdminIsUnrestricted checks the root cause of a bug the
+// authorization matrix found: an admin token has no permissions of its own,
+// so a KeyInfo for it filtered away every zone in GET /dnszone. Admins get
+// nil (not restricted); scoped tokens get their permissions, also when they
+// have none.
+func TestGetKeyInfo_AdminIsUnrestricted(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	if GetKeyInfo(ctx) != nil {
+		t.Error("no token: want nil")
+	}
+	admin := WithToken(ctx, &storage.Token{ID: 1, IsAdmin: true})
+	if GetKeyInfo(admin) != nil {
+		t.Error("admin token: want nil (unrestricted)")
+	}
+	if GetKeyInfo(WithAdmin(WithToken(ctx, &storage.Token{ID: 1}), true)) != nil {
+		t.Error("admin context: want nil (unrestricted)")
+	}
+	scoped := WithToken(ctx, &storage.Token{ID: 2})
+	ki := GetKeyInfo(scoped)
+	if ki == nil || ki.Permissions == nil || len(ki.Permissions) != 0 {
+		t.Errorf("scoped token without permissions: got %+v, want an empty scope", ki)
+	}
+	perm := &storage.Permission{ZoneID: 5, RecordTypes: []string{"TXT"}}
+	ki = GetKeyInfo(WithPermissions(scoped, []*storage.Permission{perm}))
+	if ki == nil || ki.KeyID != 2 || len(ki.Permissions) != 1 {
+		t.Errorf("scoped token: got %+v", ki)
+	}
+}

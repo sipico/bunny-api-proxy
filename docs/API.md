@@ -514,7 +514,7 @@ See [Official Documentation](bunny-api-official-docs/dnszone-add-record.md) for 
 Update an existing DNS record, like bunny.net's endpoint of the same path.
 
 **Authentication:** AccessKey required
-**Permissions Required:** `update_record` action, and the record type in the request body must be one of the token's record types
+**Permissions Required:** `update_record` action. Both the record type in the request body and the type of the existing record must be among the token's record types (a TXT-only token cannot change an A record)
 **Path Parameters:** `zoneID` - The zone ID, `recordID` - The record ID
 **Body:** the same fields as adding a record (`Type`, `Name`, `Value`, `Ttl`, `Priority`, ...)
 
@@ -535,7 +535,7 @@ curl -X POST http://localhost:8080/dnszone/123456/records/789012 \
 Delete a DNS record from the specified zone.
 
 **Authentication:** AccessKey required
-**Permissions Required:** `delete_record` action
+**Permissions Required:** `delete_record` action, and the type of the record must be among the token's record types (a TXT-only token cannot delete an A record). The proxy looks the record up first; a record that is not in the zone gets `404`.
 **Path Parameters:**
 - `zoneID` - The zone ID
 - `recordID` - The record ID to delete

@@ -26,6 +26,7 @@ Everything since 2026.02.2. Read **Breaking changes** and **Upgrading** before y
 - **`bunny-api-proxy backup <file>`** writes a consistent copy of the database while the proxy runs (`docker exec bunny-api-proxy /app/bunny-api-proxy backup /data/proxy-backup.db`). A plain file copy can miss recent writes.
 
 ### Security
+- **Record types were not enforced on delete, and not on listing zones.** In 2026.02.2 a scoped token limited to, say, `TXT` could delete records of any type in its zones (`DELETE /dnszone/{id}/records/{recordId}` names no type and the proxy did not look it up), and `GET /dnszone` showed it every record of its zones. Now the proxy checks the type of the existing record before a delete or update (one extra lookup for scoped tokens with a type limit; a record outside the zone gets `404`), and filters the records inside listed zones like `GET /dnszone/{id}` does. Found by a new authorization test that checks every endpoint for every kind of token.
 - **Scoped tokens could use the admin API in 2026.02.2**, including creating tokens and permissions. Admin rights are now checked on every admin endpoint except `whoami`. If you gave scoped tokens to clients you do not fully trust, review your tokens after upgrading (`GET /admin/api/tokens`).
 - Deleting a permission checks that it belongs to the token in the URL; before, any permission ID could be deleted through any token's URL.
 - A client-supplied `X-Request-ID` is only used when it has at most 128 characters from `A-Z a-z 0-9 - _ .`; otherwise a new ID is generated (prevents log injection).

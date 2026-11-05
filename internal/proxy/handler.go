@@ -184,6 +184,42 @@ func isUpstreamUnreachable(err error) bool {
 	return errors.As(err, &urlErr)
 }
 
+// authorizeExistingRecord checks, for a scoped token whose permission for
+// the zone is limited to record types, that the record it wants to change or
+// delete has one of those types. Without this a TXT-only token could delete
+// or rewrite A or MX records (the request itself names no type, or only the
+// new one). It looks the record up in the zone; a record that is not in the
+// zone gets 404. Admins and permissions without a type limit need no lookup.
+// On refusal it writes the response and returns false.
+func (h *Handler) authorizeExistingRecord(w http.ResponseWriter, r *http.Request, zoneID, recordID int64) bool {
+	permitted := auth.GetPermittedRecordTypes(auth.GetKeyInfo(r.Context()), zoneID)
+	if permitted == nil {
+		return true
+	}
+	zone, err := h.client.GetZone(r.Context(), zoneID)
+	if err != nil {
+		handleBunnyError(w, err)
+		return false
+	}
+	for _, rec := range zone.Records {
+		if rec.ID != recordID {
+			continue
+		}
+		recType := auth.MapRecordTypeToString(rec.Type)
+		for _, t := range permitted {
+			if t == recType {
+				return true
+			}
+		}
+		h.logger.Warn("record type not permitted for this token",
+			"zone_id", zoneID, "record_id", recordID, "record_type", recType)
+		writeError(w, http.StatusForbidden, "permission denied")
+		return false
+	}
+	writeError(w, http.StatusNotFound, "resource not found")
+	return false
+}
+
 // filterRecordsByPermission filters zone records based on the scoped key's permitted record types.
 // Returns the original records if no type restriction applies.
 func filterRecordsByPermission(records []bunny.Record, keyInfo *auth.KeyInfo, zoneID int64) []bunny.Record {
@@ -259,6 +295,14 @@ func (h *Handler) HandleListZones(w http.ResponseWriter, r *http.Request) {
 		result.Items = filtered
 		result.TotalItems = len(filtered)
 		result.HasMoreItems = false
+	}
+
+	// Zones in the list carry their records: show a scoped token only the
+	// record types it may see, as GET /dnszone/{id} and the record list do.
+	if keyInfo != nil {
+		for i := range result.Items {
+			result.Items[i].Records = filterRecordsByPermission(result.Items[i].Records, keyInfo, result.Items[i].ID)
+		}
 	}
 
 	// Log the request
@@ -805,6 +849,12 @@ func (h *Handler) HandleUpdateRecord(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// The middleware checked the record type in the body; the record being
+	// changed must be of a permitted type too.
+	if !h.authorizeExistingRecord(w, r, zoneID, recordID) {
+		return
+	}
+
 	// Call client to update record — validation is delegated to the backend
 	// (bunny.net API has nuanced validation rules per record type)
 	record, err := h.client.UpdateRecord(r.Context(), zoneID, recordID, &req)
@@ -849,6 +899,11 @@ func (h *Handler) HandleDeleteRecord(w http.ResponseWriter, r *http.Request) {
 	recordID, err := strconv.ParseInt(recordIDStr, 10, 64)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "invalid record ID")
+		return
+	}
+
+	// A delete request names no record type: check the existing record's.
+	if !h.authorizeExistingRecord(w, r, zoneID, recordID) {
 		return
 	}
 

@@ -2682,3 +2682,141 @@ func TestHandleBunnyError_UpstreamFailures(t *testing.T) {
 		})
 	}
 }
+
+// scopedTXTRequest returns a request for a scoped token that may change only
+// TXT records in zone 1.
+func scopedTXTRequest(method, path string, body io.Reader, params map[string]string) *http.Request {
+	r := newTestRequest(method, path, body, params)
+	ctx := auth.WithToken(r.Context(), &storage.Token{ID: 7, Name: "acme"})
+	ctx = auth.WithPermissions(ctx, []*storage.Permission{{
+		ZoneID: 1, AllowedActions: []string{"list_records", "update_record", "delete_record"}, RecordTypes: []string{"TXT"},
+	}})
+	return r.WithContext(ctx)
+}
+
+// zoneWithTXTAndA is zone 1 with a TXT record (Id 10) and an A record (Id 11).
+func zoneWithTXTAndA() *bunny.Zone {
+	return &bunny.Zone{ID: 1, Domain: "example.com", Records: []bunny.Record{
+		{ID: 10, Type: 3, Name: "_acme-challenge", Value: "v"},
+		{ID: 11, Type: 0, Name: "www", Value: "192.0.2.1"},
+	}}
+}
+
+// TestRecordChanges_CheckTheExistingRecordType checks that a scoped token
+// limited to TXT can neither delete nor update a record of another type:
+// the request names no type (delete) or only the new one (update).
+func TestRecordChanges_CheckTheExistingRecordType(t *testing.T) {
+	t.Parallel()
+	txtBody := `{"Type":3,"Name":"www","Value":"x","Ttl":300}`
+	tests := []struct {
+		name     string
+		method   string
+		recordID string
+		zoneErr  error
+		want     int
+		upstream bool // whether the change reaches bunny.net
+	}{
+		{"delete TXT record", http.MethodDelete, "10", nil, http.StatusNoContent, true},
+		{"delete A record", http.MethodDelete, "11", nil, http.StatusForbidden, false},
+		{"delete record not in zone", http.MethodDelete, "99", nil, http.StatusNotFound, false},
+		{"delete, zone lookup fails", http.MethodDelete, "10", &bunny.ServerError{StatusCode: http.StatusBadGateway}, http.StatusBadGateway, false},
+		{"update TXT record", http.MethodPost, "10", nil, http.StatusNoContent, true},
+		{"update A record with a TXT body", http.MethodPost, "11", nil, http.StatusForbidden, false},
+		{"update record not in zone", http.MethodPost, "99", nil, http.StatusNotFound, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			changed := false
+			client := &mockBunnyClient{
+				getZoneFunc: func(context.Context, int64) (*bunny.Zone, error) {
+					if tt.zoneErr != nil {
+						return nil, tt.zoneErr
+					}
+					return zoneWithTXTAndA(), nil
+				},
+				deleteRecordFunc: func(context.Context, int64, int64) error { changed = true; return nil },
+				updateRecordFunc: func(context.Context, int64, int64, *bunny.AddRecordRequest) (*bunny.Record, error) {
+					changed = true
+					return nil, nil
+				},
+			}
+			h := NewHandler(client, slog.New(slog.NewTextHandler(io.Discard, nil)))
+			var body io.Reader
+			if tt.method == http.MethodPost {
+				body = strings.NewReader(txtBody)
+			}
+			params := map[string]string{"zoneID": "1", "recordID": tt.recordID}
+			r := scopedTXTRequest(tt.method, "/dnszone/1/records/"+tt.recordID, body, params)
+			w := httptest.NewRecorder()
+			if tt.method == http.MethodDelete {
+				h.HandleDeleteRecord(w, r)
+			} else {
+				h.HandleUpdateRecord(w, r)
+			}
+			if w.Code != tt.want {
+				t.Errorf("status = %d, want %d (%s)", w.Code, tt.want, w.Body.String())
+			}
+			if changed != tt.upstream {
+				t.Errorf("change sent to bunny.net = %v, want %v", changed, tt.upstream)
+			}
+		})
+	}
+}
+
+// TestRecordChanges_AdminNeedsNoLookup checks that admins (no KeyInfo) are
+// not limited by record type and cost no extra lookup.
+func TestRecordChanges_AdminNeedsNoLookup(t *testing.T) {
+	t.Parallel()
+	client := &mockBunnyClient{
+		getZoneFunc: func(context.Context, int64) (*bunny.Zone, error) {
+			t.Error("unexpected zone lookup for an admin")
+			return zoneWithTXTAndA(), nil
+		},
+		deleteRecordFunc: func(context.Context, int64, int64) error { return nil },
+	}
+	h := NewHandler(client, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	r := newTestRequest(http.MethodDelete, "/dnszone/1/records/11", nil, map[string]string{"zoneID": "1", "recordID": "11"})
+	r = r.WithContext(auth.WithAdmin(auth.WithToken(r.Context(), &storage.Token{ID: 1, IsAdmin: true}), true))
+	w := httptest.NewRecorder()
+	h.HandleDeleteRecord(w, r)
+	if w.Code != http.StatusNoContent {
+		t.Errorf("status = %d, want 204", w.Code)
+	}
+}
+
+// TestHandleListZones_FiltersRecordsForScopedTokens checks that the records
+// inside listed zones follow the token's record types, and that an admin
+// sees every zone and record.
+func TestHandleListZones_FiltersRecordsForScopedTokens(t *testing.T) {
+	t.Parallel()
+	list := func() *bunny.ListZonesResponse {
+		return &bunny.ListZonesResponse{Items: []bunny.Zone{*zoneWithTXTAndA(), {ID: 2, Domain: "other.example"}}, TotalItems: 2}
+	}
+	client := &mockBunnyClient{listZonesFunc: func(context.Context, *bunny.ListZonesOptions) (*bunny.ListZonesResponse, error) {
+		return list(), nil
+	}}
+	h := NewHandler(client, slog.New(slog.NewTextHandler(io.Discard, nil)))
+
+	w := httptest.NewRecorder()
+	h.HandleListZones(w, scopedTXTRequest(http.MethodGet, "/dnszone", nil, nil))
+	var scoped bunny.ListZonesResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &scoped); err != nil {
+		t.Fatal(err)
+	}
+	if len(scoped.Items) != 1 || len(scoped.Items[0].Records) != 1 || scoped.Items[0].Records[0].Type != 3 {
+		t.Errorf("scoped token sees %+v, want zone 1 with only the TXT record", scoped.Items)
+	}
+
+	r := newTestRequest(http.MethodGet, "/dnszone", nil, nil)
+	r = r.WithContext(auth.WithAdmin(auth.WithToken(r.Context(), &storage.Token{ID: 1, IsAdmin: true}), true))
+	w = httptest.NewRecorder()
+	h.HandleListZones(w, r)
+	var admin bunny.ListZonesResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &admin); err != nil {
+		t.Fatal(err)
+	}
+	if len(admin.Items) != 2 || len(admin.Items[0].Records) != 2 {
+		t.Errorf("admin sees %+v, want both zones with all records", admin.Items)
+	}
+}
