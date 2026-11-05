@@ -737,32 +737,44 @@ The SQLite database contains:
 
 ### Backup Procedure
 
-**Option 1: Docker Volume Backup**
-```bash
-# Create a backup
-docker run --rm \
-  -v bunny-proxy-data:/data \
-  -v $(pwd):/backup \
-  alpine tar czf /backup/proxy-backup-$(date +%Y%m%d-%H%M%S).tar.gz -C /data proxy.db
+The database runs in SQLite's WAL mode: recent writes can sit in `proxy.db-wal` until SQLite folds them into `proxy.db`. **Copying `proxy.db` (with `cp`, `tar`, ...) while the proxy runs can therefore miss recent changes or produce an inconsistent file.** Use the built-in `backup` command instead. It writes a consistent copy (SQLite `VACUUM INTO`), is safe while the proxy keeps running, and never overwrites an existing file. The image is distroless, so there is no `sqlite3` in it; the command is part of the proxy binary.
 
-# List backups
-ls -lh proxy-backup-*.tar.gz
+**Option 1: Docker (recommended)**
+```bash
+# Write the backup inside the data volume, then copy it out
+docker exec bunny-api-proxy /app/bunny-api-proxy backup /data/proxy-backup.db
+docker cp bunny-api-proxy:/data/proxy-backup.db ./proxy-backup-$(date +%Y%m%d-%H%M%S).db
 ```
 
-**Option 2: Direct File Backup (Host-mounted volume)**
-```bash
-# If using host path volume
-cp /var/lib/bunny-api-proxy/proxy.db /backups/proxy-$(date +%Y%m%d-%H%M%S).db
+The distroless image has no shell or `rm`, so the file stays in the volume (the next backup needs another name, because the command never overwrites). Cleaner: write to a separate mounted backup directory:
 
-# Or with compression
-gzip -c /var/lib/bunny-api-proxy/proxy.db > /backups/proxy-$(date +%Y%m%d-%H%M%S).db.gz
+```bash
+# With a second volume mounted at /backup (writable by uid 65532)
+docker exec bunny-api-proxy /app/bunny-api-proxy backup /backup/proxy-$(date +%Y%m%d-%H%M%S).db
 ```
 
-**Option 3: Automated Daily Backup (cron)**
+**Option 2: Binary (outside Docker)**
 ```bash
-# Add to crontab -e
-0 2 * * * docker run --rm -v bunny-proxy-data:/data -v /backups:/backup alpine tar czf /backup/proxy-backup-$(date +\%Y\%m\%d).tar.gz -C /data proxy.db && find /backups -name "proxy-backup-*.tar.gz" -mtime +30 -delete
+DATABASE_PATH=/var/lib/bunny-api-proxy/proxy.db bunny-api-proxy backup /backups/proxy-$(date +%Y%m%d-%H%M%S).db
 ```
+
+**Option 3: Stop, then copy**
+
+If the proxy is stopped cleanly, SQLite has folded the WAL into `proxy.db`, and a plain copy is consistent:
+```bash
+docker stop bunny-api-proxy
+docker run --rm -v bunny-proxy-data:/data -v $(pwd):/backup alpine \
+  tar czf /backup/proxy-backup-$(date +%Y%m%d-%H%M%S).tar.gz -C /data proxy.db
+docker start bunny-api-proxy
+```
+
+**Option 4: Automated daily backup (cron)**
+```bash
+# crontab -e (requires a /backup volume mounted into the container, see Option 1)
+0 2 * * * docker exec bunny-api-proxy /app/bunny-api-proxy backup /backup/proxy-$(date +\%Y\%m\%d).db && find /srv/bunny-proxy-backups -name "proxy-*.db" -mtime +30 -delete
+```
+
+The proxy also writes an automatic backup before every schema migration (see [Database Migrations](#database-migrations)).
 
 ### Recovery Procedure
 
@@ -782,7 +794,9 @@ gzip -c /var/lib/bunny-api-proxy/proxy.db > /backups/proxy-$(date +%Y%m%d-%H%M%S
      -v $(pwd):/backup \
      alpine tar xzf /backup/proxy-backup-YYYYMMDD-HHMMSS.tar.gz -C /data
 
-   # Option 2: From direct file backup
+   # Option 2: From a backup file (made with the backup command)
+   # Remove the old WAL files too, or SQLite applies them to the restored file
+   rm -f /var/lib/bunny-api-proxy/proxy.db-wal /var/lib/bunny-api-proxy/proxy.db-shm
    cp /backups/proxy-YYYYMMDD.db /var/lib/bunny-api-proxy/proxy.db
    ```
 

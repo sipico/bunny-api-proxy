@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"log/slog"
 	"net"
@@ -37,9 +38,37 @@ func main() {
 		os.Exit(runHealthCheck()) // coverage-ignore: health subcommand only used in container HEALTHCHECK
 	}
 
+	// Handle backup subcommand: consistent copy of the database (VACUUM INTO)
+	if len(os.Args) > 1 && os.Args[1] == "backup" { // coverage-ignore: dispatch only; runBackup is tested
+		os.Exit(runBackup(os.Args[2:], os.Getenv, os.Stdout, os.Stderr)) // coverage-ignore: dispatch only; runBackup is tested
+	}
+
 	if err := run(); err != nil { // coverage-ignore: run() errors only occur in production failures
 		log.Fatalf("Server failed: %v", err) // coverage-ignore: run() errors only occur in production failures
 	}
+}
+
+// runBackup writes a consistent copy of the database to the path in args[0].
+// It is safe while the proxy is running and does not migrate the database.
+// The database path comes from DATABASE_PATH (default /data/proxy.db), the
+// same variable the server reads. Usage, in the distroless container:
+//
+//	docker exec bunny-api-proxy /app/bunny-api-proxy backup /data/proxy-backup.db
+func runBackup(args []string, getenv func(string) string, stdout, stderr io.Writer) int {
+	if len(args) != 1 || args[0] == "" {
+		_, _ = fmt.Fprintln(stderr, "usage: bunny-api-proxy backup <target file>") //nolint:errcheck // nothing to do if stderr fails
+		return 2
+	}
+	src := getenv("DATABASE_PATH")
+	if src == "" {
+		src = "/data/proxy.db"
+	}
+	if err := storage.Backup(context.Background(), src, args[0]); err != nil {
+		_, _ = fmt.Fprintf(stderr, "backup failed: %v\n", err) //nolint:errcheck // nothing to do if stderr fails
+		return 1
+	}
+	_, _ = fmt.Fprintf(stdout, "backup of %s written to %s\n", src, args[0]) //nolint:errcheck // informational
+	return 0
 }
 
 // runHealthCheck performs an HTTP health check against the local server.
