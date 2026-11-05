@@ -22,6 +22,18 @@ func (e *APIError) Error() string {
 	return fmt.Sprintf("bunny: %s: %s", e.ErrorKey, e.Message)
 }
 
+// ServerError is a 5xx answer from bunny.net without a structured error
+// body (for example an HTML page from a gateway). A 5xx with a structured
+// body is an *APIError with that StatusCode.
+type ServerError struct {
+	StatusCode int
+}
+
+// Error implements the error interface for ServerError.
+func (e *ServerError) Error() string {
+	return fmt.Sprintf("bunny: server error (status %d)", e.StatusCode)
+}
+
 // Sentinel errors for common API error cases.
 var (
 	ErrUnauthorized = errors.New("bunny: unauthorized (invalid API key)")

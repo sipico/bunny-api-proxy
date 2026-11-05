@@ -7,6 +7,7 @@
 Everything since 2026.02.2. Read **Breaking changes** and **Upgrading** before you upgrade.
 
 ### Breaking changes
+- **Failures of bunny.net itself get `502` or `504`** instead of `500` (or bunny.net's 5xx status): `502 Bad Gateway` for a 5xx answer or when bunny.net cannot be reached, `504 Gateway Timeout` when it does not answer within 30 seconds. The message says that a change may have been applied anyway; check before retrying a write. bunny.net's 5xx text is no longer passed to clients, only logged. 4xx errors are unchanged.
 - **`/metrics` moved off the public port.** Prometheus metrics are served by a separate listener, `METRICS_LISTEN_ADDR` (default `localhost:9090`); `GET /metrics` on the proxy port now returns 404. Inside a container `localhost` is not reachable from outside: set `METRICS_LISTEN_ADDR=:9090` and expose that port only to your monitoring network.
 - **The admin API requires an admin token.** Scoped tokens get `403 admin_required` on `/admin/api/tokens...` and `/admin/api/loglevel`; `/admin/api/whoami` stays available to every token. In 2026.02.2 any valid token could manage tokens (see **Security**).
 - **`GET /dnszone/{id}/records` returns bunny.net's paginated list** (`Items`, `CurrentPage`, `TotalItems`, `HasMoreItems`) instead of a plain array, and supports `page`, `perPage`, `type` and `search` like bunny.net's endpoint. Scoped tokens only see, and only count, their permitted record types.
