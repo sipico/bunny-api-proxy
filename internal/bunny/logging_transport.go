@@ -135,10 +135,15 @@ func redactSensitiveData(key string) string {
 	return key[:4] + "..." + key[len(key)-4:]
 }
 
-// RetryTransport wraps an http.RoundTripper and retries on timeout errors and 5xx responses.
-// Retries idempotent methods (GET, HEAD, OPTIONS, DELETE, PUT) on both timeout and 5xx errors.
-// Retries non-idempotent methods (POST, PATCH) only on timeout errors (request didn't reach server).
-// Uses exponential backoff (1s, 2s, 4s) with max 3 retries (4 total attempts).
+// RetryTransport wraps an http.RoundTripper and retries GET, HEAD, OPTIONS and
+// DELETE on timeout errors and 5xx responses, with exponential backoff (1s, 2s,
+// 4s) and at most 3 retries (4 attempts).
+//
+// Writes (POST, PUT, PATCH) are never retried: neither a 5xx nor a timeout
+// shows that bunny.net did not apply them. Measured against the real API:
+// two identical PUT /dnszone/{id}/records created two records, and PUTs whose
+// client timed out after 50-500 ms had all created their record. The error
+// goes back to the caller, which can check before trying again.
 type RetryTransport struct {
 	Transport http.RoundTripper
 	Logger    *slog.Logger
@@ -161,14 +166,15 @@ func (t *RetryTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		var retryReason string
 
 		if err != nil {
-			// Network/timeout errors: retry for ALL methods (request likely didn't reach server)
-			if isTimeoutError(err) {
+			// Timeouts: only for methods that are safe to repeat; a timed-out
+			// write may have been applied.
+			if isTimeoutError(err) && isRetryableMethod(req.Method) {
 				shouldRetry = true
 				retryReason = fmt.Sprintf("timeout error: %v", err)
 			}
 		} else if resp != nil {
-			// 5xx errors: only retry for idempotent methods
-			if is5xxError(resp.StatusCode) && isIdempotentMethod(req.Method) {
+			// 5xx errors: only for methods that are safe to repeat
+			if is5xxError(resp.StatusCode) && isRetryableMethod(req.Method) {
 				shouldRetry = true
 				retryReason = fmt.Sprintf("server error: %d %s", resp.StatusCode, resp.Status)
 				// Close the response body before retrying
@@ -228,14 +234,14 @@ func (t *RetryTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	return resp, err
 }
 
-// isIdempotentMethod returns true for HTTP methods that are safe to retry on server errors.
-// GET, HEAD, OPTIONS: standard idempotent read operations
-// DELETE: idempotent (deleting twice yields same result)
-// PUT: typically idempotent (creating/replacing same resource)
-// POST: NOT idempotent (may have side effects)
-func isIdempotentMethod(method string) bool {
+// isRetryableMethod reports whether a request may be sent again after a
+// timeout or 5xx. GET, HEAD and OPTIONS only read; DELETE of the same ID has
+// the same end result (a repeat may answer 404). PUT is not included,
+// although HTTP defines it as idempotent: bunny.net uses PUT to add records,
+// and every PUT creates a new one. POST and PATCH are not idempotent.
+func isRetryableMethod(method string) bool {
 	switch method {
-	case http.MethodGet, http.MethodHead, http.MethodOptions, http.MethodDelete, http.MethodPut:
+	case http.MethodGet, http.MethodHead, http.MethodOptions, http.MethodDelete:
 		return true
 	default:
 		return false

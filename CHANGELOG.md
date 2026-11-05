@@ -36,7 +36,7 @@ Everything since 2026.02.2. Read **Breaking changes** and **Upgrading** before y
 - Go 1.27.3; GitHub Actions pinned to commit SHAs; weekly `govulncheck` on `main`.
 
 ### Fixes
-- Requests to bunny.net time out after 30 seconds, and idempotent requests (GET, PUT, DELETE) are retried on 5xx responses and timeouts with exponential backoff (1s, 2s, 4s). `POST` is not retried.
+- Requests to bunny.net time out after 30 seconds. Reads and deletes (GET, HEAD, OPTIONS, DELETE) are retried on 5xx responses and timeouts with exponential backoff (1s, 2s, 4s). Writes (POST, PUT, PATCH) are never retried: bunny.net may already have applied them, and adding a record twice creates two records.
 - SQLite memory mapping is disabled, which fixes crashes (SIGBUS) on Docker bind mounts.
 - The readiness check (`/ready`) uses a lightweight database ping.
 - The container health check uses the port from `LISTEN_ADDR` instead of always `:8080`.

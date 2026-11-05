@@ -54,7 +54,7 @@ _Parked until a real use case needs scoped keys for more than record operations.
 
 ## Upstream Resilience
 
-- [ ] **Read-after-write verification for POST retries (was #343)** - Today a 5xx on a POST to bunny.net is not retried, because the write may have happened (timeouts and network errors are retried). Instead: after a 5xx, check with the matching GET (for example `GetZone` after `CreateZone`, or match the record by name+type+value after `AddRecord`). If the write happened, return success; if not, retry with backoff; if the check also fails, give up as today. Costs an extra API call per 5xx and needs a mapping per write operation. Only worth it if production use shows POST failures during bunny.net outages. Alternative: idempotency keys, if bunny.net ever adds them.
+- [ ] **Read-after-write verification for failed writes (was #343)** - Today a write to bunny.net (POST, PUT, PATCH) is never retried after a 5xx or a timeout, because the write may have happened: measured against the real API, two identical `PUT /dnszone/{id}/records` created two records, and PUTs whose client timed out after 50-500 ms had all created their record. The error goes to the client. Instead: after such a failure, check with the matching GET (for example `GetZone` after `CreateZone`, or match the record by name+type+value after `AddRecord`). If the write happened, return success; if not, retry; if the check also fails, return the error as today. Open problems: bunny.net allows identical records, so a match may be an older record; and a write may become visible only later, so "not found" does not prove it was not applied. Costs an extra API call per failure and needs a mapping per write operation. Alternative: idempotency keys, if bunny.net ever adds them.
 
 ---
 
