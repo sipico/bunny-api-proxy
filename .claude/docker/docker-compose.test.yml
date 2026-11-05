@@ -25,6 +25,7 @@ services:
     environment:
       - LOG_LEVEL=debug
       - LISTEN_ADDR=:8080
+      - METRICS_LISTEN_ADDR=:9090  # Reachable on the (internal) test network for the metrics E2E tests
       - DATABASE_PATH=/data/proxy.db
       - BUNNY_API_URL=${BUNNY_API_URL-http://mockbunny:8081}  # Default to mock only if unset (not if empty)
       - BUNNY_API_KEY=${BUNNY_MASTER_API_KEY}  # Master key (fixed dummy value in mock mode, BUNNY_API_TEST_KEY for real API)
@@ -76,6 +77,7 @@ services:
       dockerfile: .claude/docker/Dockerfile.testrunner
     environment:
       - PROXY_URL=http://proxy:8080
+      - METRICS_URL=http://proxy:9090  # Set, so the metrics tests fail instead of skipping
       - BUNNY_MASTER_API_KEY=${BUNNY_MASTER_API_KEY}  # Master key for bootstrap
       - E2E_RUN_ID=${E2E_RUN_ID:-}  # Unique zone-name ID per CI run (no .git in this container)
       - BUNNY_FRESH_PROXY_URL=${BUNNY_FRESH_PROXY_URL:-}  # Set in mock mode only (proxy-fresh)

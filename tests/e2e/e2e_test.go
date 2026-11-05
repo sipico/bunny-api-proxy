@@ -149,7 +149,7 @@ func TestE2E_MetricsInternalListener(t *testing.T) {
 
 	resp, err := http.Get(metricsURL + "/metrics")
 	if err != nil {
-		t.Skipf("Metrics internal listener not accessible at %s (may be expected in CI): %v", metricsURL, err)
+		skipOrFailMetrics(t, "Metrics internal listener not accessible at %s: %v", metricsURL, err)
 	}
 	defer resp.Body.Close()
 
@@ -1406,6 +1406,17 @@ func TestE2E_BootstrapFlowFresh(t *testing.T) {
 // Helper Functions
 // =============================================================================
 
+// skipOrFailMetrics skips a metrics test when METRICS_URL is not set (a local
+// run without a metrics listener), and fails it when METRICS_URL is set, as in
+// CI, so an unreachable metrics listener cannot go unnoticed.
+func skipOrFailMetrics(t *testing.T, format string, args ...any) {
+	t.Helper()
+	if os.Getenv("METRICS_URL") != "" {
+		t.Fatalf(format, args...)
+	}
+	t.Skipf(format+" (set METRICS_URL to require metrics)", args...)
+}
+
 // getMetricsBody fetches the /metrics endpoint from the internal metrics listener and returns its body as a string.
 // After the security fix (issue #294), metrics are only accessible on the internal listener, not the public proxy.
 func getMetricsBody(t *testing.T) string {
@@ -1416,12 +1427,12 @@ func getMetricsBody(t *testing.T) string {
 
 	resp, err := http.Get(metricsURL + "/metrics")
 	if err != nil {
-		t.Skipf("Metrics internal listener not accessible at %s: %v", metricsURL, err)
+		skipOrFailMetrics(t, "Metrics internal listener not accessible at %s: %v", metricsURL, err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		t.Skipf("Metrics endpoint returned %d (metrics listener may not be configured in E2E environment)", resp.StatusCode)
+		skipOrFailMetrics(t, "Metrics endpoint returned %d", resp.StatusCode)
 	}
 
 	bodyBytes, err := io.ReadAll(resp.Body)
