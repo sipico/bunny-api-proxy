@@ -100,7 +100,7 @@ services:
       com.example.description: "Traefik reverse proxy with Let's Encrypt"
 
   bunny-api-proxy:
-    image: sipico/bunny-api-proxy:latest
+    image: ghcr.io/sipico/bunny-api-proxy:latest
     container_name: bunny-api-proxy
 
     env_file: ../.env
@@ -176,7 +176,7 @@ services:
       - "traefik.http.middlewares.security-headers.headers.customresponseheaders.X-Frame-Options=DENY"
       - "traefik.http.middlewares.security-headers.headers.customresponseheaders.X-XSS-Protection=1; mode=block"
 
-      com.example.description: "Bunny API Proxy (behind Traefik)"
+      - "com.example.description=Bunny API Proxy (behind Traefik)"
 
 # Named volumes
 volumes:
