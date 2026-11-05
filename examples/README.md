@@ -166,13 +166,17 @@ sudo nano /etc/bunny-api-proxy/.env
 **6. Download binary:**
 
 ```bash
-# Option A: From releases
-sudo wget https://github.com/sipico/bunny-api-proxy/releases/download/v2026.01.2/bunny-api-proxy-linux-amd64 \
-  -O /usr/local/bin/bunny-api-proxy
+# Releases publish container images, not separate binaries.
+
+# Option A: Copy the binary out of the release image (linux/amd64)
+docker create --name bunny-api-proxy-bin ghcr.io/sipico/bunny-api-proxy:<version>
+sudo docker cp bunny-api-proxy-bin:/app/bunny-api-proxy /usr/local/bin/bunny-api-proxy
+docker rm bunny-api-proxy-bin
 sudo chmod 755 /usr/local/bin/bunny-api-proxy
 
-# Option B: Build from source
-cd /home/user/bunny-api-proxy
+# Option B: Build from source (Go version as in go.mod)
+git clone https://github.com/sipico/bunny-api-proxy.git
+cd bunny-api-proxy
 go build -o bunny-api-proxy ./cmd/bunny-api-proxy
 sudo cp bunny-api-proxy /usr/local/bin/
 sudo chmod 755 /usr/local/bin/bunny-api-proxy
@@ -407,16 +411,18 @@ kubectl logs <pod-name> -p  # Previous pod logs
 kubectl port-forward service/bunny-api-proxy 8080:8080
 curl http://localhost:8080/health
 
-# Execute command in pod
-kubectl exec -it <pod-name> -- /bin/sh
-kubectl exec <pod-name> -- curl http://localhost:8080/health
+# Health check inside the pod (the distroless image has no shell or curl;
+# the binary has a health subcommand)
+kubectl exec <pod-name> -- /app/bunny-api-proxy health
 
-# Update image (when deploying new version)
+# Update image (when deploying new version; release tags have no "v")
 kubectl set image deployment/bunny-api-proxy \
-  bunny-api-proxy=sipico/bunny-api-proxy:v2026.01.2 \
-  --record
+  bunny-api-proxy=ghcr.io/sipico/bunny-api-proxy:<version>
 
 # Rollback to previous version
+# Careful after an upgrade that migrated the database: older releases must
+# not run on a newer schema. Restore the pre-migration backup
+# (proxy.db.v<old>-backup-*) first, see docs/DEPLOYMENT.md.
 kubectl rollout undo deployment/bunny-api-proxy
 
 # Scale replicas (not recommended with SQLite)
@@ -539,35 +545,37 @@ az aks get-credentials --resource-group my-rg --name bunny-proxy
 
 ### Backup Procedures
 
+The database runs in SQLite's WAL mode: recent writes can sit in `proxy.db-wal`. **Copying `proxy.db` while the proxy runs (with `cp`, `docker cp`, `tar` or `rsync`) can miss them.** Use the built-in `backup` command, which writes a consistent copy while the proxy keeps running and never overwrites an existing file. See [docs/DEPLOYMENT.md](../docs/DEPLOYMENT.md#backup-and-recovery) for all options.
+
 **Docker Compose:**
 ```bash
-# Backup database file
-docker cp bunny-api-proxy:/data/proxy.db ./backup/proxy.db.$(date +%Y%m%d)
-
-# Backup entire volume
-docker run --rm -v bunny_data:/data -v $(pwd)/backup:/backup \
-  busybox tar czf /backup/proxy.db.tar.gz /data/proxy.db
+# Consistent backup inside the volume, then copy it out
+docker exec bunny-api-proxy /app/bunny-api-proxy backup /data/proxy-backup-$(date +%Y%m%d).db
+docker cp bunny-api-proxy:/data/proxy-backup-$(date +%Y%m%d).db ./backup/
 
 # Backup to external storage (S3 example)
-aws s3 cp backup/proxy.db.tar.gz s3://my-bucket/backups/
+aws s3 cp ./backup/proxy-backup-$(date +%Y%m%d).db s3://my-bucket/backups/
 ```
 
 **Systemd:**
 ```bash
-# Backup database
-sudo cp /var/lib/bunny-api-proxy/proxy.db \
-  /backup/proxy.db.$(date +%Y%m%d)
+# Consistent backup while the service runs
+sudo -u bunny-proxy DATABASE_PATH=/var/lib/bunny-api-proxy/proxy.db \
+  /usr/local/bin/bunny-api-proxy backup /backup/proxy-$(date +%Y%m%d).db
 
-# Backup with rsync
-rsync -avz /var/lib/bunny-api-proxy/ /backup/bunny-proxy/
-
-# Backup to remote server
-rsync -avz /var/lib/bunny-api-proxy/ user@backup-server:/backups/bunny-proxy/
+# Copy the backup files (not the live database directory) to a remote server
+rsync -avz /backup/ user@backup-server:/backups/bunny-proxy/
 ```
 
 **Kubernetes:**
 ```bash
-# Create volumesnapshot (if supported)
+# Consistent backup inside the pod (the image has no shell or tar)
+kubectl exec <pod-name> -- /app/bunny-api-proxy backup /data/proxy-backup-$(date +%Y%m%d).db
+kubectl cp <pod-name>:/data/proxy-backup-$(date +%Y%m%d).db ./proxy-backup-$(date +%Y%m%d).db
+
+# Or a volume snapshot (if supported). It is crash-consistent: it holds
+# proxy.db and proxy.db-wal from the same moment, and SQLite replays the WAL
+# on start.
 kubectl apply -f - <<EOF
 apiVersion: snapshot.storage.k8s.io/v1
 kind: VolumeSnapshot
@@ -577,26 +585,24 @@ spec:
   source:
     persistentVolumeClaimName: bunny-api-proxy-pvc
 EOF
-
-# Backup via pod
-kubectl exec -it <pod-name> -- tar czf /data/backup.tar.gz /data/proxy.db
-
-# Copy out of pod
-kubectl cp <pod-name>:/data/backup.tar.gz ./backup.tar.gz
 ```
 
 ### Restore Procedures
 
+Stop the proxy first, and remove `proxy.db-wal` and `proxy.db-shm` next to the database, or SQLite applies them to the restored file.
+
 **Docker Compose:**
 ```bash
-# Stop services
-docker-compose down
+# Stop the container (stop, not down: down removes the container)
+docker compose stop bunny-api-proxy
 
-# Restore database
-docker cp ./backup/proxy.db.20240125 bunny-api-proxy:/data/proxy.db
+# Restore into the volume with a helper container
+# (the volume name is <project>_bunny_data; check with `docker volume ls`)
+docker run --rm -v bunny-api-proxy_bunny_data:/data -v $(pwd)/backup:/backup alpine \
+  sh -c 'rm -f /data/proxy.db-wal /data/proxy.db-shm && cp /backup/proxy-backup-20240125.db /data/proxy.db && chown 65532:65532 /data/proxy.db'
 
-# Start services
-docker-compose up -d
+# Start the container
+docker compose start bunny-api-proxy
 ```
 
 **Systemd:**
@@ -605,7 +611,8 @@ docker-compose up -d
 sudo systemctl stop bunny-api-proxy
 
 # Restore database
-sudo cp /backup/proxy.db.20240125 /var/lib/bunny-api-proxy/proxy.db
+sudo rm -f /var/lib/bunny-api-proxy/proxy.db-wal /var/lib/bunny-api-proxy/proxy.db-shm
+sudo cp /backup/proxy-20240125.db /var/lib/bunny-api-proxy/proxy.db
 sudo chown bunny-proxy:bunny-proxy /var/lib/bunny-api-proxy/proxy.db
 
 # Start service
@@ -713,7 +720,7 @@ kubectl delete pod <pod-name>
 # Docker Compose
 docker-compose ps
 docker-compose logs bunny-api-proxy
-docker-compose exec bunny-api-proxy /bin/sh
+docker-compose exec bunny-api-proxy /app/bunny-api-proxy health  # no shell in the distroless image
 docker inspect <container-id>
 
 # Systemd
@@ -744,9 +751,8 @@ See `../.env.example` for complete configuration options:
 
 ### Version Information
 
-All examples reference version `2026.01.2`:
-- Docker image: `sipico/bunny-api-proxy:latest` or `sipico/bunny-api-proxy:v2026.01.2`
-- Binary releases: https://github.com/sipico/bunny-api-proxy/releases
+- Docker image: `ghcr.io/sipico/bunny-api-proxy:latest` (built from `main`) or a release tag such as `ghcr.io/sipico/bunny-api-proxy:2026.02.2` (release tags have no "v")
+- Release notes: https://github.com/sipico/bunny-api-proxy/releases (releases publish container images only, no separate binaries)
 
 ## Next Steps
 
