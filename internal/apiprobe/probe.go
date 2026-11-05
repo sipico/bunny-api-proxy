@@ -324,7 +324,11 @@ func sortedIDs(m map[int64]bool) []int64 {
 // runs. Only zones with the probe suffix, and pull zones whose own hostnames
 // are all under probe zones, are touched.
 func (p *Prober) cleanupStale(ctx context.Context) {
-	pz := p.do(ctx, "find stale probe pull zones", http.MethodGet, "/pullzone", url.Values{"search": {"bapprobe"}}, nil, "")
+	// bunny.net names pull zones randomly (e.g. "aca56385-5") and its search
+	// does not look at hostnames, so list them all and judge each one by its
+	// hostnames. GET /pullzone returns a paginated object (the spec says an
+	// array; both are accepted).
+	pz := p.do(ctx, "find stale probe pull zones", http.MethodGet, "/pullzone", url.Values{"perPage": {"1000"}}, nil, "")
 	if pz.Status == http.StatusOK {
 		var zones []pullZone
 		if json.Unmarshal(pz.rawBody, &zones) != nil {
@@ -334,13 +338,15 @@ func (p *Prober) cleanupStale(ctx context.Context) {
 			_ = json.Unmarshal(pz.rawBody, &paged) //nolint:errcheck // nothing to clean up if neither shape matches
 			zones = paged.Items
 		}
+		owned := 0
 		for _, z := range zones {
 			if z.owned() {
+				owned++
 				p.do(ctx, "delete stale probe pull zone", http.MethodDelete, fmt.Sprintf("/pullzone/%d", z.ID), nil, nil, "")
 			}
 		}
+		pz.Note = fmt.Sprintf("%d pull zones in the account, %d left behind by earlier probe runs", len(zones), owned)
 	}
-
 	ex := p.do(ctx, "find stale probe zones", http.MethodGet, "/dnszone", url.Values{"search": {"bapprobe"}}, nil, "")
 	var list struct {
 		Items []struct {

@@ -335,6 +335,7 @@ type fakeBunny struct {
 	pullZones map[int64]string // id -> custom hostname
 	deleted   []int64
 	keepPZ    bool // false: bunny.net removes the pull zone with the zone
+	paged     bool // list pull zones as {"Items": [...]} like the real API
 }
 
 func (f *fakeBunny) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -347,6 +348,10 @@ func (f *fakeBunny) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		list := make([]string, 0, len(f.pullZones))
 		for pid, host := range f.pullZones {
 			list = append(list, fmt.Sprintf(`{"Id":%d,"Hostnames":[{"Value":"p.b-cdn.net","IsSystemHostname":true},{"Value":%q}]}`, pid, host))
+		}
+		if f.paged {
+			_, _ = fmt.Fprintf(w, `{"Items":[%s],"CurrentPage":0,"TotalItems":%d,"HasMoreItems":false}`, strings.Join(list, ","), len(list))
+			return
 		}
 		_, _ = fmt.Fprintf(w, "[%s]", strings.Join(list, ","))
 	case r.Method == http.MethodPost && r.URL.Path == "/dnszone":
@@ -391,6 +396,7 @@ func TestProber_PullZoneCleanup(t *testing.T) {
 	t.Parallel()
 	for name, tc := range map[string]struct {
 		keep        bool
+		paged       bool
 		stale       map[int64]string
 		wantDeleted []int64
 		wantNote    string
@@ -398,11 +404,11 @@ func TestProber_PullZoneCleanup(t *testing.T) {
 		"bunny.net removes it":    {keep: false, wantNote: "is gone"},
 		"left behind, deleted":    {keep: true, wantDeleted: []int64{500}, wantNote: "deleting it"},
 		"stale probe pull zone":   {keep: false, stale: map[int64]string{9: "redirect.old" + ZoneSuffix}, wantDeleted: []int64{9}, wantNote: "is gone"},
-		"stale foreign untouched": {keep: false, stale: map[int64]string{8: "cdn.example.com"}, wantNote: "is gone"},
+		"stale foreign untouched": {keep: false, stale: map[int64]string{8: "cdn.example.com"}, wantNote: "1 pull zones in the account, 0 left behind"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			f := &fakeBunny{pullZones: map[int64]string{}, keepPZ: tc.keep}
+			f := &fakeBunny{pullZones: map[int64]string{}, keepPZ: tc.keep, paged: tc.paged}
 			for id, host := range tc.stale {
 				f.pullZones[id] = host
 			}
