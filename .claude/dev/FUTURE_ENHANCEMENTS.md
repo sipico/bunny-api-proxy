@@ -30,6 +30,7 @@ _Tracked in GitHub Issues: Update DNS Record (#235), Import/Export (#238, #239).
 - [ ] **Zone name patterns** - e.g., "all .nl domains", "zones containing 'prod'"
 - [ ] **Record name patterns** - Regex filters on record names (e.g., `^_acme-challenge\.`)
 - [ ] **Wildcard zone access** - `zone_id: *` for all zones (auth layer supports ZoneID=0, needs storage/API support)
+- [ ] **No record-type limit** - `auth` treats a permission without record types as "all types", but the API and storage require at least one type, so that branch (like ZoneID=0) is unreachable (found by the record-type matrix). Either support both through the API, with their own matrix cases, or remove the branches. Granting all 16 types explicitly works today.
 
 ### Advanced Scoping
 
@@ -49,6 +50,13 @@ _Parked until a real use case needs scoped keys for more than record operations.
   - Constraints: existing permissions keep working (default to `records`); storage currently requires `zone_id > 0` and non-empty record types; any schema change is a new versioned migration step (#301)
   - Open: should import/export be allowed for scoped keys (needs BIND parsing and record-type filtering)?
   - Full discussion and the list of blocked endpoints: #246
+
+---
+
+## ACME Client Integration
+
+- [ ] **Base URL option in lego and acme.sh** - Both have bunny.net support with `https://api.bunny.net` fixed (lego's provider has no endpoint setting; acme.sh's `dns_bunny.sh` hardcodes the URL). An option for the API URL, offered upstream, would let them use the proxy unchanged. Today only the certbot hook (`examples/certbot/bunny-proxy-hook.sh`) works out of the box.
+- [ ] **More ready-made hooks** - an acme.sh `dnsapi` script and a lego `exec` provider script, each run by the getting-started tests like the certbot hook.
 
 ---
 

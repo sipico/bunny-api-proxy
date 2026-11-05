@@ -326,7 +326,7 @@ curl -H "AccessKey: scoped-token-value" \
 curl -X POST \
   -H "AccessKey: scoped-token-value" \
   -H "Content-Type: application/json" \
-  -d '{"Type":"TXT","Name":"_acme-challenge","Value":"validation-token","Ttl":300}' \
+  -d '{"Type":3,"Name":"_acme-challenge","Value":"validation-token","Ttl":300}' \
   http://localhost:8080/dnszone/123456/records
 
 # Delete the test record when done

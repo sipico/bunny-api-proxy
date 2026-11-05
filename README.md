@@ -13,7 +13,7 @@ An API proxy for bunny.net that enables scoped and limited API keys. Perfect for
 - **Scoped Tokens** - Create tokens with granular permissions for specific zones and operations
 - **Admin Tokens** - Full-access tokens for management operations
 - **Bootstrap Security** - Master key can only create the first admin token, then is locked out
-- **DNS API Support** - Proxies bunny.net DNS operations (7 endpoints: zones and records management)
+- **DNS API Support** - All of bunny.net's DNS zone endpoints; scoped tokens for records, admin tokens for the rest (see [docs/API.md](docs/API.md#implemented-endpoints))
 - **SQLite Storage** - Lightweight, embedded database with persistent storage
 - **Structured Logging** - JSON-formatted logs with runtime log level control
 - **Health Endpoints** - Liveness and readiness probes for container orchestration
@@ -21,14 +21,87 @@ An API proxy for bunny.net that enables scoped and limited API keys. Perfect for
 
 ## Quick Start
 
-### Using Docker
+You need your bunny.net API key (Account settings → API) and a DNS zone that already exists in bunny.net. The examples use `example.com`; replace it with your zone. They use `curl` and [`jq`](https://jqlang.org/).
+
+### 1. Start the proxy
 
 ```bash
-docker run -d \
+export BUNNY_API_KEY=your-bunny-net-api-key
+docker run -d --name bunny-api-proxy \
   -p 8080:8080 \
+  -e BUNNY_API_KEY \
   -v bunny-proxy-data:/data \
   ghcr.io/sipico/bunny-api-proxy:latest
 ```
+
+The image is published for `linux/amd64` and `linux/arm64` (Raspberry Pi with a 64-bit OS). Without Docker, see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for the release binaries.
+
+### 2. First steps
+
+<!-- quickstart:begin -->
+Create the first admin token with your bunny.net API key. This works only once: after it, the API key is locked out of the admin API. Store the admin token safely, it is shown only once.
+
+```bash
+PROXY=http://localhost:8080
+ADMIN_TOKEN=$(curl -sf -X POST "$PROXY/admin/api/tokens" \
+  -H "AccessKey: $BUNNY_API_KEY" -H "Content-Type: application/json" \
+  -d '{"name": "admin", "is_admin": true}' | jq -r .token)
+echo "Admin token: $ADMIN_TOKEN"
+```
+
+Find the ID of your zone:
+
+```bash
+ZONE_ID=$(curl -sf "$PROXY/dnszone?search=example.com" -H "AccessKey: $ADMIN_TOKEN" \
+  | jq -r '.Items[] | select(.Domain == "example.com") | .Id')
+echo "Zone ID: $ZONE_ID"
+```
+
+Create a scoped token for an ACME client: it may only add and delete TXT records in this zone.
+
+```bash
+ACME_TOKEN=$(curl -sf -X POST "$PROXY/admin/api/tokens" \
+  -H "AccessKey: $ADMIN_TOKEN" -H "Content-Type: application/json" \
+  -d "{\"name\": \"acme\", \"is_admin\": false, \"zones\": [$ZONE_ID],
+       \"actions\": [\"add_record\", \"delete_record\"], \"record_types\": [\"TXT\"]}" | jq -r .token)
+echo "ACME token: $ACME_TOKEN"
+```
+
+Try it: add a TXT record with the scoped token and delete it again (`Type` 3 is TXT in bunny.net's API):
+
+```bash
+RECORD_ID=$(curl -sf -X PUT "$PROXY/dnszone/$ZONE_ID/records" \
+  -H "AccessKey: $ACME_TOKEN" -H "Content-Type: application/json" \
+  -d '{"Type": 3, "Name": "_acme-challenge", "Value": "test", "Ttl": 120}' | jq -r .Id)
+curl -sf -X DELETE "$PROXY/dnszone/$ZONE_ID/records/$RECORD_ID" -H "AccessKey: $ACME_TOKEN"
+echo "Added and deleted TXT record $RECORD_ID"
+```
+
+And what it may not do: an A record (`Type` 0) is refused with `403`.
+
+```bash
+curl -s -o /dev/null -w "%{http_code}\n" -X PUT "$PROXY/dnszone/$ZONE_ID/records" \
+  -H "AccessKey: $ACME_TOKEN" -H "Content-Type: application/json" \
+  -d '{"Type": 0, "Name": "www", "Value": "192.0.2.1", "Ttl": 300}'
+```
+<!-- quickstart:end -->
+
+These steps are run as written by the tests (`cmd/bunny-api-proxy/getting_started_test.go`).
+
+### 3. Get certificates (ACME DNS-01)
+
+[`examples/certbot/bunny-proxy-hook.sh`](examples/certbot/bunny-proxy-hook.sh) is a certbot hook that uses the scoped token from step 2. It finds the zone for the domain itself, also for subdomains and wildcards, and removes exactly the record it added.
+
+```bash
+export BUNNY_PROXY_URL=http://localhost:8080
+export BUNNY_PROXY_TOKEN=your-acme-token
+certbot certonly --manual --preferred-challenges dns \
+  --manual-auth-hook    "/path/to/bunny-proxy-hook.sh auth" \
+  --manual-cleanup-hook "/path/to/bunny-proxy-hook.sh cleanup" \
+  -d example.com -d '*.example.com'
+```
+
+Other ACME clients (lego, acme.sh) have bunny.net support built in, but with `https://api.bunny.net` fixed; they cannot be pointed at the proxy without changes. Run the proxy behind HTTPS when the ACME client is on another machine (see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)).
 
 ### Configuration
 
@@ -36,34 +109,12 @@ All configuration is via environment variables:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `LOG_LEVEL` | `info` | Log level (debug, info, warn, error) |
-| `LISTEN_ADDR` | `:8080` | Server listen address |
+| `BUNNY_API_KEY` | (required) | Your bunny.net API key. Used to call bunny.net and, once, to create the first admin token. Never stored. |
+| `LISTEN_ADDR` | `:8080` | Address of the API |
 | `DATABASE_PATH` | `/data/proxy.db` | SQLite database path |
-| `BUNNY_API_URL` | `https://api.bunny.net` | bunny.net API endpoint |
-
-### Bootstrap: Creating the First Admin Token
-
-On first run, use your bunny.net master API key to create an admin token:
-
-```bash
-# Create the first admin token using master key
-curl -X POST http://localhost:8080/admin/api/tokens \
-  -H "AccessKey: YOUR_BUNNY_NET_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"name": "primary-admin", "is_admin": true}'
-```
-
-Response:
-```json
-{
-  "id": 1,
-  "name": "primary-admin",
-  "token": "abc123...",
-  "is_admin": true
-}
-```
-
-**Important:** Save the returned `token` value - it is shown only once. After the first admin token is created, the master key is locked out and all further management must use admin tokens.
+| `LOG_LEVEL` | `info` | Log level (debug, info, warn, error) |
+| `METRICS_LISTEN_ADDR` | `localhost:9090` | Address of the Prometheus metrics endpoint (`/metrics`). In a container, set `:9090` to scrape it from outside. |
+| `BUNNY_API_URL` | `https://api.bunny.net` | bunny.net API endpoint (for testing) |
 
 ## Authentication
 
