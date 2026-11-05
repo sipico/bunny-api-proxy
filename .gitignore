@@ -44,3 +44,6 @@ Thumbs.db
 # Build artifacts
 dist/
 build/
+
+# Schema migration fixtures written by released versions (issue #301)
+!internal/storage/testdata/*.db

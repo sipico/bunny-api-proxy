@@ -820,7 +820,17 @@ All admin tokens are stored as hashes and cannot be recovered.
 
 ## Upgrading
 
-Upgrades are safe and straightforward. The database schema is auto-initialized on startup.
+Upgrades are safe and straightforward. The database schema is migrated automatically on startup.
+
+### Database Migrations
+
+- **Skipping releases is fine.** Every release contains all earlier migration steps. You can upgrade from any release (2026.02.1 or later) directly to the newest one. There is no need to upgrade release by release.
+- **All or nothing.** All pending steps run in one SQLite transaction. If a step fails, the proxy does not start and the database is left exactly as it was.
+- **Automatic backup.** Before migrating an existing database, the proxy writes a copy next to it, for example `/data/proxy.db.v2-backup-20261105T061846.480914501Z` (the old schema version and the UTC time). If the backup cannot be written, nothing is migrated. Backups are not deleted automatically, so remove old ones once the upgrade is confirmed.
+- **Downgrades are refused.** A release started on a database written by a newer release stops with `database schema is newer than this version of bunny-api-proxy supports`. Releases before version tracking (2026.02.1 and 2026.02.2) cannot detect this, so do not start them on a migrated database.
+- The log shows what happened: `database schema migrated from_version=2 to_version=4 backup=...`.
+
+**Rolling back an upgrade:** stop the proxy, replace `proxy.db` with the backup file (and delete `proxy.db-wal` and `proxy.db-shm` if present), then start the previous image. Tokens created after the upgrade are not in the backup.
 
 ### Docker Upgrade
 

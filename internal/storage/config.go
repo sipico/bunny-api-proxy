@@ -1,8 +1,10 @@
 package storage
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 )
 
 // SQLiteStorage implements the Storage interface using SQLite.
@@ -12,6 +14,10 @@ type SQLiteStorage struct {
 
 // New creates a new SQLiteStorage instance.
 // The dbPath is the file path for the SQLite database (or ":memory:" for tests).
+//
+// The schema is migrated to SchemaVersion on open (see schema.go). Before an
+// existing file database is migrated, a backup is written next to it as
+// <dbPath>.v<old version>-backup-<UTC timestamp>.
 func New(dbPath string) (*SQLiteStorage, error) {
 	// Open database connection
 	db, err := sql.Open("sqlite", dbPath)
@@ -19,8 +25,21 @@ func New(dbPath string) (*SQLiteStorage, error) {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
 
-	// Initialize schema
-	if err := InitSchema(db); err != nil {
+	// modernc.org/sqlite requires a single connection for in-process file
+	// databases to avoid "database is locked" errors. Set it before the
+	// migration so every statement below runs on the same connection.
+	db.SetMaxOpenConns(1)
+
+	// Set busy timeout to wait for locks instead of failing immediately (5 seconds).
+	// Set before the migration so a second process starting at the same time
+	// waits for the first one's migration instead of failing.
+	if _, err := db.Exec("PRAGMA busy_timeout = 5000"); err != nil { // coverage-ignore: pragma fails only on corrupted DB
+		_ = db.Close() //nolint:errcheck
+		return nil, fmt.Errorf("failed to set busy timeout: %w", err)
+	}
+
+	// Migrate the schema (one transaction, backup first for file databases)
+	if _, err := migrateDB(context.Background(), db, migrations, backupBaseFor(dbPath)); err != nil {
 		_ = db.Close() //nolint:errcheck
 		return nil, fmt.Errorf("failed to initialize schema: %w", err)
 	}
@@ -29,12 +48,6 @@ func New(dbPath string) (*SQLiteStorage, error) {
 	if _, err := db.Exec("PRAGMA journal_mode = WAL"); err != nil { // coverage-ignore: pragma fails only on corrupted DB
 		_ = db.Close() //nolint:errcheck
 		return nil, fmt.Errorf("failed to set WAL mode: %w", err)
-	}
-
-	// Set busy timeout to wait for locks instead of failing immediately (5 seconds)
-	if _, err := db.Exec("PRAGMA busy_timeout = 5000"); err != nil { // coverage-ignore: pragma fails only on corrupted DB
-		_ = db.Close() //nolint:errcheck
-		return nil, fmt.Errorf("failed to set busy timeout: %w", err)
 	}
 
 	// Disable memory-mapped I/O to prevent SIGBUS on Docker bind mounts
@@ -46,11 +59,6 @@ func New(dbPath string) (*SQLiteStorage, error) {
 		return nil, fmt.Errorf("failed to disable mmap: %w", err)
 	}
 
-	// Configure connection pool for concurrent access
-	// modernc.org/sqlite requires single connection for in-process file databases
-	// to avoid "database is locked" errors
-	db.SetMaxOpenConns(1)
-
 	// Enable foreign key constraints
 	if _, err := db.Exec("PRAGMA foreign_keys = ON"); err != nil { // coverage-ignore: pragma fails only on corrupted DB
 		_ = db.Close() //nolint:errcheck
@@ -60,6 +68,15 @@ func New(dbPath string) (*SQLiteStorage, error) {
 	return &SQLiteStorage{
 		db: db,
 	}, nil
+}
+
+// backupBaseFor returns the path prefix for pre-migration backups, or "" for
+// in-memory databases and SQLite URIs, which have no plain file path.
+func backupBaseFor(dbPath string) string {
+	if dbPath == "" || dbPath == ":memory:" || strings.HasPrefix(dbPath, "file:") {
+		return ""
+	}
+	return dbPath
 }
 
 // Close closes the database connection.

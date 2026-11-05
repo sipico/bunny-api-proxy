@@ -23,7 +23,7 @@ func TestInitSchema(t *testing.T) {
 	}
 
 	// Verify all tables exist
-	tables := []string{"config", "tokens", "permissions"}
+	tables := []string{"tokens", "permissions"}
 	for _, table := range tables {
 		query := "SELECT name FROM sqlite_master WHERE type='table' AND name=?"
 		var name string
@@ -63,13 +63,13 @@ func TestInitSchemaIdempotent(t *testing.T) {
 	}
 
 	// Verify tables still exist
-	query := "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('config', 'tokens', 'permissions')"
+	query := "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('tokens', 'permissions')"
 	var count int
 	if err := db.QueryRow(query).Scan(&count); err != nil {
 		t.Fatalf("failed to query tables: %v", err)
 	}
-	if count != 3 {
-		t.Errorf("expected 3 tables, got %d", count)
+	if count != 2 {
+		t.Errorf("expected 2 tables, got %d", count)
 	}
 }
 
@@ -150,75 +150,6 @@ func TestForeignKeyConstraint(t *testing.T) {
 	}
 }
 
-// TestMigrateSchema verifies that MigrateSchema works correctly.
-func TestMigrateSchema(t *testing.T) {
-	t.Parallel()
-	db, err := sql.Open("sqlite", ":memory:")
-	if err != nil {
-		t.Fatalf("failed to open database: %v", err)
-	}
-	defer db.Close()
-
-	// Call MigrateSchema
-	if err := MigrateSchema(db); err != nil {
-		t.Fatalf("MigrateSchema failed: %v", err)
-	}
-
-	// Verify tables exist
-	query := "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('config', 'tokens', 'permissions')"
-	var count int
-	if err := db.QueryRow(query).Scan(&count); err != nil {
-		t.Fatalf("failed to query tables: %v", err)
-	}
-	if count != 3 {
-		t.Errorf("expected 3 tables, got %d", count)
-	}
-}
-
-// TestConfigTableStructure verifies the config table has correct schema.
-func TestConfigTableStructure(t *testing.T) {
-	t.Parallel()
-	db, err := sql.Open("sqlite", ":memory:")
-	if err != nil {
-		t.Fatalf("failed to open database: %v", err)
-	}
-	defer db.Close()
-
-	if err := InitSchema(db); err != nil {
-		t.Fatalf("InitSchema failed: %v", err)
-	}
-
-	// Query table info
-	rows, err := db.Query("PRAGMA table_info(config)")
-	if err != nil {
-		t.Fatalf("failed to query config table info: %v", err)
-	}
-	defer rows.Close()
-
-	columns := make(map[string]bool)
-	for rows.Next() {
-		var cid int
-		var name string
-		var ctype string
-		var notnull int
-		var dfltValue sql.NullString
-		var pk int
-
-		if err := rows.Scan(&cid, &name, &ctype, &notnull, &dfltValue, &pk); err != nil {
-			t.Fatalf("failed to scan column info: %v", err)
-		}
-		columns[name] = true
-	}
-
-	// Verify required columns exist
-	requiredColumns := []string{"id", "master_api_key_hash"}
-	for _, col := range requiredColumns {
-		if !columns[col] {
-			t.Errorf("config table missing column: %s", col)
-		}
-	}
-}
-
 // TestTokensTableStructure verifies the tokens table has correct schema.
 func TestTokensTableStructure(t *testing.T) {
 	t.Parallel()
@@ -255,7 +186,7 @@ func TestTokensTableStructure(t *testing.T) {
 	}
 
 	// Verify required columns exist
-	requiredColumns := []string{"id", "key_hash", "name", "is_admin", "created_at"}
+	requiredColumns := []string{"id", "key_hash", "name", "is_admin", "created_at", "expires_at"}
 	for _, col := range requiredColumns {
 		if !columns[col] {
 			t.Errorf("tokens table missing column: %s", col)
@@ -388,26 +319,6 @@ func TestInitSchemaUniqueConstraints(t *testing.T) {
 	}
 }
 
-// TestInitSchemaConfigPrimaryKeyConstraint verifies config table's single-row constraint.
-func TestInitSchemaConfigPrimaryKeyConstraint(t *testing.T) {
-	t.Parallel()
-	db, err := sql.Open("sqlite", ":memory:")
-	if err != nil {
-		t.Fatalf("failed to open database: %v", err)
-	}
-	defer db.Close()
-
-	if err := InitSchema(db); err != nil {
-		t.Fatalf("InitSchema failed: %v", err)
-	}
-
-	// Try to insert config with id != 1 (should fail)
-	_, err = db.Exec("INSERT INTO config (id, master_api_key_hash) VALUES (?, ?)", 2, "key_hash")
-	if err == nil {
-		t.Error("expected constraint error for config id != 1, got nil")
-	}
-}
-
 // TestSchemaPermissionsInsert verifies that we can insert and retrieve permissions.
 func TestSchemaPermissionsInsert(t *testing.T) {
 	t.Parallel()
@@ -499,35 +410,6 @@ func TestSchemaTokensInsert(t *testing.T) {
 	}
 	if adminFlag != true {
 		t.Errorf("is_admin mismatch: expected true, got %v", adminFlag)
-	}
-}
-
-// TestSchemaConfigInsert verifies that config can be stored.
-func TestSchemaConfigInsert(t *testing.T) {
-	t.Parallel()
-	db, err := sql.Open("sqlite", ":memory:")
-	if err != nil {
-		t.Fatalf("failed to open database: %v", err)
-	}
-	defer db.Close()
-
-	if err := InitSchema(db); err != nil {
-		t.Fatalf("InitSchema failed: %v", err)
-	}
-
-	// Insert config
-	_, err = db.Exec("INSERT INTO config (id, master_api_key_hash) VALUES (?, ?)", 1, "key_hash_value")
-	if err != nil {
-		t.Fatalf("failed to insert config: %v", err)
-	}
-
-	// Verify config exists
-	var keyHash string
-	if err := db.QueryRow("SELECT master_api_key_hash FROM config WHERE id = 1").Scan(&keyHash); err != nil {
-		t.Errorf("config not found: %v", err)
-	}
-	if keyHash != "key_hash_value" {
-		t.Errorf("config mismatch: expected 'key_hash_value', got '%s'", keyHash)
 	}
 }
 

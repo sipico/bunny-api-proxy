@@ -111,14 +111,6 @@ _Note: Out of MVP scope. SQLite is sufficient for single-instance deployments._
 - [ ] **Backup to S3/bunny Storage** - Off-site backup
 - [ ] **Point-in-time recovery** - Restore to specific moment
 
-### Database Schema Management
-
-- [ ] **Versioned migrations** - Implement migrations/ directory for schema changes
-  - Currently using `CREATE TABLE IF NOT EXISTS` in schema.go
-  - Need versioned migrations when schema evolves (adding columns, etc.)
-  - Consider tools like golang-migrate or custom solution
-  - Track schema version in database
-
 ---
 
 ## Completed
