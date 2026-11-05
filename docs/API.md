@@ -271,9 +271,12 @@ curl -X POST http://localhost:8080/admin/api/loglevel \
 **Example Response:**
 ```json
 {
-  "level": "debug"
+  "level": "debug",
+  "warning": "Debug logging will expose request/response bodies. Not recommended for production."
 }
 ```
+
+The `warning` field (and a `WARN` server log line) appears only when the level is set to `debug`. Debug logs mask admin API bodies with an allowlist (plaintext tokens are never logged), but DNS record values and bunny.net payloads are logged in full.
 
 ---
 

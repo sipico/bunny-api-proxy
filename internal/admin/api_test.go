@@ -1173,3 +1173,93 @@ func TestHandleDeleteTokenPermissionIDOR(t *testing.T) {
 }
 
 // TestWriteAPIError was moved to errors_test.go as TestWriteError and TestWriteErrorWithHint
+
+// TestHandleSetLogLevel_DebugWarning verifies that switching to debug logs a
+// warning and returns one in the response, and that other levels do not
+// (issue #399).
+func TestHandleSetLogLevel_DebugWarning(t *testing.T) {
+	t.Parallel()
+	for _, level := range []string{"debug", "info", "warn", "error"} {
+		t.Run(level, func(t *testing.T) {
+			t.Parallel()
+			var logs bytes.Buffer
+			logger := slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
+			h := NewHandler(&mockstore.MockStorage{}, new(slog.LevelVar), logger)
+
+			body, _ := json.Marshal(SetLogLevelRequest{Level: level})
+			w := httptest.NewRecorder()
+			h.HandleSetLogLevel(w, httptest.NewRequest(http.MethodPost, "/api/loglevel", bytes.NewReader(body)))
+
+			if w.Code != http.StatusOK {
+				t.Fatalf("status = %d, want 200", w.Code)
+			}
+			var resp map[string]string
+			if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+				t.Fatalf("invalid JSON: %v", err)
+			}
+			warnLogged := strings.Contains(logs.String(), "level=WARN") &&
+				strings.Contains(logs.String(), "Debug logging enabled")
+
+			if level == "debug" {
+				if resp["warning"] == "" {
+					t.Error("expected a warning in the response for debug")
+				}
+				if !warnLogged {
+					t.Errorf("expected a WARN log for debug, got logs:\n%s", logs.String())
+				}
+			} else {
+				if _, ok := resp["warning"]; ok {
+					t.Errorf("unexpected warning in the response for %s: %q", level, resp["warning"])
+				}
+				if warnLogged {
+					t.Errorf("unexpected debug warning logged for %s", level)
+				}
+			}
+		})
+	}
+}
+
+// TestAdminRouter_DebugLogsDoNotContainPlaintextToken verifies that with
+// debug logging on, creating a token through the admin router does not
+// write the plaintext token to the logs: the response body is logged with
+// the allowlist, which does not include "token" (issue #399).
+func TestAdminRouter_DebugLogsDoNotContainPlaintextToken(t *testing.T) {
+	t.Parallel()
+	var logs bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
+
+	mock := &mockstore.MockStorage{
+		HasAnyAdminTokenFunc: func(ctx context.Context) (bool, error) { return false, nil }, // bootstrap
+		CreateTokenFunc: func(ctx context.Context, name string, isAdmin bool, keyHash string) (*storage.Token, error) {
+			return &storage.Token{ID: 1, Name: name, IsAdmin: isAdmin, CreatedAt: time.Now()}, nil
+		},
+	}
+	h := NewHandler(mock, new(slog.LevelVar), logger)
+	h.SetBootstrapService(auth.NewBootstrapService(mock, "master-key-for-test"))
+	router := h.NewRouter()
+
+	body, _ := json.Marshal(CreateUnifiedTokenRequest{Name: "first-admin", IsAdmin: true})
+	req := httptest.NewRequest(http.MethodPost, "/api/tokens", bytes.NewReader(body))
+	req.Header.Set("AccessKey", "master-key-for-test")
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want 201 (body: %s)", w.Code, w.Body.String())
+	}
+	var created CreateUnifiedTokenResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &created); err != nil || created.Token == "" {
+		t.Fatalf("expected a plaintext token in the response, err=%v body=%s", err, w.Body.String())
+	}
+
+	if strings.Contains(logs.String(), created.Token) {
+		t.Errorf("plaintext token found in debug logs:\n%s", logs.String())
+	}
+	if !strings.Contains(logs.String(), "HTTP Response") || !strings.Contains(logs.String(), "[REDACTED]") {
+		t.Errorf("expected a masked HTTP Response debug log, got:\n%s", logs.String())
+	}
+	if strings.Contains(logs.String(), "master-key-for-test") {
+		t.Errorf("master key found in debug logs:\n%s", logs.String())
+	}
+}
