@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/sipico/bunny-api-proxy/internal/storage"
@@ -400,5 +401,76 @@ func TestGetPermittedRecordTypes(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestValidateActions verifies that only actions a scoped token can use are
+// accepted when permissions are created (issue #392).
+func TestValidateActions(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name    string
+		actions []string
+		want    string
+	}{
+		{"empty", nil, ""},
+		{"all scoped actions", []string{"list_zones", "get_zone", "list_records", "add_record", "update_record", "delete_record"}, ""},
+		{"misspelled", []string{"list_records", "add_records"}, "add_records"},
+		{"wrong case", []string{"List_Records"}, "List_Records"},
+		{"admin-only action", []string{"delete_zone"}, "delete_zone"},
+		{"first invalid is reported", []string{"bogus1", "bogus2"}, "bogus1"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := ValidateActions(tt.actions); got != tt.want {
+				t.Errorf("ValidateActions(%v) = %q, want %q", tt.actions, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestValidateRecordTypes verifies record types against the names the
+// permission check compares with (MapRecordTypeToString), case-sensitively.
+func TestValidateRecordTypes(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name  string
+		types []string
+		want  string
+	}{
+		{"empty", nil, ""},
+		{"misspelled", []string{"TXT", "TXXT"}, "TXXT"},
+		{"wrong case", []string{"txt"}, "txt"},
+		{"unknown", []string{"SOA"}, "SOA"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := ValidateRecordTypes(tt.types); got != tt.want {
+				t.Errorf("ValidateRecordTypes(%v) = %q, want %q", tt.types, got, tt.want)
+			}
+		})
+	}
+
+	// Every name the permission check can produce must be accepted.
+	for i := 0; i <= 12; i++ {
+		name := MapRecordTypeToString(i)
+		if got := ValidateRecordTypes([]string{name}); got != "" {
+			t.Errorf("record type %q (bunny type %d) rejected", name, i)
+		}
+	}
+}
+
+// TestValidListsSorted verifies the lists used in error hints are complete and sorted.
+func TestValidListsSorted(t *testing.T) {
+	t.Parallel()
+	actions := ValidActionsList()
+	if len(actions) != len(ValidActions) || !slices.IsSorted(actions) {
+		t.Errorf("ValidActionsList() = %v, want all %d actions sorted", actions, len(ValidActions))
+	}
+	types := ValidRecordTypesList()
+	if len(types) != len(ValidRecordTypes) || !slices.IsSorted(types) {
+		t.Errorf("ValidRecordTypesList() = %v, want all %d record types sorted", types, len(ValidRecordTypes))
 	}
 }

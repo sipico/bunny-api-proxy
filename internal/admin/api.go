@@ -6,9 +6,11 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -59,6 +61,26 @@ func (h *Handler) HandleSetLogLevel(w http.ResponseWriter, r *http.Request) {
 		// Encoding errors are not critical for loglevel response
 		_ = err
 	}
+}
+
+// validatePermissionValues rejects actions and record types that the
+// permission check would never match, so a typo fails loudly at creation
+// instead of producing a token that silently cannot do anything (issue #392).
+// It writes a 400 response and returns false if a value is invalid.
+func validatePermissionValues(w http.ResponseWriter, actions, recordTypes []string) bool {
+	if invalid := auth.ValidateActions(actions); invalid != "" {
+		WriteErrorWithHint(w, http.StatusBadRequest, ErrCodeInvalidRequest,
+			fmt.Sprintf("Invalid action: %q", invalid),
+			"Valid actions are: "+strings.Join(auth.ValidActionsList(), ", "))
+		return false
+	}
+	if invalid := auth.ValidateRecordTypes(recordTypes); invalid != "" {
+		WriteErrorWithHint(w, http.StatusBadRequest, ErrCodeInvalidRequest,
+			fmt.Sprintf("Invalid record type: %q", invalid),
+			"Valid record types are: "+strings.Join(auth.ValidRecordTypesList(), ", "))
+		return false
+	}
+	return true
 }
 
 // generateRandomKey generates a random hex string of the given length.
@@ -235,6 +257,9 @@ func (h *Handler) HandleCreateUnifiedToken(w http.ResponseWriter, r *http.Reques
 		}
 		if len(req.RecordTypes) == 0 {
 			WriteError(w, http.StatusBadRequest, ErrCodeInvalidRequest, "Scoped tokens require at least one record type")
+			return
+		}
+		if !validatePermissionValues(w, req.Actions, req.RecordTypes) {
 			return
 		}
 	}
@@ -476,6 +501,9 @@ func (h *Handler) HandleAddTokenPermission(w http.ResponseWriter, r *http.Reques
 	}
 	if len(req.RecordTypes) == 0 {
 		WriteError(w, http.StatusBadRequest, ErrCodeInvalidRequest, "At least one record type is required")
+		return
+	}
+	if !validatePermissionValues(w, req.AllowedActions, req.RecordTypes) {
 		return
 	}
 

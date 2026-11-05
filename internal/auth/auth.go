@@ -5,6 +5,8 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"maps"
+	"slices"
 
 	"github.com/sipico/bunny-api-proxy/internal/storage"
 )
@@ -56,6 +58,69 @@ const (
 	// ActionGetDNSScanResult retrieves DNS scan results (admin only).
 	ActionGetDNSScanResult Action = "get_dns_scan_result"
 )
+
+// ValidActions is the set of actions that can be granted to scoped tokens.
+// Admin-only actions are excluded: scoped tokens can never use them, so a
+// permission listing one would silently do nothing (issue #392).
+var ValidActions = map[string]bool{
+	string(ActionListZones):    true,
+	string(ActionGetZone):      true,
+	string(ActionListRecords):  true,
+	string(ActionAddRecord):    true,
+	string(ActionUpdateRecord): true,
+	string(ActionDeleteRecord): true,
+}
+
+// ValidRecordTypes is the set of DNS record type names that can be granted.
+// They are exactly the names MapRecordTypeToString produces, which is what
+// CheckPermission compares against (case-sensitive).
+var ValidRecordTypes = map[string]bool{
+	"A":        true,
+	"AAAA":     true,
+	"CNAME":    true,
+	"TXT":      true,
+	"MX":       true,
+	"SPF":      true,
+	"Flatten":  true,
+	"PullZone": true,
+	"SRV":      true,
+	"CAA":      true,
+	"PTR":      true,
+	"Script":   true,
+	"NS":       true,
+}
+
+// ValidateActions returns the first action that is not in ValidActions,
+// or "" if all actions are valid.
+func ValidateActions(actions []string) string {
+	for _, a := range actions {
+		if !ValidActions[a] {
+			return a
+		}
+	}
+	return ""
+}
+
+// ValidateRecordTypes returns the first record type that is not in
+// ValidRecordTypes, or "" if all record types are valid.
+func ValidateRecordTypes(types []string) string {
+	for _, t := range types {
+		if !ValidRecordTypes[t] {
+			return t
+		}
+	}
+	return ""
+}
+
+// ValidActionsList returns the valid actions, sorted, for error messages.
+func ValidActionsList() []string {
+	return slices.Sorted(maps.Keys(ValidActions))
+}
+
+// ValidRecordTypesList returns the valid record types, sorted, for error messages.
+func ValidRecordTypesList() []string {
+	return slices.Sorted(maps.Keys(ValidRecordTypes))
+}
 
 // Errors for authentication and authorization failures.
 var (

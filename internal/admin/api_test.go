@@ -450,6 +450,44 @@ func TestHandleCreateUnifiedToken(t *testing.T) {
 			wantBody:   "invalid_request",
 		},
 		{
+			name: "scoped token with misspelled action (issue #392)",
+			body: CreateUnifiedTokenRequest{
+				Name: "scoped", Zones: []int64{123},
+				Actions: []string{"list_records", "add_records"}, RecordTypes: []string{"TXT"},
+			},
+			wantStatus: http.StatusBadRequest,
+			wantBody:   "add_records",
+		},
+		{
+			name: "scoped token with admin-only action (issue #392)",
+			body: CreateUnifiedTokenRequest{
+				Name: "scoped", Zones: []int64{123},
+				Actions: []string{"delete_zone"}, RecordTypes: []string{"TXT"},
+			},
+			wantStatus: http.StatusBadRequest,
+			wantBody:   "delete_zone",
+		},
+		{
+			name: "scoped token with misspelled record type (issue #392)",
+			body: CreateUnifiedTokenRequest{
+				Name: "scoped", Zones: []int64{123},
+				Actions: []string{"list_records"}, RecordTypes: []string{"TXT", "TXXT"},
+			},
+			wantStatus: http.StatusBadRequest,
+			wantBody:   "TXXT",
+		},
+		{
+			name: "scoped token with all valid actions and record types",
+			body: CreateUnifiedTokenRequest{
+				Name: "scoped-all", Zones: []int64{123},
+				Actions:     []string{"list_zones", "get_zone", "list_records", "add_record", "update_record", "delete_record"},
+				RecordTypes: []string{"A", "AAAA", "CNAME", "TXT", "MX", "SPF", "Flatten", "PullZone", "SRV", "CAA", "PTR", "Script", "NS"},
+			},
+			mockToken:  &storage.Token{ID: 3, Name: "scoped-all", IsAdmin: false},
+			wantStatus: http.StatusCreated,
+			wantBody:   `"is_admin":false`,
+		},
+		{
 			name: "scoped token missing zones",
 			body: CreateUnifiedTokenRequest{
 				Name:        "scoped",
@@ -837,6 +875,26 @@ func TestHandleAddTokenPermission(t *testing.T) {
 			body:       "not-json",
 			wantStatus: http.StatusBadRequest,
 			wantBody:   "invalid_request",
+		},
+		{
+			name:      "misspelled action (issue #392)",
+			tokenID:   "2",
+			mockToken: &storage.Token{ID: 2, Name: "scoped", IsAdmin: false},
+			body: AddPermissionRequest{
+				ZoneID: 123, AllowedActions: []string{"add_records"}, RecordTypes: []string{"TXT"},
+			},
+			wantStatus: http.StatusBadRequest,
+			wantBody:   "add_records",
+		},
+		{
+			name:      "misspelled record type (issue #392)",
+			tokenID:   "2",
+			mockToken: &storage.Token{ID: 2, Name: "scoped", IsAdmin: false},
+			body: AddPermissionRequest{
+				ZoneID: 123, AllowedActions: []string{"add_record"}, RecordTypes: []string{"txt"},
+			},
+			wantStatus: http.StatusBadRequest,
+			wantBody:   "txt",
 		},
 		{
 			name:      "invalid zone ID",

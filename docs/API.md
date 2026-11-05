@@ -303,7 +303,12 @@ Each scoped API key has associated permissions that define:
 - `get_zone` - Get zone details
 - `list_records` - List records in a zone
 - `add_record` - Add DNS records
+- `update_record` - Update DNS records
 - `delete_record` - Delete DNS records
+
+**Available Record Types** (case-sensitive): `A`, `AAAA`, `CNAME`, `TXT`, `MX`, `SPF`, `Flatten`, `PullZone`, `SRV`, `CAA`, `PTR`, `Script`, `NS`
+
+Both lists are validated when a token or permission is created: an unknown value, a different spelling or case, or an admin-only action gets `400 invalid_request`. The error message names the invalid value, and the hint lists the valid ones.
 
 ### Implemented Endpoints
 
