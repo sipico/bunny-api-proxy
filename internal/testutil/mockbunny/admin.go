@@ -15,7 +15,7 @@ type CreateZoneRequest struct {
 
 // CreateRecordRequest is the request body for POST /admin/zones/{zoneId}/records
 type CreateRecordRequest struct {
-	Type  int    `json:"Type"` // 0 = A, 1 = AAAA, 2 = CNAME, 3 = TXT, 4 = MX, 5 = SPF, 6 = Flatten, 7 = PullZone, 8 = SRV, 9 = CAA, 10 = PTR, 11 = Script, 12 = NS
+	Type  int    `json:"Type"` // 0 = A, 1 = AAAA, 2 = CNAME, 3 = TXT, 4 = MX, 5 = Redirect, 6 = Flatten, 7 = PullZone, 8 = SRV, 9 = CAA, 10 = PTR, 11 = Script, 12 = NS, 13 = SVCB, 14 = HTTPS, 15 = TLSA
 	Name  string `json:"Name"`
 	Value string `json:"Value"`
 	TTL   int32  `json:"Ttl"`

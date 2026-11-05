@@ -160,7 +160,7 @@ func (s *Server) handleDeleteRecord(w http.ResponseWriter, r *http.Request) {
 
 // AddRecordRequest represents the request body for creating a new DNS record.
 type AddRecordRequest struct {
-	Type     int    `json:"Type"` // 0 = A, 1 = AAAA, 2 = CNAME, 3 = TXT, 4 = MX, 5 = SPF, 6 = Flatten, 7 = PullZone, 8 = SRV, 9 = CAA, 10 = PTR, 11 = Script, 12 = NS
+	Type     int    `json:"Type"` // 0 = A, 1 = AAAA, 2 = CNAME, 3 = TXT, 4 = MX, 5 = Redirect, 6 = Flatten, 7 = PullZone, 8 = SRV, 9 = CAA, 10 = PTR, 11 = Script, 12 = NS, 13 = SVCB, 14 = HTTPS, 15 = TLSA
 	Name     string `json:"Name"`
 	Value    string `json:"Value"`
 	TTL      int32  `json:"Ttl"`
@@ -607,7 +607,8 @@ func (s *Server) handleImportRecords(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// recordTypeStringToInt converts a DNS record type string to its integer value.
+// recordTypeStringToInt converts a DNS record type string to its integer value
+// (bunny.net DnsRecordTypes: 5 = Redirect, 6 = Flatten; there is no SPF type).
 // Returns -1 if the type is not recognized.
 func recordTypeStringToInt(typeStr string) int {
 	switch typeStr {
@@ -621,9 +622,9 @@ func recordTypeStringToInt(typeStr string) int {
 		return 3
 	case "MX":
 		return 4
-	case "SPF":
-		return 5
 	case "REDIRECT":
+		return 5
+	case "FLATTEN":
 		return 6
 	case "PULLZONE":
 		return 7
@@ -637,6 +638,12 @@ func recordTypeStringToInt(typeStr string) int {
 		return 11
 	case "NS":
 		return 12
+	case "SVCB":
+		return 13
+	case "HTTPS":
+		return 14
+	case "TLSA":
+		return 15
 	default:
 		return -1
 	}
@@ -990,9 +997,9 @@ func recordTypeName(t int) string {
 	case 4:
 		return "MX"
 	case 5:
-		return "SPF"
-	case 6:
 		return "REDIRECT"
+	case 6:
+		return "FLATTEN"
 	case 7:
 		return "PULLZONE"
 	case 8:
@@ -1005,6 +1012,12 @@ func recordTypeName(t int) string {
 		return "SCRIPT"
 	case 12:
 		return "NS"
+	case 13:
+		return "SVCB"
+	case 14:
+		return "HTTPS"
+	case 15:
+		return "TLSA"
 	default:
 		return "UNKNOWN"
 	}
