@@ -75,19 +75,22 @@ func TestNewInitializesSchema(t *testing.T) {
 	}
 	defer func() { _ = storage.Close() }()
 
-	// Verify config table exists
-	query := "SELECT name FROM sqlite_master WHERE type='table' AND name='config'"
+	// Verify the schema is at the current version and the tokens table exists
+	var version int
+	if err := storage.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil {
+		t.Fatalf("failed to read schema version: %v", err)
+	}
+	if version != SchemaVersion {
+		t.Errorf("schema version = %d, want %d", version, SchemaVersion)
+	}
 	var tableName string
-	err = storage.db.QueryRow(query).Scan(&tableName)
+	err = storage.db.QueryRow("SELECT name FROM sqlite_master WHERE type='table' AND name='tokens'").Scan(&tableName)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			t.Error("config table does not exist")
+			t.Error("tokens table does not exist")
 		} else {
 			t.Fatalf("failed to check table: %v", err)
 		}
-	}
-	if tableName != "config" {
-		t.Errorf("expected table name 'config', got %s", tableName)
 	}
 }
 

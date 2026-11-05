@@ -27,7 +27,17 @@ An API proxy for bunny.net that allows creating scoped/limited API keys. Sits be
 | Web Framework | Chi | Lightweight, idiomatic Go, 100% net/http compatible |
 | Database | SQLite | Zero config, single file, perfect for single-container deployment |
 | SQLite Driver | modernc.org/sqlite | Pure Go, no CGO required, enables simpler builds and cross-compilation |
+| Schema migrations | Small built-in runner (`internal/storage/schema.go`), version in `PRAGMA user_version` | See below |
 | Container Base | Distroless (gcr.io/distroless/static:nonroot) | Minimal attack surface (~2-5 MB), no shell or package manager, immutable, fewer CVEs |
+
+### Schema migrations (issue #301)
+
+| Option | Pros | Cons |
+|--------|------|------|
+| **Built-in runner** (chosen) | No dependency, ~100 lines; all steps in one transaction; legacy databases without a stored version are detected; backup and downgrade guard built in | We maintain it ourselves |
+| golang-migrate / goose | Well known, CLI included | Extra dependency; SQL files to embed; no detection of our pre-versioning databases; per-step transactions by default |
+
+Every release ships all steps, so users can skip releases. Released steps are never edited; new steps are appended and `SchemaVersion` is bumped.
 
 ## Project Policies
 
