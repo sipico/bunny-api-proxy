@@ -381,7 +381,7 @@ jobs:
         env:
           BUNNY_MASTER_API_KEY: ${{ env.MOCK_E2E_KEY }}
         run: |
-          docker compose -f .claude/docker/docker-compose.test.yml down -v
+          docker compose -f .claude/docker/docker-compose.test.yml --profile mock down -v
 
   e2e-test-real-api:
     name: E2E Tests (Real Bunny.net API)
